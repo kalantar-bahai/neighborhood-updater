@@ -397,7 +397,7 @@ function resetToSrp(key) {
 
 function detailItem(label, key, yesNoVal, notesVal) {
   var isYes = (yesNoVal || '').toLowerCase() === 'yes';
-  var isNo  = (yesNoVal || '').toLowerCase() === 'no';
+  var isNo  = !isYes;
   return '<div class="detail-item">' +
     '<div class="q">' + label + '</div>' +
     '<div class="toggle-row">' +
