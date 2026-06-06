@@ -57,7 +57,7 @@ function showPicker(rows, email) {
   var clusterOrder = [];
   var clusterMap = {};
   rows.forEach(function(r) {
-    var c = r.cluster || 'Other';
+    var c = (r.cluster || '').trim() || 'Unspecified';
     if (!clusterMap[c]) { clusterMap[c] = []; clusterOrder.push(c); }
     clusterMap[c].push(r);
   });
