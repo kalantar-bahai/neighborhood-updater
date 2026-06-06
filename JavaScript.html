@@ -77,10 +77,14 @@ function loadNeighborhood(name) {
   google.script.run
     .withSuccessHandler(function(data) {
       document.getElementById('loading-state').style.display = 'none';
-      appState.currentNeighborhood = data.row;
-      appState.srp = data.srp;
-      renderDetail(data);
-      document.getElementById('detail-view').style.display = 'block';
+      try {
+        appState.currentNeighborhood = data.row;
+        appState.srp = data.srp;
+        renderDetail(data);
+        document.getElementById('detail-view').style.display = 'block';
+      } catch(e) {
+        showError('Render error: ' + e.message + ' — ' + e.stack);
+      }
     })
     .withFailureHandler(onError)
     .getNeighborhoodData(name);
@@ -95,7 +99,7 @@ function handleDiscard() {
 
 // ── Utility ───────────────────────────────────────────────────────────────────
 function esc(str) {
-  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return (String(str == null ? '' : str)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function val(id) {
