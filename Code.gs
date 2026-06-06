@@ -21,14 +21,16 @@ function getInitialData() {
     return { error: 'Access denied. Your account (' + auth.email + ') is not authorized.' };
   }
 
-  var rows = auth.rows.map(function(r) {
-    return {
-      neighborhood: r[COL.NEIGHBORHOOD],
-      cluster:      r[COL.CLUSTER],
-      locality:     r[COL.LOCALITY],
-      stage:        r[COL.STAGE]
-    };
-  });
+  var rows = auth.rows
+    .filter(function(r) { return (r[COL.NEIGHBORHOOD] || '').trim() !== ''; })
+    .map(function(r) {
+      return {
+        neighborhood: r[COL.NEIGHBORHOOD],
+        cluster:      r[COL.CLUSTER],
+        locality:     r[COL.LOCALITY],
+        stage:        r[COL.STAGE]
+      };
+    });
 
   return { role: auth.role, rows: rows, email: auth.email };
 }
