@@ -1,0 +1,11 @@
+{
+  "name": "neighborhood",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "push": "clasp push"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  }
+}
