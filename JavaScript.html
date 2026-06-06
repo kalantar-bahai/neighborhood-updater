@@ -150,6 +150,17 @@ function esc(str) {
   return (String(str == null ? '' : str)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function fmtPct(val) {
+  if (val == null || val === '') return '';
+  var s = String(val).trim();
+  var n = parseFloat(s.replace('%', ''));
+  if (isNaN(n)) return s;
+  // If stored as a proportion (e.g. 0.024), convert to percentage
+  if (!s.includes('%') && Math.abs(n) < 1) n = n * 100;
+  // toFixed(2) then strip trailing zeros
+  return +n.toFixed(2) + '%';
+}
+
 function val(id) {
   var el = document.getElementById(id);
   return el ? el.value : '';
@@ -207,8 +218,8 @@ function renderDetail(data) {
   html += field('Total Households', 'f-totalHH',  r.totalHH);
   html += '</div>';
   html += '<div class="row row-2">';
-  html += pairField('Individuals Connected', 'f-indNum', r.indNum, 'f-indPct', r.indPct);
-  html += pairField('Households Connected',  'f-hhNum',  r.hhNum,  'f-hhPct',  r.hhPct);
+  html += pairField('Individuals Connected', 'f-indNum', r.indNum, 'f-indPct', fmtPct(r.indPct));
+  html += pairField('Households Connected',  'f-hhNum',  r.hhNum,  'f-hhPct',  fmtPct(r.hhPct));
   html += '</div>';
   html += '<div class="field"><label>Makeup of Population</label>';
   html += '<textarea id="f-makeup" onchange="setDirty()">' + esc(r.makeup) + '</textarea></div>';
