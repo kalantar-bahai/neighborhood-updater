@@ -25,11 +25,12 @@ function getInitialData() {
     .filter(function(r) { return (r[COL.NEIGHBORHOOD] || '').trim() !== ''; })
     .map(function(r) {
       return {
-        neighborhood: r[COL.NEIGHBORHOOD],
-        grouping:     r[COL.GROUPING],
-        cluster:      r[COL.CLUSTER],
-        locality:     r[COL.LOCALITY],
-        stage:        r[COL.STAGE]
+        neighborhood:       r[COL.NEIGHBORHOOD],
+        parentNeighborhood: r[COL.PARENT_NEIGHBORHOOD],
+        grouping:           r[COL.GROUPING],
+        cluster:            r[COL.CLUSTER],
+        locality:           r[COL.LOCALITY],
+        stage:              r[COL.STAGE]
       };
     });
 

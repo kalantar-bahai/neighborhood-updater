@@ -102,9 +102,24 @@ function showPicker(rows, email) {
       var rowsDiv = document.createElement('div');
       rowsDiv.className = 'cluster-rows';
 
+      // Separate standalone rows from pockets; group pockets by parent
+      var standaloneRows = [];
+      var parentOrder = [];
+      var parentMap = {};
       clusterRows.forEach(function(r) {
+        var p = (r.parentNeighborhood || '').trim();
+        if (!p) {
+          standaloneRows.push(r);
+        } else {
+          if (!parentMap[p]) { parentMap[p] = []; parentOrder.push(p); }
+          parentMap[p].push(r);
+        }
+      });
+      parentOrder.sort(function(a, b) { return a.localeCompare(b); });
+
+      function makeItem(r, isPocket) {
         var item = document.createElement('div');
-        item.className = 'picker-item';
+        item.className = 'picker-item' + (isPocket ? ' pocket-item' : '');
         item.innerHTML =
           '<div>' +
           '  <div class="name">' + esc(r.neighborhood) + '</div>' +
@@ -112,7 +127,17 @@ function showPicker(rows, email) {
           '</div>' +
           '<span class="stage-badge">' + esc(r.stage || '') + '</span>';
         item.onclick = function() { loadNeighborhood(r.neighborhood); };
-        rowsDiv.appendChild(item);
+        return item;
+      }
+
+      standaloneRows.forEach(function(r) { rowsDiv.appendChild(makeItem(r, false)); });
+
+      parentOrder.forEach(function(parentName) {
+        var parentLabel = document.createElement('div');
+        parentLabel.className = 'parent-label';
+        parentLabel.textContent = parentName;
+        rowsDiv.appendChild(parentLabel);
+        parentMap[parentName].forEach(function(r) { rowsDiv.appendChild(makeItem(r, true)); });
       });
 
       header.onclick = function() {

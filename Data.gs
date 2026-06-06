@@ -3,14 +3,14 @@
 // Fallbacks allow Jest to import this file without Config.gs.
 var COL = typeof COL !== 'undefined' ? COL : {
   GROUPING:0,CLUSTER:1,PG:2,CLUSTER_CODE:3,LOCALITY:4,NEIGHBORHOOD:5,
-  STAGE:6,CONTACT:7,EMAIL:8,AUX_BOARD:9,MAKEUP:10,TOTAL_POP:11,TOTAL_HH:12,
-  IND_NUM:13,IND_PCT:14,HH_NUM:15,HH_PCT:16,
-  CC_ACT:17,CC_PART:18,CC_FOF:19,JYG_ACT:20,JYG_PART:21,JYG_FOF:22,
-  SC_ACT:23,SC_PART:24,SC_FOF:25,TOTAL_ED_ACT:26,TOTAL_ED_PART:27,TOTAL_ED_FOF:28,
-  DEV_ACT:29,DEV_PART:30,DEV_FOF:31,TOTAL_ACT:32,TOTAL_PART:33,TOTAL_FOF:34,
-  PROTAGONISTS:35,ACCOMPANIERS:36,LEVEL:37,NOTES_PREVALENCE:38,
-  SUPPORTED:39,NOTES_SUPPORTED:40,PRESENCE:41,NOTES_PRESENCE:42,
-  INVOLVED:43,NOTES_INVOLVED:44,EFFORTS:45,NOTES_EFFORTS:46
+  PARENT_NEIGHBORHOOD:6,STAGE:7,CONTACT:8,EMAIL:9,AUX_BOARD:10,MAKEUP:11,
+  TOTAL_POP:12,TOTAL_HH:13,IND_NUM:14,IND_PCT:15,HH_NUM:16,HH_PCT:17,
+  CC_ACT:18,CC_PART:19,CC_FOF:20,JYG_ACT:21,JYG_PART:22,JYG_FOF:23,
+  SC_ACT:24,SC_PART:25,SC_FOF:26,TOTAL_ED_ACT:27,TOTAL_ED_PART:28,TOTAL_ED_FOF:29,
+  DEV_ACT:30,DEV_PART:31,DEV_FOF:32,TOTAL_ACT:33,TOTAL_PART:34,TOTAL_FOF:35,
+  PROTAGONISTS:36,ACCOMPANIERS:37,LEVEL:38,NOTES_PREVALENCE:39,
+  SUPPORTED:40,NOTES_SUPPORTED:41,PRESENCE:42,NOTES_PRESENCE:43,
+  INVOLVED:44,NOTES_INVOLVED:45,EFFORTS:46,NOTES_EFFORTS:47
 };
 
 var SRP_COL = typeof SRP_COL !== 'undefined' ? SRP_COL : {
@@ -25,8 +25,9 @@ function parseRow(row) {
     pg:              row[COL.PG],
     clusterCode:     row[COL.CLUSTER_CODE],
     locality:        row[COL.LOCALITY],
-    neighborhood:    row[COL.NEIGHBORHOOD],
-    stage:           row[COL.STAGE],
+    neighborhood:       row[COL.NEIGHBORHOOD],
+    parentNeighborhood: row[COL.PARENT_NEIGHBORHOOD],
+    stage:              row[COL.STAGE],
     contact:         row[COL.CONTACT],
     email:           row[COL.EMAIL],
     auxBoard:        row[COL.AUX_BOARD],
@@ -110,6 +111,11 @@ function getRowData(neighborhoodName) {
 
   var srpRows = _getAllSrpRows();
   var srpMatch = findSrpRow(neighborhoodName, srpRows);
+  // If no direct match and row has a parent, try "<parent> - <neighborhood>"
+  if (!srpMatch && masterRow[COL.PARENT_NEIGHBORHOOD]) {
+    var combined = masterRow[COL.PARENT_NEIGHBORHOOD] + ' - ' + neighborhoodName;
+    srpMatch = findSrpRow(combined, srpRows);
+  }
   var srp = parseSrpRow(srpMatch);
 
   return {
