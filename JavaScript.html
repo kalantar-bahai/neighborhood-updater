@@ -221,7 +221,7 @@ function renderDetail(data) {
   html += '</div>';
   html += '<div class="row row-3">';
   html += field('Locality',              'f-locality',     r.locality);
-  html += field('Neighborhood & Pocket', 'f-neighborhood', r.neighborhood);
+  html += field('Neighborhood & Pocket', 'f-neighborhood', r.neighborhood, true);
   html += selectField('Neighborhood Stage', 'f-stage', r.stage, [
     'Emerging Activity', 'Growing Activity', 'Intense Activity (18+ activities)'
   ]);
