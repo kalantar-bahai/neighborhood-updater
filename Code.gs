@@ -34,7 +34,12 @@ function getInitialData() {
       };
     });
 
-  return { role: auth.role, rows: rows, email: auth.email };
+  // Pass SRP names so client can show missing-SRP indicator in picker
+  var srpNames = _getAllSrpRows().map(function(r) {
+    return (r[SRP_COL.NAME] || '').toLowerCase().trim();
+  });
+
+  return { role: auth.role, rows: rows, email: auth.email, srpNames: srpNames };
 }
 
 // Called by client when user selects a neighborhood

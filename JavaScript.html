@@ -4,6 +4,7 @@ var appState = {
   role: null,
   email: null,
   allRows: [],
+  srpNames: [],
   currentNeighborhood: null,
   srp: null,
   isDirty: false
@@ -28,6 +29,7 @@ function onInitialData(data) {
   appState.role = data.role;
   appState.email = data.email;
   appState.allRows = data.rows;
+  appState.srpNames = data.srpNames || [];
 
   if (data.rows.length === 1) {
     loadNeighborhood(data.rows[0].neighborhood);
@@ -103,36 +105,65 @@ function showPicker(rows, email) {
       rowsDiv.className = 'cluster-rows';
 
       // Separate standalone rows from pockets; group pockets by parent
-      var standaloneRows = [];
       var parentOrder = [];
       var parentMap = {};
+      var standaloneMap = {}; // name → row, for standalone items
       clusterRows.forEach(function(r) {
         var p = (r.parentNeighborhood || '').trim();
         if (!p) {
-          standaloneRows.push(r);
+          standaloneMap[r.neighborhood] = r;
         } else {
           if (!parentMap[p]) { parentMap[p] = []; parentOrder.push(p); }
           parentMap[p].push(r);
         }
       });
-      parentOrder.sort(function(a, b) { return a.localeCompare(b); });
+
+      // Build a combined sorted list of entries: standalone rows + parent groups
+      var entries = [];
+      Object.keys(standaloneMap).forEach(function(name) {
+        entries.push({ type: 'standalone', name: name, row: standaloneMap[name] });
+      });
+      parentOrder.forEach(function(p) {
+        entries.push({ type: 'parent', name: p });
+      });
+      entries.sort(function(a, b) { return a.name.localeCompare(b.name); });
+
+      function inSrp(r) {
+        var names = appState.srpNames;
+        var name = (r.neighborhood || '').toLowerCase().trim();
+        if (names.indexOf(name) !== -1) return true;
+        var parent = (r.parentNeighborhood || '').trim();
+        if (parent) {
+          var combined = (parent + ' - ' + r.neighborhood).toLowerCase().trim();
+          if (names.indexOf(combined) !== -1) return true;
+        }
+        return false;
+      }
 
       function makeItem(r, isPocket) {
         var item = document.createElement('div');
         item.className = 'picker-item' + (isPocket ? ' pocket-item' : '');
+        var srpBadge = inSrp(r) ? '' : '<span class="no-srp-badge">SRP</span>';
         item.innerHTML =
           '<div>' +
           '  <div class="name">' + esc(r.neighborhood) + '</div>' +
           '  <div class="sub">' + esc(r.locality) + '</div>' +
           '</div>' +
-          '<span class="stage-badge">' + esc(r.stage || '') + '</span>';
+          '<div style="display:flex;align-items:center;gap:6px">' +
+          srpBadge +
+          '<span class="stage-badge">' + esc(r.stage || '') + '</span>' +
+          '</div>';
         item.onclick = function() { loadNeighborhood(r.neighborhood); };
         return item;
       }
 
-      standaloneRows.forEach(function(r) { rowsDiv.appendChild(makeItem(r, false)); });
-
-      parentOrder.forEach(function(parentName) {
+      entries.forEach(function(entry) {
+        if (entry.type === 'standalone') {
+          rowsDiv.appendChild(makeItem(entry.row, false));
+          return;
+        }
+        var parentName = entry.name;
+        {
         // Find the parent's own row if it exists in the full list
         var parentRow = clusterRows.find(function(r) {
           return (r.neighborhood || '').trim() === parentName && !(r.parentNeighborhood || '').trim();
