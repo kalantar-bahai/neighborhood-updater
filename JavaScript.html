@@ -186,7 +186,34 @@ function renderDetail(data) {
     computeTotal([r.activities.ccs, r.activities.jygs, r.activities.scs, r.activities.devotionals]));
   html += '</tbody></table></div></div>';
 
-  // Workers, Additional Details added in Task 12
+  // Workers & Prevalence
+  html += '<div class="card">';
+  html += '<div class="card-header">Workers &amp; Prevalence</div>';
+  html += '<div class="card-body">';
+  html += '<div class="row row-2">';
+  html += field('Protagonists / Workers',  'f-protagonists', r.protagonists);
+  html += field('Accompaniers in Nucleus', 'f-accompaniers', r.accompaniers);
+  html += '</div>';
+  if (srp && srp.facilitators) {
+    html += '<div class="srp-ref">SRP Facilitators (different measure): <strong>' +
+            esc(srp.facilitators) + '</strong></div>';
+  }
+  html += '<div class="divider"></div>';
+  html += '<div class="field"><label>Prevalence Level</label>' +
+          '<input type="text" id="f-level" value="' + esc(r.level) + '" onchange="setDirty()"></div>';
+  html += '<div class="field"><label>Notes</label>' +
+          '<textarea id="f-notesPrevalence" onchange="setDirty()">' + esc(r.notesPrevalence) + '</textarea></div>';
+  html += '</div></div>';
+
+  // Additional Details
+  html += '<div class="card">';
+  html += '<div class="card-header">Additional Details</div>';
+  html += '<div class="card-body"><div class="detail-grid">';
+  html += detailItem('Assembly Support',                      'supported', r.supported, r.notesSupported);
+  html += detailItem('Social Action Presence',                'presence',  r.presence,  r.notesPresence);
+  html += detailItem('Local Leaders Involved',                'involved',  r.involved,  r.notesInvolved);
+  html += detailItem('Specific Efforts for Spiritual Health', 'efforts',   r.efforts,   r.notesEfforts);
+  html += '</div></div></div>';
 
   document.getElementById('form-container').innerHTML = html;
 }
@@ -305,6 +332,98 @@ function resetToSrp(key) {
   setDirty();
 }
 
-// Placeholder — filled in Task 13
-function handleSave() {}
+function detailItem(label, key, yesNoVal, notesVal) {
+  var isYes = (yesNoVal || '').toLowerCase() === 'yes';
+  var isNo  = (yesNoVal || '').toLowerCase() === 'no';
+  return '<div class="detail-item">' +
+    '<div class="q">' + label + '</div>' +
+    '<div class="toggle-row">' +
+    '<button id="tb-' + key + '-yes" class="tb' + (isYes ? ' yes' : '') + '" onclick="setToggle(\'' + key + '\',\'Yes\')">' +
+    'Yes</button>' +
+    '<button id="tb-' + key + '-no" class="tb' + (isNo ? ' no' : '') + '" onclick="setToggle(\'' + key + '\',\'No\')">' +
+    'No</button>' +
+    '</div>' +
+    '<textarea id="f-notes-' + key + '" onchange="setDirty()">' + esc(notesVal) + '</textarea>' +
+    '</div>';
+}
+
+function setToggle(key, value) {
+  var yBtn = document.getElementById('tb-' + key + '-yes');
+  var nBtn = document.getElementById('tb-' + key + '-no');
+  if (value === 'Yes') { yBtn.className = 'tb yes'; nBtn.className = 'tb'; }
+  else                 { yBtn.className = 'tb';     nBtn.className = 'tb no'; }
+  setDirty();
+}
+
+function getToggleValue(key) {
+  var yBtn = document.getElementById('tb-' + key + '-yes');
+  if (!yBtn) return '';
+  if (yBtn.classList.contains('yes')) return 'Yes';
+  var nBtn = document.getElementById('tb-' + key + '-no');
+  if (nBtn && nBtn.classList.contains('no')) return 'No';
+  return '';
+}
+
+// ── Save ──────────────────────────────────────────────────────────────────────
+function handleSave() {
+  var statusEl = document.getElementById('save-status');
+  var saveBtns = [document.getElementById('save-btn'), document.getElementById('save-btn-footer')];
+  statusEl.textContent = 'Saving...';
+  statusEl.className = 'save-status';
+  saveBtns.forEach(function(b) { if (b) b.disabled = true; });
+
+  var name = appState.currentNeighborhood.neighborhood;
+  var formData = collectFormData();
+
+  google.script.run
+    .withSuccessHandler(function() {
+      appState.isDirty = false;
+      statusEl.textContent = 'Saved successfully';
+      statusEl.className = 'save-status success';
+      saveBtns.forEach(function(b) { if (b) b.disabled = false; });
+      document.getElementById('header-updated').textContent =
+        'Last saved by ' + appState.email + ' on ' + new Date().toLocaleString();
+    })
+    .withFailureHandler(function(err) {
+      statusEl.textContent = 'Save failed: ' + (err.message || err);
+      statusEl.className = 'save-status error';
+      saveBtns.forEach(function(b) { if (b) b.disabled = false; });
+    })
+    .saveNeighborhood(name, formData);
+}
+
+function collectFormData() {
+  return {
+    locality:    val('f-locality'),
+    stage:       val('f-stage'),
+    contact:     val('f-contact'),
+    email:       val('f-email'),
+    auxBoard:    val('f-auxBoard'),
+    makeup:      val('f-makeup'),
+    totalPop:    val('f-totalPop'),
+    totalHH:     val('f-totalHH'),
+    indNum:      val('f-indNum'),
+    indPct:      val('f-indPct'),
+    hhNum:       val('f-hhNum'),
+    hhPct:       val('f-hhPct'),
+    activities: {
+      ccs:         { act: val('f-ccs-act'),         part: val('f-ccs-part'),         fof: val('f-ccs-fof') },
+      jygs:        { act: val('f-jygs-act'),        part: val('f-jygs-part'),        fof: val('f-jygs-fof') },
+      scs:         { act: val('f-scs-act'),         part: val('f-scs-part'),         fof: val('f-scs-fof') },
+      devotionals: { act: val('f-devotionals-act'), part: val('f-devotionals-part'), fof: val('f-devotionals-fof') }
+    },
+    protagonists:    val('f-protagonists'),
+    accompaniers:    val('f-accompaniers'),
+    level:           val('f-level'),
+    notesPrevalence: val('f-notesPrevalence'),
+    supported:       getToggleValue('supported'),
+    notesSupported:  val('f-notes-supported'),
+    presence:        getToggleValue('presence'),
+    notesPresence:   val('f-notes-presence'),
+    involved:        getToggleValue('involved'),
+    notesInvolved:   val('f-notes-involved'),
+    efforts:         getToggleValue('efforts'),
+    notesEfforts:    val('f-notes-efforts')
+  };
+}
 </script>
