@@ -107,7 +107,92 @@ function setDirty() {
   appState.isDirty = true;
 }
 
-// Placeholders — filled in Tasks 10-13
-function renderDetail(data) {}
+// ── Render detail ─────────────────────────────────────────────────────────────
+function renderDetail(data) {
+  var r = data.row;
+  var srp = data.srp;
+
+  document.getElementById('header-name').textContent = r.neighborhood;
+  document.getElementById('header-meta').textContent =
+    r.cluster + ' \xb7 ' + r.clusterCode + ' \xb7 ' + r.locality;
+  document.getElementById('header-updated').textContent =
+    data.lastUpdatedAt
+      ? 'Last saved by ' + data.lastUpdatedBy + ' on ' + new Date(data.lastUpdatedAt).toLocaleString()
+      : '';
+
+  var html = '';
+
+  // Identity
+  html += '<div class="card">';
+  html += '<div class="card-header">Identity</div>';
+  html += '<div class="card-body">';
+  html += '<div class="row row-4">';
+  html += field('Grouping',     'f-grouping',    r.grouping,    true);
+  html += field('Cluster Code', 'f-clusterCode', r.clusterCode, true);
+  html += field('Cluster',      'f-cluster',     r.cluster,     true);
+  html += field('PG',           'f-pg',          r.pg,          true);
+  html += '</div>';
+  html += '<div class="row row-3">';
+  html += field('Locality',              'f-locality',     r.locality);
+  html += field('Neighborhood & Pocket', 'f-neighborhood', r.neighborhood);
+  html += selectField('Neighborhood Stage', 'f-stage', r.stage, [
+    'Emerging Activity', 'Growing Activity', 'Intense Activity (18+ activities)'
+  ]);
+  html += '</div>';
+  html += '<div class="row row-3">';
+  html += field('Neighborhood Contact',      'f-contact',  r.contact);
+  html += field('Contact Email',             'f-email',    r.email,    false, 'email');
+  html += field('Auxiliary Board Member(s)', 'f-auxBoard', r.auxBoard);
+  html += '</div>';
+  html += '</div></div>';
+
+  // Population
+  html += '<div class="card">';
+  html += '<div class="card-header">Population</div>';
+  html += '<div class="card-body">';
+  html += '<div class="row row-2">';
+  html += field('Total Population', 'f-totalPop', r.totalPop);
+  html += field('Total Households', 'f-totalHH',  r.totalHH);
+  html += '</div>';
+  html += '<div class="row row-2">';
+  html += pairField('Individuals Connected', 'f-indNum', r.indNum, 'f-indPct', r.indPct);
+  html += pairField('Households Connected',  'f-hhNum',  r.hhNum,  'f-hhPct',  r.hhPct);
+  html += '</div>';
+  html += '<div class="field"><label>Makeup of Population</label>';
+  html += '<textarea id="f-makeup" onchange="setDirty()">' + esc(r.makeup) + '</textarea></div>';
+  html += '</div></div>';
+
+  // Activities, Workers, Additional Details added in Tasks 11-12
+  // (placeholder so form renders during testing)
+
+  document.getElementById('form-container').innerHTML = html;
+}
+
+function field(label, id, value, readonly, type) {
+  var roClass = readonly ? ' class="ro"' : '';
+  var roAttr  = readonly ? ' readonly'   : '';
+  var t = type || 'text';
+  return '<div class="field"><label>' + label + '</label>' +
+    '<input type="' + t + '" id="' + id + '" value="' + esc(value) + '"' +
+    roClass + roAttr + ' onchange="setDirty()"></div>';
+}
+
+function selectField(label, id, value, options) {
+  var opts = options.map(function(o) {
+    return '<option' + (o === value ? ' selected' : '') + '>' + esc(o) + '</option>';
+  }).join('');
+  return '<div class="field"><label>' + label + '</label>' +
+    '<select id="' + id + '" onchange="setDirty()">' + opts + '</select></div>';
+}
+
+function pairField(label, idNum, valNum, idPct, valPct) {
+  return '<div class="pair-field"><label>' + label + '</label>' +
+    '<div class="pair-inputs">' +
+    '<input type="text" id="' + idNum + '" value="' + esc(valNum) + '" placeholder="#" onchange="setDirty()">' +
+    '<input type="text" id="' + idPct + '" value="' + esc(valPct) + '" placeholder="%" class="pct" onchange="setDirty()">' +
+    '</div></div>';
+}
+
+// Placeholder — filled in Task 13
 function handleSave() {}
 </script>
