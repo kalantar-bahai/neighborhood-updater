@@ -162,8 +162,31 @@ function renderDetail(data) {
   html += '<textarea id="f-makeup" onchange="setDirty()">' + esc(r.makeup) + '</textarea></div>';
   html += '</div></div>';
 
-  // Activities, Workers, Additional Details added in Tasks 11-12
-  // (placeholder so form renders during testing)
+  // Activities
+  var srpActs = srp || {};
+  var srpDate = srp ? 'SRP synced' : 'No SRP data';
+  html += '<div class="card">';
+  html += '<div class="card-header">Educational Activities &amp; Devotionals';
+  html += '<span class="srp-badge">' + srpDate + '</span></div>';
+  html += '<div class="card-body">';
+  html += '<div class="sync-note">Numbers pre-filled from SRP where available. ' +
+          'Edit any value to override — overridden values are highlighted amber with the SRP figure for reference.</div>';
+  html += '<table class="act-table"><thead><tr>' +
+    '<th class="left">Activity</th>' +
+    '<th>Active</th><th>Participants</th><th>Friends of the Faith</th>' +
+    '<th class="srp-col">SRP</th>' +
+    '</tr></thead><tbody>';
+  html += actRow("Children's Classes (CCs)", 'ccs',         r.activities.ccs,         srpActs.ccs);
+  html += actRow('Junior Youth Groups (JYGs)', 'jygs',      r.activities.jygs,        srpActs.jygs);
+  html += actRow('Study Circles (SCs)', 'scs',              r.activities.scs,         srpActs.scs);
+  html += totalRow('Total Educational Activities',
+    computeTotal([r.activities.ccs, r.activities.jygs, r.activities.scs]));
+  html += actRow('Devotionals', 'devotionals',              r.activities.devotionals, srpActs.devotionals);
+  html += totalRow('Total Activities',
+    computeTotal([r.activities.ccs, r.activities.jygs, r.activities.scs, r.activities.devotionals]));
+  html += '</tbody></table></div></div>';
+
+  // Workers, Additional Details added in Task 12
 
   document.getElementById('form-container').innerHTML = html;
 }
@@ -191,6 +214,95 @@ function pairField(label, idNum, valNum, idPct, valPct) {
     '<input type="text" id="' + idNum + '" value="' + esc(valNum) + '" placeholder="#" onchange="setDirty()">' +
     '<input type="text" id="' + idPct + '" value="' + esc(valPct) + '" placeholder="%" class="pct" onchange="setDirty()">' +
     '</div></div>';
+}
+
+function actRow(label, key, userVals, srpVals) {
+  var uAct  = userVals ? (userVals.act  || '') : '';
+  var uPart = userVals ? (userVals.part || '') : '';
+  var uFof  = userVals ? (userVals.fof  || '') : '';
+  var sAct  = srpVals ? (srpVals.act  || '') : null;
+  var sPart = srpVals ? (srpVals.part || '') : null;
+  var sFof  = srpVals ? (srpVals.fof  || '') : null;
+  var actDiffers  = sAct  !== null && String(uAct).trim()  !== String(sAct).trim();
+  var partDiffers = sPart !== null && String(uPart).trim() !== String(sPart).trim();
+  var fofDiffers  = sFof  !== null && String(uFof).trim()  !== String(sFof).trim();
+  var anyDiffers  = actDiffers || partDiffers || fofDiffers;
+  var srpText = sAct !== null ? sAct + ' / ' + sPart + ' / ' + sFof : 'not in SRP';
+  var row = '<tr><td class="row-label">' + label + '</td>';
+  row += actCell('f-' + key + '-act',  uAct,  actDiffers);
+  row += actCell('f-' + key + '-part', uPart, partDiffers);
+  row += actCell('f-' + key + '-fof',  uFof,  fofDiffers);
+  row += '<td class="srp-cell' + (anyDiffers ? ' differs' : '') + '">' + srpText;
+  if (anyDiffers) {
+    row += ' <button class="reset-btn" onclick="resetToSrp(\'' + key + '\')">reset</button>';
+  }
+  row += '</td></tr>';
+  return row;
+}
+
+function actCell(id, value, differs) {
+  var cls = differs ? ' class="overridden"' : '';
+  return '<td><input type="number" id="' + id + '" value="' + esc(value) + '"' +
+    cls + ' onchange="setDirty(); updateTotals()"></td>';
+}
+
+function totalRow(label, totals) {
+  var slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return '<tr class="total-row"><td class="row-label">' + label + '</td>' +
+    '<td><input class="plain" type="number" id="total-' + slug + '-act"  value="' + totals.act  + '" readonly></td>' +
+    '<td><input class="plain" type="number" id="total-' + slug + '-part" value="' + totals.part + '" readonly></td>' +
+    '<td><input class="plain" type="number" id="total-' + slug + '-fof"  value="' + totals.fof  + '" readonly></td>' +
+    '<td class="srp-cell">—</td></tr>';
+}
+
+function computeTotal(actsList) {
+  return actsList.reduce(function(acc, a) {
+    acc.act  += parseInt(a && a.act  || 0, 10);
+    acc.part += parseInt(a && a.part || 0, 10);
+    acc.fof  += parseInt(a && a.fof  || 0, 10);
+    return acc;
+  }, { act: 0, part: 0, fof: 0 });
+}
+
+function updateTotals() {
+  var edTotal = computeTotalFromInputs(['ccs', 'jygs', 'scs']);
+  setTotalInputs('total-educational-activities', edTotal);
+  var allTotal = computeTotalFromInputs(['ccs', 'jygs', 'scs', 'devotionals']);
+  setTotalInputs('total-activities', allTotal);
+}
+
+function computeTotalFromInputs(keys) {
+  return keys.reduce(function(acc, key) {
+    var aEl = document.getElementById('f-' + key + '-act');
+    var pEl = document.getElementById('f-' + key + '-part');
+    var fEl = document.getElementById('f-' + key + '-fof');
+    acc.act  += parseInt(aEl && aEl.value  || 0, 10);
+    acc.part += parseInt(pEl && pEl.value  || 0, 10);
+    acc.fof  += parseInt(fEl && fEl.value  || 0, 10);
+    return acc;
+  }, { act: 0, part: 0, fof: 0 });
+}
+
+function setTotalInputs(prefix, totals) {
+  var aEl = document.getElementById(prefix + '-act');
+  var pEl = document.getElementById(prefix + '-part');
+  var fEl = document.getElementById(prefix + '-fof');
+  if (aEl) aEl.value = totals.act;
+  if (pEl) pEl.value = totals.part;
+  if (fEl) fEl.value = totals.fof;
+}
+
+function resetToSrp(key) {
+  var srp = appState.srp;
+  if (!srp || !srp[key]) return;
+  var aEl = document.getElementById('f-' + key + '-act');
+  var pEl = document.getElementById('f-' + key + '-part');
+  var fEl = document.getElementById('f-' + key + '-fof');
+  if (aEl) { aEl.value = srp[key].act || ''; aEl.classList.remove('overridden'); }
+  if (pEl) { pEl.value = srp[key].part || ''; pEl.classList.remove('overridden'); }
+  if (fEl) { fEl.value = srp[key].fof || ''; fEl.classList.remove('overridden'); }
+  updateTotals();
+  setDirty();
 }
 
 // Placeholder — filled in Task 13
