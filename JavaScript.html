@@ -223,7 +223,7 @@ function renderDetail(data) {
   html += field('Locality',              'f-locality',     r.locality);
   html += field('Neighborhood & Pocket', 'f-neighborhood', r.neighborhood, true);
   html += selectField('Neighborhood Stage', 'f-stage', r.stage, [
-    'Emerging Activity', 'Focus Neighborhood', 'Intense Activity (18+ activities)'
+    '', 'Emerging Activity', 'Focus Neighborhood', 'Intense Activity (18+ activities)'
   ]);
   html += '</div>';
   html += '<div class="row row-3">';
@@ -316,7 +316,8 @@ function field(label, id, value, readonly, type) {
 
 function selectField(label, id, value, options) {
   var opts = options.map(function(o) {
-    return '<option' + (o === value ? ' selected' : '') + '>' + esc(o) + '</option>';
+    var isSelected = o === (value || '');
+    return '<option value="' + esc(o) + '"' + (isSelected ? ' selected' : '') + '>' + (o || '—') + '</option>';
   }).join('');
   return '<div class="field"><label>' + label + '</label>' +
     '<select id="' + id + '" onchange="setDirty()">' + opts + '</select></div>';
