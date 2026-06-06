@@ -143,7 +143,7 @@ function saveRowData(neighborhoodName, formData, userEmail) {
   var props = {};
   props['lastUpdatedBy_' + neighborhoodName] = userEmail;
   props['lastUpdatedAt_' + neighborhoodName] = new Date().toISOString();
-  PropertiesService.getDocumentProperties().setProperties(props);
+  PropertiesService.getScriptProperties().setProperties(props);
 
   return { success: true };
 }

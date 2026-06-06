@@ -1,9 +1,13 @@
 function doGet() {
-  return HtmlService
-    .createTemplateFromFile('Index')
-    .evaluate()
-    .setTitle('Neighborhood Detail')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  try {
+    return HtmlService
+      .createTemplateFromFile('Index')
+      .evaluate()
+      .setTitle('Neighborhood Detail')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } catch(e) {
+    return HtmlService.createHtmlOutput('<pre>Error: ' + e.message + '\n' + e.stack + '</pre>');
+  }
 }
 
 function include(filename) {
@@ -41,7 +45,7 @@ function getNeighborhoodData(neighborhoodName) {
   var data = getRowData(neighborhoodName);
   if (!data) throw new Error('Neighborhood not found: ' + neighborhoodName);
 
-  var props = PropertiesService.getDocumentProperties().getProperties();
+  var props = PropertiesService.getScriptProperties().getProperties();
   data.lastUpdatedBy = props['lastUpdatedBy_' + neighborhoodName] || '';
   data.lastUpdatedAt = props['lastUpdatedAt_' + neighborhoodName] || '';
 
