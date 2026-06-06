@@ -26,6 +26,7 @@ function getInitialData() {
     .map(function(r) {
       return {
         neighborhood: r[COL.NEIGHBORHOOD],
+        grouping:     r[COL.GROUPING],
         cluster:      r[COL.CLUSTER],
         locality:     r[COL.LOCALITY],
         stage:        r[COL.STAGE]
