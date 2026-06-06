@@ -1,0 +1,113 @@
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+var appState = {
+  role: null,
+  email: null,
+  allRows: [],
+  currentNeighborhood: null,
+  srp: null,
+  isDirty: false
+};
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+window.addEventListener('load', function() {
+  google.script.run
+    .withSuccessHandler(onInitialData)
+    .withFailureHandler(onError)
+    .getInitialData();
+});
+
+function onInitialData(data) {
+  document.getElementById('loading-state').style.display = 'none';
+
+  if (data.error) {
+    showError(data.error);
+    return;
+  }
+
+  appState.role = data.role;
+  appState.email = data.email;
+  appState.allRows = data.rows;
+
+  if (data.rows.length === 1) {
+    loadNeighborhood(data.rows[0].neighborhood);
+  } else {
+    showPicker(data.rows, data.email);
+  }
+}
+
+function onError(err) {
+  showError(err.message || String(err));
+}
+
+function showError(msg) {
+  document.getElementById('loading-state').style.display = 'none';
+  var el = document.getElementById('error-state');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+// ── Picker ───────────────────────────────────────────────────────────────────
+function showPicker(rows, email) {
+  document.getElementById('picker-email').textContent = email;
+  var list = document.getElementById('picker-list');
+  list.innerHTML = '';
+  rows.forEach(function(r) {
+    var item = document.createElement('div');
+    item.className = 'picker-item';
+    item.innerHTML =
+      '<div>' +
+      '  <div class="name">' + esc(r.neighborhood) + '</div>' +
+      '  <div class="sub">' + esc(r.cluster) + ' \xb7 ' + esc(r.locality) + '</div>' +
+      '</div>' +
+      '<span class="stage-badge">' + esc(r.stage || '') + '</span>';
+    item.onclick = function() { loadNeighborhood(r.neighborhood); };
+    list.appendChild(item);
+  });
+  document.getElementById('picker-view').style.display = 'block';
+}
+
+// ── Load neighborhood ─────────────────────────────────────────────────────────
+function loadNeighborhood(name) {
+  document.getElementById('picker-view').style.display = 'none';
+  document.getElementById('detail-view').style.display = 'none';
+  document.getElementById('loading-state').style.display = 'block';
+  document.getElementById('loading-state').textContent = 'Loading ' + name + '...';
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      document.getElementById('loading-state').style.display = 'none';
+      appState.currentNeighborhood = data.row;
+      appState.srp = data.srp;
+      renderDetail(data);
+      document.getElementById('detail-view').style.display = 'block';
+    })
+    .withFailureHandler(onError)
+    .getNeighborhoodData(name);
+}
+
+// ── Discard ───────────────────────────────────────────────────────────────────
+function handleDiscard() {
+  if (appState.isDirty && !confirm('Discard all unsaved changes?')) return;
+  appState.isDirty = false;
+  loadNeighborhood(appState.currentNeighborhood.neighborhood);
+}
+
+// ── Utility ───────────────────────────────────────────────────────────────────
+function esc(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function val(id) {
+  var el = document.getElementById(id);
+  return el ? el.value : '';
+}
+
+function setDirty() {
+  appState.isDirty = true;
+}
+
+// Placeholders — filled in Tasks 10-13
+function renderDetail(data) {}
+function handleSave() {}
+</script>
