@@ -1,0 +1,6 @@
+node_modules/**
+tests/**
+docs/**
+.superpowers/**
+package.json
+package-lock.json
