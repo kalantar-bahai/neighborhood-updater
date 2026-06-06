@@ -78,6 +78,48 @@ function parseSrpRow(row) {
   };
 }
 
+// Apps Script: read all rows from master sheet
+function _getAllMasterRows() {
+  var ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+  var sheet = ss.getSheetByName(MASTER_TAB);
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  var numRows = lastRow - MASTER_DATA_ROW + 1;
+  if (numRows < 1) return [];
+  return sheet.getRange(MASTER_DATA_ROW, 1, numRows, lastCol).getValues();
+}
+
+// Apps Script: read all rows from SRP cache sheet
+function _getAllSrpRows() {
+  var ss = SpreadsheetApp.openById(SRP_SHEET_ID);
+  var sheet = ss.getSheetByName(SRP_TAB);
+  var lastRow = sheet.getLastRow();
+  var numRows = lastRow - SRP_DATA_ROW + 1;
+  if (numRows < 1) return [];
+  return sheet.getRange(SRP_DATA_ROW, 1, numRows, 17).getValues();
+}
+
+// Returns parsed row data + SRP data for a given neighborhood name
+function getRowData(neighborhoodName) {
+  var masterRows = _getAllMasterRows();
+  var masterRow = masterRows.find(function(r) {
+    return (r[COL.NEIGHBORHOOD] || '').toLowerCase().trim() ===
+           (neighborhoodName || '').toLowerCase().trim();
+  });
+  if (!masterRow) return null;
+
+  var srpRows = _getAllSrpRows();
+  var srpMatch = findSrpRow(neighborhoodName, srpRows);
+  var srp = parseSrpRow(srpMatch);
+
+  return {
+    row: parseRow(masterRow),
+    srp: srp,
+    lastUpdatedBy: '',
+    lastUpdatedAt: ''
+  };
+}
+
 if (typeof module !== 'undefined') {
   module.exports = { parseRow: parseRow, findSrpRow: findSrpRow, parseSrpRow: parseSrpRow };
 }
