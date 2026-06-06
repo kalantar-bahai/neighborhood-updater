@@ -82,12 +82,22 @@ function loadNeighborhood(name) {
         appState.srp = data.srp;
         renderDetail(data);
         document.getElementById('detail-view').style.display = 'block';
+        var backBtn = document.getElementById('back-btn');
+        if (backBtn) backBtn.style.display = appState.allRows.length > 1 ? 'block' : 'none';
       } catch(e) {
         showError('Render error: ' + e.message + ' — ' + e.stack);
       }
     })
     .withFailureHandler(onError)
     .getNeighborhoodData(name);
+}
+
+// ── Back to picker ────────────────────────────────────────────────────────────
+function handleBack() {
+  if (appState.isDirty && !confirm('You have unsaved changes. Go back anyway?')) return;
+  appState.isDirty = false;
+  document.getElementById('detail-view').style.display = 'none';
+  document.getElementById('picker-view').style.display = 'block';
 }
 
 // ── Discard ───────────────────────────────────────────────────────────────────

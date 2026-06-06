@@ -23,10 +23,13 @@
   <!-- Detail view (shown after row is selected) -->
   <div id="detail-view">
     <div class="page-header">
-      <div>
-        <h1 id="header-name"></h1>
-        <div class="meta" id="header-meta"></div>
-        <div class="last-updated" id="header-updated"></div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button id="back-btn" onclick="handleBack()" style="display:none;background:rgba(255,255,255,0.2);border:none;color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px">&larr; All neighborhoods</button>
+        <div>
+          <h1 id="header-name"></h1>
+          <div class="meta" id="header-meta"></div>
+          <div class="last-updated" id="header-updated"></div>
+        </div>
       </div>
       <button class="save-btn" id="save-btn" onclick="handleSave()">Save to spreadsheet</button>
     </div>
