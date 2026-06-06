@@ -52,18 +52,56 @@ function showPicker(rows, email) {
   document.getElementById('picker-email').textContent = email;
   var list = document.getElementById('picker-list');
   list.innerHTML = '';
+
+  // Group by cluster, preserving order of first appearance
+  var clusterOrder = [];
+  var clusterMap = {};
   rows.forEach(function(r) {
-    var item = document.createElement('div');
-    item.className = 'picker-item';
-    item.innerHTML =
-      '<div>' +
-      '  <div class="name">' + esc(r.neighborhood) + '</div>' +
-      '  <div class="sub">' + esc(r.cluster) + ' \xb7 ' + esc(r.locality) + '</div>' +
-      '</div>' +
-      '<span class="stage-badge">' + esc(r.stage || '') + '</span>';
-    item.onclick = function() { loadNeighborhood(r.neighborhood); };
-    list.appendChild(item);
+    var c = r.cluster || 'Other';
+    if (!clusterMap[c]) { clusterMap[c] = []; clusterOrder.push(c); }
+    clusterMap[c].push(r);
   });
+
+  clusterOrder.forEach(function(clusterName) {
+    var clusterRows = clusterMap[clusterName];
+
+    // Cluster header
+    var header = document.createElement('div');
+    header.className = 'cluster-header';
+    header.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px">' +
+      '  <span class="cluster-arrow">▶</span>' +
+      '  <span class="cluster-name">' + esc(clusterName) + '</span>' +
+      '</div>' +
+      '<span class="cluster-count">' + clusterRows.length + ' neighborhood' + (clusterRows.length !== 1 ? 's' : '') + '</span>';
+
+    // Neighborhood rows container
+    var rowsDiv = document.createElement('div');
+    rowsDiv.className = 'cluster-rows';
+
+    clusterRows.forEach(function(r) {
+      var item = document.createElement('div');
+      item.className = 'picker-item';
+      item.innerHTML =
+        '<div>' +
+        '  <div class="name">' + esc(r.neighborhood) + '</div>' +
+        '  <div class="sub">' + esc(r.locality) + '</div>' +
+        '</div>' +
+        '<span class="stage-badge">' + esc(r.stage || '') + '</span>';
+      item.onclick = function() { loadNeighborhood(r.neighborhood); };
+      rowsDiv.appendChild(item);
+    });
+
+    header.onclick = function() {
+      var isOpen = rowsDiv.classList.contains('open');
+      rowsDiv.classList.toggle('open', !isOpen);
+      header.classList.toggle('open', !isOpen);
+    };
+
+    list.appendChild(header);
+    list.appendChild(rowsDiv);
+  });
+
   document.getElementById('picker-view').style.display = 'block';
 }
 

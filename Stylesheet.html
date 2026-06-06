@@ -79,11 +79,19 @@
   .picker-container { max-width: 600px; margin: 40px auto; padding: 0 16px; }
   .picker-title { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
   .picker-sub { font-size: 13px; color: #718096; margin-bottom: 20px; }
-  .picker-item { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+  .cluster-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #ebf4ff; border: 1px solid #bee3f8; border-radius: 8px; margin-bottom: 4px; cursor: pointer; user-select: none; }
+  .cluster-header:hover { background: #dbeafe; }
+  .cluster-header .cluster-name { font-weight: 700; font-size: 14px; color: #2b6cb0; }
+  .cluster-header .cluster-count { font-size: 12px; color: #718096; }
+  .cluster-header .cluster-arrow { font-size: 12px; color: #718096; transition: transform 0.15s; }
+  .cluster-header.open .cluster-arrow { transform: rotate(90deg); }
+  .cluster-rows { display: none; margin-bottom: 8px; }
+  .cluster-rows.open { display: block; }
+  .picker-item { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px 10px 24px; margin-bottom: 4px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
   .picker-item:hover { border-color: #4299e1; background: #ebf8ff; }
-  .picker-item .name { font-weight: 600; font-size: 14px; }
-  .picker-item .sub { font-size: 12px; color: #718096; margin-top: 2px; }
-  .stage-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: #c6f6d5; color: #276749; }
+  .picker-item .name { font-weight: 600; font-size: 13px; }
+  .picker-item .sub { font-size: 11px; color: #718096; margin-top: 1px; }
+  .stage-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: #c6f6d5; color: #276749; flex-shrink: 0; margin-left: 8px; }
 
   /* States */
   .error-state { text-align: center; padding: 60px 20px; color: #e53e3e; }
