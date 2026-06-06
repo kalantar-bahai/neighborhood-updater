@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neighborhood Detail</title>
+  <?!= include('Stylesheet'); ?>
+</head>
+<body>
+
+  <div id="loading-state" class="loading-state">Loading...</div>
+  <div id="error-state" class="error-state" style="display:none"></div>
+
+  <!-- Row picker (shown when user has access to multiple rows) -->
+  <div id="picker-view">
+    <div class="picker-container">
+      <div class="picker-title">My Neighborhoods</div>
+      <div class="picker-sub" id="picker-email"></div>
+      <div id="picker-list"></div>
+    </div>
+  </div>
+
+  <!-- Detail view (shown after row is selected) -->
+  <div id="detail-view">
+    <div class="page-header">
+      <div>
+        <h1 id="header-name"></h1>
+        <div class="meta" id="header-meta"></div>
+        <div class="last-updated" id="header-updated"></div>
+      </div>
+      <button class="save-btn" id="save-btn" onclick="handleSave()">Save to spreadsheet</button>
+    </div>
+
+    <div class="container" id="form-container"></div>
+
+    <div class="footer">
+      <span class="save-status" id="save-status"></span>
+      <button class="btn-cancel" onclick="handleDiscard()">Discard changes</button>
+      <button class="btn-save" id="save-btn-footer" onclick="handleSave()">Save to spreadsheet</button>
+    </div>
+  </div>
+
+  <?!= include('JavaScript'); ?>
+</body>
+</html>
