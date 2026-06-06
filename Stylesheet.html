@@ -88,8 +88,15 @@
   .cluster-header.open .cluster-arrow { transform: rotate(90deg); }
   .cluster-rows { display: none; margin-bottom: 8px; }
   .cluster-rows.open { display: block; }
-  .parent-label { font-size: 11px; font-weight: 700; color: #4a5568; padding: 8px 14px 3px; text-transform: uppercase; letter-spacing: 0.4px; }
-  .pocket-item { padding-left: 32px; }
+  .parent-item { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; margin-bottom: 4px; display: flex; align-items: center; gap: 0; }
+  .parent-item .parent-arrow { font-size: 11px; color: #a0aec0; cursor: pointer; padding: 0 10px 0 0; transition: transform 0.15s; flex-shrink: 0; }
+  .parent-item .parent-arrow.open { transform: rotate(90deg); }
+  .parent-item .parent-name { font-weight: 600; font-size: 13px; cursor: pointer; flex: 1; }
+  .parent-item .parent-name:hover { color: #3182ce; }
+  .parent-item .stage-badge { flex-shrink: 0; margin-left: 8px; }
+  .pocket-rows { display: none; margin-bottom: 4px; }
+  .pocket-rows.open { display: block; }
+  .pocket-item { padding-left: 32px; border-left: 2px solid #e2e8f0; border-radius: 0 8px 8px 0; margin-bottom: 3px; }
   .picker-item { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px 10px 24px; margin-bottom: 4px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
   .picker-item:hover { border-color: #4299e1; background: #ebf8ff; }
   .picker-item .name { font-weight: 600; font-size: 13px; }

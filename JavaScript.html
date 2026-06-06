@@ -133,11 +133,49 @@ function showPicker(rows, email) {
       standaloneRows.forEach(function(r) { rowsDiv.appendChild(makeItem(r, false)); });
 
       parentOrder.forEach(function(parentName) {
-        var parentLabel = document.createElement('div');
-        parentLabel.className = 'parent-label';
-        parentLabel.textContent = parentName;
-        rowsDiv.appendChild(parentLabel);
-        parentMap[parentName].forEach(function(r) { rowsDiv.appendChild(makeItem(r, true)); });
+        // Find the parent's own row if it exists in the full list
+        var parentRow = clusterRows.find(function(r) {
+          return (r.neighborhood || '').trim() === parentName && !(r.parentNeighborhood || '').trim();
+        });
+
+        // Parent row with toggle triangle + clickable name
+        var parentEl = document.createElement('div');
+        parentEl.className = 'parent-item';
+
+        var arrow = document.createElement('span');
+        arrow.className = 'parent-arrow';
+        arrow.textContent = '▶';
+
+        var nameEl = document.createElement('span');
+        nameEl.className = 'parent-name';
+        nameEl.textContent = parentName;
+
+        var badge = document.createElement('span');
+        badge.className = 'stage-badge';
+        badge.textContent = parentRow ? (parentRow.stage || '') : '';
+
+        parentEl.appendChild(arrow);
+        parentEl.appendChild(nameEl);
+        parentEl.appendChild(badge);
+
+        // Pocket list (hidden by default)
+        var pocketDiv = document.createElement('div');
+        pocketDiv.className = 'pocket-rows';
+        parentMap[parentName].forEach(function(r) { pocketDiv.appendChild(makeItem(r, true)); });
+
+        arrow.onclick = function(e) {
+          e.stopPropagation();
+          var isOpen = pocketDiv.classList.contains('open');
+          pocketDiv.classList.toggle('open', !isOpen);
+          arrow.classList.toggle('open', !isOpen);
+        };
+
+        if (parentRow) {
+          nameEl.onclick = function() { loadNeighborhood(parentRow.neighborhood); };
+        }
+
+        rowsDiv.appendChild(parentEl);
+        rowsDiv.appendChild(pocketDiv);
       });
 
       header.onclick = function() {
