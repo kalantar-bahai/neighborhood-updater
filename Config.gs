@@ -3,10 +3,11 @@ var SRP_SHEET_ID    = '1w8eRljld_O4vkSPNwRuKWO6YL7uJIJXZ3AtqWUPi5Eo';
 
 var MASTER_TAB      = 'Neighborhoods';
 var ACCESS_TAB      = 'GlobalAccess';
-var SRP_TAB         = 'Sheet1';
+var DEV_TAB         = 'Devotionals';
+var EDU_TAB         = 'Education';
 
 var MASTER_DATA_ROW = 4; // 1-based: data starts here
-var SRP_DATA_ROW    = 4;
+var SRP_DATA_ROW    = 2; // both cache tabs have header row 1, data from row 2
 
 var COL = {
   GROUPING:           0,
@@ -59,19 +60,18 @@ var COL = {
   NOTES_EFFORTS:      47
 };
 
-var SRP_COL = {
-  NAME:         0,
-  CC_ACT:       1,
-  CC_PART:      2,
-  CC_FOF:       3,
-  JYG_ACT:      4,
-  JYG_PART:     5,
-  JYG_FOF:      6,
-  SC_ACT:       7,
-  SC_PART:      8,
-  SC_FOF:       9,
-  FACILITATORS: 10,
-  DEV_ACT:      14,
-  DEV_PART:     15,
-  DEV_FOF:      16
+// Devotionals tab column layout
+var DEV_COL = {
+  NAME: 0, LATIN_NAME: 1, LOCALITY: 2, ELECTORAL_UNIT: 3, CLUSTER: 4,
+  GROUP_OF_CLUSTERS: 5, SUBREGION: 6, REGION: 7, GROUP_OF_REGIONS: 8,
+  NATIONAL_COMMUNITY: 9, DEV_ACT: 10, DEV_PART: 11, DEV_FOF: 12, COMMENTS: 13
+};
+
+// Education tab column layout
+var EDU_COL = {
+  NAME: 0,
+  CC_ACT: 1,  CC_PART: 2,  CC_FOF: 3,
+  JYG_ACT: 4, JYG_PART: 5, JYG_FOF: 6,
+  SC_ACT: 7,  SC_PART: 8,  SC_FOF: 9,
+  FACILITATORS: 10
 };

@@ -14,7 +14,6 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-// Called by client on page load
 function getInitialData() {
   var auth = getAuthorizedRows();
   if (auth.role === 'none') {
@@ -34,9 +33,8 @@ function getInitialData() {
       };
     });
 
-  // Pass SRP names so client can show missing-SRP indicator in picker
-  var srpNames = _getAllSrpRows().map(function(r) {
-    return (r[SRP_COL.NAME] || '').toLowerCase().trim();
+  var srpNames = _getAllDevRows().map(function(r) {
+    return (r[DEV_COL.NAME] || '').toLowerCase().trim();
   });
 
   return { role: auth.role, rows: rows, email: auth.email, srpNames: srpNames };
@@ -61,7 +59,6 @@ function getNeighborhoodData(neighborhoodName) {
   return data;
 }
 
-// Called by client on save
 function saveNeighborhood(neighborhoodName, formData) {
   var auth = getAuthorizedRows();
   var allowed = auth.role === 'global' || auth.rows.some(function(r) {

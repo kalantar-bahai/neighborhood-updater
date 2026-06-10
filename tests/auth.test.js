@@ -28,15 +28,17 @@ describe('_getContactRowIndices', () => {
     ['', '', '', '', '', 'Gamma', '', 'Alice', 'alice@x.com']
   ];
 
+  const EMAIL_COL = 8; // COL.EMAIL
+
   test('returns indices of rows matching email', () => {
-    expect(_getContactRowIndices('alice@x.com', rows)).toEqual([0, 2]);
+    expect(_getContactRowIndices('alice@x.com', rows, EMAIL_COL)).toEqual([0, 2]);
   });
 
   test('is case-insensitive', () => {
-    expect(_getContactRowIndices('BOB@X.COM', rows)).toEqual([1]);
+    expect(_getContactRowIndices('BOB@X.COM', rows, EMAIL_COL)).toEqual([1]);
   });
 
   test('returns empty array for no match', () => {
-    expect(_getContactRowIndices('nobody@x.com', rows)).toEqual([]);
+    expect(_getContactRowIndices('nobody@x.com', rows, EMAIL_COL)).toEqual([]);
   });
 });

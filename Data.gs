@@ -13,9 +13,14 @@ var COL = typeof COL !== 'undefined' ? COL : {
   INVOLVED:44,NOTES_INVOLVED:45,EFFORTS:46,NOTES_EFFORTS:47
 };
 
-var SRP_COL = typeof SRP_COL !== 'undefined' ? SRP_COL : {
+var DEV_COL = typeof DEV_COL !== 'undefined' ? DEV_COL : {
+  NAME:0,LATIN_NAME:1,LOCALITY:2,ELECTORAL_UNIT:3,CLUSTER:4,
+  GROUP_OF_CLUSTERS:5,SUBREGION:6,REGION:7,GROUP_OF_REGIONS:8,
+  NATIONAL_COMMUNITY:9,DEV_ACT:10,DEV_PART:11,DEV_FOF:12,COMMENTS:13
+};
+var EDU_COL = typeof EDU_COL !== 'undefined' ? EDU_COL : {
   NAME:0,CC_ACT:1,CC_PART:2,CC_FOF:3,JYG_ACT:4,JYG_PART:5,JYG_FOF:6,
-  SC_ACT:7,SC_PART:8,SC_FOF:9,FACILITATORS:10,DEV_ACT:14,DEV_PART:15,DEV_FOF:16
+  SC_ACT:7,SC_PART:8,SC_FOF:9,FACILITATORS:10
 };
 
 function parseRow(row) {
@@ -61,44 +66,114 @@ function parseRow(row) {
   };
 }
 
-function findSrpRow(neighborhoodName, srpRows) {
-  var name = (neighborhoodName || '').toLowerCase().trim();
-  return srpRows.find(function(row) {
-    return (row[SRP_COL.NAME] || '').toLowerCase().trim() === name;
+function findSrpRow(name, rows, nameCol) {
+  var needle = (name || '').toLowerCase().trim();
+  return rows.find(function(row) {
+    return (row[nameCol] || '').toLowerCase().trim() === needle;
   }) || null;
 }
 
-function parseSrpRow(row) {
-  if (!row) return null;
+function parseSrpData(devRow, eduRow) {
+  if (!devRow && !eduRow) return null;
   return {
-    facilitators: row[SRP_COL.FACILITATORS],
-    ccs:          { act: row[SRP_COL.CC_ACT],  part: row[SRP_COL.CC_PART],  fof: row[SRP_COL.CC_FOF] },
-    jygs:         { act: row[SRP_COL.JYG_ACT], part: row[SRP_COL.JYG_PART], fof: row[SRP_COL.JYG_FOF] },
-    scs:          { act: row[SRP_COL.SC_ACT],  part: row[SRP_COL.SC_PART],  fof: row[SRP_COL.SC_FOF] },
-    devotionals:  { act: row[SRP_COL.DEV_ACT], part: row[SRP_COL.DEV_PART], fof: row[SRP_COL.DEV_FOF] }
+    facilitators: eduRow ? eduRow[EDU_COL.FACILITATORS] : '',
+    ccs:  eduRow ? { act: eduRow[EDU_COL.CC_ACT],  part: eduRow[EDU_COL.CC_PART],  fof: eduRow[EDU_COL.CC_FOF]  } : null,
+    jygs: eduRow ? { act: eduRow[EDU_COL.JYG_ACT], part: eduRow[EDU_COL.JYG_PART], fof: eduRow[EDU_COL.JYG_FOF] } : null,
+    scs:  eduRow ? { act: eduRow[EDU_COL.SC_ACT],  part: eduRow[EDU_COL.SC_PART],  fof: eduRow[EDU_COL.SC_FOF]  } : null,
+    devotionals: devRow ? { act: devRow[DEV_COL.DEV_ACT], part: devRow[DEV_COL.DEV_PART], fof: devRow[DEV_COL.DEV_FOF] } : null
   };
 }
 
-// Apps Script: read all rows from master sheet
-function _getAllMasterRows() {
-  var ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
-  var sheet = ss.getSheetByName(MASTER_TAB);
-  var lastRow = sheet.getLastRow();
-  var lastCol = sheet.getLastColumn();
-  var numRows = lastRow - MASTER_DATA_ROW + 1;
-  if (numRows < 1) return [];
-  return sheet.getRange(MASTER_DATA_ROW, 1, numRows, lastCol).getValues();
+// ── Sheets API via service account ───────────────────────────────────────────
+
+var _saToken_ = null;
+
+function _getServiceAccountToken() {
+  if (_saToken_) return _saToken_;
+  var key = JSON.parse(PropertiesService.getScriptProperties().getProperty('SERVICE_ACCOUNT'));
+  var now = Math.floor(Date.now() / 1000);
+  var header = Utilities.base64EncodeWebSafe(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  var claim  = Utilities.base64EncodeWebSafe(JSON.stringify({
+    iss: key.client_email,
+    scope: 'https://www.googleapis.com/auth/spreadsheets',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now
+  }));
+  var toSign = header + '.' + claim;
+  var sig = Utilities.base64EncodeWebSafe(Utilities.computeRsaSha256Signature(toSign, key.private_key));
+  var jwt = toSign + '.' + sig;
+  var resp = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+    method: 'post',
+    contentType: 'application/x-www-form-urlencoded',
+    payload: 'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=' + jwt,
+    muteHttpExceptions: true
+  });
+  _saToken_ = JSON.parse(resp.getContentText()).access_token;
+  return _saToken_;
 }
 
-// Apps Script: read all rows from SRP cache sheet
-function _getAllSrpRows() {
-  var ss = SpreadsheetApp.openById(SRP_SHEET_ID);
-  var sheet = ss.getSheetByName(SRP_TAB);
-  var lastRow = sheet.getLastRow();
-  var numRows = lastRow - SRP_DATA_ROW + 1;
-  if (numRows < 1) return [];
-  return sheet.getRange(SRP_DATA_ROW, 1, numRows, 17).getValues();
+function _sheetsGet(spreadsheetId, range) {
+  var token = _getServiceAccountToken();
+  var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId +
+            '/values/' + encodeURIComponent(range);
+  var resp = UrlFetchApp.fetch(url, {
+    headers: { 'Authorization': 'Bearer ' + token },
+    muteHttpExceptions: true
+  });
+  var data = JSON.parse(resp.getContentText());
+  return data.values || [];
 }
+
+function _sheetsUpdateCells(spreadsheetId, sheetName, sheetRow, updates) {
+  var token = _getServiceAccountToken();
+  var data = updates.map(function(u) {
+    return { range: sheetName + '!' + _colLetter(u.col) + sheetRow, values: [[u.value]] };
+  });
+  UrlFetchApp.fetch(
+    'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values:batchUpdate',
+    {
+      method: 'post',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      payload: JSON.stringify({ valueInputOption: 'RAW', data: data }),
+      muteHttpExceptions: true
+    }
+  );
+}
+
+function _colLetter(index) {
+  var letter = '';
+  index++;
+  while (index > 0) {
+    var rem = (index - 1) % 26;
+    letter = String.fromCharCode(65 + rem) + letter;
+    index = Math.floor((index - 1) / 26);
+  }
+  return letter;
+}
+
+function _normalizeRow(row, numCols) {
+  var r = row ? row.slice() : [];
+  while (r.length < numCols) r.push('');
+  return r;
+}
+
+// ── Sheet readers ─────────────────────────────────────────────────────────────
+
+// COL goes up to index 47 = column AV
+function _getAllMasterRows() {
+  var rows = _sheetsGet(MASTER_SHEET_ID, MASTER_TAB + '!A' + MASTER_DATA_ROW + ':AV');
+  return rows.map(function(r) { return _normalizeRow(r, 48); });
+}
+
+function _getCacheRows(sheetId, tabName, numCols, dataRow) {
+  var endCol = _colLetter(numCols - 1);
+  var rows = _sheetsGet(sheetId, tabName + '!A' + dataRow + ':' + endCol);
+  return rows.map(function(r) { return _normalizeRow(r, numCols); });
+}
+
+function _getAllDevRows() { return _getCacheRows(SRP_SHEET_ID, DEV_TAB, 14, SRP_DATA_ROW); }
+function _getAllEduRows() { return _getCacheRows(SRP_SHEET_ID, EDU_TAB, 11, SRP_DATA_ROW); }
 
 // Returns parsed row data + SRP data for a given neighborhood name
 function getRowData(neighborhoodName) {
@@ -109,14 +184,19 @@ function getRowData(neighborhoodName) {
   });
   if (!masterRow) return null;
 
-  var srpRows = _getAllSrpRows();
-  var srpMatch = findSrpRow(neighborhoodName, srpRows);
-  // If no direct match and row has a parent, try "<parent> - <neighborhood>"
-  if (!srpMatch && masterRow[COL.PARENT_NEIGHBORHOOD]) {
-    var combined = masterRow[COL.PARENT_NEIGHBORHOOD] + ' - ' + neighborhoodName;
-    srpMatch = findSrpRow(combined, srpRows);
+  var devRows = _getAllDevRows();
+  var eduRows = _getAllEduRows();
+
+  function lookup(rows, nameCol) {
+    var match = findSrpRow(neighborhoodName, rows, nameCol);
+    if (!match && masterRow[COL.PARENT_NEIGHBORHOOD]) {
+      var combined = masterRow[COL.PARENT_NEIGHBORHOOD] + ' - ' + neighborhoodName;
+      match = findSrpRow(combined, rows, nameCol);
+    }
+    return match;
   }
-  var srp = parseSrpRow(srpMatch);
+
+  var srp = parseSrpData(lookup(devRows, DEV_COL.NAME), lookup(eduRows, EDU_COL.NAME));
 
   return {
     row: parseRow(masterRow),
@@ -127,24 +207,15 @@ function getRowData(neighborhoodName) {
 }
 
 function saveRowData(neighborhoodName, formData, userEmail) {
-  var ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
-  var sheet = ss.getSheetByName(MASTER_TAB);
-  var lastRow = sheet.getLastRow();
-  var numRows = lastRow - MASTER_DATA_ROW + 1;
-  var allRows = sheet.getRange(MASTER_DATA_ROW, 1, numRows, sheet.getLastColumn()).getValues();
-
+  var allRows = _getAllMasterRows();
   var rowIndex = allRows.findIndex(function(r) {
     return (r[COL.NEIGHBORHOOD] || '').toLowerCase().trim() ===
            (neighborhoodName || '').toLowerCase().trim();
   });
   if (rowIndex === -1) throw new Error('Row not found: ' + neighborhoodName);
 
-  var sheetRow = MASTER_DATA_ROW + rowIndex; // 1-based sheet row
-  var updates = buildRowUpdate(formData);
-
-  updates.forEach(function(u) {
-    sheet.getRange(sheetRow, u.col + 1).setValue(u.value); // col is 0-based, getRange is 1-based
-  });
+  var sheetRow = MASTER_DATA_ROW + rowIndex;
+  _sheetsUpdateCells(MASTER_SHEET_ID, MASTER_TAB, sheetRow, buildRowUpdate(formData));
 
   var props = {};
   props['lastUpdatedBy_' + neighborhoodName] = userEmail;
@@ -197,5 +268,5 @@ function buildRowUpdate(formData) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { parseRow: parseRow, findSrpRow: findSrpRow, parseSrpRow: parseSrpRow };
+  module.exports = { parseRow: parseRow, findSrpRow: findSrpRow, parseSrpData: parseSrpData };
 }

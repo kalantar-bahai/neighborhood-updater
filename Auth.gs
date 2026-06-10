@@ -1,45 +1,37 @@
 // Auth.gs
 
-// Fallback for COL when running in Node/Jest (Apps Script globals not available)
-var COL = typeof COL !== 'undefined' ? COL : { EMAIL: 8 };
-
 // Pure functions — exported for testing via module.exports at end of file
 function _isGlobalUser(email, globalList) {
   var norm = email.toLowerCase().trim();
   return globalList.some(function(e) { return (e || '').toLowerCase().trim() === norm; });
 }
 
-function _getContactRowIndices(email, rows) {
+function _getContactRowIndices(email, rows, emailCol) {
   var norm = email.toLowerCase().trim();
   return rows.reduce(function(acc, row, i) {
-    if ((row[COL.EMAIL] || '').toLowerCase().trim() === norm) acc.push(i);
+    if ((row[emailCol] || '').toLowerCase().trim() === norm) acc.push(i);
     return acc;
   }, []);
 }
 
-// Apps Script entry point
+// Apps Script entry point — identity comes from Google (USER_ACCESSING)
 function getAuthorizedRows() {
   var email = Session.getActiveUser().getEmail();
-  var ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
 
-  var globalSheet = ss.getSheetByName(ACCESS_TAB);
-  var globalList = globalSheet.getDataRange().getValues().flat().filter(Boolean);
+  var globalRows = _sheetsGet(MASTER_SHEET_ID, ACCESS_TAB + '!A:A');
+  var globalList = globalRows.reduce(function(acc, r) {
+    if (r[0]) acc.push(r[0]);
+    return acc;
+  }, []);
 
-  var dataSheet = ss.getSheetByName(MASTER_TAB);
-  var lastRow = dataSheet.getLastRow();
-  var lastCol = dataSheet.getLastColumn();
-  var numDataRows = lastRow - MASTER_DATA_ROW + 1;
-  if (numDataRows < 1) return { role: 'none', rows: [], email: email };
-
-  var allRows = dataSheet
-    .getRange(MASTER_DATA_ROW, 1, numDataRows, lastCol)
-    .getValues();
+  var allRows = _getAllMasterRows();
+  if (allRows.length === 0) return { role: 'none', rows: [], email: email };
 
   if (_isGlobalUser(email, globalList)) {
     return { role: 'global', rows: allRows, email: email };
   }
 
-  var indices = _getContactRowIndices(email, allRows);
+  var indices = _getContactRowIndices(email, allRows, COL.EMAIL);
   if (indices.length === 0) return { role: 'none', rows: [], email: email };
 
   return {

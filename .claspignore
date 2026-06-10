@@ -2,5 +2,6 @@ node_modules/**
 tests/**
 docs/**
 .superpowers/**
+srp-cache/**
 package.json
 package-lock.json

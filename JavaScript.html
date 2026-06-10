@@ -12,17 +12,34 @@ var appState = {
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 window.addEventListener('load', function() {
+  _loadInitialData(0);
+});
+
+function _loadInitialData(attempt) {
   google.script.run
     .withSuccessHandler(onInitialData)
-    .withFailureHandler(onError)
+    .withFailureHandler(function(err) {
+      var msg = (err.message || String(err)).toLowerCase();
+      var isPermErr = msg.indexOf('permission') !== -1 || msg.indexOf('urlfetch') !== -1 ||
+                      msg.indexOf('external_request') !== -1;
+      if (attempt === 0 && isPermErr) {
+        setTimeout(function() { _loadInitialData(1); }, 2000);
+      } else {
+        onError(err);
+      }
+    })
     .getInitialData();
-});
+}
 
 function onInitialData(data) {
   document.getElementById('loading-state').style.display = 'none';
 
   if (data.error) {
-    showError(data.error);
+    var appUrl = window.location.href.split('?')[0];
+    var chooserUrl = 'https://accounts.google.com/AccountChooser?continue=' + encodeURIComponent(appUrl);
+    var multiAccountNote = '<br><br>If you have multiple Google accounts, your browser may have ' +
+      'used the wrong one. <a href="' + chooserUrl + '">Sign in with a different account</a>.';
+    showError(data.error, multiAccountNote);
     return;
   }
 
@@ -42,10 +59,10 @@ function onError(err) {
   showError(err.message || String(err));
 }
 
-function showError(msg) {
+function showError(msg, extraHtml) {
   document.getElementById('loading-state').style.display = 'none';
   var el = document.getElementById('error-state');
-  el.textContent = msg;
+  el.innerHTML = esc(msg) + (extraHtml || '');
   el.style.display = 'block';
 }
 
@@ -118,6 +135,9 @@ function showPicker(rows, email) {
         }
       });
 
+      // Parents appear in both maps; remove them from standaloneMap so they only render once
+      parentOrder.forEach(function(p) { delete standaloneMap[p]; });
+
       // Build a combined sorted list of entries: standalone rows + parent groups
       var entries = [];
       Object.keys(standaloneMap).forEach(function(name) {
@@ -163,7 +183,6 @@ function showPicker(rows, email) {
           return;
         }
         var parentName = entry.name;
-        {
         // Find the parent's own row if it exists in the full list
         var parentRow = clusterRows.find(function(r) {
           return (r.neighborhood || '').trim() === parentName && !(r.parentNeighborhood || '').trim();
@@ -376,7 +395,7 @@ function renderDetail(data) {
   html += field('Accompaniers in Nucleus', 'f-accompaniers', r.accompaniers);
   html += '</div>';
   if (srp && srp.facilitators) {
-    html += '<div class="srp-ref">SRP Facilitators (different measure): <strong>' +
+    html += '<div class="srp-ref">SRP Facilitators: <strong>' +
             esc(srp.facilitators) + '</strong></div>';
   }
   html += '<div class="divider"></div>';

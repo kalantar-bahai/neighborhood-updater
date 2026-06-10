@@ -1,2 +1,6 @@
+tmp/
 node_modules/
 .clasp.json
+srp-cache/.env
+srp-cache/session.json
+srp-cache/exports/
