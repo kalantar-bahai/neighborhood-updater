@@ -111,9 +111,9 @@ function TotalRow({ label, totals }: { label: string; totals: { act: number; par
   return (
     <tr className="total-row">
       <td className="row-label">{label}</td>
-      <td><input className="plain" type="number" value={totals.act} readOnly /></td>
-      <td><input className="plain" type="number" value={totals.part} readOnly /></td>
-      <td><input className="plain" type="number" value={totals.fof} readOnly /></td>
+      <td><input className="plain" type="text" value={totals.act} readOnly /></td>
+      <td><input className="plain" type="text" value={totals.part} readOnly /></td>
+      <td><input className="plain" type="text" value={totals.fof} readOnly /></td>
       <td className="srp-cell">—</td>
     </tr>
   );
