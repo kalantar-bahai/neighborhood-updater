@@ -208,7 +208,7 @@ export default function DetailView({ detail, email, showBack, onBack, onSaved }:
           {showBack && <button className="back-btn" onClick={onBack}>← Back</button>}
           <div style={{ minWidth: 0 }}>
             <h1>{row.neighborhood}</h1>
-            <div className="meta">{row.cluster} · {row.clusterCode} · {row.locality}</div>
+            <div className="meta">{row.clusterCode} · {row.cluster} · {row.locality}</div>
             {updatedLine && <div className="last-updated">{updatedLine}</div>}
           </div>
         </div>
