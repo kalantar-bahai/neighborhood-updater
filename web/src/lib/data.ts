@@ -75,7 +75,7 @@ export function parseRow(row: string[]) {
   };
 }
 
-function findSrpRow(name: string, rows: string[][], nameCol: number) {
+export function findSrpRow(name: string, rows: string[][], nameCol: number) {
   const needle = norm(name);
   return rows.find(r => norm(r[nameCol]) === needle) ?? null;
 }
