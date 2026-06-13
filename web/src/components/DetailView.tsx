@@ -7,6 +7,7 @@ interface Props {
   detail: NeighborhoodDetail;
   email: string;
   showBack: boolean;
+  spreadsheetUrl: string;
   onBack: () => void;
   onSaved: (savedBy: string, savedAt: string) => void;
 }
@@ -137,7 +138,7 @@ function ToggleItem({ label, value, notes, onToggle, onNotes }: {
   );
 }
 
-export default function DetailView({ detail, email, showBack, onBack, onSaved }: Props) {
+export default function DetailView({ detail, email, showBack, spreadsheetUrl, onBack, onSaved }: Props) {
   const { row, srp } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   const [isDirty, setIsDirty] = useState(false);
@@ -213,6 +214,9 @@ export default function DetailView({ detail, email, showBack, onBack, onSaved }:
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+          <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            Open sheet ↗
+          </a>
           <button onClick={() => window.location.href = '/signout'} style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
             Sign out
           </button>

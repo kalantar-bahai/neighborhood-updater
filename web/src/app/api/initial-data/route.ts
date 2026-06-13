@@ -33,5 +33,7 @@ export const GET = auth(async (req) => {
   const devRows = await getAllDevRows();
   const srpNames = devRows.map(r => (r[DEV_COL.NAME] || '').toLowerCase().trim());
 
-  return NextResponse.json({ role, rows: authorizedRows, email, srpNames });
+  const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${process.env.MASTER_SHEET_ID}`;
+
+  return NextResponse.json({ role, rows: authorizedRows, email, srpNames, spreadsheetUrl });
 });

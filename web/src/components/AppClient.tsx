@@ -63,6 +63,7 @@ export default function AppClient() {
         detail={detail}
         email={initialData.email}
         showBack={initialData.rows.length > 1}
+        spreadsheetUrl={initialData.spreadsheetUrl}
         onBack={handleBack}
         onSaved={() => {}}
       />
