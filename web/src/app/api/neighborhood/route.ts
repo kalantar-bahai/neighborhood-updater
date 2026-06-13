@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getAuthorizedRows } from '@/lib/access';
 import { getRowData, saveRowData } from '@/lib/data';
@@ -6,7 +6,7 @@ import { COL } from '@/lib/config';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
-export const GET = auth(async (req: NextRequest) => {
+export const GET = auth(async (req) => {
   if (!req.auth?.user?.email) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
@@ -24,7 +24,7 @@ export const GET = auth(async (req: NextRequest) => {
   return NextResponse.json(data);
 });
 
-export const POST = auth(async (req: NextRequest) => {
+export const POST = auth(async (req) => {
   if (!req.auth?.user?.email) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
