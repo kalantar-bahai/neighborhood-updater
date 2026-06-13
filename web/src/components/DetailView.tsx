@@ -212,7 +212,12 @@ export default function DetailView({ detail, email, showBack, onBack, onSaved }:
             {updatedLine && <div className="last-updated">{updatedLine}</div>}
           </div>
         </div>
-        <button className="save-btn" disabled={saving} onClick={handleSave}>Save</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+          <button onClick={() => window.location.href = '/api/auth/signout'} style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
+            Sign out
+          </button>
+          <button className="save-btn" disabled={saving} onClick={handleSave}>Save</button>
+        </div>
       </div>
 
       <div className="container">

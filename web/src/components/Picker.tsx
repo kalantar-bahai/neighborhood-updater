@@ -8,9 +8,10 @@ interface Props {
   email: string;
   srpNames: string[];
   onSelect: (name: string) => void;
+  onSignOut: () => void;
 }
 
-export default function Picker({ rows, email, srpNames, onSelect }: Props) {
+export default function Picker({ rows, email, srpNames, onSelect, onSignOut }: Props) {
   const [openClusters, setOpenClusters] = useState<Set<string>>(new Set());
   const [openPockets, setOpenPockets] = useState<Set<string>>(new Set());
 
@@ -68,7 +69,12 @@ export default function Picker({ rows, email, srpNames, onSelect }: Props) {
 
   return (
     <div className="picker-container">
-      <div className="picker-title">My Neighborhoods</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <div className="picker-title">My Neighborhoods</div>
+        <button onClick={onSignOut} style={{ fontSize: 12, color: '#718096', background: 'none', border: '1px solid #cbd5e0', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
+          Sign out
+        </button>
+      </div>
       <div className="picker-sub">{email}</div>
 
       {groupingOrder.map(gName => {

@@ -40,7 +40,17 @@ export default function AppClient() {
   }
 
   if (error) {
-    return <div className="error-state">{error}</div>;
+    return (
+      <div className="error-state">
+        <div>{error}</div>
+        <button
+          onClick={() => window.location.href = '/api/auth/signout'}
+          style={{ marginTop: 16, fontSize: 13, color: '#3182ce', background: 'none', border: '1px solid #bee3f8', borderRadius: 6, padding: '6px 16px', cursor: 'pointer' }}
+        >
+          Login with a different account
+        </button>
+      </div>
+    );
   }
 
   if (!initialData || loadingDetail) {
@@ -65,6 +75,7 @@ export default function AppClient() {
       email={initialData.email}
       srpNames={initialData.srpNames}
       onSelect={loadNeighborhood}
+      onSignOut={() => window.location.href = '/api/auth/signout'}
     />
   );
 }
