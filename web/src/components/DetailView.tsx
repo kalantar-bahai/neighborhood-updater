@@ -19,13 +19,12 @@ function rowToForm(row: NeighborhoodRow): FormState {
   return rest;
 }
 
-function fmtPct(val: string) {
-  if (!val) return '';
-  const s = val.trim();
-  const n = parseFloat(s.replace('%', ''));
-  if (isNaN(n)) return s;
-  const pct = !s.includes('%') && Math.abs(n) < 1 ? n * 100 : n;
-  return +pct.toFixed(2) + '%';
+function computedPct(connected: string, total: string): string {
+  const c = parseFloat(connected);
+  const t = parseFloat(total);
+  if (!c || !t || t === 0) return '';
+  const pct = (c / t) * 100;
+  return (pct <= 1.0 ? +pct.toFixed(2) : +pct.toFixed(1)) + '%';
 }
 
 function actTotal(acts: (Activity | undefined)[]) {
@@ -66,16 +65,16 @@ function SelectField({ label, value, options, onChange }: {
   );
 }
 
-function PairField({ label, numVal, pctVal, onNumChange, onPctChange }: {
+function PairField({ label, numVal, pctVal, onNumChange, pctReadonly }: {
   label: string; numVal: string; pctVal: string;
-  onNumChange: (v: string) => void; onPctChange: (v: string) => void;
+  onNumChange: (v: string) => void; pctReadonly?: boolean;
 }) {
   return (
     <div className="pair-field">
       <label>{label}</label>
       <div className="pair-inputs">
         <input type="text" value={numVal || ''} placeholder="#" onChange={e => onNumChange(e.target.value)} />
-        <input type="text" value={pctVal || ''} placeholder="%" className="pct" onChange={e => onPctChange(e.target.value)} />
+        <input type="text" value={pctVal || ''} placeholder="%" className={`pct${pctReadonly ? ' ro' : ''}`} readOnly={pctReadonly} />
       </div>
     </div>
   );
@@ -260,13 +259,13 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
             <div className="field-grid-2">
               <PairField
                 label="Individuals Connected"
-                numVal={form.indNum} pctVal={fmtPct(form.indPct)}
-                onNumChange={v => set('indNum', v)} onPctChange={v => set('indPct', v)}
+                numVal={form.indNum} pctVal={computedPct(form.indNum, form.totalPop)}
+                onNumChange={v => set('indNum', v)} pctReadonly
               />
               <PairField
                 label="Households Connected"
-                numVal={form.hhNum} pctVal={fmtPct(form.hhPct)}
-                onNumChange={v => set('hhNum', v)} onPctChange={v => set('hhPct', v)}
+                numVal={form.hhNum} pctVal={computedPct(form.hhNum, form.totalHH)}
+                onNumChange={v => set('hhNum', v)} pctReadonly
               />
             </div>
             <div className="field">
