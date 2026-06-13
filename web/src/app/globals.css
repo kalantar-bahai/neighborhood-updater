@@ -145,7 +145,7 @@
   border-color: #4299e1;
   box-shadow: 0 0 0 3px rgba(66,153,225,0.15);
 }
-.field input.ro { background: #f7fafc; color: #718096; }
+.field input.ro, .pair-inputs input.ro { background: #f7fafc; color: #718096; }
 .field textarea { resize: vertical; min-height: 60px; }
 
 /* ── Pair fields ──────────────────────────────────────────────────────────── */
