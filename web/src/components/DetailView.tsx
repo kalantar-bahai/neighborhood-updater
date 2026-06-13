@@ -233,19 +233,14 @@ export default function DetailView({ detail, email, showBack, onBack, onSaved }:
               <Field label="PG"           value={row.pg}          readonly />
             </div>
             <div className="field-grid-3">
-              <Field label="Locality"              value={form.locality}    onChange={v => set('locality', v)} />
+              <Field label="Locality"              value={row.locality}    readonly />
               <Field label="Neighborhood & Pocket" value={row.neighborhood} readonly />
-              <SelectField
-                label="Neighborhood Stage"
-                value={form.stage}
-                options={['', 'Emerging Activity', 'Focus Neighborhood', 'Intense Activity (18+ activities)']}
-                onChange={v => set('stage', v)}
-              />
+              <Field label="Neighborhood Stage"    value={row.stage}       readonly />
             </div>
             <div className="field-grid-3">
-              <Field label="Neighborhood Contact"      value={form.contact}  onChange={v => set('contact', v)} />
-              <Field label="Contact Email"             value={form.email}    onChange={v => set('email', v)} type="email" />
-              <Field label="Auxiliary Board Member(s)" value={form.auxBoard} onChange={v => set('auxBoard', v)} />
+              <Field label="Neighborhood Contact"      value={row.contact}  readonly />
+              <Field label="Contact Email"             value={row.email}    readonly />
+              <Field label="Auxiliary Board Member(s)" value={row.auxBoard} readonly />
             </div>
           </div>
         </div>
