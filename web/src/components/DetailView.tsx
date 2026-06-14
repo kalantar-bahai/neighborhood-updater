@@ -124,7 +124,7 @@ function ToggleItem({ label, value, notes, onToggle, onNotes }: {
   onToggle: (v: string) => void; onNotes: (v: string) => void;
 }) {
   const isYes = (value || '').toLowerCase() === 'yes';
-  const isNo  = (value || '').toLowerCase() === 'no';
+  const isNo  = !isYes;
   return (
     <div className="detail-item">
       <div className="q">{label}</div>
