@@ -50,6 +50,8 @@ export interface NeighborhoodRow {
   notesInvolved: string;
   efforts: string;
   notesEfforts: string;
+  gatherings: string;
+  notesGatherings: string;
 }
 
 export interface SrpData {

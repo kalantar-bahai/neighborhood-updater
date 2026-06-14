@@ -15,8 +15,8 @@ function normalize(row: string[], numCols: number): string[] {
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
 export async function getAllMasterRows() {
-  const rows = await sheetsGet(MASTER_SHEET_ID, `${MASTER_TAB}!A${MASTER_DATA_ROW}:AV`);
-  return rows.map(r => normalize(r, 48));
+  const rows = await sheetsGet(MASTER_SHEET_ID, `${MASTER_TAB}!A${MASTER_DATA_ROW}:AX`);
+  return rows.map(r => normalize(r, 50));
 }
 
 export async function getGlobalList() {
@@ -70,8 +70,10 @@ export function parseRow(row: string[]) {
     notesPresence:   row[COL.NOTES_PRESENCE],
     involved:        row[COL.INVOLVED],
     notesInvolved:   row[COL.NOTES_INVOLVED],
-    efforts:         row[COL.EFFORTS],
-    notesEfforts:    row[COL.NOTES_EFFORTS],
+    efforts:          row[COL.EFFORTS],
+    notesEfforts:     row[COL.NOTES_EFFORTS],
+    gatherings:       row[COL.GATHERINGS],
+    notesGatherings:  row[COL.NOTES_GATHERINGS],
   };
 }
 
@@ -142,6 +144,7 @@ export async function saveRowData(neighborhoodName: string, formData: Record<str
     [COL.PRESENCE, d.presence], [COL.NOTES_PRESENCE, d.notesPresence],
     [COL.INVOLVED, d.involved], [COL.NOTES_INVOLVED, d.notesInvolved],
     [COL.EFFORTS, d.efforts], [COL.NOTES_EFFORTS, d.notesEfforts],
+    [COL.GATHERINGS, d.gatherings], [COL.NOTES_GATHERINGS, d.notesGatherings],
   ].map(([col, value]) => ({
     range: `${MASTER_TAB}!${colLetter(col as number)}${sheetRow}`,
     values: [[value ?? '']],

@@ -336,14 +336,10 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
           <div className="card-header">Additional Details</div>
           <div className="card-body">
             <div className="detail-grid">
-              <ToggleItem label="Assembly Support" value={form.supported} notes={form.notesSupported}
-                onToggle={v => set('supported', v)} onNotes={v => set('notesSupported', v)} />
               <ToggleItem label="Social Action Presence" value={form.presence} notes={form.notesPresence}
                 onToggle={v => set('presence', v)} onNotes={v => set('notesPresence', v)} />
-              <ToggleItem label="Local Leaders Involved" value={form.involved} notes={form.notesInvolved}
-                onToggle={v => set('involved', v)} onNotes={v => set('notesInvolved', v)} />
-              <ToggleItem label="Specific Efforts for Spiritual Health" value={form.efforts} notes={form.notesEfforts}
-                onToggle={v => set('efforts', v)} onNotes={v => set('notesEfforts', v)} />
+              <ToggleItem label="Gatherings / Festivals" value={form.gatherings} notes={form.notesGatherings}
+                onToggle={v => set('gatherings', v)} onNotes={v => set('notesGatherings', v)} />
             </div>
           </div>
         </div>
