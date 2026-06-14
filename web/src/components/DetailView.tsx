@@ -146,16 +146,16 @@ function ToggleItem({ label, value, notes, onToggle, onNotes }: {
   );
 }
 
-// Ring centers are shifted so the overall bounding box is centered in the 540×310 viewBox:
-// horizontal: left edge at 70, right edge at 470 (70px margin each side)
-// vertical:   top edge at 55, bottom edge at 255 (55px margin each side)
+// Bounding box centered in 540×310 viewBox (70px h-margin, 55px v-margin each side).
+// textY = top of ring at tx + 16, where top = cy - ry×√(1−((tx−cx)/rx)²)
+// This places each label at a consistent distance below the ring's upper arc at its text x.
 const RINGS = [
   { cx: 270, cy: 155, rx: 200, ry: 100, fill: '#dbeafe', textFill: '#1e3a8a', tx: 286, textY:  71 },
   { cx: 250, cy: 163, rx: 168, ry:  84, fill: '#bfdbfe', textFill: '#1e3a8a', tx: 266, textY:  95 },
   { cx: 230, cy: 171, rx: 136, ry:  68, fill: '#93c5fd', textFill: '#1e3a8a', tx: 246, textY: 119 },
-  { cx: 210, cy: 179, rx: 104, ry:  52, fill: '#60a5fa', textFill: '#1e3a8a', tx: 226, textY: 143 },
-  { cx: 190, cy: 187, rx:  72, ry:  36, fill: '#2563eb', textFill: '#ffffff', tx: 206, textY: 167 },
-  { cx: 170, cy: 195, rx:  40, ry:  20, fill: '#1e3a8a', textFill: '#ffffff', tx: 186, textY: 199 },
+  { cx: 210, cy: 179, rx: 104, ry:  52, fill: '#60a5fa', textFill: '#1e3a8a', tx: 226, textY: 144 },
+  { cx: 190, cy: 187, rx:  72, ry:  36, fill: '#2563eb', textFill: '#ffffff', tx: 206, textY: 168 },
+  { cx: 170, cy: 195, rx:  40, ry:  20, fill: '#1e3a8a', textFill: '#ffffff', tx: 186, textY: 193 },
 ];
 
 function formatNum(v: string): string {
