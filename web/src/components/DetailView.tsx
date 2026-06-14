@@ -173,7 +173,7 @@ function ConcentricDiagram({ data }: { data: { label: string; value: string }[] 
         <ellipse key={i} cx={r.cx} cy={r.cy} rx={r.rx} ry={r.ry} fill={r.fill} stroke="white" strokeWidth={1.5} />
       ))}
       {RINGS.map((r, i) => (
-        <text key={i} x={r.tx} y={r.textY} textAnchor="middle" fontSize={12} fontWeight={600} fill={r.textFill}>
+        <text key={i} x={r.tx} y={r.textY} textAnchor="start" fontSize={12} fontWeight={600} fill={r.textFill}>
           {formatNum(data[i].value)} {data[i].label}
         </text>
       ))}
