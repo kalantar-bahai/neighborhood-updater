@@ -146,6 +146,34 @@ function ToggleItem({ label, value, notes, onToggle, onNotes }: {
   );
 }
 
+const RINGS = [
+  { cx: 300, cy: 180, rx: 200, ry: 100, fill: '#dbeafe', textFill: '#1e3a8a', tx: 316, nameY:  90, valueY: 104 },
+  { cx: 285, cy: 190, rx: 160, ry:  80, fill: '#93c5fd', textFill: '#1e3a8a', tx: 301, nameY: 120, valueY: 134 },
+  { cx: 270, cy: 200, rx: 120, ry:  60, fill: '#60a5fa', textFill: '#1e3a8a', tx: 286, nameY: 150, valueY: 164 },
+  { cx: 255, cy: 210, rx:  80, ry:  40, fill: '#2563eb', textFill: '#ffffff', tx: 271, nameY: 180, valueY: 194 },
+  { cx: 240, cy: 220, rx:  40, ry:  20, fill: '#1e3a8a', textFill: '#ffffff', tx: 256, nameY: 210, valueY: 224 },
+];
+
+function ConcentricDiagram({ data }: { data: { label: string; value: string }[] }) {
+  return (
+    <svg viewBox="0 0 540 310" style={{ width: '100%', display: 'block' }}>
+      {RINGS.map((r, i) => (
+        <ellipse key={i} cx={r.cx} cy={r.cy} rx={r.rx} ry={r.ry} fill={r.fill} stroke="white" strokeWidth={1.5} />
+      ))}
+      {RINGS.map((r, i) => (
+        <g key={i}>
+          <text x={r.tx} y={r.nameY} textAnchor="middle" fontSize={10} fontWeight={600} fill={r.textFill} letterSpacing={0.5}>
+            {data[i].label.toUpperCase()}
+          </text>
+          <text x={r.tx} y={r.valueY} textAnchor="middle" fontSize={14} fontWeight={700} fill={r.textFill}>
+            {data[i].value || '—'}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 export default function DetailView({ detail, email, showBack, spreadsheetUrl, onBack, onSaved }: Props) {
   const { row, srp } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
@@ -154,6 +182,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
   const [saveStatus, setSaveStatus] = useState<{ msg: string; type: 'idle' | 'success' | 'error' }>({ msg: '', type: 'idle' });
   const [lastUpdatedBy, setLastUpdatedBy] = useState('');
   const [lastUpdatedAt, setLastUpdatedAt] = useState('');
+  const [showDiagram, setShowDiagram] = useState(false);
 
   const set = useCallback(<K extends keyof FormState>(key: K, val: FormState[K]) => {
     setForm(f => ({ ...f, [key]: val }));
@@ -216,13 +245,22 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
   const edTotal  = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs]);
   const allTotal = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs, form.activities.devotionals]);
 
-  const actVals = (['ccs', 'jygs', 'scs', 'devotionals'] as const)
-    .flatMap(k => [form.activities[k].act, form.activities[k].part, form.activities[k].fof]);
+  const actKeys = ['ccs', 'jygs', 'scs', 'devotionals'] as const;
+  const actVals = actKeys.flatMap(k => [form.activities[k].act, form.activities[k].part, form.activities[k].fof]);
   const hasIntErrors = [
     form.totalPop, form.totalHH, form.indNum, form.hhNum,
     form.protagonists, form.accompaniers,
     ...actVals,
   ].some(v => !isValidInt(v));
+
+  const hasAnyActPart = actKeys.some(k => form.activities[k].part !== '');
+  const diagramData = [
+    { label: 'Total Population',      value: form.totalPop },
+    { label: 'Individuals Connected', value: form.indNum },
+    { label: 'Participants',          value: hasAnyActPart ? String(allTotal.part) : '' },
+    { label: 'Protagonists',          value: form.protagonists },
+    { label: 'Accompaniers',          value: form.accompaniers },
+  ];
 
   const updatedLine = lastUpdatedAt
     ? `Last saved by ${lastUpdatedBy} on ${new Date(lastUpdatedAt).toLocaleString()}`
@@ -240,6 +278,9 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+          <button onClick={() => setShowDiagram(true)} style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            Diagram
+          </button>
           <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', textDecoration: 'none', whiteSpace: 'nowrap' }}>
             Open sheet ↗
           </a>
@@ -372,6 +413,24 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
         </div>
 
       </div>
+
+      {showDiagram && (
+        <div
+          onClick={() => setShowDiagram(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: 12, padding: '20px 24px', maxWidth: 560, width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: '#2d3748' }}>{row.neighborhood}</div>
+                <div style={{ fontSize: 11, color: '#718096', marginTop: 2 }}>{row.clusterCode} · {row.cluster} · {row.locality}</div>
+              </div>
+              <button onClick={() => setShowDiagram(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#718096', lineHeight: 1, padding: 0 }}>×</button>
+            </div>
+            <ConcentricDiagram data={diagramData} />
+          </div>
+        </div>
+      )}
 
       <div className="footer">
         <span className={`save-status${saveStatus.type !== 'idle' ? ` ${saveStatus.type}` : ''}`}>
