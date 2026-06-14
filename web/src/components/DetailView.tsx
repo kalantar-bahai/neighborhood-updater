@@ -27,6 +27,8 @@ function computedPct(connected: string, total: string): string {
   return (pct <= 1.0 ? +pct.toFixed(2) : +pct.toFixed(1)) + '%';
 }
 
+function isValidInt(v: string) { return !v || /^\d+$/.test(v.trim()); }
+
 function actTotal(acts: (Activity | undefined)[]) {
   return acts.reduce((acc, a) => ({
     act:  acc.act  + parseInt((a?.act  || '0'), 10),
@@ -35,9 +37,11 @@ function actTotal(acts: (Activity | undefined)[]) {
   }), { act: 0, part: 0, fof: 0 });
 }
 
-function Field({ label, value, onChange, readonly, type }: {
-  label: string; value: string; onChange?: (v: string) => void; readonly?: boolean; type?: string;
+function Field({ label, value, onChange, readonly, type, integer }: {
+  label: string; value: string; onChange?: (v: string) => void; readonly?: boolean; type?: string; integer?: boolean;
 }) {
+  const hasError = integer && !readonly && !isValidInt(value);
+  const cls = [readonly ? 'ro' : '', hasError ? 'error' : ''].filter(Boolean).join(' ');
   return (
     <div className="field">
       <label>{label}</label>
@@ -45,7 +49,7 @@ function Field({ label, value, onChange, readonly, type }: {
         type={type || 'text'}
         value={value || ''}
         readOnly={readonly}
-        className={readonly ? 'ro' : ''}
+        className={cls || undefined}
         onChange={e => onChange?.(e.target.value)}
       />
     </div>
@@ -65,15 +69,16 @@ function SelectField({ label, value, options, onChange }: {
   );
 }
 
-function PairField({ label, numVal, pctVal, onNumChange, pctReadonly }: {
+function PairField({ label, numVal, pctVal, onNumChange, pctReadonly, numInteger }: {
   label: string; numVal: string; pctVal: string;
-  onNumChange: (v: string) => void; pctReadonly?: boolean;
+  onNumChange: (v: string) => void; pctReadonly?: boolean; numInteger?: boolean;
 }) {
+  const hasError = numInteger && !isValidInt(numVal);
   return (
     <div className="pair-field">
       <label>{label}</label>
       <div className="pair-inputs">
-        <input type="text" value={numVal || ''} placeholder="#" onChange={e => onNumChange(e.target.value)} />
+        <input type="text" value={numVal || ''} placeholder="#" className={hasError ? 'error' : undefined} onChange={e => onNumChange(e.target.value)} />
         <input type="text" value={pctVal || ''} placeholder="%" className={`pct${pctReadonly ? ' ro' : ''}`} readOnly={pctReadonly} />
       </div>
     </div>
@@ -93,12 +98,16 @@ function ActRow({ label, userVals, srpVals, onChange, onReset }: {
   const anyDiffers  = actDiffers || partDiffers || fofDiffers;
   const srpText = srpVals ? `${srpVals.act} / ${srpVals.part} / ${srpVals.fof}` : 'not in SRP';
 
+  function cls(differs: boolean, val: string) {
+    return [differs ? 'overridden' : '', !isValidInt(val) ? 'error' : ''].filter(Boolean).join(' ') || undefined;
+  }
+
   return (
     <tr>
       <td className="row-label">{label}</td>
-      <td><input type="number" value={userVals.act || ''} className={actDiffers ? 'overridden' : ''} onChange={e => onChange('act', e.target.value)} /></td>
-      <td><input type="number" value={userVals.part || ''} className={partDiffers ? 'overridden' : ''} onChange={e => onChange('part', e.target.value)} /></td>
-      <td><input type="number" value={userVals.fof || ''} className={fofDiffers ? 'overridden' : ''} onChange={e => onChange('fof', e.target.value)} /></td>
+      <td><input type="text" value={userVals.act || ''} className={cls(actDiffers, userVals.act)} onChange={e => onChange('act', e.target.value)} /></td>
+      <td><input type="text" value={userVals.part || ''} className={cls(partDiffers, userVals.part)} onChange={e => onChange('part', e.target.value)} /></td>
+      <td><input type="text" value={userVals.fof || ''} className={cls(fofDiffers, userVals.fof)} onChange={e => onChange('fof', e.target.value)} /></td>
       <td className={`srp-cell${anyDiffers ? ' differs' : ''}`}>
         {srpText}
         {anyDiffers && <button className="reset-btn" onClick={onReset}>reset</button>}
@@ -197,6 +206,14 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
   const edTotal  = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs]);
   const allTotal = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs, form.activities.devotionals]);
 
+  const actVals = (['ccs', 'jygs', 'scs', 'devotionals'] as const)
+    .flatMap(k => [form.activities[k].act, form.activities[k].part, form.activities[k].fof]);
+  const hasIntErrors = [
+    form.totalPop, form.totalHH, form.indNum, form.hhNum,
+    form.protagonists, form.accompaniers,
+    ...actVals,
+  ].some(v => !isValidInt(v));
+
   const updatedLine = lastUpdatedAt
     ? `Last saved by ${lastUpdatedBy} on ${new Date(lastUpdatedAt).toLocaleString()}`
     : '';
@@ -219,7 +236,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
           <button onClick={() => window.location.href = '/signout'} style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
             Sign out
           </button>
-          <button className="save-btn" disabled={saving} onClick={handleSave}>Save</button>
+          <button className="save-btn" disabled={saving || hasIntErrors} onClick={handleSave}>Save</button>
         </div>
       </div>
 
@@ -253,19 +270,19 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
           <div className="card-header">Population</div>
           <div className="card-body">
             <div className="field-grid-2">
-              <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} />
-              <Field label="Total Households" value={form.totalHH}  onChange={v => set('totalHH', v)} />
+              <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} integer />
+              <Field label="Total Households" value={form.totalHH}  onChange={v => set('totalHH', v)} integer />
             </div>
             <div className="field-grid-2">
               <PairField
                 label="Individuals Connected"
                 numVal={form.indNum} pctVal={computedPct(form.indNum, form.totalPop)}
-                onNumChange={v => set('indNum', v)} pctReadonly
+                onNumChange={v => set('indNum', v)} pctReadonly numInteger
               />
               <PairField
                 label="Households Connected"
                 numVal={form.hhNum} pctVal={computedPct(form.hhNum, form.totalHH)}
-                onNumChange={v => set('hhNum', v)} pctReadonly
+                onNumChange={v => set('hhNum', v)} pctReadonly numInteger
               />
             </div>
             <div className="field">
@@ -316,8 +333,8 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
           <div className="card-header">Workers &amp; Prevalence</div>
           <div className="card-body">
             <div className="field-grid-2">
-              <Field label="Protagonists / Workers"  value={form.protagonists} onChange={v => set('protagonists', v)} />
-              <Field label="Accompaniers in Nucleus" value={form.accompaniers} onChange={v => set('accompaniers', v)} />
+              <Field label="Protagonists / Workers"  value={form.protagonists} onChange={v => set('protagonists', v)} integer />
+              <Field label="Accompaniers in Nucleus" value={form.accompaniers} onChange={v => set('accompaniers', v)} integer />
             </div>
             {srp?.facilitators && (
               <div className="srp-ref">SRP Facilitators: <strong>{srp.facilitators}</strong></div>
@@ -351,7 +368,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
           {saveStatus.msg}
         </span>
         <button className="btn-cancel" onClick={handleDiscard}>Discard changes</button>
-        <button className="btn-save" disabled={saving} onClick={handleSave}>Save to spreadsheet</button>
+        <button className="btn-save" disabled={saving || hasIntErrors} onClick={handleSave}>Save to spreadsheet</button>
       </div>
     </>
   );
