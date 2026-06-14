@@ -75,6 +75,8 @@
   flex-shrink: 0;
 }
 .save-btn:disabled { background: #a0aec0; cursor: default; }
+.save-btn-label { display: none; }
+@media (min-width: 480px) { .save-btn-label { display: inline; } }
 .back-btn {
   background: rgba(255,255,255,0.2);
   border: none;
