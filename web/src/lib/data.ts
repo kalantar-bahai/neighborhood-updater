@@ -14,9 +14,11 @@ function normalize(row: string[], numCols: number): string[] {
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
+function stripCommas(s: string) { return s ? s.replace(/,/g, '') : s; }
+
 export async function getAllMasterRows() {
-  const rows = await sheetsGet(MASTER_SHEET_ID, `${MASTER_TAB}!A${MASTER_DATA_ROW}:AV`);
-  return rows.map(r => normalize(r, 48));
+  const rows = await sheetsGet(MASTER_SHEET_ID, `${MASTER_TAB}!A${MASTER_DATA_ROW}:AX`);
+  return rows.map(r => normalize(r, 50));
 }
 
 export async function getGlobalList() {
@@ -48,20 +50,20 @@ export function parseRow(row: string[]) {
     email:               row[COL.EMAIL],
     auxBoard:            row[COL.AUX_BOARD],
     makeup:              row[COL.MAKEUP],
-    totalPop:            row[COL.TOTAL_POP],
-    totalHH:             row[COL.TOTAL_HH],
-    indNum:              row[COL.IND_NUM],
+    totalPop:            stripCommas(row[COL.TOTAL_POP]),
+    totalHH:             stripCommas(row[COL.TOTAL_HH]),
+    indNum:              stripCommas(row[COL.IND_NUM]),
     indPct:              row[COL.IND_PCT],
-    hhNum:               row[COL.HH_NUM],
+    hhNum:               stripCommas(row[COL.HH_NUM]),
     hhPct:               row[COL.HH_PCT],
     activities: {
-      ccs:         { act: row[COL.CC_ACT],        part: row[COL.CC_PART],        fof: row[COL.CC_FOF] },
-      jygs:        { act: row[COL.JYG_ACT],       part: row[COL.JYG_PART],       fof: row[COL.JYG_FOF] },
-      scs:         { act: row[COL.SC_ACT],        part: row[COL.SC_PART],        fof: row[COL.SC_FOF] },
-      devotionals: { act: row[COL.DEV_ACT],       part: row[COL.DEV_PART],       fof: row[COL.DEV_FOF] },
+      ccs:         { act: stripCommas(row[COL.CC_ACT]),   part: stripCommas(row[COL.CC_PART]),   fof: stripCommas(row[COL.CC_FOF]) },
+      jygs:        { act: stripCommas(row[COL.JYG_ACT]),  part: stripCommas(row[COL.JYG_PART]),  fof: stripCommas(row[COL.JYG_FOF]) },
+      scs:         { act: stripCommas(row[COL.SC_ACT]),   part: stripCommas(row[COL.SC_PART]),   fof: stripCommas(row[COL.SC_FOF]) },
+      devotionals: { act: stripCommas(row[COL.DEV_ACT]),  part: stripCommas(row[COL.DEV_PART]),  fof: stripCommas(row[COL.DEV_FOF]) },
     },
-    protagonists:    row[COL.PROTAGONISTS],
-    accompaniers:    row[COL.ACCOMPANIERS],
+    protagonists:    stripCommas(row[COL.PROTAGONISTS]),
+    accompaniers:    stripCommas(row[COL.ACCOMPANIERS]),
     level:           row[COL.LEVEL],
     notesPrevalence: row[COL.NOTES_PREVALENCE],
     supported:       row[COL.SUPPORTED],
@@ -70,8 +72,10 @@ export function parseRow(row: string[]) {
     notesPresence:   row[COL.NOTES_PRESENCE],
     involved:        row[COL.INVOLVED],
     notesInvolved:   row[COL.NOTES_INVOLVED],
-    efforts:         row[COL.EFFORTS],
-    notesEfforts:    row[COL.NOTES_EFFORTS],
+    efforts:          row[COL.EFFORTS],
+    notesEfforts:     row[COL.NOTES_EFFORTS],
+    gatherings:       row[COL.GATHERINGS],
+    notesGatherings:  row[COL.NOTES_GATHERINGS],
   };
 }
 
@@ -130,8 +134,8 @@ export async function saveRowData(neighborhoodName: string, formData: Record<str
     [COL.LOCALITY, d.locality], [COL.STAGE, d.stage], [COL.CONTACT, d.contact],
     [COL.EMAIL, d.email], [COL.AUX_BOARD, d.auxBoard], [COL.MAKEUP, d.makeup],
     [COL.TOTAL_POP, d.totalPop], [COL.TOTAL_HH, d.totalHH],
-    [COL.IND_NUM, d.indNum], [COL.IND_PCT, d.indPct],
-    [COL.HH_NUM, d.hhNum], [COL.HH_PCT, d.hhPct],
+    [COL.IND_NUM, d.indNum],
+    [COL.HH_NUM, d.hhNum],
     [COL.CC_ACT, d.activities.ccs.act], [COL.CC_PART, d.activities.ccs.part], [COL.CC_FOF, d.activities.ccs.fof],
     [COL.JYG_ACT, d.activities.jygs.act], [COL.JYG_PART, d.activities.jygs.part], [COL.JYG_FOF, d.activities.jygs.fof],
     [COL.SC_ACT, d.activities.scs.act], [COL.SC_PART, d.activities.scs.part], [COL.SC_FOF, d.activities.scs.fof],
@@ -142,6 +146,7 @@ export async function saveRowData(neighborhoodName: string, formData: Record<str
     [COL.PRESENCE, d.presence], [COL.NOTES_PRESENCE, d.notesPresence],
     [COL.INVOLVED, d.involved], [COL.NOTES_INVOLVED, d.notesInvolved],
     [COL.EFFORTS, d.efforts], [COL.NOTES_EFFORTS, d.notesEfforts],
+    [COL.GATHERINGS, d.gatherings], [COL.NOTES_GATHERINGS, d.notesGatherings],
   ].map(([col, value]) => ({
     range: `${MASTER_TAB}!${colLetter(col as number)}${sheetRow}`,
     values: [[value ?? '']],

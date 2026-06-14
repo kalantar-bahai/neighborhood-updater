@@ -7,6 +7,7 @@ interface Props {
   detail: NeighborhoodDetail;
   email: string;
   showBack: boolean;
+  spreadsheetUrl: string;
   onBack: () => void;
   onSaved: (savedBy: string, savedAt: string) => void;
 }
@@ -18,14 +19,15 @@ function rowToForm(row: NeighborhoodRow): FormState {
   return rest;
 }
 
-function fmtPct(val: string) {
-  if (!val) return '';
-  const s = val.trim();
-  const n = parseFloat(s.replace('%', ''));
-  if (isNaN(n)) return s;
-  const pct = !s.includes('%') && Math.abs(n) < 1 ? n * 100 : n;
-  return +pct.toFixed(2) + '%';
+function computedPct(connected: string, total: string): string {
+  const c = parseFloat(connected);
+  const t = parseFloat(total);
+  if (!c || !t || t === 0) return '';
+  const pct = (c / t) * 100;
+  return (pct <= 1.0 ? +pct.toFixed(2) : +pct.toFixed(1)) + '%';
 }
+
+function isValidInt(v: string) { return !v || /^\d+$/.test(v.trim()); }
 
 function actTotal(acts: (Activity | undefined)[]) {
   return acts.reduce((acc, a) => ({
@@ -35,9 +37,11 @@ function actTotal(acts: (Activity | undefined)[]) {
   }), { act: 0, part: 0, fof: 0 });
 }
 
-function Field({ label, value, onChange, readonly, type }: {
-  label: string; value: string; onChange?: (v: string) => void; readonly?: boolean; type?: string;
+function Field({ label, value, onChange, readonly, type, integer }: {
+  label: string; value: string; onChange?: (v: string) => void; readonly?: boolean; type?: string; integer?: boolean;
 }) {
+  const hasError = integer && !readonly && !isValidInt(value);
+  const cls = [readonly ? 'ro' : '', hasError ? 'error' : ''].filter(Boolean).join(' ');
   return (
     <div className="field">
       <label>{label}</label>
@@ -45,7 +49,7 @@ function Field({ label, value, onChange, readonly, type }: {
         type={type || 'text'}
         value={value || ''}
         readOnly={readonly}
-        className={readonly ? 'ro' : ''}
+        className={cls || undefined}
         onChange={e => onChange?.(e.target.value)}
       />
     </div>
@@ -65,16 +69,17 @@ function SelectField({ label, value, options, onChange }: {
   );
 }
 
-function PairField({ label, numVal, pctVal, onNumChange, onPctChange }: {
+function PairField({ label, numVal, pctVal, onNumChange, pctReadonly, numInteger }: {
   label: string; numVal: string; pctVal: string;
-  onNumChange: (v: string) => void; onPctChange: (v: string) => void;
+  onNumChange: (v: string) => void; pctReadonly?: boolean; numInteger?: boolean;
 }) {
+  const hasError = numInteger && !isValidInt(numVal);
   return (
     <div className="pair-field">
       <label>{label}</label>
       <div className="pair-inputs">
-        <input type="text" value={numVal || ''} placeholder="#" onChange={e => onNumChange(e.target.value)} />
-        <input type="text" value={pctVal || ''} placeholder="%" className="pct" onChange={e => onPctChange(e.target.value)} />
+        <input type="text" value={numVal || ''} placeholder="#" className={hasError ? 'error' : undefined} onChange={e => onNumChange(e.target.value)} />
+        <input type="text" value={pctVal || ''} placeholder="%" className={`pct${pctReadonly ? ' ro' : ''}`} readOnly={pctReadonly} />
       </div>
     </div>
   );
@@ -93,12 +98,16 @@ function ActRow({ label, userVals, srpVals, onChange, onReset }: {
   const anyDiffers  = actDiffers || partDiffers || fofDiffers;
   const srpText = srpVals ? `${srpVals.act} / ${srpVals.part} / ${srpVals.fof}` : 'not in SRP';
 
+  function cls(differs: boolean, val: string) {
+    return [differs ? 'overridden' : '', !isValidInt(val) ? 'error' : ''].filter(Boolean).join(' ') || undefined;
+  }
+
   return (
     <tr>
       <td className="row-label">{label}</td>
-      <td><input type="number" value={userVals.act || ''} className={actDiffers ? 'overridden' : ''} onChange={e => onChange('act', e.target.value)} /></td>
-      <td><input type="number" value={userVals.part || ''} className={partDiffers ? 'overridden' : ''} onChange={e => onChange('part', e.target.value)} /></td>
-      <td><input type="number" value={userVals.fof || ''} className={fofDiffers ? 'overridden' : ''} onChange={e => onChange('fof', e.target.value)} /></td>
+      <td><input type="text" value={userVals.act || ''} className={cls(actDiffers, userVals.act)} onChange={e => onChange('act', e.target.value)} /></td>
+      <td><input type="text" value={userVals.part || ''} className={cls(partDiffers, userVals.part)} onChange={e => onChange('part', e.target.value)} /></td>
+      <td><input type="text" value={userVals.fof || ''} className={cls(fofDiffers, userVals.fof)} onChange={e => onChange('fof', e.target.value)} /></td>
       <td className={`srp-cell${anyDiffers ? ' differs' : ''}`}>
         {srpText}
         {anyDiffers && <button className="reset-btn" onClick={onReset}>reset</button>}
@@ -111,9 +120,9 @@ function TotalRow({ label, totals }: { label: string; totals: { act: number; par
   return (
     <tr className="total-row">
       <td className="row-label">{label}</td>
-      <td><input className="plain" type="number" value={totals.act} readOnly /></td>
-      <td><input className="plain" type="number" value={totals.part} readOnly /></td>
-      <td><input className="plain" type="number" value={totals.fof} readOnly /></td>
+      <td><input className="plain" type="text" value={totals.act} readOnly /></td>
+      <td><input className="plain" type="text" value={totals.part} readOnly /></td>
+      <td><input className="plain" type="text" value={totals.fof} readOnly /></td>
       <td className="srp-cell">—</td>
     </tr>
   );
@@ -124,7 +133,7 @@ function ToggleItem({ label, value, notes, onToggle, onNotes }: {
   onToggle: (v: string) => void; onNotes: (v: string) => void;
 }) {
   const isYes = (value || '').toLowerCase() === 'yes';
-  const isNo  = (value || '').toLowerCase() === 'no';
+  const isNo  = !isYes;
   return (
     <div className="detail-item">
       <div className="q">{label}</div>
@@ -137,7 +146,7 @@ function ToggleItem({ label, value, notes, onToggle, onNotes }: {
   );
 }
 
-export default function DetailView({ detail, email, showBack, onBack, onSaved }: Props) {
+export default function DetailView({ detail, email, showBack, spreadsheetUrl, onBack, onSaved }: Props) {
   const { row, srp } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   const [isDirty, setIsDirty] = useState(false);
@@ -187,6 +196,16 @@ export default function DetailView({ detail, email, showBack, onBack, onSaved }:
     }
   }
 
+  function handleBack() {
+    if (isDirty && !confirm('Discard all unsaved changes?')) return;
+    onBack();
+  }
+
+  function handleSignOut() {
+    if (isDirty && !confirm('Discard all unsaved changes?')) return;
+    window.location.href = '/signout';
+  }
+
   function handleDiscard() {
     if (isDirty && !confirm('Discard all unsaved changes?')) return;
     setForm(rowToForm(row));
@@ -197,6 +216,14 @@ export default function DetailView({ detail, email, showBack, onBack, onSaved }:
   const edTotal  = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs]);
   const allTotal = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs, form.activities.devotionals]);
 
+  const actVals = (['ccs', 'jygs', 'scs', 'devotionals'] as const)
+    .flatMap(k => [form.activities[k].act, form.activities[k].part, form.activities[k].fof]);
+  const hasIntErrors = [
+    form.totalPop, form.totalHH, form.indNum, form.hhNum,
+    form.protagonists, form.accompaniers,
+    ...actVals,
+  ].some(v => !isValidInt(v));
+
   const updatedLine = lastUpdatedAt
     ? `Last saved by ${lastUpdatedBy} on ${new Date(lastUpdatedAt).toLocaleString()}`
     : '';
@@ -205,18 +232,21 @@ export default function DetailView({ detail, email, showBack, onBack, onSaved }:
     <>
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0 }}>
-          {showBack && <button className="back-btn" onClick={onBack}>← Back</button>}
+          {showBack && <button className="back-btn" onClick={handleBack}>← Back</button>}
           <div style={{ minWidth: 0 }}>
             <h1>{row.neighborhood}</h1>
-            <div className="meta">{row.cluster} · {row.clusterCode} · {row.locality}</div>
+            <div className="meta">{row.clusterCode} · {row.cluster} · {row.locality}</div>
             {updatedLine && <div className="last-updated">{updatedLine}</div>}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-          <button onClick={() => window.location.href = '/api/auth/signout'} style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
+          <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            Open sheet ↗
+          </a>
+          <button onClick={handleSignOut} style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
             Sign out
           </button>
-          <button className="save-btn" disabled={saving} onClick={handleSave}>Save</button>
+          <button className="save-btn" disabled={saving || hasIntErrors} onClick={handleSave}>Save</button>
         </div>
       </div>
 
@@ -233,19 +263,14 @@ export default function DetailView({ detail, email, showBack, onBack, onSaved }:
               <Field label="PG"           value={row.pg}          readonly />
             </div>
             <div className="field-grid-3">
-              <Field label="Locality"              value={form.locality}    onChange={v => set('locality', v)} />
+              <Field label="Locality"              value={row.locality}    readonly />
               <Field label="Neighborhood & Pocket" value={row.neighborhood} readonly />
-              <SelectField
-                label="Neighborhood Stage"
-                value={form.stage}
-                options={['', 'Emerging Activity', 'Focus Neighborhood', 'Intense Activity (18+ activities)']}
-                onChange={v => set('stage', v)}
-              />
+              <Field label="Neighborhood Stage"    value={row.stage}       readonly />
             </div>
             <div className="field-grid-3">
-              <Field label="Neighborhood Contact"      value={form.contact}  onChange={v => set('contact', v)} />
-              <Field label="Contact Email"             value={form.email}    onChange={v => set('email', v)} type="email" />
-              <Field label="Auxiliary Board Member(s)" value={form.auxBoard} onChange={v => set('auxBoard', v)} />
+              <Field label="Neighborhood Contact"      value={row.contact}  readonly />
+              <Field label="Contact Email"             value={row.email}    readonly />
+              <Field label="Auxiliary Board Member(s)" value={row.auxBoard} readonly />
             </div>
           </div>
         </div>
@@ -255,19 +280,19 @@ export default function DetailView({ detail, email, showBack, onBack, onSaved }:
           <div className="card-header">Population</div>
           <div className="card-body">
             <div className="field-grid-2">
-              <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} />
-              <Field label="Total Households" value={form.totalHH}  onChange={v => set('totalHH', v)} />
+              <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} integer />
+              <Field label="Total Households" value={form.totalHH}  onChange={v => set('totalHH', v)} integer />
             </div>
             <div className="field-grid-2">
               <PairField
                 label="Individuals Connected"
-                numVal={form.indNum} pctVal={fmtPct(form.indPct)}
-                onNumChange={v => set('indNum', v)} onPctChange={v => set('indPct', v)}
+                numVal={form.indNum} pctVal={computedPct(form.indNum, form.totalPop)}
+                onNumChange={v => set('indNum', v)} pctReadonly numInteger
               />
               <PairField
                 label="Households Connected"
-                numVal={form.hhNum} pctVal={fmtPct(form.hhPct)}
-                onNumChange={v => set('hhNum', v)} onPctChange={v => set('hhPct', v)}
+                numVal={form.hhNum} pctVal={computedPct(form.hhNum, form.totalHH)}
+                onNumChange={v => set('hhNum', v)} pctReadonly numInteger
               />
             </div>
             <div className="field">
@@ -318,8 +343,8 @@ export default function DetailView({ detail, email, showBack, onBack, onSaved }:
           <div className="card-header">Workers &amp; Prevalence</div>
           <div className="card-body">
             <div className="field-grid-2">
-              <Field label="Protagonists / Workers"  value={form.protagonists} onChange={v => set('protagonists', v)} />
-              <Field label="Accompaniers in Nucleus" value={form.accompaniers} onChange={v => set('accompaniers', v)} />
+              <Field label="Protagonists / Workers"  value={form.protagonists} onChange={v => set('protagonists', v)} integer />
+              <Field label="Accompaniers in Nucleus" value={form.accompaniers} onChange={v => set('accompaniers', v)} integer />
             </div>
             {srp?.facilitators && (
               <div className="srp-ref">SRP Facilitators: <strong>{srp.facilitators}</strong></div>
@@ -338,14 +363,10 @@ export default function DetailView({ detail, email, showBack, onBack, onSaved }:
           <div className="card-header">Additional Details</div>
           <div className="card-body">
             <div className="detail-grid">
-              <ToggleItem label="Assembly Support" value={form.supported} notes={form.notesSupported}
-                onToggle={v => set('supported', v)} onNotes={v => set('notesSupported', v)} />
               <ToggleItem label="Social Action Presence" value={form.presence} notes={form.notesPresence}
                 onToggle={v => set('presence', v)} onNotes={v => set('notesPresence', v)} />
-              <ToggleItem label="Local Leaders Involved" value={form.involved} notes={form.notesInvolved}
-                onToggle={v => set('involved', v)} onNotes={v => set('notesInvolved', v)} />
-              <ToggleItem label="Specific Efforts for Spiritual Health" value={form.efforts} notes={form.notesEfforts}
-                onToggle={v => set('efforts', v)} onNotes={v => set('notesEfforts', v)} />
+              <ToggleItem label="Gatherings / Festivals" value={form.gatherings} notes={form.notesGatherings}
+                onToggle={v => set('gatherings', v)} onNotes={v => set('notesGatherings', v)} />
             </div>
           </div>
         </div>
@@ -357,7 +378,7 @@ export default function DetailView({ detail, email, showBack, onBack, onSaved }:
           {saveStatus.msg}
         </span>
         <button className="btn-cancel" onClick={handleDiscard}>Discard changes</button>
-        <button className="btn-save" disabled={saving} onClick={handleSave}>Save to spreadsheet</button>
+        <button className="btn-save" disabled={saving || hasIntErrors} onClick={handleSave}>Save to spreadsheet</button>
       </div>
     </>
   );

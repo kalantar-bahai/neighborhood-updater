@@ -44,7 +44,7 @@ export default function AppClient() {
       <div className="error-state">
         <div>{error}</div>
         <button
-          onClick={() => window.location.href = '/api/auth/signout'}
+          onClick={() => window.location.href = '/signout'}
           style={{ marginTop: 16, fontSize: 13, color: '#3182ce', background: 'none', border: '1px solid #bee3f8', borderRadius: 6, padding: '6px 16px', cursor: 'pointer' }}
         >
           Login with a different account
@@ -63,6 +63,7 @@ export default function AppClient() {
         detail={detail}
         email={initialData.email}
         showBack={initialData.rows.length > 1}
+        spreadsheetUrl={initialData.spreadsheetUrl}
         onBack={handleBack}
         onSaved={() => {}}
       />
@@ -75,7 +76,7 @@ export default function AppClient() {
       email={initialData.email}
       srpNames={initialData.srpNames}
       onSelect={loadNeighborhood}
-      onSignOut={() => window.location.href = '/api/auth/signout'}
+      onSignOut={() => window.location.href = '/signout'}
     />
   );
 }

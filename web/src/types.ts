@@ -50,6 +50,8 @@ export interface NeighborhoodRow {
   notesInvolved: string;
   efforts: string;
   notesEfforts: string;
+  gatherings: string;
+  notesGatherings: string;
 }
 
 export interface SrpData {
@@ -70,6 +72,7 @@ export interface InitialData {
   rows: NeighborhoodSummary[];
   email: string;
   srpNames: string[];
+  spreadsheetUrl: string;
 }
 
 export type FormData = Omit<NeighborhoodRow,
