@@ -146,6 +146,27 @@ function ToggleItem({ label, value, notes, onToggle, onNotes }: {
   );
 }
 
+const IcoDiagram = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <ellipse cx="12" cy="12" rx="10" ry="7"/><ellipse cx="12" cy="12" rx="5" ry="3.5"/>
+  </svg>
+);
+const IcoExternalLink = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+  </svg>
+);
+const IcoLogOut = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+  </svg>
+);
+const IcoSave = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+  </svg>
+);
+
 // Bounding box centered in 540×310 viewBox (70px h-margin, 55px v-margin each side).
 // textY = top of ring at tx + 16, where top = cy - ry×√(1−((tx−cx)/rx)²)
 // This places each label at a consistent distance below the ring's upper arc at its text x.
@@ -288,17 +309,19 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
             {updatedLine && <div className="last-updated">{updatedLine}</div>}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-          <button onClick={() => setShowDiagram(true)} style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            Diagram
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+          <button onClick={() => setShowDiagram(true)} title="Diagram" aria-label="Diagram" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
+            <IcoDiagram />
           </button>
-          <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', textDecoration: 'none', whiteSpace: 'nowrap' }}>
-            Open sheet ↗
+          <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" title="Open spreadsheet" aria-label="Open spreadsheet" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', textDecoration: 'none' }}>
+            <IcoExternalLink />
           </a>
-          <button onClick={handleSignOut} style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
-            Sign out
+          <button onClick={handleSignOut} title="Sign out" aria-label="Sign out" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
+            <IcoLogOut />
           </button>
-          <button className="save-btn" disabled={saving || hasIntErrors} onClick={handleSave}>Save</button>
+          <button className="save-btn" disabled={saving || hasIntErrors} onClick={handleSave} title="Save to spreadsheet" aria-label="Save to spreadsheet" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 12px' }}>
+            <IcoSave /><span className="save-btn-label">Save</span>
+          </button>
         </div>
       </div>
 
