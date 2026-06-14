@@ -154,6 +154,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
   const [saveStatus, setSaveStatus] = useState<{ msg: string; type: 'idle' | 'success' | 'error' }>({ msg: '', type: 'idle' });
   const [lastUpdatedBy, setLastUpdatedBy] = useState('');
   const [lastUpdatedAt, setLastUpdatedAt] = useState('');
+  const [showDiagram, setShowDiagram] = useState(false);
 
   const set = useCallback(<K extends keyof FormState>(key: K, val: FormState[K]) => {
     setForm(f => ({ ...f, [key]: val }));
@@ -216,13 +217,22 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
   const edTotal  = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs]);
   const allTotal = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs, form.activities.devotionals]);
 
-  const actVals = (['ccs', 'jygs', 'scs', 'devotionals'] as const)
-    .flatMap(k => [form.activities[k].act, form.activities[k].part, form.activities[k].fof]);
+  const actKeys = ['ccs', 'jygs', 'scs', 'devotionals'] as const;
+  const actVals = actKeys.flatMap(k => [form.activities[k].act, form.activities[k].part, form.activities[k].fof]);
   const hasIntErrors = [
     form.totalPop, form.totalHH, form.indNum, form.hhNum,
     form.protagonists, form.accompaniers,
     ...actVals,
   ].some(v => !isValidInt(v));
+
+  const hasAnyActPart = actKeys.some(k => form.activities[k].part !== '');
+  const diagramData = [
+    { label: 'Total Population',      value: form.totalPop },
+    { label: 'Individuals Connected', value: form.indNum },
+    { label: 'Participants',          value: hasAnyActPart ? String(allTotal.part) : '' },
+    { label: 'Protagonists',          value: form.protagonists },
+    { label: 'Accompaniers',          value: form.accompaniers },
+  ];
 
   const updatedLine = lastUpdatedAt
     ? `Last saved by ${lastUpdatedBy} on ${new Date(lastUpdatedAt).toLocaleString()}`
@@ -240,6 +250,9 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+          <button onClick={() => setShowDiagram(true)} style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            Diagram
+          </button>
           <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', textDecoration: 'none', whiteSpace: 'nowrap' }}>
             Open sheet ↗
           </a>
@@ -372,6 +385,50 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
         </div>
 
       </div>
+
+      {showDiagram && (
+        <div
+          onClick={() => setShowDiagram(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: 12, padding: '20px 24px', maxWidth: 560, width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: '#2d3748' }}>{row.neighborhood}</div>
+                <div style={{ fontSize: 11, color: '#718096', marginTop: 2 }}>{row.clusterCode} · {row.cluster} · {row.locality}</div>
+              </div>
+              <button onClick={() => setShowDiagram(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#718096', lineHeight: 1, padding: 0 }}>×</button>
+            </div>
+            <svg viewBox="0 0 540 360" style={{ width: '100%', display: 'block' }}>
+              {[
+                { rx: 255, ry: 150, fill: '#dbeafe' },
+                { rx: 204, ry: 120, fill: '#93c5fd' },
+                { rx: 153, ry:  90, fill: '#60a5fa' },
+                { rx: 102, ry:  60, fill: '#2563eb' },
+                { rx:  51, ry:  30, fill: '#1e3a8a' },
+              ].map((r, i) => (
+                <ellipse key={i} cx={270} cy={200} rx={r.rx} ry={r.ry} fill={r.fill} stroke="white" strokeWidth={1.5} />
+              ))}
+              {[
+                { labelY: 63,  valueY: 77,  textFill: '#1e3a8a' },
+                { labelY: 93,  valueY: 107, textFill: '#1e3a8a' },
+                { labelY: 123, valueY: 137, textFill: '#1e3a8a' },
+                { labelY: 153, valueY: 167, textFill: '#ffffff' },
+                { labelY: 190, valueY: 206, textFill: '#ffffff' },
+              ].map((t, i) => (
+                <g key={i}>
+                  <text x={270} y={t.labelY} textAnchor="middle" fontSize={10} fontWeight={600} fill={t.textFill} letterSpacing={0.5}>
+                    {diagramData[i].label.toUpperCase()}
+                  </text>
+                  <text x={270} y={t.valueY} textAnchor="middle" fontSize={14} fontWeight={700} fill={t.textFill}>
+                    {diagramData[i].value || '—'}
+                  </text>
+                </g>
+              ))}
+            </svg>
+          </div>
+        </div>
+      )}
 
       <div className="footer">
         <span className={`save-status${saveStatus.type !== 'idle' ? ` ${saveStatus.type}` : ''}`}>
