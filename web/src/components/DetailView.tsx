@@ -196,6 +196,16 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
     }
   }
 
+  function handleBack() {
+    if (isDirty && !confirm('Discard all unsaved changes?')) return;
+    onBack();
+  }
+
+  function handleSignOut() {
+    if (isDirty && !confirm('Discard all unsaved changes?')) return;
+    window.location.href = '/signout';
+  }
+
   function handleDiscard() {
     if (isDirty && !confirm('Discard all unsaved changes?')) return;
     setForm(rowToForm(row));
@@ -222,7 +232,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
     <>
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0 }}>
-          {showBack && <button className="back-btn" onClick={onBack}>← Back</button>}
+          {showBack && <button className="back-btn" onClick={handleBack}>← Back</button>}
           <div style={{ minWidth: 0 }}>
             <h1>{row.neighborhood}</h1>
             <div className="meta">{row.clusterCode} · {row.cluster} · {row.locality}</div>
@@ -233,7 +243,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
           <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', textDecoration: 'none', whiteSpace: 'nowrap' }}>
             Open sheet ↗
           </a>
-          <button onClick={() => window.location.href = '/signout'} style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
+          <button onClick={handleSignOut} style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
             Sign out
           </button>
           <button className="save-btn" disabled={saving || hasIntErrors} onClick={handleSave}>Save</button>
