@@ -146,6 +146,34 @@ function ToggleItem({ label, value, notes, onToggle, onNotes }: {
   );
 }
 
+const RINGS = [
+  { cx: 300, cy: 180, rx: 200, ry: 100, fill: '#dbeafe', textFill: '#1e3a8a', tx: 316, nameY:  90, valueY: 104 },
+  { cx: 285, cy: 190, rx: 160, ry:  80, fill: '#93c5fd', textFill: '#1e3a8a', tx: 301, nameY: 120, valueY: 134 },
+  { cx: 270, cy: 200, rx: 120, ry:  60, fill: '#60a5fa', textFill: '#1e3a8a', tx: 286, nameY: 150, valueY: 164 },
+  { cx: 255, cy: 210, rx:  80, ry:  40, fill: '#2563eb', textFill: '#ffffff', tx: 271, nameY: 180, valueY: 194 },
+  { cx: 240, cy: 220, rx:  40, ry:  20, fill: '#1e3a8a', textFill: '#ffffff', tx: 256, nameY: 210, valueY: 224 },
+];
+
+function ConcentricDiagram({ data }: { data: { label: string; value: string }[] }) {
+  return (
+    <svg viewBox="0 0 540 310" style={{ width: '100%', display: 'block' }}>
+      {RINGS.map((r, i) => (
+        <ellipse key={i} cx={r.cx} cy={r.cy} rx={r.rx} ry={r.ry} fill={r.fill} stroke="white" strokeWidth={1.5} />
+      ))}
+      {RINGS.map((r, i) => (
+        <g key={i}>
+          <text x={r.tx} y={r.nameY} textAnchor="middle" fontSize={10} fontWeight={600} fill={r.textFill} letterSpacing={0.5}>
+            {data[i].label.toUpperCase()}
+          </text>
+          <text x={r.tx} y={r.valueY} textAnchor="middle" fontSize={14} fontWeight={700} fill={r.textFill}>
+            {data[i].value || '—'}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 export default function DetailView({ detail, email, showBack, spreadsheetUrl, onBack, onSaved }: Props) {
   const { row, srp } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
@@ -399,33 +427,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
               </div>
               <button onClick={() => setShowDiagram(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#718096', lineHeight: 1, padding: 0 }}>×</button>
             </div>
-            <svg viewBox="0 0 540 360" style={{ width: '100%', display: 'block' }}>
-              {[
-                { rx: 255, ry: 150, fill: '#dbeafe' },
-                { rx: 204, ry: 120, fill: '#93c5fd' },
-                { rx: 153, ry:  90, fill: '#60a5fa' },
-                { rx: 102, ry:  60, fill: '#2563eb' },
-                { rx:  51, ry:  30, fill: '#1e3a8a' },
-              ].map((r, i) => (
-                <ellipse key={i} cx={270} cy={200} rx={r.rx} ry={r.ry} fill={r.fill} stroke="white" strokeWidth={1.5} />
-              ))}
-              {[
-                { labelY: 63,  valueY: 77,  textFill: '#1e3a8a' },
-                { labelY: 93,  valueY: 107, textFill: '#1e3a8a' },
-                { labelY: 123, valueY: 137, textFill: '#1e3a8a' },
-                { labelY: 153, valueY: 167, textFill: '#ffffff' },
-                { labelY: 190, valueY: 206, textFill: '#ffffff' },
-              ].map((t, i) => (
-                <g key={i}>
-                  <text x={270} y={t.labelY} textAnchor="middle" fontSize={10} fontWeight={600} fill={t.textFill} letterSpacing={0.5}>
-                    {diagramData[i].label.toUpperCase()}
-                  </text>
-                  <text x={270} y={t.valueY} textAnchor="middle" fontSize={14} fontWeight={700} fill={t.textFill}>
-                    {diagramData[i].value || '—'}
-                  </text>
-                </g>
-              ))}
-            </svg>
+            <ConcentricDiagram data={diagramData} />
           </div>
         </div>
       )}
