@@ -14,6 +14,8 @@ function normalize(row: string[], numCols: number): string[] {
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
+function stripCommas(s: string) { return s ? s.replace(/,/g, '') : s; }
+
 export async function getAllMasterRows() {
   const rows = await sheetsGet(MASTER_SHEET_ID, `${MASTER_TAB}!A${MASTER_DATA_ROW}:AX`);
   return rows.map(r => normalize(r, 50));
@@ -48,20 +50,20 @@ export function parseRow(row: string[]) {
     email:               row[COL.EMAIL],
     auxBoard:            row[COL.AUX_BOARD],
     makeup:              row[COL.MAKEUP],
-    totalPop:            row[COL.TOTAL_POP],
-    totalHH:             row[COL.TOTAL_HH],
-    indNum:              row[COL.IND_NUM],
+    totalPop:            stripCommas(row[COL.TOTAL_POP]),
+    totalHH:             stripCommas(row[COL.TOTAL_HH]),
+    indNum:              stripCommas(row[COL.IND_NUM]),
     indPct:              row[COL.IND_PCT],
-    hhNum:               row[COL.HH_NUM],
+    hhNum:               stripCommas(row[COL.HH_NUM]),
     hhPct:               row[COL.HH_PCT],
     activities: {
-      ccs:         { act: row[COL.CC_ACT],        part: row[COL.CC_PART],        fof: row[COL.CC_FOF] },
-      jygs:        { act: row[COL.JYG_ACT],       part: row[COL.JYG_PART],       fof: row[COL.JYG_FOF] },
-      scs:         { act: row[COL.SC_ACT],        part: row[COL.SC_PART],        fof: row[COL.SC_FOF] },
-      devotionals: { act: row[COL.DEV_ACT],       part: row[COL.DEV_PART],       fof: row[COL.DEV_FOF] },
+      ccs:         { act: stripCommas(row[COL.CC_ACT]),   part: stripCommas(row[COL.CC_PART]),   fof: stripCommas(row[COL.CC_FOF]) },
+      jygs:        { act: stripCommas(row[COL.JYG_ACT]),  part: stripCommas(row[COL.JYG_PART]),  fof: stripCommas(row[COL.JYG_FOF]) },
+      scs:         { act: stripCommas(row[COL.SC_ACT]),   part: stripCommas(row[COL.SC_PART]),   fof: stripCommas(row[COL.SC_FOF]) },
+      devotionals: { act: stripCommas(row[COL.DEV_ACT]),  part: stripCommas(row[COL.DEV_PART]),  fof: stripCommas(row[COL.DEV_FOF]) },
     },
-    protagonists:    row[COL.PROTAGONISTS],
-    accompaniers:    row[COL.ACCOMPANIERS],
+    protagonists:    stripCommas(row[COL.PROTAGONISTS]),
+    accompaniers:    stripCommas(row[COL.ACCOMPANIERS]),
     level:           row[COL.LEVEL],
     notesPrevalence: row[COL.NOTES_PREVALENCE],
     supported:       row[COL.SUPPORTED],
