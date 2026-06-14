@@ -147,12 +147,12 @@ function ToggleItem({ label, value, notes, onToggle, onNotes }: {
 }
 
 const RINGS = [
-  { cx: 300, cy: 180, rx: 200, ry: 100, fill: '#dbeafe', textFill: '#1e3a8a', tx: 316, textY:  96 },
-  { cx: 288, cy: 188, rx: 168, ry:  84, fill: '#bfdbfe', textFill: '#1e3a8a', tx: 304, textY: 120 },
-  { cx: 276, cy: 196, rx: 136, ry:  68, fill: '#93c5fd', textFill: '#1e3a8a', tx: 292, textY: 144 },
-  { cx: 264, cy: 204, rx: 104, ry:  52, fill: '#60a5fa', textFill: '#1e3a8a', tx: 280, textY: 168 },
-  { cx: 252, cy: 212, rx:  72, ry:  36, fill: '#2563eb', textFill: '#ffffff', tx: 268, textY: 192 },
-  { cx: 240, cy: 220, rx:  40, ry:  20, fill: '#1e3a8a', textFill: '#ffffff', tx: 248, textY: 216 },
+  { cx: 318, cy: 178, rx: 200, ry: 100, fill: '#dbeafe', textFill: '#1e3a8a', tx: 334, textY:  94 },
+  { cx: 298, cy: 186, rx: 168, ry:  84, fill: '#bfdbfe', textFill: '#1e3a8a', tx: 314, textY: 118 },
+  { cx: 278, cy: 194, rx: 136, ry:  68, fill: '#93c5fd', textFill: '#1e3a8a', tx: 294, textY: 142 },
+  { cx: 258, cy: 202, rx: 104, ry:  52, fill: '#60a5fa', textFill: '#1e3a8a', tx: 274, textY: 166 },
+  { cx: 238, cy: 210, rx:  72, ry:  36, fill: '#2563eb', textFill: '#ffffff', tx: 254, textY: 190 },
+  { cx: 218, cy: 218, rx:  40, ry:  20, fill: '#1e3a8a', textFill: '#ffffff', tx: 234, textY: 216 },
 ];
 
 function formatNum(v: string): string {
