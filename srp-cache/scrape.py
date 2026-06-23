@@ -1,7 +1,7 @@
 """
-SRP cache scraper — loads a saved session, downloads two Excel reports from
-onlinesrp.org, parses neighbourhood-level data, and writes it to two tabs
-in the SRP cache Google Sheet.
+SRP cache scraper — authenticates with onlinesrp.org, downloads two Excel
+reports, parses neighbourhood-level data, and writes it to two tabs in the
+SRP cache Google Sheet.
 
     Devotionals tab  ← Locations → Clusters → Focus Neighbourhoods
     Education tab    ← Reports → General Reports → Institute Reports →
@@ -10,7 +10,8 @@ in the SRP cache Google Sheet.
 Usage:
     python scrape.py
 
-If the session has expired, run auth.py first.
+Set SRP_USERNAME, SRP_PASSWORD, and TOTP_SECRET in .env to authenticate
+automatically.  If any are missing the browser opens for manual login.
 """
 
 import asyncio
@@ -20,14 +21,18 @@ from pathlib import Path
 
 import gspread
 import openpyxl
+import pyotp
 from dotenv import load_dotenv
 from google.oauth2.service_account import Credentials
 from playwright.async_api import async_playwright
 
 load_dotenv()
 
-SRP_URL  = os.environ.get('SRP_URL', 'https://usa.onlinesrp.org/')
-REGION   = 'Atlantic'
+SRP_URL      = os.environ.get('SRP_URL', 'https://usa.onlinesrp.org/')
+SRP_USERNAME = os.environ.get('SRP_USERNAME', '').strip()
+SRP_PASSWORD = os.environ.get('SRP_PASSWORD', '').strip()
+TOTP_SECRET  = os.environ.get('TOTP_SECRET', '').strip()
+REGION       = 'Atlantic'
 TIMEOUT  = 60_000  # ms
 
 SHEET_ID         = '1w8eRljld_O4vkSPNwRuKWO6YL7uJIJXZ3AtqWUPi5Eo'
@@ -38,6 +43,49 @@ DATA_START_ROW   = 2  # row 1 will be a header written by this script
 SERVICE_ACCOUNT  = Path.home() / '.google-service-account.json'
 SESSION_FILE     = Path(__file__).parent / 'session.json'
 EXPORTS_DIR      = Path(__file__).parent / 'exports'
+
+
+# ── Authentication ────────────────────────────────────────────────────────────
+
+async def authenticate(page):
+    """Fill credentials and TOTP on the login + verification pages."""
+    print('Authenticating...')
+
+    # Step 1: username + password
+    await page.locator('#txtUserName').wait_for(state='visible')
+    await page.locator('#txtUserName').fill(SRP_USERNAME)
+    await page.locator('#txtPassword').fill(SRP_PASSWORD)
+    await page.keyboard.press('Enter')
+
+    # Step 2: TOTP on the Account Verification page
+    await page.wait_for_url(lambda url: 'login' not in url.lower(), timeout=TIMEOUT)
+    code = pyotp.TOTP(TOTP_SECRET).now()
+    await page.locator('#txtVerificationCode').wait_for(state='visible')
+    await page.locator('#txtVerificationCode').fill(code)
+    await page.get_by_role('button', name='Continue').click()
+
+    await page.wait_for_url(lambda url: 'verification' not in url.lower(), timeout=TIMEOUT)
+    await page.wait_for_timeout(2_000)
+    print('  Authenticated.')
+
+
+# ── TOTP watchdog ─────────────────────────────────────────────────────────────
+
+async def totp_watchdog(page, stop_event):
+    """Background task: fills TOTP whenever a mid-session verification prompt appears."""
+    while not stop_event.is_set():
+        try:
+            await asyncio.wait_for(
+                page.locator('#txtVerificationCode').wait_for(state='visible'),
+                timeout=2.0,
+            )
+            print('  Mid-session TOTP prompt detected — filling automatically.')
+            code = pyotp.TOTP(TOTP_SECRET).now()
+            await page.locator('#txtVerificationCode').fill(code)
+            await page.get_by_role('button', name='Continue').click()
+            await page.wait_for_timeout(1_000)
+        except Exception:
+            pass
 
 
 # ── Navigation ────────────────────────────────────────────────────────────────
@@ -230,33 +278,36 @@ def write_education(records):
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 async def main():
-    if not SESSION_FILE.exists():
-        print('No session found. Run auth.py first.')
-        return
-
     EXPORTS_DIR.mkdir(exist_ok=True)
 
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=False)
-        context = await browser.new_context(
-            storage_state=str(SESSION_FILE),
-            accept_downloads=True,
-        )
+        context = await browser.new_context(accept_downloads=True)
         page = await context.new_page()
         page.set_default_timeout(TIMEOUT)
         page.set_default_navigation_timeout(TIMEOUT)
 
         await page.goto(SRP_URL)
-        await page.wait_for_load_state('networkidle')
+        await page.wait_for_load_state('domcontentloaded')
+        await page.wait_for_timeout(2_000)
+
         if 'login' in page.url.lower():
-            print('Session expired. Run auth.py to re-authenticate.')
-            await browser.close()
-            return
+            if SRP_USERNAME and SRP_PASSWORD and TOTP_SECRET:
+                await authenticate(page)
+            else:
+                print('Not logged in. Set SRP_USERNAME, SRP_PASSWORD, and TOTP_SECRET in .env, or log in manually and press Enter.')
+                input()
 
-        await set_scope(page)
+        stop_event = asyncio.Event()
+        watchdog = asyncio.create_task(totp_watchdog(page, stop_event))
 
-        dev_bytes = await scrape_devotionals(page)
-        edu_bytes = await scrape_education(page)
+        try:
+            await set_scope(page)
+            dev_bytes = await scrape_devotionals(page)
+            edu_bytes = await scrape_education(page)
+        finally:
+            stop_event.set()
+            await watchdog
 
         await browser.close()
 
