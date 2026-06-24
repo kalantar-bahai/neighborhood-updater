@@ -164,11 +164,16 @@ async def scrape_locality(page, locality: str) -> bytes | None:
         await page.wait_for_timeout(500)
         # Step 2: select the locality from the treeview (span.k-in avoids matching the scope button)
         await page.locator('span.k-in').filter(has_text=locality).click()
-        # Wait for the loading modal to clear before interacting with the sidebar
-        await page.locator('.modal.app-modal-dlg-container.in').wait_for(state='hidden', timeout=TIMEOUT)
+        # Confirm scope changed — dropdown button will contain the locality name once ready
+        await page.locator('#dropdownLocationSelector').filter(has_text=locality).wait_for(
+            state='visible', timeout=TIMEOUT
+        )
         # Step 3: click Locality Summary (appears in sidebar now that scope is a locality)
         await page.get_by_role('button', name='Locality Summary').click()
-        await page.wait_for_timeout(500)
+        # Wait for report to finish loading — Export button appears once data is ready
+        await page.get_by_role('button', name='Export Data |').wait_for(
+            state='visible', timeout=TIMEOUT
+        )
         # Step 4: export Excel
         return await download_excel(page, EXPORTS_DIR)
     except Exception as e:
