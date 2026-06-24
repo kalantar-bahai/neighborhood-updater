@@ -22,10 +22,12 @@ from srp_lib.browser import launch_browser, download_excel
 from srp_lib.sheets import open_sheet
 
 SHEET_ID    = '1wV1kZZd-vkxfIEqU-PlEl5aMPr6Bk2c7VOvKiyxxv5k'
-EXPORTS_DIR = Path(__file__).parent / 'exports'
-TIMEOUT     = 60_000
-HEADER_ROWS = 3    # rows 1–3 are headers; data starts at row 4
-DATE_COL    = 4    # column E, 0-indexed
+EXPORTS_DIR          = Path(__file__).parent / 'exports'
+TIMEOUT              = 60_000
+HEADER_ROWS          = 3       # rows 1–3 are headers; data starts at row 4
+DATE_COL             = 4       # column E, 0-indexed
+INTER_LOCALITY_DELAY = 10_000  # ms between locality requests; reduces server load
+MAX_RETRIES          = 2
 
 LOCALITIES = [
     'Apex', 'Carrboro', 'Cary', 'Chapel Hill',
@@ -147,43 +149,56 @@ def write_locality_data(tab, row_values: list, new_date_val) -> None:
         print(f'  Overwrote last row (Date as of: {new_date_val}).')
 
 
+async def navigate_to_locality_summary(page):
+    """Navigate to Reports → Locality Summary from any page state (including home)."""
+    await page.get_by_role('link', name='Reports').click()
+    await page.wait_for_timeout(1_000)
+    await page.get_by_role('button', name='Locality Summary').click()
+    await page.wait_for_timeout(1_000)
+
+
 async def scrape_locality(page, locality: str) -> bytes | None:
-    """Change scope to locality, click Locality Summary, export Excel.
+    """Change scope to locality, click Locality Summary, export Excel. Returns None on failure."""
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            if attempt > 1:
+                print(f'  Retrying {locality!r} (attempt {attempt})...')
+                await navigate_to_locality_summary(page)
 
-    Navigation order (per Task 3 schema discovery):
-    1. Click the scope button (shows current selection containing 'United States')
-    2. Select the locality from the treeview
-    3. Click the 'Locality Summary' button (only appears after scope is set to a locality)
-    4. Export Excel
+            # Open scope dropdown and select the locality (exact match avoids substring collisions)
+            await page.locator('#dropdownLocationSelector').click()
+            await page.wait_for_timeout(500)
+            await page.locator(f'span.k-in:text-is("{locality}")').click()
 
-    Returns None on failure.
-    """
-    try:
-        # Step 1: open the scope dropdown (button label shows current scope)
-        await page.locator('#dropdownLocationSelector').click()
-        await page.wait_for_timeout(500)
-        # Step 2: select the locality from the treeview (:text-is() is exact, avoids partial matches)
-        await page.locator(f'span.k-in:text-is("{locality}")').click()
-        # Confirm scope changed — dropdown button will contain the locality name once ready
-        await page.locator('#dropdownLocationSelector').filter(has_text=locality).wait_for(
-            state='visible', timeout=TIMEOUT
-        )
-        # SRP shows a loading modal while it fetches locality data; some localities are slow.
-        # Wait up to 5 minutes for it to clear before interacting with the sidebar.
-        await page.locator('.modal.app-modal-dlg-container.in').wait_for(
-            state='hidden', timeout=300_000
-        )
-        # Step 3: click Locality Summary (appears in sidebar now that scope is a locality)
-        await page.get_by_role('button', name='Locality Summary').click()
-        # Wait for report to finish loading — Export button appears once data is ready
-        await page.get_by_role('button', name='Export Data |').wait_for(
-            state='visible', timeout=TIMEOUT
-        )
-        # Step 4: export Excel
-        return await download_excel(page, EXPORTS_DIR)
-    except Exception as e:
-        print(f'  WARNING: skipping {locality!r}: {e}')
-        return None
+            # Confirm scope changed before interacting further
+            await page.locator('#dropdownLocationSelector').filter(has_text=locality).wait_for(
+                state='visible', timeout=TIMEOUT
+            )
+
+            # SRP shows a loading modal while fetching locality data; some localities are slow
+            await page.locator('.modal.app-modal-dlg-container.in').wait_for(
+                state='hidden', timeout=300_000
+            )
+
+            # Locality Summary button only appears at locality scope
+            await page.get_by_role('button', name='Locality Summary').click()
+            await page.get_by_role('button', name='Export Data |').wait_for(
+                state='visible', timeout=300_000
+            )
+            return await download_excel(page, EXPORTS_DIR, timeout=300_000)
+
+        except Exception as e:
+            short = str(e).split('\n')[0]
+            if attempt < MAX_RETRIES:
+                print(f'  WARNING: attempt {attempt} failed for {locality!r} ({short}) — re-navigating and retrying')
+                try:
+                    await navigate_to_locality_summary(page)
+                except Exception:
+                    pass
+            else:
+                print(f'  WARNING: skipping {locality!r} after {MAX_RETRIES} attempts ({short})')
+
+    return None
 
 
 async def main():
@@ -214,7 +229,9 @@ async def main():
         await page.wait_for_timeout(500)
 
         locality_bytes: dict[str, bytes] = {}
-        for locality in LOCALITIES:
+        for i, locality in enumerate(LOCALITIES):
+            if i > 0:
+                await page.wait_for_timeout(INTER_LOCALITY_DELAY)
             print(f'Scraping {locality}...')
             data = await scrape_locality(page, locality)
             if data is not None:
