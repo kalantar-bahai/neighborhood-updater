@@ -16,22 +16,16 @@ automatically.  If any are missing the browser opens for manual login.
 
 import asyncio
 import io
-import os
 from pathlib import Path
 
-import gspread
 import openpyxl
-import pyotp
-from dotenv import load_dotenv
-from google.oauth2.service_account import Credentials
 from playwright.async_api import async_playwright
 
-load_dotenv()
+from srp_lib.auth import load_credentials, authenticate, totp_watchdog
+from srp_lib.browser import launch_browser, download_excel
+from srp_lib.browser import click as srp_click
+from srp_lib.sheets import open_sheet
 
-SRP_URL      = os.environ.get('SRP_URL', 'https://usa.onlinesrp.org/')
-SRP_USERNAME = os.environ.get('SRP_USERNAME', '').strip()
-SRP_PASSWORD = os.environ.get('SRP_PASSWORD', '').strip()
-TOTP_SECRET  = os.environ.get('TOTP_SECRET', '').strip()
 REGION       = 'Atlantic'
 TIMEOUT  = 60_000  # ms
 
@@ -40,52 +34,7 @@ TAB_DEVOTIONALS  = 'Devotionals'
 TAB_EDUCATION    = 'Education'
 DATA_START_ROW   = 2  # row 1 will be a header written by this script
 
-SERVICE_ACCOUNT  = Path.home() / '.google-service-account.json'
-SESSION_FILE     = Path(__file__).parent / 'session.json'
 EXPORTS_DIR      = Path(__file__).parent / 'exports'
-
-
-# ── Authentication ────────────────────────────────────────────────────────────
-
-async def authenticate(page):
-    """Fill credentials and TOTP on the login + verification pages."""
-    print('Authenticating...')
-
-    # Step 1: username + password
-    await page.locator('#txtUserName').wait_for(state='visible')
-    await page.locator('#txtUserName').fill(SRP_USERNAME)
-    await page.locator('#txtPassword').fill(SRP_PASSWORD)
-    await page.keyboard.press('Enter')
-
-    # Step 2: TOTP on the Account Verification page
-    await page.wait_for_url(lambda url: 'login' not in url.lower(), timeout=TIMEOUT)
-    code = pyotp.TOTP(TOTP_SECRET).now()
-    await page.locator('#txtVerificationCode').wait_for(state='visible')
-    await page.locator('#txtVerificationCode').fill(code)
-    await page.get_by_role('button', name='Continue').click()
-
-    await page.wait_for_url(lambda url: 'verification' not in url.lower(), timeout=TIMEOUT)
-    await page.wait_for_timeout(2_000)
-    print('  Authenticated.')
-
-
-# ── TOTP watchdog ─────────────────────────────────────────────────────────────
-
-async def totp_watchdog(page, stop_event):
-    """Background task: fills TOTP whenever a mid-session verification prompt appears."""
-    while not stop_event.is_set():
-        try:
-            await asyncio.wait_for(
-                page.locator('#txtVerificationCode').wait_for(state='visible'),
-                timeout=2.0,
-            )
-            print('  Mid-session TOTP prompt detected — filling automatically.')
-            code = pyotp.TOTP(TOTP_SECRET).now()
-            await page.locator('#txtVerificationCode').fill(code)
-            await page.get_by_role('button', name='Continue').click()
-            await page.wait_for_timeout(1_000)
-        except Exception:
-            pass
 
 
 # ── Navigation ────────────────────────────────────────────────────────────────
@@ -94,49 +43,28 @@ async def set_scope(page):
     btn = page.locator('#dropdownLocationSelector')
     await btn.wait_for(state='visible')
     await btn.click()
-    await page.wait_for_timeout(DELAY)
+    await page.wait_for_timeout(500)
     await page.get_by_text(REGION, exact=True).first.click()
-    await page.wait_for_timeout(DELAY)
-
-
-async def download_excel(page):
-    """Click Export Data → Excel, return file bytes."""
-    await page.get_by_role('button', name='Export Data |').click()
-    await page.wait_for_timeout(300)
-    async with page.expect_download(timeout=TIMEOUT) as dl:
-        await page.get_by_role('link', name='Excel').click()
-    download = await dl.value
-    path = EXPORTS_DIR / download.suggested_filename
-    await download.save_as(path)
-    print(f'  Downloaded: {path.name}')
-    return path.read_bytes()
-
-
-DELAY = 500  # ms between clicks to avoid rate limiting
-
-
-async def click(page, locator):
-    await locator.click()
-    await page.wait_for_timeout(DELAY)
+    await page.wait_for_timeout(500)
 
 
 async def scrape_devotionals(page):
     print('Scraping devotionals report...')
-    await click(page, page.get_by_role('link', name='Locations'))
-    await click(page, page.get_by_role('button', name='Clusters'))
-    await click(page, page.get_by_role('link', name='Focus Neighbourhoods'))
-    return await download_excel(page)
+    await srp_click(page, page.get_by_role('link', name='Locations'))
+    await srp_click(page, page.get_by_role('button', name='Clusters'))
+    await srp_click(page, page.get_by_role('link', name='Focus Neighbourhoods'))
+    return await download_excel(page, EXPORTS_DIR, timeout=TIMEOUT)
 
 
 async def scrape_education(page):
     print('Scraping education report...')
-    await click(page, page.get_by_role('link', name='Reports'))
-    await click(page, page.get_by_role('button', name='General Reports'))
-    await click(page, page.get_by_role('link', name='Institute Reports'))
-    await click(page, page.get_by_role('button', name='All Educational Core'))
-    await click(page, page.get_by_role('button', name='By Region'))
-    await click(page, page.get_by_role('link', name='By Focus Neighbourhood'))
-    return await download_excel(page)
+    await srp_click(page, page.get_by_role('link', name='Reports'))
+    await srp_click(page, page.get_by_role('button', name='General Reports'))
+    await srp_click(page, page.get_by_role('link', name='Institute Reports'))
+    await srp_click(page, page.get_by_role('button', name='All Educational Core'))
+    await srp_click(page, page.get_by_role('button', name='By Region'))
+    await srp_click(page, page.get_by_role('link', name='By Focus Neighbourhood'))
+    return await download_excel(page, EXPORTS_DIR, timeout=TIMEOUT)
 
 
 # ── Excel parsing ─────────────────────────────────────────────────────────────
@@ -219,21 +147,8 @@ def parse_education(xlsx_bytes):
 
 # ── Google Sheet writer ───────────────────────────────────────────────────────
 
-def open_sheet(tab_name):
-    creds = Credentials.from_service_account_file(
-        SERVICE_ACCOUNT,
-        scopes=['https://www.googleapis.com/auth/spreadsheets'],
-    )
-    gc = gspread.authorize(creds)
-    spreadsheet = gc.open_by_key(SHEET_ID)
-    try:
-        return spreadsheet.worksheet(tab_name)
-    except gspread.exceptions.WorksheetNotFound:
-        return spreadsheet.add_worksheet(title=tab_name, rows=500, cols=30)
-
-
 def write_tab(tab_name, headers, records):
-    sheet = open_sheet(tab_name)
+    sheet = open_sheet(SHEET_ID, tab_name)
     sheet.clear()
     sheet.update(values=[headers] + records, range_name='A1')
     print(f'  Wrote {len(records)} rows to "{tab_name}" tab.')
@@ -278,28 +193,28 @@ def write_education(records):
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 async def main():
+    creds = load_credentials()
     EXPORTS_DIR.mkdir(exist_ok=True)
 
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=False)
-        context = await browser.new_context(accept_downloads=True)
+        browser, context = await launch_browser(pw)
         page = await context.new_page()
         page.set_default_timeout(TIMEOUT)
         page.set_default_navigation_timeout(TIMEOUT)
 
-        await page.goto(SRP_URL)
+        await page.goto(creds['url'])
         await page.wait_for_load_state('domcontentloaded')
         await page.wait_for_timeout(2_000)
 
         if 'login' in page.url.lower():
-            if SRP_USERNAME and SRP_PASSWORD and TOTP_SECRET:
-                await authenticate(page)
+            if creds['username'] and creds['password'] and creds['totp_secret']:
+                await authenticate(page, creds['username'], creds['password'], creds['totp_secret'])
             else:
-                print('Not logged in. Set SRP_USERNAME, SRP_PASSWORD, and TOTP_SECRET in .env, or log in manually and press Enter.')
+                print('Not logged in. Set credentials in .env, or log in manually and press Enter.')
                 input()
 
         stop_event = asyncio.Event()
-        watchdog = asyncio.create_task(totp_watchdog(page, stop_event))
+        watchdog = asyncio.create_task(totp_watchdog(page, stop_event, creds['totp_secret']))
 
         try:
             await set_scope(page)
