@@ -7,3 +7,5 @@ srp-cache/exports/
 srp-cache/.venv/
 .superpowers/
 *.swp
+__pycache__/
+*.pyc
