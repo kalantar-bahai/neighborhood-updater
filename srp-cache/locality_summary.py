@@ -168,6 +168,11 @@ async def scrape_locality(page, locality: str) -> bytes | None:
         await page.locator('#dropdownLocationSelector').filter(has_text=locality).wait_for(
             state='visible', timeout=TIMEOUT
         )
+        # SRP shows a loading modal while it fetches locality data; some localities are slow.
+        # Wait up to 5 minutes for it to clear before interacting with the sidebar.
+        await page.locator('.modal.app-modal-dlg-container.in').wait_for(
+            state='hidden', timeout=300_000
+        )
         # Step 3: click Locality Summary (appears in sidebar now that scope is a locality)
         await page.get_by_role('button', name='Locality Summary').click()
         # Wait for report to finish loading — Export button appears once data is ready
