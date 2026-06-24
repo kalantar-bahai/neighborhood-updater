@@ -99,7 +99,15 @@ def parse_row(xlsx_bytes: bytes) -> list:
     wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes), read_only=True, data_only=True)
     ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
-    return ['' if v is None else v for v in rows[3]]
+
+    def _coerce(v):
+        if v is None:
+            return ''
+        if isinstance(v, (datetime.datetime, datetime.date)):
+            return v.strftime('%Y-%m-%d')
+        return v
+
+    return [_coerce(v) for v in rows[3]]
 
 
 def parse_date(v) -> datetime.date:
@@ -108,13 +116,20 @@ def parse_date(v) -> datetime.date:
     Accepts:
     - datetime.datetime (returned by openpyxl for date cells)
     - datetime.date
-    - str in '%m/%d/%y' format (e.g. '5/3/26' or '11/9/25')
+    - str in ISO format '%Y-%m-%d' (produced by parse_row after coercion)
+    - str in '%m/%d/%y' format (e.g. '5/3/26') from sheet reads
     """
     if isinstance(v, datetime.datetime):
         return v.date()
     if isinstance(v, datetime.date):
         return v
-    return datetime.datetime.strptime(str(v), '%m/%d/%y').date()
+    s = str(v)
+    for fmt in ('%Y-%m-%d', '%m/%d/%y'):
+        try:
+            return datetime.datetime.strptime(s, fmt).date()
+        except ValueError:
+            pass
+    raise ValueError(f'Unrecognised date format: {s!r}')
 
 
 def should_append(last_date_str: str | None, new_date_str: str) -> bool:
