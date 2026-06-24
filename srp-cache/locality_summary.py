@@ -9,11 +9,17 @@ Set SRP_USERNAME, SRP_PASSWORD, and TOTP_SECRET in .env to authenticate
 automatically. If any are missing the browser opens for manual login.
 """
 
+import asyncio
 import datetime
 import io
 from pathlib import Path
 
 import openpyxl
+from playwright.async_api import async_playwright
+
+from srp_lib.auth import load_credentials, authenticate, totp_watchdog
+from srp_lib.browser import launch_browser, download_excel
+from srp_lib.sheets import open_sheet
 
 SHEET_ID    = '1wV1kZZd-vkxfIEqU-PlEl5aMPr6Bk2c7VOvKiyxxv5k'
 EXPORTS_DIR = Path(__file__).parent / 'exports'
@@ -114,3 +120,121 @@ def should_append(last_date_str: str | None, new_date_str: str) -> bool:
     if last_date_str is None:
         return True
     return parse_date(new_date_str) != parse_date(last_date_str)
+
+
+def write_locality_data(tab, row_values: list, new_date_val) -> None:
+    """Overwrite the last data row if date matches, otherwise append a new row.
+
+    Inlines last-date extraction to avoid a double get_all_values() round-trip.
+    new_date_val may be a datetime.datetime, datetime.date, or str.
+    """
+    all_values = tab.get_all_values()
+    data_rows = all_values[HEADER_ROWS:]
+
+    last_date = None
+    if data_rows:
+        last_row = data_rows[-1]
+        if len(last_row) > DATE_COL and last_row[DATE_COL]:
+            last_date = last_row[DATE_COL]
+
+    if should_append(last_date, new_date_val):
+        next_row = HEADER_ROWS + len(data_rows) + 1  # 1-indexed sheet row
+        tab.update(values=[row_values], range_name=f'A{next_row}')
+        print(f'  Appended (Date as of: {new_date_val}).')
+    else:
+        last_row_num = HEADER_ROWS + len(data_rows)  # 1-indexed sheet row
+        tab.update(values=[row_values], range_name=f'A{last_row_num}')
+        print(f'  Overwrote last row (Date as of: {new_date_val}).')
+
+
+async def scrape_locality(page, locality: str) -> bytes | None:
+    """Change scope to locality, click Locality Summary, export Excel.
+
+    Navigation order (per Task 3 schema discovery):
+    1. Click the scope button (shows current selection containing 'United States')
+    2. Select the locality from the treeview
+    3. Click the 'Locality Summary' button (only appears after scope is set to a locality)
+    4. Export Excel
+
+    Returns None on failure.
+    """
+    try:
+        # Step 1: open the scope dropdown (button label shows current scope)
+        await page.get_by_role('button', name='United States', exact=False).click()
+        await page.wait_for_timeout(500)
+        # Step 2: select the locality from the treeview
+        await page.get_by_text(locality, exact=True).click()
+        await page.wait_for_timeout(1_000)
+        # Step 3: click Locality Summary (appears in sidebar now that scope is a locality)
+        await page.get_by_role('button', name='Locality Summary').click()
+        await page.wait_for_timeout(500)
+        # Step 4: export Excel
+        return await download_excel(page, EXPORTS_DIR)
+    except Exception as e:
+        print(f'  WARNING: skipping {locality!r}: {e}')
+        return None
+
+
+async def main():
+    creds = load_credentials()
+    EXPORTS_DIR.mkdir(exist_ok=True)
+
+    async with async_playwright() as pw:
+        browser, context = await launch_browser(pw)
+        page = await context.new_page()
+        page.set_default_timeout(TIMEOUT)
+        page.set_default_navigation_timeout(TIMEOUT)
+
+        await page.goto(creds['url'])
+        await page.wait_for_load_state('domcontentloaded')
+        await page.wait_for_timeout(2_000)
+
+        if 'login' in page.url.lower():
+            if creds['username'] and creds['password'] and creds['totp_secret']:
+                await authenticate(page, creds['username'], creds['password'], creds['totp_secret'])
+            else:
+                print('Not logged in. Set credentials in .env or log in manually and press Enter.')
+                input()
+
+        stop_event = asyncio.Event()
+        watchdog = asyncio.create_task(totp_watchdog(page, stop_event, creds['totp_secret']))
+
+        await page.get_by_role('link', name='Reports').click()
+        await page.wait_for_timeout(500)
+
+        locality_bytes: dict[str, bytes] = {}
+        for locality in LOCALITIES:
+            print(f'Scraping {locality}...')
+            data = await scrape_locality(page, locality)
+            if data is not None:
+                locality_bytes[locality] = data
+
+        stop_event.set()
+        await watchdog
+        await browser.close()
+
+    if not locality_bytes:
+        print('No localities downloaded — nothing to write.')
+        return
+
+    # Validate schema against the first successful download
+    first_data = next(iter(locality_bytes.values()))
+    actual_headers = extract_headers(first_data)
+    error = validate_columns(actual_headers, EXPECTED_COLUMNS)
+    if error:
+        print(error)
+        return
+
+    print('Writing to Google Sheet...')
+    for locality, data in locality_bytes.items():
+        row_values = parse_row(data)
+        new_date_val = row_values[DATE_COL]
+        tab = open_sheet(SHEET_ID, locality)
+        print(f'  {locality}:', end=' ')
+        write_locality_data(tab, row_values, new_date_val)
+
+    print('Done.')
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
