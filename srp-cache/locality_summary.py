@@ -162,8 +162,8 @@ async def scrape_locality(page, locality: str) -> bytes | None:
         # Step 1: open the scope dropdown (button label shows current scope)
         await page.locator('#dropdownLocationSelector').click()
         await page.wait_for_timeout(500)
-        # Step 2: select the locality from the treeview
-        await page.get_by_text(locality, exact=True).click()
+        # Step 2: select the locality from the treeview (span.k-in avoids matching the scope button)
+        await page.locator('span.k-in').filter(has_text=locality).click()
         await page.wait_for_timeout(1_000)
         # Step 3: click Locality Summary (appears in sidebar now that scope is a locality)
         await page.get_by_role('button', name='Locality Summary').click()
