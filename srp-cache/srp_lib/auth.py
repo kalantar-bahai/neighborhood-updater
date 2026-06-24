@@ -34,16 +34,21 @@ async def authenticate(page, username, password, totp_secret, timeout=60_000):
 
 
 async def totp_watchdog(page, stop_event, totp_secret):
+    # Poll with is_visible() (a snapshot, no hanging future) rather than
+    # wait_for(), which creates an internal future that triggers
+    # "Future exception was never retrieved" when cancelled at shutdown.
     while not stop_event.is_set():
         try:
-            await asyncio.wait_for(
-                page.locator('#txtVerificationCode').wait_for(state='visible'),
-                timeout=2.0,
-            )
-            print('  Mid-session TOTP prompt — filling automatically.')
-            code = pyotp.TOTP(totp_secret).now()
-            await page.locator('#txtVerificationCode').fill(code)
-            await page.get_by_role('button', name='Continue').click()
-            await page.wait_for_timeout(1_000)
+            await asyncio.sleep(2.0)
+            if stop_event.is_set():
+                return
+            if await page.locator('#txtVerificationCode').is_visible():
+                print('  Mid-session TOTP prompt — filling automatically.')
+                code = pyotp.TOTP(totp_secret).now()
+                await page.locator('#txtVerificationCode').fill(code)
+                await page.get_by_role('button', name='Continue').click()
+                await page.wait_for_timeout(1_000)
+        except asyncio.CancelledError:
+            return
         except Exception:
             pass
