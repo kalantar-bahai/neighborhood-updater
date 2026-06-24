@@ -222,7 +222,11 @@ async def main():
             edu_bytes = await scrape_education(page)
         finally:
             stop_event.set()
-            await watchdog
+            watchdog.cancel()
+            try:
+                await watchdog
+            except asyncio.CancelledError:
+                pass
 
         await browser.close()
 

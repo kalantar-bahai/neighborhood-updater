@@ -221,7 +221,11 @@ async def main():
                 locality_bytes[locality] = data
 
         stop_event.set()
-        await watchdog
+        watchdog.cancel()
+        try:
+            await watchdog
+        except asyncio.CancelledError:
+            pass
         await browser.close()
 
     if not locality_bytes:
