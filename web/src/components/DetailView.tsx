@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { NeighborhoodDetail, NeighborhoodRow, Activity, SrpData } from '@/types';
+import AccompaniersModal from './AccompaniersModal';
 
 interface Props {
   detail: NeighborhoodDetail;
@@ -37,14 +38,18 @@ function actTotal(acts: (Activity | undefined)[]) {
   }), { act: 0, part: 0, fof: 0 });
 }
 
-function Field({ label, value, onChange, readonly, type, integer }: {
+function Field({ label, value, onChange, readonly, type, integer, onLabelClick, highlighted }: {
   label: string; value: string; onChange?: (v: string) => void; readonly?: boolean; type?: string; integer?: boolean;
+  onLabelClick?: () => void; highlighted?: boolean;
 }) {
   const hasError = integer && !readonly && !isValidInt(value);
-  const cls = [readonly ? 'ro' : '', hasError ? 'error' : ''].filter(Boolean).join(' ');
+  const cls = [readonly ? 'ro' : '', hasError ? 'error' : '', highlighted ? 'overridden' : ''].filter(Boolean).join(' ');
   return (
     <div className="field">
-      <label>{label}</label>
+      {onLabelClick
+        ? <label onClick={onLabelClick} style={{ cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>{label} <IcoList /></label>
+        : <label>{label}</label>
+      }
       <input
         type={type || 'text'}
         value={value || ''}
@@ -166,6 +171,12 @@ const IcoSave = () => (
     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
   </svg>
 );
+const IcoList = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+    <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+  </svg>
+);
 
 // Bounding box centered in 540×310 viewBox (70px h-margin, 55px v-margin each side).
 // textY = top of ring at tx + 16, where top = cy - ry×√(1−((tx−cx)/rx)²)
@@ -214,6 +225,8 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
   const [lastUpdatedBy, setLastUpdatedBy] = useState('');
   const [lastUpdatedAt, setLastUpdatedAt] = useState('');
   const [showDiagram, setShowDiagram] = useState(false);
+  const [accompanierNames, setAccompanierNames] = useState<string[]>(() => detail.accompanierNames);
+  const [showAccompaniersModal, setShowAccompaniersModal] = useState(false);
 
   const set = useCallback(<K extends keyof FormState>(key: K, val: FormState[K]) => {
     setForm(f => ({ ...f, [key]: val }));
@@ -272,6 +285,9 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
     setIsDirty(false);
     setSaveStatus({ msg: '', type: 'idle' });
   }
+
+  const accompaniersMismatch = accompanierNames.length > 0 &&
+    accompanierNames.length !== parseInt(form.accompaniers || '0', 10);
 
   const edTotal  = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs]);
   const allTotal = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs, form.activities.devotionals]);
@@ -419,7 +435,14 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
           <div className="card-body">
             <div className="field-grid-2">
               <Field label="Protagonists / Workers"  value={form.protagonists} onChange={v => set('protagonists', v)} integer />
-              <Field label="Accompaniers in Nucleus" value={form.accompaniers} onChange={v => set('accompaniers', v)} integer />
+              <Field
+                label="Accompaniers in Nucleus"
+                value={form.accompaniers}
+                onChange={v => set('accompaniers', v)}
+                integer
+                highlighted={accompaniersMismatch}
+                onLabelClick={() => setShowAccompaniersModal(true)}
+              />
             </div>
             {srp?.facilitators && (
               <div className="srp-ref">SRP Facilitators: <strong>{srp.facilitators}</strong></div>
@@ -464,6 +487,15 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
             <ConcentricDiagram data={diagramData} />
           </div>
         </div>
+      )}
+
+      {showAccompaniersModal && (
+        <AccompaniersModal
+          neighborhood={row.neighborhood}
+          initialNames={accompanierNames}
+          onSave={names => { setAccompanierNames(names); setShowAccompaniersModal(false); }}
+          onClose={() => setShowAccompaniersModal(false)}
+        />
       )}
 
       <div className="footer">
