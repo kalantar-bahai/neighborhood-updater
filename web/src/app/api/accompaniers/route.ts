@@ -47,6 +47,6 @@ export const POST = auth(async (req) => {
     parentNeighborhood:  masterRow[COL.PARENT_NEIGHBORHOOD],
   };
 
-  await saveAccompanierNames(neighborhood, names, context);
+  await saveAccompanierNames(masterRow[COL.NEIGHBORHOOD], names, context);
   return NextResponse.json({ success: true });
 });
