@@ -75,3 +75,15 @@ export const EDU_COL = {
   SC_ACT: 7,  SC_PART: 8,  SC_FOF: 9,
   FACILITATORS: 10,
 } as const;
+
+export const ACCOMPANIERS_TAB = 'Accompaniers';
+export const ACCOMPANIERS_DATA_ROW = 2;
+
+export const ACC_COL = {
+  CLUSTER:             0,
+  CLUSTER_CODE:        1,
+  LOCALITY:            2,
+  PARENT_NEIGHBORHOOD: 3,
+  NEIGHBORHOOD:        4,
+  NAME:                5,
+} as const;

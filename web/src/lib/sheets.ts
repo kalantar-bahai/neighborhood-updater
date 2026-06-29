@@ -26,3 +26,9 @@ export async function sheetsBatchUpdate(
     requestBody: { valueInputOption: 'RAW', data },
   });
 }
+
+export async function sheetsClear(spreadsheetId: string, range: string): Promise<void> {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: 'v4', auth });
+  await sheets.spreadsheets.values.clear({ spreadsheetId, range });
+}
