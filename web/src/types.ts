@@ -65,6 +65,7 @@ export interface SrpData {
 export interface NeighborhoodDetail {
   row: NeighborhoodRow;
   srp: SrpData | null;
+  accompanierNames: string[];
 }
 
 export interface InitialData {

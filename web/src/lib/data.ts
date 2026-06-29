@@ -1,9 +1,10 @@
-import { sheetsGet, sheetsBatchUpdate } from './sheets';
+import { sheetsGet, sheetsBatchUpdate, sheetsClear } from './sheets';
 import {
   MASTER_SHEET_ID, SRP_SHEET_ID,
   MASTER_TAB, ACCESS_TAB, DEV_TAB, EDU_TAB,
   MASTER_DATA_ROW, SRP_DATA_ROW,
   COL, DEV_COL, EDU_COL,
+  ACCOMPANIERS_TAB, ACCOMPANIERS_DATA_ROW, ACC_COL,
 } from './config';
 
 function normalize(row: string[], numCols: number): string[] {
@@ -96,8 +97,8 @@ export function parseSrpData(devRow: string[] | null, eduRow: string[] | null) {
 }
 
 export async function getRowData(neighborhoodName: string) {
-  const [masterRows, devRows, eduRows] = await Promise.all([
-    getAllMasterRows(), getAllDevRows(), getAllEduRows(),
+  const [masterRows, devRows, eduRows, accompanierNames] = await Promise.all([
+    getAllMasterRows(), getAllDevRows(), getAllEduRows(), getAccompanierNames(neighborhoodName),
   ]);
 
   const masterRow = masterRows.find(r => norm(r[COL.NEIGHBORHOOD]) === norm(neighborhoodName));
@@ -114,7 +115,47 @@ export async function getRowData(neighborhoodName: string) {
   return {
     row: parseRow(masterRow),
     srp: parseSrpData(lookup(devRows, DEV_COL.NAME), lookup(eduRows, EDU_COL.NAME)),
+    accompanierNames,
   };
+}
+
+async function getAllAccompanierRows() {
+  const rows = await sheetsGet(MASTER_SHEET_ID, `${ACCOMPANIERS_TAB}!A${ACCOMPANIERS_DATA_ROW}:F`);
+  return rows.map(r => normalize(r, 6));
+}
+
+export async function getAccompanierNames(neighborhoodName: string): Promise<string[]> {
+  const rows = await getAllAccompanierRows();
+  const needle = norm(neighborhoodName);
+  return rows
+    .filter(r => norm(r[ACC_COL.NEIGHBORHOOD]) === needle)
+    .map(r => r[ACC_COL.NAME]);
+}
+
+export async function saveAccompanierNames(
+  neighborhoodName: string,
+  names: string[],
+  context: { cluster: string; clusterCode: string; locality: string; parentNeighborhood: string }
+): Promise<void> {
+  const allRows = await getAllAccompanierRows();
+  const needle = norm(neighborhoodName);
+  const otherRows = allRows.filter(r => norm(r[ACC_COL.NEIGHBORHOOD]) !== needle);
+  const newRows = names.map(name => [
+    context.cluster,
+    context.clusterCode,
+    context.locality,
+    context.parentNeighborhood,
+    neighborhoodName,
+    name,
+  ]);
+  const combined = [...otherRows, ...newRows];
+  await sheetsClear(MASTER_SHEET_ID, `${ACCOMPANIERS_TAB}!A${ACCOMPANIERS_DATA_ROW}:F`);
+  if (combined.length > 0) {
+    await sheetsBatchUpdate(MASTER_SHEET_ID, [{
+      range: `${ACCOMPANIERS_TAB}!A${ACCOMPANIERS_DATA_ROW}`,
+      values: combined,
+    }]);
+  }
 }
 
 export async function saveRowData(neighborhoodName: string, formData: Record<string, unknown>, userEmail: string) {
