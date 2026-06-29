@@ -50,6 +50,7 @@ export default function AccompaniersModal({ neighborhood, initialNames, onSave, 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Save failed');
       onSave(names);
+      onClose();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
