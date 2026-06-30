@@ -348,7 +348,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-          <button onClick={() => setShowDiagram(true)} title="Diagram" aria-label="Diagram" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
+          <button onClick={() => setShowDiagram(true)} title="Concentric Circle" aria-label="Concentric Circle" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
             <IcoDiagram />
           </button>
           <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" title="Open spreadsheet" aria-label="Open spreadsheet" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', textDecoration: 'none' }}>
