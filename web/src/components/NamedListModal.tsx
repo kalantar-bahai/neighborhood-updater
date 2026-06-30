@@ -3,13 +3,24 @@
 import { useState } from 'react';
 
 interface Props {
+  title: string;
+  type: string;
   neighborhood: string;
   initialNames: string[];
+  importNames?: string[];
   onSave: (names: string[]) => void;
   onClose: () => void;
 }
 
-export default function AccompaniersModal({ neighborhood, initialNames, onSave, onClose }: Props) {
+function IcoImport() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+  );
+}
+
+export default function NamedListModal({ title, type, neighborhood, initialNames, importNames, onSave, onClose }: Props) {
   const [names, setNames] = useState<string[]>(initialNames);
   const [input, setInput] = useState('');
   const [saving, setSaving] = useState(false);
@@ -38,14 +49,21 @@ export default function AccompaniersModal({ neighborhood, initialNames, onSave, 
     });
   }
 
+  function importFromList() {
+    if (!importNames) return;
+    const existing = new Set(names.map(n => n.toLowerCase().trim()));
+    const toAdd = importNames.filter(n => !existing.has(n.toLowerCase().trim()));
+    setNames(prev => [...prev, ...toAdd]);
+  }
+
   async function handleSave() {
     setSaving(true);
     setError('');
     try {
-      const res = await fetch('/api/accompaniers', {
+      const res = await fetch('/api/workers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ neighborhood, names }),
+        body: JSON.stringify({ neighborhood, type, names }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Save failed');
@@ -68,10 +86,20 @@ export default function AccompaniersModal({ neighborhood, initialNames, onSave, 
         style={{ background: 'white', borderRadius: 12, padding: '20px 24px', maxWidth: 480, width: '100%', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <div style={{ fontWeight: 700, fontSize: 15, color: '#2d3748' }}>Accompaniers in Nucleus</div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: '#2d3748' }}>{title}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#718096', lineHeight: 1, padding: 0 }}>×</button>
         </div>
         <div style={{ fontSize: 12, color: '#718096', marginBottom: 16 }}>{neighborhood}</div>
+
+        {importNames && importNames.length > 0 && (
+          <button
+            onClick={importFromList}
+            title="Import accompaniers"
+            style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', padding: '4px 8px', background: '#ebf8ff', border: '1px solid #bee3f8', borderRadius: 6, cursor: 'pointer', color: '#2b6cb0', marginBottom: 8 }}
+          >
+            <IcoImport />
+          </button>
+        )}
 
         <div style={{ overflowY: 'auto', flex: 1, marginBottom: 12 }}>
           {names.length === 0 && (
