@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { InitialData, NeighborhoodDetail } from '@/types';
+import { InitialData, NucleusDetail } from '@/types';
 import Picker from './Picker';
 import DetailView from './DetailView';
 
 export default function AppClient() {
   const [initialData, setInitialData] = useState<InitialData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [detail, setDetail] = useState<NeighborhoodDetail | null>(null);
+  const [detail, setDetail] = useState<NucleusDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   useEffect(() => {
@@ -17,21 +17,21 @@ export default function AppClient() {
       .then(data => {
         if (data.error) { setError(data.error); return; }
         setInitialData(data);
-        if (data.rows.length === 1) loadNeighborhood(data.rows[0].neighborhood);
+        if (data.rows.length === 1) loadNucleus(data.rows[0].nucleus);
       })
       .catch(() => setError('Failed to load. Please refresh.'));
   }, []);
 
-  function loadNeighborhood(name: string) {
+  function loadNucleus(name: string) {
     setLoadingDetail(true);
     setDetail(null);
-    fetch(`/api/neighborhood?name=${encodeURIComponent(name)}`)
+    fetch(`/api/nucleus?name=${encodeURIComponent(name)}`)
       .then(r => r.json())
       .then(data => {
         if (data.error) { setError(data.error); return; }
         setDetail(data);
       })
-      .catch(() => setError('Failed to load neighborhood.'))
+      .catch(() => setError('Failed to load nucleus.'))
       .finally(() => setLoadingDetail(false));
   }
 
@@ -75,7 +75,7 @@ export default function AppClient() {
       rows={initialData.rows}
       email={initialData.email}
       srpNames={initialData.srpNames}
-      onSelect={loadNeighborhood}
+      onSelect={loadNucleus}
       onSignOut={() => window.location.href = '/signout'}
     />
   );

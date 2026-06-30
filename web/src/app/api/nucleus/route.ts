@@ -15,7 +15,7 @@ export const GET = auth(async (req) => {
   if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400 });
 
   const { role, rows } = await getAuthorizedRows(req.auth.user.email);
-  const allowed = role === 'global' || rows.some(r => norm(r[COL.NEIGHBORHOOD]) === norm(name));
+  const allowed = role === 'global' || rows.some(r => norm(r[COL.NUCLEUS]) === norm(name));
   if (!allowed) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
   const data = await getRowData(name);
@@ -34,7 +34,7 @@ export const POST = auth(async (req) => {
 
   const email = req.auth.user.email;
   const { role, rows } = await getAuthorizedRows(email);
-  const allowed = role === 'global' || rows.some(r => norm(r[COL.NEIGHBORHOOD]) === norm(name));
+  const allowed = role === 'global' || rows.some(r => norm(r[COL.NUCLEUS]) === norm(name));
   if (!allowed) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
   const result = await saveRowData(name, formData, email);

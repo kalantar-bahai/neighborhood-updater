@@ -26,13 +26,13 @@ describe('parseRow', () => {
     const row = makeRow({
       [COL.GROUPING]: 'NC Piedmont',
       [COL.CLUSTER]: 'Charlotte Area',
-      [COL.NEIGHBORHOOD]: 'Albemarle Corridor',
+      [COL.NUCLEUS]: 'Albemarle Corridor',
       [COL.EMAIL]: 'mike@x.com',
     });
     const result = parseRow(row);
     expect(result.grouping).toBe('NC Piedmont');
     expect(result.cluster).toBe('Charlotte Area');
-    expect(result.neighborhood).toBe('Albemarle Corridor');
+    expect(result.nucleus).toBe('Albemarle Corridor');
     expect(result.email).toBe('mike@x.com');
   });
 
@@ -70,7 +70,7 @@ describe('parseRow', () => {
 
   test('empty row returns empty strings throughout', () => {
     const result = parseRow(new Array(48).fill(''));
-    expect(result.neighborhood).toBe('');
+    expect(result.nucleus).toBe('');
     expect(result.activities.ccs).toEqual({ act: '', part: '', fof: '' });
   });
 });
@@ -159,33 +159,33 @@ describe('getWorkerNames', () => {
 
   test('returns names in row order for matching neighborhood and type', async () => {
     mockSheetsGet.mockResolvedValue([
-      makeAccRow({ [ACC_COL.NEIGHBORHOOD]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Alice' }),
-      makeAccRow({ [ACC_COL.NEIGHBORHOOD]: 'Beta',  [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Bob' }),
-      makeAccRow({ [ACC_COL.NEIGHBORHOOD]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Charlie' }),
+      makeAccRow({ [ACC_COL.NUCLEUS]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Alice' }),
+      makeAccRow({ [ACC_COL.NUCLEUS]: 'Beta',  [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Bob' }),
+      makeAccRow({ [ACC_COL.NUCLEUS]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Charlie' }),
     ]);
     const result = await getWorkerNames('Alpha', 'accompanier');
     expect(result).toEqual(['Alice', 'Charlie']);
   });
 
-  test('is case-insensitive for both neighborhood and type', async () => {
+  test('is case-insensitive for both nucleus and type', async () => {
     mockSheetsGet.mockResolvedValue([
-      makeAccRow({ [ACC_COL.NEIGHBORHOOD]: 'ALPHA', [ACC_COL.TYPE]: 'Accompanier', [ACC_COL.NAME]: 'Alice' }),
+      makeAccRow({ [ACC_COL.NUCLEUS]: 'ALPHA', [ACC_COL.TYPE]: 'Accompanier', [ACC_COL.NAME]: 'Alice' }),
     ]);
     const result = await getWorkerNames('alpha', 'accompanier');
     expect(result).toEqual(['Alice']);
   });
 
-  test('returns empty when neighborhood matches but type does not', async () => {
+  test('returns empty when nucleus matches but type does not', async () => {
     mockSheetsGet.mockResolvedValue([
-      makeAccRow({ [ACC_COL.NEIGHBORHOOD]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Alice' }),
+      makeAccRow({ [ACC_COL.NUCLEUS]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Alice' }),
     ]);
     const result = await getWorkerNames('Alpha', 'protagonist');
     expect(result).toEqual([]);
   });
 
-  test('returns empty array when no rows match neighborhood', async () => {
+  test('returns empty array when no rows match nucleus', async () => {
     mockSheetsGet.mockResolvedValue([
-      makeAccRow({ [ACC_COL.NEIGHBORHOOD]: 'Beta', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Bob' }),
+      makeAccRow({ [ACC_COL.NUCLEUS]: 'Beta', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Bob' }),
     ]);
     const result = await getWorkerNames('Alpha', 'accompanier');
     expect(result).toEqual([]);
@@ -201,7 +201,7 @@ describe('getWorkerNames', () => {
 describe('saveWorkerNames', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  const ctx = { cluster: 'Charlotte', clusterCode: 'C1', locality: 'Charlotte', parentNeighborhood: '' };
+  const ctx = { cluster: 'Charlotte', clusterCode: 'C1', locality: 'Charlotte', parentNucleus: '' };
 
   function makeAccRow(overrides: Record<number, string> = {}): string[] {
     const row = new Array(7).fill('');
@@ -209,10 +209,10 @@ describe('saveWorkerNames', () => {
     return row;
   }
 
-  test('replaces rows for neighborhood+type and preserves other neighborhoods', async () => {
+  test('replaces rows for nucleus+type and preserves other nuclei', async () => {
     mockSheetsGet.mockResolvedValue([
-      makeAccRow({ [ACC_COL.NEIGHBORHOOD]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Old Name' }),
-      makeAccRow({ [ACC_COL.NEIGHBORHOOD]: 'Beta',  [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Bob' }),
+      makeAccRow({ [ACC_COL.NUCLEUS]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Old Name' }),
+      makeAccRow({ [ACC_COL.NUCLEUS]: 'Beta',  [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Bob' }),
     ]);
     mockSheetsClear.mockResolvedValue(undefined);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
@@ -223,15 +223,15 @@ describe('saveWorkerNames', () => {
     expect(mockSheetsBatchUpdate).toHaveBeenCalledOnce();
     const rows = mockSheetsBatchUpdate.mock.calls[0][1][0].values as string[][];
     expect(rows).toHaveLength(3);
-    expect(rows[0][ACC_COL.NEIGHBORHOOD]).toBe('Beta');
+    expect(rows[0][ACC_COL.NUCLEUS]).toBe('Beta');
     expect(rows[1]).toEqual(['Charlotte', 'C1', 'Charlotte', '', 'Alpha', 'accompanier', 'Alice']);
     expect(rows[2]).toEqual(['Charlotte', 'C1', 'Charlotte', '', 'Alpha', 'accompanier', 'Charlie']);
   });
 
   test('preserves rows of a different type for the same neighborhood', async () => {
     mockSheetsGet.mockResolvedValue([
-      makeAccRow({ [ACC_COL.NEIGHBORHOOD]: 'Alpha', [ACC_COL.TYPE]: 'protagonist', [ACC_COL.NAME]: 'ProtagA' }),
-      makeAccRow({ [ACC_COL.NEIGHBORHOOD]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'OldAcc' }),
+      makeAccRow({ [ACC_COL.NUCLEUS]: 'Alpha', [ACC_COL.TYPE]: 'protagonist', [ACC_COL.NAME]: 'ProtagA' }),
+      makeAccRow({ [ACC_COL.NUCLEUS]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'OldAcc' }),
     ]);
     mockSheetsClear.mockResolvedValue(undefined);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
@@ -246,7 +246,7 @@ describe('saveWorkerNames', () => {
 
   test('clears without writing when names list is empty', async () => {
     mockSheetsGet.mockResolvedValue([
-      makeAccRow({ [ACC_COL.NEIGHBORHOOD]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Alice' }),
+      makeAccRow({ [ACC_COL.NUCLEUS]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Alice' }),
     ]);
     mockSheetsClear.mockResolvedValue(undefined);
 

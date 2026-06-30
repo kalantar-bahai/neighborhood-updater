@@ -20,14 +20,14 @@ export const GET = auth(async (req) => {
   }
 
   const authorizedRows = rows
-    .filter(r => (r[COL.NEIGHBORHOOD] || '').trim() !== '')
+    .filter(r => (r[COL.NUCLEUS] || '').trim() !== '')
     .map(r => ({
-      neighborhood:       r[COL.NEIGHBORHOOD],
-      parentNeighborhood: r[COL.PARENT_NEIGHBORHOOD],
-      grouping:           r[COL.GROUPING],
-      cluster:            r[COL.CLUSTER],
-      locality:           r[COL.LOCALITY],
-      stage:              r[COL.STAGE],
+      nucleus:       r[COL.NUCLEUS],
+      parentNucleus: r[COL.PARENT_NUCLEUS],
+      grouping:      r[COL.GROUPING],
+      cluster:       r[COL.CLUSTER],
+      locality:      r[COL.LOCALITY],
+      stage:         r[COL.STAGE],
     }));
 
   const devRows = await getAllDevRows();

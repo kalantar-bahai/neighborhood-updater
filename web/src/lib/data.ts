@@ -44,8 +44,8 @@ export function parseRow(row: string[]) {
     pg:                  row[COL.PG],
     clusterCode:         row[COL.CLUSTER_CODE],
     locality:            row[COL.LOCALITY],
-    neighborhood:        row[COL.NEIGHBORHOOD],
-    parentNeighborhood:  row[COL.PARENT_NEIGHBORHOOD],
+    nucleus:             row[COL.NUCLEUS],
+    parentNucleus:       row[COL.PARENT_NUCLEUS],
     stage:               row[COL.STAGE],
     contact:             row[COL.CONTACT],
     email:               row[COL.EMAIL],
@@ -96,20 +96,20 @@ export function parseSrpData(devRow: string[] | null, eduRow: string[] | null) {
   };
 }
 
-export async function getRowData(neighborhoodName: string) {
+export async function getRowData(nucleusName: string) {
   const [masterRows, devRows, eduRows, accompanierNames, protagonistNames] = await Promise.all([
     getAllMasterRows(), getAllDevRows(), getAllEduRows(),
-    getWorkerNames(neighborhoodName, 'accompanier'),
-    getWorkerNames(neighborhoodName, 'protagonist'),
+    getWorkerNames(nucleusName, 'accompanier'),
+    getWorkerNames(nucleusName, 'protagonist'),
   ]);
 
-  const masterRow = masterRows.find(r => norm(r[COL.NEIGHBORHOOD]) === norm(neighborhoodName));
+  const masterRow = masterRows.find(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
   if (!masterRow) return null;
 
   const lookup = (rows: string[][], nameCol: number) => {
-    let match = findSrpRow(neighborhoodName, rows, nameCol);
-    if (!match && masterRow[COL.PARENT_NEIGHBORHOOD]) {
-      match = findSrpRow(`${masterRow[COL.PARENT_NEIGHBORHOOD]} - ${neighborhoodName}`, rows, nameCol);
+    let match = findSrpRow(nucleusName, rows, nameCol);
+    if (!match && masterRow[COL.PARENT_NUCLEUS]) {
+      match = findSrpRow(`${masterRow[COL.PARENT_NUCLEUS]} - ${nucleusName}`, rows, nameCol);
     }
     return match;
   };
@@ -127,31 +127,31 @@ async function getAllWorkerRows() {
   return rows.map(r => normalize(r, 7));
 }
 
-export async function getWorkerNames(neighborhoodName: string, type: string): Promise<string[]> {
+export async function getWorkerNames(nucleusName: string, type: string): Promise<string[]> {
   const rows = await getAllWorkerRows();
-  const needle = norm(neighborhoodName);
+  const needle = norm(nucleusName);
   return rows
-    .filter(r => norm(r[ACC_COL.NEIGHBORHOOD]) === needle && norm(r[ACC_COL.TYPE]) === norm(type))
+    .filter(r => norm(r[ACC_COL.NUCLEUS]) === needle && norm(r[ACC_COL.TYPE]) === norm(type))
     .map(r => r[ACC_COL.NAME]);
 }
 
 export async function saveWorkerNames(
-  neighborhoodName: string,
+  nucleusName: string,
   type: string,
   names: string[],
-  context: { cluster: string; clusterCode: string; locality: string; parentNeighborhood: string }
+  context: { cluster: string; clusterCode: string; locality: string; parentNucleus: string }
 ): Promise<void> {
   const allRows = await getAllWorkerRows();
-  const needle = norm(neighborhoodName);
+  const needle = norm(nucleusName);
   const otherRows = allRows.filter(r =>
-    !(norm(r[ACC_COL.NEIGHBORHOOD]) === needle && norm(r[ACC_COL.TYPE]) === norm(type))
+    !(norm(r[ACC_COL.NUCLEUS]) === needle && norm(r[ACC_COL.TYPE]) === norm(type))
   );
   const newRows = names.map(name => [
     context.cluster,
     context.clusterCode,
     context.locality,
-    context.parentNeighborhood,
-    neighborhoodName,
+    context.parentNucleus,
+    nucleusName,
     type,
     name,
   ]);
@@ -165,10 +165,10 @@ export async function saveWorkerNames(
   }
 }
 
-export async function saveRowData(neighborhoodName: string, formData: Record<string, unknown>, userEmail: string) {
+export async function saveRowData(nucleusName: string, formData: Record<string, unknown>, userEmail: string) {
   const allRows = await getAllMasterRows();
-  const rowIndex = allRows.findIndex(r => norm(r[COL.NEIGHBORHOOD]) === norm(neighborhoodName));
-  if (rowIndex === -1) throw new Error(`Row not found: ${neighborhoodName}`);
+  const rowIndex = allRows.findIndex(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
+  if (rowIndex === -1) throw new Error(`Row not found: ${nucleusName}`);
 
   const sheetRow = MASTER_DATA_ROW + rowIndex;
   const d = formData as any;

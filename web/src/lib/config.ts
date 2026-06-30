@@ -1,7 +1,7 @@
 export const MASTER_SHEET_ID = process.env.MASTER_SHEET_ID!;
 export const SRP_SHEET_ID    = process.env.SRP_SHEET_ID!;
 
-export const MASTER_TAB  = 'Neighborhoods';
+export const MASTER_TAB  = 'Nuclei';
 export const ACCESS_TAB  = 'GlobalAccess';
 export const DEV_TAB     = 'Devotionals';
 export const EDU_TAB     = 'Education';
@@ -15,8 +15,8 @@ export const COL = {
   PG:                  2,
   CLUSTER_CODE:        3,
   LOCALITY:            4,
-  NEIGHBORHOOD:        5,
-  PARENT_NEIGHBORHOOD: 6,
+  NUCLEUS:             5,
+  PARENT_NUCLEUS:      6,
   STAGE:               7,
   CONTACT:             8,
   EMAIL:               9,
@@ -85,8 +85,8 @@ export const ACC_COL = {
   CLUSTER:             0,
   CLUSTER_CODE:        1,
   LOCALITY:            2,
-  PARENT_NEIGHBORHOOD: 3,
-  NEIGHBORHOOD:        4,
+  PARENT_NUCLEUS:      3,
+  NUCLEUS:             4,
   TYPE:                5,
   NAME:                6,
 } as const;

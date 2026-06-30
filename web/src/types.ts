@@ -4,18 +4,18 @@ export interface Activity {
   fof: string;
 }
 
-export interface NeighborhoodSummary {
-  neighborhood: string;
-  parentNeighborhood: string;
+export interface NucleusSummary {
+  nucleus: string;
+  parentNucleus: string;
   grouping: string;
   cluster: string;
   locality: string;
   stage: string;
 }
 
-export interface NeighborhoodRow {
-  neighborhood: string;
-  parentNeighborhood: string;
+export interface NucleusRow {
+  nucleus: string;
+  parentNucleus: string;
   grouping: string;
   cluster: string;
   pg: string;
@@ -62,8 +62,8 @@ export interface SrpData {
   devotionals: Activity | null;
 }
 
-export interface NeighborhoodDetail {
-  row: NeighborhoodRow;
+export interface NucleusDetail {
+  row: NucleusRow;
   srp: SrpData | null;
   accompanierNames: string[];
   protagonistNames: string[];
@@ -71,13 +71,13 @@ export interface NeighborhoodDetail {
 
 export interface InitialData {
   role: 'global' | 'contact';
-  rows: NeighborhoodSummary[];
+  rows: NucleusSummary[];
   email: string;
   srpNames: string[];
   spreadsheetUrl: string;
 }
 
-export type FormData = Omit<NeighborhoodRow,
-  'neighborhood' | 'parentNeighborhood' | 'grouping' | 'cluster' |
+export type FormData = Omit<NucleusRow,
+  'nucleus' | 'parentNucleus' | 'grouping' | 'cluster' |
   'pg' | 'clusterCode'
 >;

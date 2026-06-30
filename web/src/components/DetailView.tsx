@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { NeighborhoodDetail, NeighborhoodRow, Activity, SrpData } from '@/types';
+import { NucleusDetail, NucleusRow, Activity, SrpData } from '@/types';
 import NamedListModal from './NamedListModal';
 
 interface Props {
-  detail: NeighborhoodDetail;
+  detail: NucleusDetail;
   email: string;
   showBack: boolean;
   spreadsheetUrl: string;
@@ -13,10 +13,10 @@ interface Props {
   onSaved: (savedBy: string, savedAt: string) => void;
 }
 
-type FormState = Omit<NeighborhoodRow, 'neighborhood' | 'parentNeighborhood' | 'grouping' | 'cluster' | 'pg' | 'clusterCode'>;
+type FormState = Omit<NucleusRow, 'nucleus' | 'parentNucleus' | 'grouping' | 'cluster' | 'pg' | 'clusterCode'>;
 
-function rowToForm(row: NeighborhoodRow): FormState {
-  const { neighborhood: _n, parentNeighborhood: _p, grouping: _g, cluster: _c, pg: _pg, clusterCode: _cc, ...rest } = row;
+function rowToForm(row: NucleusRow): FormState {
+  const { nucleus: _n, parentNucleus: _p, grouping: _g, cluster: _c, pg: _pg, clusterCode: _cc, ...rest } = row;
   return rest;
 }
 
@@ -270,10 +270,10 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
     setSaving(true);
     setSaveStatus({ msg: 'Saving...', type: 'idle' });
     try {
-      const res = await fetch('/api/neighborhood', {
+      const res = await fetch('/api/nucleus', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: row.neighborhood, formData: form }),
+        body: JSON.stringify({ name: row.nucleus, formData: form }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Save failed');
@@ -342,7 +342,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0 }}>
           {showBack && <button className="back-btn" onClick={handleBack}>← Back</button>}
           <div style={{ minWidth: 0 }}>
-            <h1>{row.neighborhood}</h1>
+            <h1>{row.nucleus}</h1>
             <div className="meta">{row.clusterCode} · {row.cluster} · {row.locality}</div>
             {updatedLine && <div className="last-updated">{updatedLine}</div>}
           </div>
@@ -377,11 +377,11 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
             </div>
             <div className="field-grid-3">
               <Field label="Locality"              value={row.locality}    readonly />
-              <Field label="Neighborhood & Pocket" value={row.neighborhood} readonly />
-              <Field label="Neighborhood Stage"    value={row.stage}       readonly />
+              <Field label="Nucleus / Pocket" value={row.nucleus} readonly />
+              <Field label="Stage"            value={row.stage}   readonly />
             </div>
             <div className="field-grid-3">
-              <Field label="Neighborhood Contact"      value={row.contact}  readonly />
+              <Field label="Contact"      value={row.contact}  readonly />
               <Field label="Contact Email"             value={row.email}    readonly />
               <Field label="Auxiliary Board Member(s)" value={row.auxBoard} readonly />
             </div>
@@ -510,7 +510,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
           <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: 12, padding: '20px 24px', maxWidth: 560, width: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: '#2d3748' }}>{row.neighborhood}</div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: '#2d3748' }}>{row.nucleus}</div>
                 <div style={{ fontSize: 11, color: '#718096', marginTop: 2 }}>{row.clusterCode} · {row.cluster} · {row.locality}</div>
               </div>
               <button onClick={() => setShowDiagram(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#718096', lineHeight: 1, padding: 0 }}>×</button>
@@ -524,7 +524,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
         <NamedListModal
           title="Accompaniers in Nucleus"
           type="accompanier"
-          neighborhood={row.neighborhood}
+          nucleus={row.nucleus}
           initialNames={accompanierNames}
           onSave={names => {
             const wasInSync = accompanierNames.length === parseInt(form.accompaniers || '0', 10);
@@ -540,7 +540,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
         <NamedListModal
           title="Protagonists / Workers"
           type="protagonist"
-          neighborhood={row.neighborhood}
+          nucleus={row.nucleus}
           initialNames={protagonistNames}
           importNames={accompanierNames}
           onSave={names => {

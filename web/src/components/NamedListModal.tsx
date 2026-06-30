@@ -5,7 +5,7 @@ import { useState } from 'react';
 interface Props {
   title: string;
   type: string;
-  neighborhood: string;
+  nucleus: string;
   initialNames: string[];
   importNames?: string[];
   onSave: (names: string[]) => void;
@@ -20,7 +20,7 @@ function IcoImport() {
   );
 }
 
-export default function NamedListModal({ title, type, neighborhood, initialNames, importNames, onSave, onClose }: Props) {
+export default function NamedListModal({ title, type, nucleus, initialNames, importNames, onSave, onClose }: Props) {
   const [names, setNames] = useState<string[]>(initialNames);
   const [input, setInput] = useState('');
   const [saving, setSaving] = useState(false);
@@ -63,7 +63,7 @@ export default function NamedListModal({ title, type, neighborhood, initialNames
       const res = await fetch('/api/workers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ neighborhood, type, names }),
+        body: JSON.stringify({ nucleus, type, names }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Save failed');
@@ -89,7 +89,7 @@ export default function NamedListModal({ title, type, neighborhood, initialNames
           <div style={{ fontWeight: 700, fontSize: 15, color: '#2d3748' }}>{title}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#718096', lineHeight: 1, padding: 0 }}>×</button>
         </div>
-        <div style={{ fontSize: 12, color: '#718096', marginBottom: 16 }}>{neighborhood}</div>
+        <div style={{ fontSize: 12, color: '#718096', marginBottom: 16 }}>{nucleus}</div>
 
         {importNames && importNames.length > 0 && (
           <button

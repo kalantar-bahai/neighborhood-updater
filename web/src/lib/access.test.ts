@@ -22,9 +22,9 @@ beforeEach(() => { vi.clearAllMocks(); });
 
 describe('getAuthorizedRows', () => {
   const rows = [
-    makeRow({ [COL.NEIGHBORHOOD]: 'Alpha', [COL.EMAIL]: 'alice@x.com' }),
-    makeRow({ [COL.NEIGHBORHOOD]: 'Beta',  [COL.EMAIL]: 'bob@x.com' }),
-    makeRow({ [COL.NEIGHBORHOOD]: 'Gamma', [COL.EMAIL]: 'alice@x.com' }),
+    makeRow({ [COL.NUCLEUS]: 'Alpha', [COL.EMAIL]: 'alice@x.com' }),
+    makeRow({ [COL.NUCLEUS]: 'Beta',  [COL.EMAIL]: 'bob@x.com' }),
+    makeRow({ [COL.NUCLEUS]: 'Gamma', [COL.EMAIL]: 'alice@x.com' }),
   ];
 
   test('returns global role and all rows for global user', async () => {
@@ -70,7 +70,7 @@ describe('getAuthorizedRows', () => {
   test('global user is not also matched as contact', async () => {
     const rowsWithGlobal = [
       ...rows,
-      makeRow({ [COL.NEIGHBORHOOD]: 'Admin Area', [COL.EMAIL]: 'admin@x.com' }),
+      makeRow({ [COL.NUCLEUS]: 'Admin Area', [COL.EMAIL]: 'admin@x.com' }),
     ];
     mockGetAllMasterRows.mockResolvedValue(rowsWithGlobal);
     mockGetGlobalList.mockResolvedValue(['admin@x.com']);
