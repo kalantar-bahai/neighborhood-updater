@@ -149,6 +149,7 @@
 }
 .field input.ro { background: #f7fafc; color: #718096; }
 .field input.error { border-color: #e53e3e; background: #fff5f5; }
+.field input.overridden { border-color: #f6ad55; background: #fffaf0; }
 .field textarea { resize: vertical; min-height: 60px; }
 
 /* ── Pair fields ──────────────────────────────────────────────────────────── */

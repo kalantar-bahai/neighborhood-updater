@@ -110,7 +110,7 @@ export interface NeighborhoodDetail {
 ### `POST /api/accompaniers`
 
 - Body: `{ neighborhood: string, names: string[] }`
-- Validates access; pulls context fields (`cluster`, `clusterCode`, `locality`, `parentNeighborhood`) from the master row
+- Validates access; reads the master row by neighborhood name (same `getAllMasterRows` lookup used in `/api/neighborhood`) to pull context fields (`cluster`, `clusterCode`, `locality`, `parentNeighborhood`)
 - Calls `saveAccompanierNames`
 - Returns `{ success: true }`
 

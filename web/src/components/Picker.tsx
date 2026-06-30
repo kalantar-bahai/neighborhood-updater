@@ -25,25 +25,6 @@ export default function Picker({ rows, email, srpNames, onSelect, onSignOut }: P
     return false;
   }
 
-  // Build grouping → cluster → rows hierarchy
-  const groupingOrder: string[] = [];
-  const groupingMap: Record<string, { clusterOrder: string[]; clusterMap: Record<string, NeighborhoodSummary[]> }> = {};
-
-  rows.forEach(r => {
-    const g = (r.grouping || '').trim() || 'Unspecified';
-    const c = (r.cluster || '').trim() || 'Unspecified';
-    if (!groupingMap[g]) { groupingMap[g] = { clusterOrder: [], clusterMap: {} }; groupingOrder.push(g); }
-    const gEntry = groupingMap[g];
-    if (!gEntry.clusterMap[c]) { gEntry.clusterMap[c] = []; gEntry.clusterOrder.push(c); }
-    gEntry.clusterMap[c].push(r);
-  });
-
-  groupingOrder.sort((a, b) => a.localeCompare(b));
-  Object.values(groupingMap).forEach(g => {
-    g.clusterOrder.sort((a, b) => a.localeCompare(b));
-    Object.values(g.clusterMap).forEach(arr => arr.sort((a, b) => a.neighborhood.localeCompare(b.neighborhood)));
-  });
-
   function toggleCluster(key: string) {
     setOpenClusters(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
   }
@@ -67,6 +48,83 @@ export default function Picker({ rows, email, srpNames, onSelect, onSignOut }: P
     );
   }
 
+  function renderClusterContent(clusterRows: NeighborhoodSummary[], keyPrefix: string) {
+    const parentMap: Record<string, NeighborhoodSummary[]> = {};
+    const parentOrder: string[] = [];
+    const standaloneMap: Record<string, NeighborhoodSummary> = {};
+
+    clusterRows.forEach(r => {
+      const p = (r.parentNeighborhood || '').trim();
+      if (!p) {
+        standaloneMap[r.neighborhood] = r;
+      } else {
+        if (!parentMap[p]) { parentMap[p] = []; parentOrder.push(p); }
+        parentMap[p].push(r);
+      }
+    });
+    parentOrder.forEach(p => delete standaloneMap[p]);
+
+    const entries: Array<{ type: 'standalone'; row: NeighborhoodSummary } | { type: 'parent'; name: string }> = [];
+    Object.values(standaloneMap).forEach(row => entries.push({ type: 'standalone', row }));
+    parentOrder.forEach(name => entries.push({ type: 'parent', name }));
+    entries.sort((a, b) => a.type === 'standalone' && b.type === 'standalone'
+      ? a.row.neighborhood.localeCompare(b.row.neighborhood)
+      : (a.type === 'standalone' ? a.row.neighborhood : a.name)
+          .localeCompare(b.type === 'standalone' ? b.row.neighborhood : b.name));
+
+    return entries.map(entry => {
+      if (entry.type === 'standalone') {
+        return <NeighborhoodItem key={entry.row.neighborhood} r={entry.row} isPocket={false} />;
+      }
+      const parentName = entry.name;
+      const pocketKey = `${keyPrefix}__${parentName}`;
+      const isPocketOpen = openPockets.has(pocketKey);
+      const parentRow = clusterRows.find(r => r.neighborhood === parentName && !r.parentNeighborhood);
+
+      return (
+        <div key={parentName}>
+          <div className="parent-item">
+            <span
+              className={`parent-arrow${isPocketOpen ? ' open' : ''}`}
+              onClick={() => togglePocket(pocketKey)}
+            >▶</span>
+            <span className="parent-name" onClick={() => parentRow && onSelect(parentName)}>
+              {parentName}
+            </span>
+            {parentRow?.stage && <span className="stage-badge">{parentRow.stage}</span>}
+          </div>
+          <div className={`pocket-rows${isPocketOpen ? ' open' : ''}`}>
+            {parentMap[parentName].map(r => (
+              <NeighborhoodItem key={r.neighborhood} r={r} isPocket />
+            ))}
+          </div>
+        </div>
+      );
+    });
+  }
+
+  // Build grouping → cluster → rows hierarchy
+  const groupingOrder: string[] = [];
+  const groupingMap: Record<string, { clusterOrder: string[]; clusterMap: Record<string, NeighborhoodSummary[]> }> = {};
+
+  rows.forEach(r => {
+    const g = (r.grouping || '').trim() || 'Unspecified';
+    const c = (r.cluster || '').trim() || 'Unspecified';
+    if (!groupingMap[g]) { groupingMap[g] = { clusterOrder: [], clusterMap: {} }; groupingOrder.push(g); }
+    const gEntry = groupingMap[g];
+    if (!gEntry.clusterMap[c]) { gEntry.clusterMap[c] = []; gEntry.clusterOrder.push(c); }
+    gEntry.clusterMap[c].push(r);
+  });
+
+  groupingOrder.sort((a, b) => a.localeCompare(b));
+  Object.values(groupingMap).forEach(g => {
+    g.clusterOrder.sort((a, b) => a.localeCompare(b));
+    Object.values(g.clusterMap).forEach(arr => arr.sort((a, b) => a.neighborhood.localeCompare(b.neighborhood)));
+  });
+
+  const uniqueClusters = new Set(rows.map(r => (r.cluster || '').trim()));
+  const isSingleCluster = uniqueClusters.size <= 1;
+
   return (
     <div className="picker-container">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -77,7 +135,9 @@ export default function Picker({ rows, email, srpNames, onSelect, onSignOut }: P
       </div>
       <div className="picker-sub">{email}</div>
 
-      {groupingOrder.map(gName => {
+      {isSingleCluster ? (
+        renderClusterContent(rows, 'flat')
+      ) : groupingOrder.map(gName => {
         const gEntry = groupingMap[gName];
         return (
           <div key={gName}>
@@ -86,30 +146,6 @@ export default function Picker({ rows, email, srpNames, onSelect, onSignOut }: P
               const clusterRows = gEntry.clusterMap[clusterName];
               const clusterKey = `${gName}__${clusterName}`;
               const isClusterOpen = openClusters.has(clusterKey);
-
-              // Separate standalone vs parent/pocket
-              const parentMap: Record<string, NeighborhoodSummary[]> = {};
-              const parentOrder: string[] = [];
-              const standaloneMap: Record<string, NeighborhoodSummary> = {};
-
-              clusterRows.forEach(r => {
-                const p = (r.parentNeighborhood || '').trim();
-                if (!p) {
-                  standaloneMap[r.neighborhood] = r;
-                } else {
-                  if (!parentMap[p]) { parentMap[p] = []; parentOrder.push(p); }
-                  parentMap[p].push(r);
-                }
-              });
-              parentOrder.forEach(p => delete standaloneMap[p]);
-
-              const entries: Array<{ type: 'standalone'; row: NeighborhoodSummary } | { type: 'parent'; name: string }> = [];
-              Object.values(standaloneMap).forEach(row => entries.push({ type: 'standalone', row }));
-              parentOrder.forEach(name => entries.push({ type: 'parent', name }));
-              entries.sort((a, b) => a.type === 'standalone' && b.type === 'standalone'
-                ? a.row.neighborhood.localeCompare(b.row.neighborhood)
-                : (a.type === 'standalone' ? a.row.neighborhood : a.name)
-                    .localeCompare(b.type === 'standalone' ? b.row.neighborhood : b.name));
 
               return (
                 <div key={clusterKey}>
@@ -122,35 +158,7 @@ export default function Picker({ rows, email, srpNames, onSelect, onSignOut }: P
                   </div>
 
                   <div className={`cluster-rows${isClusterOpen ? ' open' : ''}`}>
-                    {entries.map(entry => {
-                      if (entry.type === 'standalone') {
-                        return <NeighborhoodItem key={entry.row.neighborhood} r={entry.row} isPocket={false} />;
-                      }
-                      const parentName = entry.name;
-                      const pocketKey = `${clusterKey}__${parentName}`;
-                      const isPocketOpen = openPockets.has(pocketKey);
-                      const parentRow = clusterRows.find(r => r.neighborhood === parentName && !r.parentNeighborhood);
-
-                      return (
-                        <div key={parentName}>
-                          <div className="parent-item">
-                            <span
-                              className={`parent-arrow${isPocketOpen ? ' open' : ''}`}
-                              onClick={() => togglePocket(pocketKey)}
-                            >▶</span>
-                            <span className="parent-name" onClick={() => parentRow && onSelect(parentName)}>
-                              {parentName}
-                            </span>
-                            {parentRow?.stage && <span className="stage-badge">{parentRow.stage}</span>}
-                          </div>
-                          <div className={`pocket-rows${isPocketOpen ? ' open' : ''}`}>
-                            {parentMap[parentName].map(r => (
-                              <NeighborhoodItem key={r.neighborhood} r={r} isPocket />
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {renderClusterContent(clusterRows, clusterKey)}
                   </div>
                 </div>
               );
