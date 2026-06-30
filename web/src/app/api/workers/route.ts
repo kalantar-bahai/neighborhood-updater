@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getAuthorizedRows } from '@/lib/access';
 import { getAllMasterRows, getWorkerNames, saveWorkerNames } from '@/lib/data';
-import { COL } from '@/lib/config';
+import { COL, WORKER_TYPES } from '@/lib/config';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
@@ -15,6 +15,7 @@ export const GET = auth(async (req) => {
   const type = req.nextUrl.searchParams.get('type');
   if (!name) return NextResponse.json({ error: 'Missing neighborhood' }, { status: 400 });
   if (!type) return NextResponse.json({ error: 'Missing type' }, { status: 400 });
+  if (!WORKER_TYPES.includes(type as typeof WORKER_TYPES[number])) return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
 
   const { role, rows } = await getAuthorizedRows(req.auth.user.email);
   const allowed = role === 'global' || rows.some(r => norm(r[COL.NEIGHBORHOOD]) === norm(name));
@@ -32,6 +33,7 @@ export const POST = auth(async (req) => {
   const { neighborhood, type, names } = await req.json();
   if (!neighborhood) return NextResponse.json({ error: 'Missing neighborhood' }, { status: 400 });
   if (!type) return NextResponse.json({ error: 'Missing type' }, { status: 400 });
+  if (!WORKER_TYPES.includes(type as typeof WORKER_TYPES[number])) return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
   if (!Array.isArray(names)) return NextResponse.json({ error: 'names must be an array' }, { status: 400 });
 
   const email = req.auth.user.email;

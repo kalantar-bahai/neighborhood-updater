@@ -78,6 +78,8 @@ export const EDU_COL = {
 
 export const WORKERS_TAB = 'Workers';
 export const WORKERS_DATA_ROW = 2;
+export const WORKER_TYPES = ['accompanier', 'protagonist'] as const;
+export type WorkerType = typeof WORKER_TYPES[number];
 
 export const ACC_COL = {
   CLUSTER:             0,
