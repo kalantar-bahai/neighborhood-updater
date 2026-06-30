@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { NeighborhoodDetail, NeighborhoodRow, Activity, SrpData } from '@/types';
-import AccompaniersModal from './AccompaniersModal';
+import NamedListModal from './NamedListModal';
 
 interface Props {
   detail: NeighborhoodDetail;
@@ -38,9 +38,9 @@ function actTotal(acts: (Activity | undefined)[]) {
   }), { act: 0, part: 0, fof: 0 });
 }
 
-function Field({ label, value, onChange, readonly, type, integer, onLabelClick, highlighted }: {
+function Field({ label, value, onChange, readonly, type, integer, onLabelClick, highlighted, onSync }: {
   label: string; value: string; onChange?: (v: string) => void; readonly?: boolean; type?: string; integer?: boolean;
-  onLabelClick?: () => void; highlighted?: boolean;
+  onLabelClick?: () => void; highlighted?: boolean; onSync?: () => void;
 }) {
   const hasError = integer && !readonly && !isValidInt(value);
   const cls = [readonly ? 'ro' : '', hasError ? 'error' : '', highlighted ? 'overridden' : ''].filter(Boolean).join(' ');
@@ -50,13 +50,24 @@ function Field({ label, value, onChange, readonly, type, integer, onLabelClick, 
         ? <label onClick={onLabelClick} style={{ cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>{label} <IcoList /></label>
         : <label>{label}</label>
       }
-      <input
-        type={type || 'text'}
-        value={value || ''}
-        readOnly={readonly}
-        className={cls || undefined}
-        onChange={e => onChange?.(e.target.value)}
-      />
+      <div style={{ position: 'relative' }}>
+        <input
+          type={type || 'text'}
+          value={value || ''}
+          readOnly={readonly}
+          className={cls || undefined}
+          style={{
+            ...(highlighted && onSync ? { paddingRight: 26 } : {}),
+            ...(highlighted ? { borderColor: '#f6ad55', background: '#fffaf0' } : {}),
+          }}
+          onChange={e => onChange?.(e.target.value)}
+        />
+        {highlighted && onSync && (
+          <button onClick={onSync} title="Sync to list count" style={{ position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#d97706', display: 'flex', alignItems: 'center' }}>
+            <IcoSync />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -177,6 +188,13 @@ const IcoList = () => (
     <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
   </svg>
 );
+const IcoSync = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="23 4 23 10 17 10"/>
+    <polyline points="1 20 1 14 7 14"/>
+    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+  </svg>
+);
 
 // Bounding box centered in 540×310 viewBox (70px h-margin, 55px v-margin each side).
 // textY = top of ring at tx + 16, where top = cy - ry×√(1−((tx−cx)/rx)²)
@@ -227,6 +245,8 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
   const [showDiagram, setShowDiagram] = useState(false);
   const [accompanierNames, setAccompanierNames] = useState<string[]>(() => detail.accompanierNames);
   const [showAccompaniersModal, setShowAccompaniersModal] = useState(false);
+  const [protagonistNames, setProtagonistNames] = useState<string[]>(() => detail.protagonistNames);
+  const [showProtagonistsModal, setShowProtagonistsModal] = useState(false);
 
   const set = useCallback(<K extends keyof FormState>(key: K, val: FormState[K]) => {
     setForm(f => ({ ...f, [key]: val }));
@@ -288,6 +308,8 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
 
   const accompaniersMismatch = accompanierNames.length > 0 &&
     accompanierNames.length !== parseInt(form.accompaniers || '0', 10);
+  const protagonistsMismatch = protagonistNames.length > 0 &&
+    protagonistNames.length !== parseInt(form.protagonists || '0', 10);
 
   const edTotal  = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs]);
   const allTotal = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs, form.activities.devotionals]);
@@ -434,7 +456,15 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
           <div className="card-header">Workers &amp; Prevalence</div>
           <div className="card-body">
             <div className="field-grid-2">
-              <Field label="Protagonists / Workers"  value={form.protagonists} onChange={v => set('protagonists', v)} integer />
+              <Field
+                label="Protagonists / Workers"
+                value={form.protagonists}
+                onChange={v => set('protagonists', v)}
+                integer
+                highlighted={protagonistsMismatch}
+                onLabelClick={() => setShowProtagonistsModal(true)}
+                onSync={() => set('protagonists', String(protagonistNames.length))}
+              />
               <Field
                 label="Accompaniers in Nucleus"
                 value={form.accompaniers}
@@ -442,6 +472,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
                 integer
                 highlighted={accompaniersMismatch}
                 onLabelClick={() => setShowAccompaniersModal(true)}
+                onSync={() => set('accompaniers', String(accompanierNames.length))}
               />
             </div>
             {srp?.facilitators && (
@@ -490,11 +521,35 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
       )}
 
       {showAccompaniersModal && (
-        <AccompaniersModal
+        <NamedListModal
+          title="Accompaniers in Nucleus"
+          type="accompanier"
           neighborhood={row.neighborhood}
           initialNames={accompanierNames}
-          onSave={names => { setAccompanierNames(names); setShowAccompaniersModal(false); }}
+          onSave={names => {
+            const wasInSync = accompanierNames.length === parseInt(form.accompaniers || '0', 10);
+            setAccompanierNames(names);
+            if (wasInSync) set('accompaniers', String(names.length));
+            setShowAccompaniersModal(false);
+          }}
           onClose={() => setShowAccompaniersModal(false)}
+        />
+      )}
+
+      {showProtagonistsModal && (
+        <NamedListModal
+          title="Protagonists / Workers"
+          type="protagonist"
+          neighborhood={row.neighborhood}
+          initialNames={protagonistNames}
+          importNames={accompanierNames}
+          onSave={names => {
+            const wasInSync = protagonistNames.length === parseInt(form.protagonists || '0', 10);
+            setProtagonistNames(names);
+            if (wasInSync) set('protagonists', String(names.length));
+            setShowProtagonistsModal(false);
+          }}
+          onClose={() => setShowProtagonistsModal(false)}
         />
       )}
 
