@@ -4,7 +4,7 @@ import {
   MASTER_TAB, ACCESS_TAB, DEV_TAB, EDU_TAB,
   MASTER_DATA_ROW, SRP_DATA_ROW,
   COL, DEV_COL, EDU_COL,
-  ACCOMPANIERS_TAB, ACCOMPANIERS_DATA_ROW, ACC_COL,
+  WORKERS_TAB, WORKERS_DATA_ROW, ACC_COL,
 } from './config';
 
 function normalize(row: string[], numCols: number): string[] {
@@ -97,8 +97,10 @@ export function parseSrpData(devRow: string[] | null, eduRow: string[] | null) {
 }
 
 export async function getRowData(neighborhoodName: string) {
-  const [masterRows, devRows, eduRows, accompanierNames] = await Promise.all([
-    getAllMasterRows(), getAllDevRows(), getAllEduRows(), getAccompanierNames(neighborhoodName),
+  const [masterRows, devRows, eduRows, accompanierNames, protagonistNames] = await Promise.all([
+    getAllMasterRows(), getAllDevRows(), getAllEduRows(),
+    getWorkerNames(neighborhoodName, 'accompanier'),
+    getWorkerNames(neighborhoodName, 'protagonist'),
   ]);
 
   const masterRow = masterRows.find(r => norm(r[COL.NEIGHBORHOOD]) === norm(neighborhoodName));
@@ -116,43 +118,48 @@ export async function getRowData(neighborhoodName: string) {
     row: parseRow(masterRow),
     srp: parseSrpData(lookup(devRows, DEV_COL.NAME), lookup(eduRows, EDU_COL.NAME)),
     accompanierNames,
+    protagonistNames,
   };
 }
 
-async function getAllAccompanierRows() {
-  const rows = await sheetsGet(MASTER_SHEET_ID, `${ACCOMPANIERS_TAB}!A${ACCOMPANIERS_DATA_ROW}:F`);
-  return rows.map(r => normalize(r, 6));
+async function getAllWorkerRows() {
+  const rows = await sheetsGet(MASTER_SHEET_ID, `${WORKERS_TAB}!A${WORKERS_DATA_ROW}:G`);
+  return rows.map(r => normalize(r, 7));
 }
 
-export async function getAccompanierNames(neighborhoodName: string): Promise<string[]> {
-  const rows = await getAllAccompanierRows();
+export async function getWorkerNames(neighborhoodName: string, type: string): Promise<string[]> {
+  const rows = await getAllWorkerRows();
   const needle = norm(neighborhoodName);
   return rows
-    .filter(r => norm(r[ACC_COL.NEIGHBORHOOD]) === needle)
+    .filter(r => norm(r[ACC_COL.NEIGHBORHOOD]) === needle && norm(r[ACC_COL.TYPE]) === norm(type))
     .map(r => r[ACC_COL.NAME]);
 }
 
-export async function saveAccompanierNames(
+export async function saveWorkerNames(
   neighborhoodName: string,
+  type: string,
   names: string[],
   context: { cluster: string; clusterCode: string; locality: string; parentNeighborhood: string }
 ): Promise<void> {
-  const allRows = await getAllAccompanierRows();
+  const allRows = await getAllWorkerRows();
   const needle = norm(neighborhoodName);
-  const otherRows = allRows.filter(r => norm(r[ACC_COL.NEIGHBORHOOD]) !== needle);
+  const otherRows = allRows.filter(r =>
+    !(norm(r[ACC_COL.NEIGHBORHOOD]) === needle && norm(r[ACC_COL.TYPE]) === norm(type))
+  );
   const newRows = names.map(name => [
     context.cluster,
     context.clusterCode,
     context.locality,
     context.parentNeighborhood,
     neighborhoodName,
+    type,
     name,
   ]);
   const combined = [...otherRows, ...newRows];
-  await sheetsClear(MASTER_SHEET_ID, `${ACCOMPANIERS_TAB}!A${ACCOMPANIERS_DATA_ROW}:F`);
+  await sheetsClear(MASTER_SHEET_ID, `${WORKERS_TAB}!A${WORKERS_DATA_ROW}:G`);
   if (combined.length > 0) {
     await sheetsBatchUpdate(MASTER_SHEET_ID, [{
-      range: `${ACCOMPANIERS_TAB}!A${ACCOMPANIERS_DATA_ROW}`,
+      range: `${WORKERS_TAB}!A${WORKERS_DATA_ROW}`,
       values: combined,
     }]);
   }

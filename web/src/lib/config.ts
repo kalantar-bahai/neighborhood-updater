@@ -76,8 +76,8 @@ export const EDU_COL = {
   FACILITATORS: 10,
 } as const;
 
-export const ACCOMPANIERS_TAB = 'Accompaniers';
-export const ACCOMPANIERS_DATA_ROW = 2;
+export const WORKERS_TAB = 'Workers';
+export const WORKERS_DATA_ROW = 2;
 
 export const ACC_COL = {
   CLUSTER:             0,
@@ -85,5 +85,6 @@ export const ACC_COL = {
   LOCALITY:            2,
   PARENT_NEIGHBORHOOD: 3,
   NEIGHBORHOOD:        4,
-  NAME:                5,
+  TYPE:                5,
+  NAME:                6,
 } as const;
