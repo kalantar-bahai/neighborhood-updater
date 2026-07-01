@@ -18,8 +18,8 @@ function norm(s: string) { return (s || '').toLowerCase().trim(); }
 function stripCommas(s: string) { return s ? s.replace(/,/g, '') : s; }
 
 export async function getAllMasterRows() {
-  const rows = await sheetsGet(MASTER_SHEET_ID, `${MASTER_TAB}!A${MASTER_DATA_ROW}:AX`);
-  return rows.map(r => normalize(r, 50));
+  const rows = await sheetsGet(MASTER_SHEET_ID, `${MASTER_TAB}!A${MASTER_DATA_ROW}:AY`);
+  return rows.map(r => normalize(r, 51));
 }
 
 export async function getGlobalList() {
@@ -46,6 +46,7 @@ export function parseRow(row: string[]) {
     locality:            row[COL.LOCALITY],
     nucleus:             row[COL.NUCLEUS],
     parentNucleus:       row[COL.PARENT_NUCLEUS],
+    nucleusType:         row[COL.TYPE],
     stage:               row[COL.STAGE],
     contact:             row[COL.CONTACT],
     email:               row[COL.EMAIL],
@@ -181,7 +182,7 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
   };
 
   const updates = [
-    [COL.LOCALITY, d.locality], [COL.STAGE, d.stage], [COL.CONTACT, d.contact],
+    [COL.LOCALITY, d.locality], [COL.TYPE, d.nucleusType], [COL.STAGE, d.stage], [COL.CONTACT, d.contact],
     [COL.EMAIL, d.email], [COL.AUX_BOARD, d.auxBoard], [COL.MAKEUP, d.makeup],
     [COL.TOTAL_POP, d.totalPop], [COL.TOTAL_HH, d.totalHH],
     [COL.IND_NUM, d.indNum],

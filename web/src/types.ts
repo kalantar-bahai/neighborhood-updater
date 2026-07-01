@@ -10,12 +10,14 @@ export interface NucleusSummary {
   grouping: string;
   cluster: string;
   locality: string;
+  nucleusType: string;
   stage: string;
 }
 
 export interface NucleusRow {
   nucleus: string;
   parentNucleus: string;
+  nucleusType: string;
   grouping: string;
   cluster: string;
   pg: string;

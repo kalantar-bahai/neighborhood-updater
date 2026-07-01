@@ -27,6 +27,7 @@ export const GET = auth(async (req) => {
       grouping:      r[COL.GROUPING],
       cluster:       r[COL.CLUSTER],
       locality:      r[COL.LOCALITY],
+      nucleusType:   r[COL.TYPE],
       stage:         r[COL.STAGE],
     }));
 

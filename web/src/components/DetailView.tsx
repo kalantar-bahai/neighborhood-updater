@@ -120,7 +120,7 @@ function ActRow({ label, userVals, srpVals, onChange, onReset }: {
 
   return (
     <tr>
-      <td className="row-label">{label}</td>
+      <td className="row-label" style={{ textAlign: 'right', paddingLeft: 4, paddingRight: 10 }}>{label}</td>
       <td><input type="text" value={userVals.act || ''} className={cls(actDiffers, userVals.act)} onChange={e => onChange('act', e.target.value)} /></td>
       <td><input type="text" value={userVals.part || ''} className={cls(partDiffers, userVals.part)} onChange={e => onChange('part', e.target.value)} /></td>
       <td><input type="text" value={userVals.fof || ''} className={cls(fofDiffers, userVals.fof)} onChange={e => onChange('fof', e.target.value)} /></td>
@@ -377,10 +377,23 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
               <Field label="Cluster"      value={row.cluster}     readonly />
               <Field label="PG"           value={row.pg}          readonly />
             </div>
-            <div className="field-grid-3">
-              <Field label="Locality"              value={row.locality}    readonly />
-              <Field label="Nucleus / Pocket" value={row.nucleus} readonly />
-              <Field label="Stage"            value={row.stage}   readonly />
+            <div className="field-grid-4">
+              <Field label="Locality"         value={row.locality} readonly />
+              <Field label="Nucleus / Pocket" value={row.nucleus}  readonly />
+              <div className="field">
+                <label>Type</label>
+                <select
+                  value={form.nucleusType || ''}
+                  onChange={e => set('nucleusType', e.target.value)}
+                  style={{ padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, background: 'white', color: '#2d3748' }}
+                >
+                  <option value="">—</option>
+                  <option value="Neighborhood">Neighborhood</option>
+                  <option value="Network">Network</option>
+                  <option value="Population">Population</option>
+                </select>
+              </div>
+              <Field label="Stage"            value={row.stage}    readonly />
             </div>
             <div className="field-grid-4">
               <Field label="Contact"                   value={row.contact}  readonly />
@@ -450,7 +463,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
                   <ActRow label="Study Circles" userVals={form.activities.scs} srpVals={srp?.scs ?? null}
                     onChange={(f, v) => setAct('scs', f, v)} onReset={() => resetToSrp('scs')} />
                   <TotalRow label="Total Educational Activities" totals={edTotal} />
-                  <ActRow label="Devotionals" userVals={form.activities.devotionals} srpVals={srp?.devotionals ?? null}
+                  <ActRow label="Devotional Gatherings" userVals={form.activities.devotionals} srpVals={srp?.devotionals ?? null}
                     onChange={(f, v) => setAct('devotionals', f, v)} onReset={() => resetToSrp('devotionals')} />
                   <TotalRow label="Total Activities" totals={allTotal} />
                 </tbody>

@@ -16,7 +16,7 @@ const mockSheetsClear = vi.mocked(sheetsClear);
 const mockSheetsBatchUpdate = vi.mocked(sheetsBatchUpdate);
 
 function makeRow(overrides: Record<number, string> = {}): string[] {
-  const row = new Array(48).fill('');
+  const row = new Array(51).fill('');
   Object.entries(overrides).forEach(([k, v]) => { row[Number(k)] = v; });
   return row;
 }
@@ -69,8 +69,9 @@ describe('parseRow', () => {
   });
 
   test('empty row returns empty strings throughout', () => {
-    const result = parseRow(new Array(48).fill(''));
+    const result = parseRow(new Array(51).fill(''));
     expect(result.nucleus).toBe('');
+    expect(result.nucleusType).toBe('');
     expect(result.activities.ccs).toEqual({ act: '', part: '', fof: '' });
   });
 });

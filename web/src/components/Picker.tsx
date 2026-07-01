@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { NucleusSummary } from '@/types';
 
 interface Props {
@@ -9,6 +9,14 @@ interface Props {
   srpNames: string[];
   onSelect: (name: string) => void;
   onSignOut: () => void;
+}
+
+function typeBadgeStyle(nucleusType: string): React.CSSProperties {
+  const t = (nucleusType || '').toLowerCase();
+  if (t === 'neighborhood') return { background: '#bee3f8', color: '#2c5282' };
+  if (t === 'network')      return { background: '#c6f6d5', color: '#276749' };
+  if (t === 'population')   return { background: '#e9d8fd', color: '#553c9a' };
+  return {};
 }
 
 export default function Picker({ rows, email, srpNames, onSelect, onSignOut }: Props) {
@@ -42,7 +50,7 @@ export default function Picker({ rows, email, srpNames, onSelect, onSignOut }: P
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {!inSrp(r) && <span className="no-srp-badge">SRP</span>}
-          {r.stage && <span className="stage-badge">{r.stage}</span>}
+          {r.stage && <span className="stage-badge" style={typeBadgeStyle(r.nucleusType)}>{r.stage}</span>}
         </div>
       </div>
     );
@@ -91,7 +99,7 @@ export default function Picker({ rows, email, srpNames, onSelect, onSignOut }: P
             <span className="parent-name" onClick={() => parentRow && onSelect(parentName)}>
               {parentName}
             </span>
-            {parentRow?.stage && <span className="stage-badge">{parentRow.stage}</span>}
+            {parentRow?.stage && <span className="stage-badge" style={typeBadgeStyle(parentRow.nucleusType)}>{parentRow.stage}</span>}
           </div>
           <div className={`pocket-rows${isPocketOpen ? ' open' : ''}`}>
             {parentMap[parentName].map(r => (
