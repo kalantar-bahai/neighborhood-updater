@@ -540,7 +540,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               onClick={() => setAccessOpen(o => !o)}
               style={{ cursor: 'pointer', userSelect: 'none' }}
             >
-              <span style={{ fontSize: 11, marginRight: 6 }}>{accessOpen ? '▼' : '▶'}</span>Manage Access
+              <span><span style={{ fontSize: 11, marginRight: 6 }}>{accessOpen ? '▼' : '▶'}</span>Manage Access</span>
             </div>
             {accessOpen && (
               <div className="card-body">
