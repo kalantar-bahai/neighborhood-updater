@@ -552,6 +552,21 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           </div>
         </div>
 
+        {/* Narrative */}
+        <div className="card">
+          <div className="card-header">Narrative</div>
+          <div className="card-body">
+            <div className="field">
+              <textarea
+                value={form.narrative || ''}
+                onChange={canWrite ? e => set('narrative', e.target.value) : undefined}
+                readOnly={!canWrite}
+                rows={6}
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Manage Access — collaborator and admin */}
         {canManageAccess && (
           <div className="card">

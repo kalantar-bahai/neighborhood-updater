@@ -61,6 +61,7 @@ export const COL = {
   NOTES_EFFORTS:       48,
   GATHERINGS:          49,
   NOTES_GATHERINGS:    50,
+  NARRATIVE:           51,
 } as const;
 
 export const DEV_COL = {

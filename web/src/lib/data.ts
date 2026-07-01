@@ -41,8 +41,8 @@ export async function saveAccessEntries(entries: AccessEntry[]): Promise<void> {
 }
 
 export async function getAllMasterRows() {
-  const rows = await sheetsGet(MASTER_SHEET_ID, `${MASTER_TAB}!A${MASTER_DATA_ROW}:AY`);
-  return rows.map(r => normalize(r, 51));
+  const rows = await sheetsGet(MASTER_SHEET_ID, `${MASTER_TAB}!A${MASTER_DATA_ROW}:AZ`);
+  return rows.map(r => normalize(r, 52));
 }
 
 export async function getAllDevRows() {
@@ -96,6 +96,7 @@ export function parseRow(row: string[]) {
     notesEfforts:     row[COL.NOTES_EFFORTS],
     gatherings:       row[COL.GATHERINGS],
     notesGatherings:  row[COL.NOTES_GATHERINGS],
+    narrative:        row[COL.NARRATIVE],
   };
 }
 
@@ -227,6 +228,7 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     [COL.INVOLVED, d.involved], [COL.NOTES_INVOLVED, d.notesInvolved],
     [COL.EFFORTS, d.efforts], [COL.NOTES_EFFORTS, d.notesEfforts],
     [COL.GATHERINGS, d.gatherings], [COL.NOTES_GATHERINGS, d.notesGatherings],
+    [COL.NARRATIVE, d.narrative],
   ].filter(([, value]) => value !== undefined)
     .map(([col, value]) => ({
       range: `${MASTER_TAB}!${colLetter(col as number)}${sheetRow}`,

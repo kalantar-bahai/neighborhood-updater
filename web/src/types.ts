@@ -63,6 +63,7 @@ export interface NucleusRow {
   notesEfforts: string;
   gatherings: string;
   notesGatherings: string;
+  narrative: string;
 }
 
 export interface SrpData {
