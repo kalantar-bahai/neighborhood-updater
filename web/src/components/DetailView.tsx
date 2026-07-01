@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { NucleusDetail, NucleusRow, Activity, SrpData } from '@/types';
 import type { Role } from '@/types';
 import NamedListModal from './NamedListModal';
+import AccessPanel from './AccessPanel';
 
 interface Props {
   detail: NucleusDetail;
@@ -529,7 +530,15 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           </div>
         </div>
 
-        {/* Manage Access panel added in Task 8 */}
+        {/* Manage Access — admin only */}
+        {isAdmin && (
+          <div className="card">
+            <div className="card-header">Manage Access</div>
+            <div className="card-body">
+              <AccessPanel nucleusName={row.nucleus} roleMap={roleMap} />
+            </div>
+          </div>
+        )}
       </div>
 
       {showDiagram && (
