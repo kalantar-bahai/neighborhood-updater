@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { InitialData, NucleusDetail } from '@/types';
+import { InitialData, NucleusDetail, Role } from '@/types';
 import Picker from './Picker';
 import DetailView from './DetailView';
 
@@ -9,6 +9,7 @@ export default function AppClient() {
   const [initialData, setInitialData] = useState<InitialData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<NucleusDetail | null>(null);
+  const [selectedNucleus, setSelectedNucleus] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   useEffect(() => {
@@ -24,6 +25,7 @@ export default function AppClient() {
 
   function loadNucleus(name: string) {
     setLoadingDetail(true);
+    setSelectedNucleus(name);
     setDetail(null);
     fetch(`/api/nucleus?name=${encodeURIComponent(name)}`)
       .then(r => r.json())
@@ -37,6 +39,7 @@ export default function AppClient() {
 
   function handleBack() {
     setDetail(null);
+    setSelectedNucleus(null);
   }
 
   if (error) {
@@ -57,10 +60,13 @@ export default function AppClient() {
     return <div className="loading-state">Loading...</div>;
   }
 
-  if (detail) {
+  if (detail && selectedNucleus) {
+    const roleMap = initialData.access.roleMap;
+    const role: Role = (roleMap[selectedNucleus] ?? roleMap['*'] ?? 'read') as Role;
     return (
       <DetailView
         detail={detail}
+        role={role}
         email={initialData.email}
         showBack={initialData.rows.length > 1}
         spreadsheetUrl={initialData.spreadsheetUrl}

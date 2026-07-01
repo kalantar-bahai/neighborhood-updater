@@ -2,10 +2,12 @@
 
 import { useState, useCallback } from 'react';
 import { NucleusDetail, NucleusRow, Activity, SrpData } from '@/types';
+import type { Role } from '@/types';
 import NamedListModal from './NamedListModal';
 
 interface Props {
   detail: NucleusDetail;
+  role: Role;
   email: string;
   showBack: boolean;
   spreadsheetUrl: string;
@@ -13,11 +15,10 @@ interface Props {
   onSaved: (savedBy: string, savedAt: string) => void;
 }
 
-type FormState = Omit<NucleusRow, 'nucleus' | 'parentNucleus' | 'grouping' | 'cluster' | 'pg' | 'clusterCode'>;
+type FormState = NucleusRow;
 
 function rowToForm(row: NucleusRow): FormState {
-  const { nucleus: _n, parentNucleus: _p, grouping: _g, cluster: _c, pg: _pg, clusterCode: _cc, ...rest } = row;
-  return rest;
+  return { ...row };
 }
 
 function computedPct(connected: string, total: string): string {
@@ -234,7 +235,7 @@ function ConcentricDiagram({ data }: { data: { label: string; value: string }[] 
   );
 }
 
-export default function DetailView({ detail, email, showBack, spreadsheetUrl, onBack, onSaved }: Props) {
+export default function DetailView({ detail, role, email, showBack, spreadsheetUrl, onBack, onSaved }: Props) {
   const { row, srp } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   const [isDirty, setIsDirty] = useState(false);
@@ -249,6 +250,10 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
   const [showProtagonistsModal, setShowProtagonistsModal] = useState(false);
   const [abmAssistantNames, setAbmAssistantNames] = useState<string[]>(() => detail.abmAssistantNames);
   const [showAbmAssistantModal, setShowAbmAssistantModal] = useState(false);
+
+  const canWrite  = role === 'read-write' || role === 'admin';
+  const isAdmin   = role === 'admin';
+  const isReadOnly = role === 'read';
 
   const set = useCallback(<K extends keyof FormState>(key: K, val: FormState[K]) => {
     setForm(f => ({ ...f, [key]: val }));
@@ -272,10 +277,22 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
     setSaving(true);
     setSaveStatus({ msg: 'Saving...', type: 'idle' });
     try {
+      const payload: Record<string, unknown> = { ...form };
+      if (isAdmin) {
+        payload.identity = {
+          nucleus:        form.nucleus,
+          parentNucleus:  form.parentNucleus,
+          grouping:       form.grouping,
+          cluster:        form.cluster,
+          pg:             form.pg,
+          clusterCode:    form.clusterCode,
+          nucleusType:    form.nucleusType,
+        };
+      }
       const res = await fetch('/api/nucleus', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: row.nucleus, formData: form }),
+        body: JSON.stringify({ name: row.nucleus, formData: payload }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Save failed');
@@ -359,9 +376,11 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
           <button onClick={handleSignOut} title="Sign out" aria-label="Sign out" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
             <IcoLogOut />
           </button>
-          <button className="save-btn" disabled={saving || hasIntErrors} onClick={handleSave} title="Save to spreadsheet" aria-label="Save to spreadsheet" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 12px' }}>
-            <IcoSave /><span className="save-btn-label">Save</span>
-          </button>
+          {!isReadOnly && (
+            <button className="save-btn" disabled={saving || hasIntErrors} onClick={handleSave} title="Save to spreadsheet" aria-label="Save to spreadsheet" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 12px' }}>
+              <IcoSave /><span className="save-btn-label">Save</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -372,21 +391,21 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
           <div className="card-header">Identity</div>
           <div className="card-body">
             <div className="field-grid-4">
-              <Field label="Grouping"     value={row.grouping}    readonly />
-              <Field label="Cluster Code" value={row.clusterCode} readonly />
-              <Field label="Cluster"      value={row.cluster}     readonly />
-              <Field label="PG"           value={row.pg}          readonly />
+              <Field label="Grouping"     value={form.grouping}    onChange={isAdmin ? v => set('grouping', v)    : undefined} readonly={!isAdmin} />
+              <Field label="Cluster Code" value={form.clusterCode} onChange={isAdmin ? v => set('clusterCode', v) : undefined} readonly={!isAdmin} />
+              <Field label="Cluster"      value={form.cluster}     onChange={isAdmin ? v => set('cluster', v)     : undefined} readonly={!isAdmin} />
+              <Field label="PG"           value={form.pg}          onChange={isAdmin ? v => set('pg', v)          : undefined} readonly={!isAdmin} />
             </div>
             <div className="field-grid-4">
-              <Field label="Locality"         value={row.locality} readonly />
-              <Field label="Nucleus / Pocket" value={row.nucleus}  readonly />
-              <Field label="Type" value={row.nucleusType} readonly />
-              <Field label="Stage"            value={row.stage}    readonly />
+              <Field label="Locality"         value={form.locality}     onChange={canWrite ? v => set('locality', v)     : undefined} readonly={!canWrite} />
+              <Field label="Nucleus / Pocket" value={form.nucleus}      onChange={isAdmin  ? v => set('nucleus', v)      : undefined} readonly={!isAdmin} />
+              <Field label="Type"             value={form.nucleusType}  onChange={isAdmin  ? v => set('nucleusType', v)  : undefined} readonly={!isAdmin} />
+              <Field label="Stage"            value={form.stage}        onChange={canWrite ? v => set('stage', v)        : undefined} readonly={!canWrite} />
             </div>
             <div className="field-grid-4">
-              <Field label="Contact"                   value={row.contact}  readonly />
-              <Field label="Contact Email"             value={row.email}    readonly />
-              <Field label="Auxiliary Board Member(s)" value={row.auxBoard} readonly />
+              <Field label="Contact"                   value={form.contact}  onChange={canWrite ? v => set('contact', v)  : undefined} readonly={!canWrite} />
+              <Field label="Contact Email"             value={form.email}    onChange={canWrite ? v => set('email', v)    : undefined} readonly={!canWrite} />
+              <Field label="Auxiliary Board Member(s)" value={form.auxBoard} onChange={canWrite ? v => set('auxBoard', v) : undefined} readonly={!canWrite} />
               <Field
                 label="ABm Assistant"
                 value={abmAssistantNames.join(', ')}
@@ -509,6 +528,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
           </div>
         </div>
 
+        {/* Manage Access panel added in Task 8 */}
       </div>
 
       {showDiagram && (
@@ -580,8 +600,12 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
         <span className={`save-status${saveStatus.type !== 'idle' ? ` ${saveStatus.type}` : ''}`}>
           {saveStatus.msg}
         </span>
-        <button className="btn-cancel" onClick={handleDiscard}>Discard changes</button>
-        <button className="btn-save" disabled={saving || hasIntErrors} onClick={handleSave}>Save to spreadsheet</button>
+        {!isReadOnly && (
+          <>
+            <button className="btn-cancel" onClick={handleDiscard}>Discard changes</button>
+            <button className="btn-save" disabled={saving || hasIntErrors} onClick={handleSave}>Save to spreadsheet</button>
+          </>
+        )}
       </div>
     </>
   );
