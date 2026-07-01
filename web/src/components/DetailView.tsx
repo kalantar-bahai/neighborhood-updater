@@ -222,14 +222,27 @@ function formatNum(v: string): string {
   return Math.round(n / 1000) + 'k';
 }
 
-function ConcentricDiagram({ data }: { data: { label: string; value: string }[] }) {
+function ConcentricDiagram({ data }: { data: { label: string; value: string; onClick?: () => void }[] }) {
   return (
     <svg viewBox="0 0 540 310" style={{ width: '100%', display: 'block' }}>
       {RINGS.map((r, i) => (
-        <ellipse key={i} cx={r.cx} cy={r.cy} rx={r.rx} ry={r.ry} fill={r.fill} stroke="white" strokeWidth={1.5} />
+        <ellipse
+          key={i}
+          cx={r.cx} cy={r.cy} rx={r.rx} ry={r.ry}
+          fill={r.fill} stroke="white" strokeWidth={1.5}
+          onClick={data[i].onClick}
+          style={data[i].onClick ? { cursor: 'pointer' } : undefined}
+        />
       ))}
       {RINGS.map((r, i) => (
-        <text key={i} x={r.tx} y={r.textY} textAnchor="start" fontSize={12} fontWeight={600} fill={r.textFill}>
+        <text
+          key={i}
+          x={r.tx} y={r.textY}
+          textAnchor="start" fontSize={12} fontWeight={600} fill={r.textFill}
+          onClick={data[i].onClick}
+          style={data[i].onClick ? { cursor: 'pointer' } : undefined}
+          textDecoration={data[i].onClick ? 'underline' : undefined}
+        >
           {formatNum(data[i].value)} {data[i].label}
         </text>
       ))}
@@ -352,8 +365,8 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
     { label: 'Potential Connections', value: '' },
     { label: 'Connected',             value: form.indNum },
     { label: 'Participating',         value: hasAnyActPart ? String(allTotal.part) : '' },
-    { label: 'Sustaining',            value: form.protagonists },
-    { label: 'Accompanying',          value: form.accompaniers },
+    { label: 'Sustaining',            value: form.protagonists,  onClick: () => setShowProtagonistsModal(true) },
+    { label: 'Accompanying',          value: form.accompaniers,  onClick: () => setShowAccompaniersModal(true) },
   ];
 
   const updatedLine = lastUpdatedAt
