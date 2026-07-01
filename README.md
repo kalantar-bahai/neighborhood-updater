@@ -28,16 +28,32 @@ The web app URL changes with each new deployment. Update the URL shared with nei
 
 ## Access control
 
-Two levels of access, both configured in the master sheet:
+Access is configured in the `Access` tab of the master sheet (columns A–D: name, email, role, nucleus). Row 1 is a header row and is skipped. Each subsequent row grants one person a role for one nucleus (or `*` for all nuclei). A person can have multiple rows.
 
-| Role | Configuration | Sees |
-|------|--------------|------|
-| Global | Email listed in `GlobalAccess` tab | All neighborhoods |
-| Contact | Email in `Contact Email` column (col 9) of a row | Only their row(s) |
-| None | Email not found in either place | Access denied error |
+### Roles
 
-To add a global admin: add their email to the `GlobalAccess` tab in the master sheet.
-To assign a contact: put their Gmail address in the `Contact Email` column of their neighborhood row.
+| Role | Read data | Edit standard fields | Manage access grants | Edit identity fields |
+|------|:---------:|:--------------------:|:--------------------:|:--------------------:|
+| `read` | ✅ | | | |
+| `read-write` | ✅ | ✅ | | |
+| `collaborator` | ✅ | ✅ | ✅ | |
+| `admin` | ✅ | ✅ | ✅ | ✅ |
+
+**Standard fields:** locality, stage, contact, email, aux board, makeup, activities, worker lists.  
+**Identity fields:** nucleus name, parent nucleus, grouping, cluster, PG, cluster code, type.
+
+### Nucleus column
+
+- A specific nucleus name (e.g. `Alpha`) — grants access only to that nucleus.
+- `*` — grants access to all nuclei.
+
+Role resolution per nucleus: highest role across any matching specific-nucleus entry and any `*` entry.
+
+### Managing access in-app
+
+Users with `collaborator` or `admin` role can open the Manage Access panel:
+- **On a nucleus detail page** — manage grants for that nucleus only.
+- **On the main list page** (global `*` grant required) — manage all grants across all nuclei.
 
 ## Auth
 
