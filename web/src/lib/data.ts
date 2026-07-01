@@ -32,10 +32,10 @@ export async function getAccessEntries(): Promise<AccessEntry[]> {
 }
 
 export async function saveAccessEntries(entries: AccessEntry[]): Promise<void> {
-  await sheetsClear(MASTER_SHEET_ID, `${ACCESS_TAB}!A:D`);
+  await sheetsClear(MASTER_SHEET_ID, `${ACCESS_TAB}!A2:D`);
   if (entries.length === 0) return;
   await sheetsBatchUpdate(MASTER_SHEET_ID, [{
-    range: `${ACCESS_TAB}!A1`,
+    range: `${ACCESS_TAB}!A2`,
     values: entries.map(e => [e.name, e.email, e.role, e.nucleus]),
   }]);
 }
