@@ -99,10 +99,9 @@ export default function AppClient() {
             <div
               className="card-header"
               onClick={() => setAccessOpen(o => !o)}
-              style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', gap: 8, alignItems: 'center' }}
+              style={{ cursor: 'pointer', userSelect: 'none' }}
             >
-              <span style={{ fontSize: 11 }}>{accessOpen ? '▼' : '▶'}</span>
-              Manage Access
+              <span style={{ fontSize: 11, marginRight: 6 }}>{accessOpen ? '▼' : '▶'}</span>Manage Access
             </div>
             {accessOpen && (
               <div className="card-body">
