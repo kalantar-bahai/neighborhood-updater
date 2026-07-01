@@ -12,11 +12,41 @@ interface Props {
   onClose: () => void;
 }
 
-function IcoImport() {
+const IcoImport = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+  </svg>
+);
+
+const IcoTrash = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+  </svg>
+);
+
+const IcoPencil = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+);
+
+const IcoCheck = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+);
+
+const IcoX = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+);
+
+function iconBtn(onClick: () => void, title: string, color: string, children: React.ReactNode) {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-    </svg>
+    <button onClick={onClick} title={title} style={{ background: 'none', border: 'none', cursor: 'pointer', color, padding: '2px 4px', display: 'inline-flex', alignItems: 'center' }}>
+      {children}
+    </button>
   );
 }
 
@@ -25,6 +55,8 @@ export default function NamedListModal({ title, type, nucleus, initialNames, imp
   const [input, setInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState('');
 
   function add() {
     const trimmed = input.trim();
@@ -47,6 +79,24 @@ export default function NamedListModal({ title, type, nucleus, initialNames, imp
       if (i === n.length - 1) return n;
       const a = [...n]; [a[i], a[i + 1]] = [a[i + 1], a[i]]; return a;
     });
+  }
+
+  function startEdit(i: number) {
+    setEditIdx(i);
+    setEditValue(names[i]);
+  }
+
+  function confirmEdit() {
+    if (editIdx === null) return;
+    const trimmed = editValue.trim();
+    if (trimmed) setNames(n => n.map((v, i) => i === editIdx ? trimmed : v));
+    setEditIdx(null);
+    setEditValue('');
+  }
+
+  function cancelEdit() {
+    setEditIdx(null);
+    setEditValue('');
   }
 
   function importFromList() {
@@ -106,22 +156,30 @@ export default function NamedListModal({ title, type, nucleus, initialNames, imp
             <div style={{ color: '#a0aec0', fontSize: 13, padding: '8px 0' }}>No names added yet.</div>
           )}
           {names.map((name, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
-              <button
-                onClick={() => moveUp(i)}
-                disabled={i === 0}
-                style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: i === 0 ? '#cbd5e0' : '#718096', fontSize: 12, padding: '2px 4px' }}
-              >↑</button>
-              <button
-                onClick={() => moveDown(i)}
-                disabled={i === names.length - 1}
-                style={{ background: 'none', border: 'none', cursor: i === names.length - 1 ? 'default' : 'pointer', color: i === names.length - 1 ? '#cbd5e0' : '#718096', fontSize: 12, padding: '2px 4px' }}
-              >↓</button>
-              <span style={{ flex: 1, fontSize: 14 }}>{name}</span>
-              <button
-                onClick={() => remove(i)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e53e3e', fontSize: 16, lineHeight: 1, padding: '2px 4px' }}
-              >×</button>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
+              <button onClick={() => moveUp(i)} disabled={i === 0}
+                style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: i === 0 ? '#cbd5e0' : '#718096', fontSize: 12, padding: '2px 4px' }}>↑</button>
+              <button onClick={() => moveDown(i)} disabled={i === names.length - 1}
+                style={{ background: 'none', border: 'none', cursor: i === names.length - 1 ? 'default' : 'pointer', color: i === names.length - 1 ? '#cbd5e0' : '#718096', fontSize: 12, padding: '2px 4px' }}>↓</button>
+              {editIdx === i ? (
+                <>
+                  <input
+                    autoFocus
+                    value={editValue}
+                    onChange={e => setEditValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') confirmEdit(); if (e.key === 'Escape') cancelEdit(); }}
+                    style={{ flex: 1, fontSize: 14, padding: '2px 6px', border: '1px solid #bee3f8', borderRadius: 4 }}
+                  />
+                  {iconBtn(confirmEdit, 'Save', '#276749', <IcoCheck />)}
+                  {iconBtn(cancelEdit, 'Cancel', '#718096', <IcoX />)}
+                </>
+              ) : (
+                <>
+                  <span style={{ flex: 1, fontSize: 14 }}>{name}</span>
+                  {iconBtn(() => startEdit(i), 'Edit', '#3182ce', <IcoPencil />)}
+                  {iconBtn(() => remove(i), 'Remove', '#e53e3e', <IcoTrash />)}
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -135,22 +193,14 @@ export default function NamedListModal({ title, type, nucleus, initialNames, imp
             placeholder="Add a name..."
             style={{ flex: 1, padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 14 }}
           />
-          <button
-            onClick={add}
-            style={{ padding: '6px 14px', background: '#3182ce', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14 }}
-          >Add</button>
+          <button onClick={add} style={{ padding: '6px 14px', background: '#3182ce', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14 }}>Add</button>
         </div>
 
         {error && <div style={{ color: '#e53e3e', fontSize: 13, marginBottom: 8 }}>{error}</div>}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button
-            onClick={onClose}
-            style={{ padding: '7px 16px', background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', fontSize: 14 }}
-          >Cancel</button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
+          <button onClick={onClose} style={{ padding: '7px 16px', background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', fontSize: 14 }}>Cancel</button>
+          <button onClick={handleSave} disabled={saving}
             style={{ padding: '7px 16px', background: '#3182ce', color: 'white', border: 'none', borderRadius: 6, cursor: saving ? 'default' : 'pointer', fontSize: 14, opacity: saving ? 0.7 : 1 }}
           >{saving ? 'Saving...' : 'Save'}</button>
         </div>
