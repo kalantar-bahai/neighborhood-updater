@@ -1,3 +1,12 @@
+export type Role = 'read' | 'read-write' | 'admin';
+
+export interface AccessEntry {
+  name: string;
+  email: string;
+  role: Role;
+  nucleus: string; // specific nucleus name or '*' for all
+}
+
 export interface Activity {
   act: string;
   part: string;
@@ -73,7 +82,7 @@ export interface NucleusDetail {
 }
 
 export interface InitialData {
-  role: 'global' | 'contact';
+  access: { roleMap: Record<string, Role> };
   rows: NucleusSummary[];
   email: string;
   srpNames: string[];
