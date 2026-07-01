@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getAuthorizedRows } from '@/lib/access';
+import { getAccess } from '@/lib/access';
 import { getAllDevRows } from '@/lib/data';
 import { COL, DEV_COL } from '@/lib/config';
 
@@ -10,16 +10,16 @@ export const GET = auth(async (req) => {
   }
 
   const email = req.auth.user.email;
-  const { role, rows } = await getAuthorizedRows(email);
+  const access = await getAccess(email);
 
-  if (role === 'none') {
+  if (access.role === 'none') {
     return NextResponse.json(
       { error: `Access denied. Your account (${email}) is not authorized.` },
       { status: 403 }
     );
   }
 
-  const authorizedRows = rows
+  const authorizedRows = access.rows
     .filter(r => (r[COL.NUCLEUS] || '').trim() !== '')
     .map(r => ({
       nucleus:       r[COL.NUCLEUS],
@@ -33,8 +33,13 @@ export const GET = auth(async (req) => {
 
   const devRows = await getAllDevRows();
   const srpNames = devRows.map(r => (r[DEV_COL.NAME] || '').toLowerCase().trim());
-
   const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${process.env.MASTER_SHEET_ID}`;
 
-  return NextResponse.json({ role, rows: authorizedRows, email, srpNames, spreadsheetUrl });
+  return NextResponse.json({
+    access: { roleMap: access.roleMap },
+    rows: authorizedRows,
+    email,
+    srpNames,
+    spreadsheetUrl,
+  });
 });

@@ -199,7 +199,18 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     return letter;
   };
 
+  const identityPairs: [number, unknown][] = d.identity ? [
+    [COL.NUCLEUS,        d.identity.nucleus],
+    [COL.PARENT_NUCLEUS, d.identity.parentNucleus],
+    [COL.GROUPING,       d.identity.grouping],
+    [COL.CLUSTER,        d.identity.cluster],
+    [COL.PG,             d.identity.pg],
+    [COL.CLUSTER_CODE,   d.identity.clusterCode],
+    [COL.TYPE,           d.identity.nucleusType],
+  ] : [];
+
   const updates = [
+    ...identityPairs,
     [COL.LOCALITY, d.locality], [COL.STAGE, d.stage], [COL.CONTACT, d.contact],
     [COL.EMAIL, d.email], [COL.AUX_BOARD, d.auxBoard], [COL.MAKEUP, d.makeup],
     [COL.TOTAL_POP, d.totalPop], [COL.TOTAL_HH, d.totalHH],

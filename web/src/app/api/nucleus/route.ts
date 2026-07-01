@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getAuthorizedRows } from '@/lib/access';
+import { getAccess } from '@/lib/access';
 import { getRowData, saveRowData } from '@/lib/data';
 import { COL } from '@/lib/config';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
+
+function effectiveRole(roleMap: Record<string, string>, nucleus: string) {
+  return roleMap[nucleus] ?? roleMap['*'] ?? null;
+}
 
 export const GET = auth(async (req) => {
   if (!req.auth?.user?.email) {
@@ -14,9 +18,11 @@ export const GET = auth(async (req) => {
   const name = req.nextUrl.searchParams.get('name');
   if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400 });
 
-  const { role, rows } = await getAuthorizedRows(req.auth.user.email);
-  const allowed = role === 'global' || rows.some(r => norm(r[COL.NUCLEUS]) === norm(name));
-  if (!allowed) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  const access = await getAccess(req.auth.user.email);
+  if (access.role === 'none') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+
+  const role = effectiveRole(access.roleMap, name);
+  if (!role) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
   const data = await getRowData(name);
   if (!data) return NextResponse.json({ error: `Not found: ${name}` }, { status: 404 });
@@ -33,9 +39,16 @@ export const POST = auth(async (req) => {
   if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400 });
 
   const email = req.auth.user.email;
-  const { role, rows } = await getAuthorizedRows(email);
-  const allowed = role === 'global' || rows.some(r => norm(r[COL.NUCLEUS]) === norm(name));
-  if (!allowed) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  const access = await getAccess(email);
+  if (access.role === 'none') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+
+  const role = effectiveRole(access.roleMap, name);
+  if (!role || role === 'read') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+
+  // Strip identity block unless caller is admin (defense-in-depth)
+  if (role !== 'admin' && formData.identity) {
+    delete formData.identity;
+  }
 
   const result = await saveRowData(name, formData, email);
   return NextResponse.json(result);
