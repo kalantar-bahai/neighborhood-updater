@@ -252,6 +252,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
   const [showProtagonistsModal, setShowProtagonistsModal] = useState(false);
   const [abmAssistantNames, setAbmAssistantNames] = useState<string[]>(() => detail.abmAssistantNames);
   const [showAbmAssistantModal, setShowAbmAssistantModal] = useState(false);
+  const [identityOpen, setIdentityOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
 
   const canWrite       = role === 'read-write' || role === 'collaborator' || role === 'admin';
@@ -392,8 +393,14 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
 
         {/* Identity */}
         <div className="card">
-          <div className="card-header">Identity</div>
-          <div className="card-body">
+          <div
+            className="card-header"
+            onClick={() => setIdentityOpen(o => !o)}
+            style={{ cursor: 'pointer', userSelect: 'none' }}
+          >
+            <span><span style={{ fontSize: 11, marginRight: 6 }}>{identityOpen ? '▼' : '▶'}</span>Identity</span>
+          </div>
+          {identityOpen && <div className="card-body">
             <div className="field-grid-4">
               <Field label="Grouping"     value={form.grouping}    onChange={isAdmin ? v => set('grouping', v)    : undefined} readonly={!isAdmin} />
               <Field label="Cluster Code" value={form.clusterCode} onChange={isAdmin ? v => set('clusterCode', v) : undefined} readonly={!isAdmin} />
@@ -417,7 +424,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
                 onLabelClick={isAdmin ? () => setShowAbmAssistantModal(true) : undefined}
               />
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* Population */}
