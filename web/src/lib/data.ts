@@ -20,7 +20,7 @@ function norm(s: string) { return (s || '').toLowerCase().trim(); }
 function stripCommas(s: string) { return s ? s.replace(/,/g, '') : s; }
 
 export async function getAccessEntries(): Promise<AccessEntry[]> {
-  const rows = await sheetsGet(MASTER_SHEET_ID, `${ACCESS_TAB}!A:D`);
+  const rows = await sheetsGet(MASTER_SHEET_ID, `${ACCESS_TAB}!A2:D`);
   return rows
     .filter(r => (r[ACCESS_COL.EMAIL] || '').trim() !== '')
     .map(r => ({
