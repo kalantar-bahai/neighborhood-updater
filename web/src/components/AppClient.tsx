@@ -95,8 +95,10 @@ export default function AppClient() {
       {isGlobalAdmin && (
         <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 16px 32px' }}>
           <div className="card">
-            <div className="card-title">Manage Access</div>
-            <AccessPanel roleMap={roleMap} />
+            <div className="card-header">Manage Access</div>
+            <div className="card-body">
+              <AccessPanel roleMap={roleMap} />
+            </div>
           </div>
         </div>
       )}
