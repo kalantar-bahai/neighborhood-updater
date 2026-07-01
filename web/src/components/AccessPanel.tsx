@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react';
 import type { AccessEntry, Role } from '@/types';
 
 interface Props {
-  nucleusName: string;
+  nucleus?: string;
   roleMap: Record<string, Role>;
 }
 
 const ROLES: Role[] = ['read', 'read-write', 'admin'];
 
-export default function AccessPanel({ nucleusName, roleMap }: Props) {
+export default function AccessPanel({ nucleus, roleMap }: Props) {
   const [entries, setEntries] = useState<AccessEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,13 +18,15 @@ export default function AccessPanel({ nucleusName, roleMap }: Props) {
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<Role>('read');
-  const [newNucleus, setNewNucleus] = useState(nucleusName);
+  const [newNucleus, setNewNucleus] = useState(nucleus ?? '');
   const [saving, setSaving] = useState(false);
 
   const hasGlobalAdmin = roleMap['*'] === 'admin';
+  const nucleusFixed = nucleus !== undefined;
 
   useEffect(() => {
-    fetch('/api/access')
+    const url = nucleus ? `/api/access?nucleus=${encodeURIComponent(nucleus)}` : '/api/access';
+    fetch(url)
       .then(r => r.json())
       .then(data => {
         if (data.error) { setError(data.error); return; }
@@ -32,7 +34,7 @@ export default function AccessPanel({ nucleusName, roleMap }: Props) {
       })
       .catch(() => setError('Failed to load access entries.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [nucleus]);
 
   async function handleAdd() {
     if (!newName.trim() || !newEmail.trim()) return;
@@ -56,7 +58,7 @@ export default function AccessPanel({ nucleusName, roleMap }: Props) {
       setNewName('');
       setNewEmail('');
       setNewRole('read');
-      setNewNucleus(nucleusName);
+      setNewNucleus(nucleus ?? '');
     } catch {
       setOpError('Network error — please try again');
     } finally {
@@ -128,7 +130,7 @@ export default function AccessPanel({ nucleusName, roleMap }: Props) {
             {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
         </div>
-        {hasGlobalAdmin && (
+        {!nucleusFixed && hasGlobalAdmin && (
           <div className="field" style={{ flex: '0 1 160px', margin: 0 }}>
             <label style={{ fontSize: 12 }}>Nucleus</label>
             <input type="text" value={newNucleus} onChange={e => setNewNucleus(e.target.value)} placeholder="name or *" style={{ fontSize: 13 }} />

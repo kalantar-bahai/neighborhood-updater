@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { InitialData, NucleusDetail, Role } from '@/types';
 import Picker from './Picker';
 import DetailView from './DetailView';
+import AccessPanel from './AccessPanel';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
@@ -79,13 +80,26 @@ export default function AppClient() {
     );
   }
 
+  const roleMap = initialData.access.roleMap;
+  const isGlobalAdmin = roleMap['*'] === 'admin';
+
   return (
-    <Picker
-      rows={initialData.rows}
-      email={initialData.email}
-      srpNames={initialData.srpNames}
-      onSelect={loadNucleus}
-      onSignOut={() => window.location.href = '/signout'}
-    />
+    <>
+      <Picker
+        rows={initialData.rows}
+        email={initialData.email}
+        srpNames={initialData.srpNames}
+        onSelect={loadNucleus}
+        onSignOut={() => window.location.href = '/signout'}
+      />
+      {isGlobalAdmin && (
+        <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 16px 32px' }}>
+          <div className="card">
+            <div className="card-title">Manage Access</div>
+            <AccessPanel roleMap={roleMap} />
+          </div>
+        </div>
+      )}
+    </>
   );
 }

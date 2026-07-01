@@ -33,9 +33,15 @@ export const GET = auth(async (req) => {
   const hasGlobalAdmin = adminNuclei.has('*');
   const visible = hasGlobalAdmin
     ? allEntries
-    : allEntries.filter(e => adminNuclei.has(e.nucleus) || e.nucleus === '*');
+    : allEntries.filter(e => adminNuclei.has(norm(e.nucleus)));
 
-  return NextResponse.json({ entries: visible });
+  const url = new URL(req.url);
+  const nucleusFilter = url.searchParams.get('nucleus');
+  const result = nucleusFilter
+    ? visible.filter(e => norm(e.nucleus) === norm(nucleusFilter))
+    : visible;
+
+  return NextResponse.json({ entries: result });
 });
 
 export const POST = auth(async (req) => {
@@ -90,7 +96,7 @@ export const DELETE = auth(async (req) => {
 
   const existing = await getAccessEntries();
   const updated = existing.filter(
-    e => !(norm(e.email) === norm(email) && e.nucleus === nucleus)
+    e => !(norm(e.email) === norm(email) && norm(e.nucleus) === norm(nucleus))
   );
   await saveAccessEntries(updated);
   return NextResponse.json({ success: true });

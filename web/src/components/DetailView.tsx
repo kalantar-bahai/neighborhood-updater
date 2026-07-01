@@ -535,7 +535,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           <div className="card">
             <div className="card-header">Manage Access</div>
             <div className="card-body">
-              <AccessPanel nucleusName={row.nucleus} roleMap={roleMap} />
+              <AccessPanel nucleus={row.nucleus} roleMap={roleMap} />
             </div>
           </div>
         )}
