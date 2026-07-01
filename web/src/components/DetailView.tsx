@@ -482,7 +482,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
                 <thead>
                   <tr>
                     <th className="left">Activity</th>
-                    <th>Active</th><th>Participants</th><th>Friends of the Faith</th>
+                    <th>Number</th><th>Participants</th><th>Friends of the Faith</th>
                     <th className="srp-col">SRP</th>
                   </tr>
                 </thead>
