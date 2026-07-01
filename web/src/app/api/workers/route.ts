@@ -50,6 +50,7 @@ export const POST = auth(async (req) => {
 
   const role = effectiveRole(access.roleMap, nucleus);
   if (!role || role === 'read') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  if (type === 'abm-assistant' && role !== 'admin') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
   const allRows = await getAllMasterRows();
   const masterRow = allRows.find(r => norm(r[COL.NUCLEUS]) === norm(nucleus));

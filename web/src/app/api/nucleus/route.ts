@@ -43,9 +43,14 @@ export const POST = auth(async (req) => {
   const role = effectiveRole(access.roleMap, name);
   if (!role || role === 'read') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
-  // Strip identity block unless caller is admin (defense-in-depth)
-  if (role !== 'admin' && formData.identity) {
+  // Strip admin-only fields unless caller is admin (defense-in-depth)
+  if (role !== 'admin') {
     delete formData.identity;
+    delete formData.locality;
+    delete formData.stage;
+    delete formData.contact;
+    delete formData.email;
+    delete formData.auxBoard;
   }
 
   const result = await saveRowData(name, formData, email);

@@ -400,20 +400,20 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               <Field label="PG"           value={form.pg}          onChange={isAdmin ? v => set('pg', v)          : undefined} readonly={!isAdmin} />
             </div>
             <div className="field-grid-4">
-              <Field label="Locality"         value={form.locality}     onChange={canWrite ? v => set('locality', v)     : undefined} readonly={!canWrite} />
+              <Field label="Locality"         value={form.locality}     onChange={isAdmin ? v => set('locality', v)     : undefined} readonly={!isAdmin} />
               <Field label="Nucleus / Pocket" value={form.nucleus}      onChange={isAdmin  ? v => set('nucleus', v)      : undefined} readonly={!isAdmin} />
               <Field label="Type"             value={form.nucleusType}  onChange={isAdmin  ? v => set('nucleusType', v)  : undefined} readonly={!isAdmin} />
-              <Field label="Stage"            value={form.stage}        onChange={canWrite ? v => set('stage', v)        : undefined} readonly={!canWrite} />
+              <Field label="Stage"            value={form.stage}        onChange={isAdmin ? v => set('stage', v)        : undefined} readonly={!isAdmin} />
             </div>
             <div className="field-grid-4">
-              <Field label="Contact"                   value={form.contact}  onChange={canWrite ? v => set('contact', v)  : undefined} readonly={!canWrite} />
-              <Field label="Contact Email"             value={form.email}    onChange={canWrite ? v => set('email', v)    : undefined} readonly={!canWrite} />
-              <Field label="Auxiliary Board Member(s)" value={form.auxBoard} onChange={canWrite ? v => set('auxBoard', v) : undefined} readonly={!canWrite} />
+              <Field label="Contact"                   value={form.contact}  onChange={isAdmin ? v => set('contact', v)  : undefined} readonly={!isAdmin} />
+              <Field label="Contact Email"             value={form.email}    onChange={isAdmin ? v => set('email', v)    : undefined} readonly={!isAdmin} />
+              <Field label="Auxiliary Board Member(s)" value={form.auxBoard} onChange={isAdmin ? v => set('auxBoard', v) : undefined} readonly={!isAdmin} />
               <Field
                 label="ABm Assistant"
                 value={abmAssistantNames.join(', ')}
                 readonly
-                onLabelClick={() => setShowAbmAssistantModal(true)}
+                onLabelClick={isAdmin ? () => setShowAbmAssistantModal(true) : undefined}
               />
             </div>
           </div>

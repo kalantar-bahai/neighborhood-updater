@@ -227,10 +227,11 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     [COL.INVOLVED, d.involved], [COL.NOTES_INVOLVED, d.notesInvolved],
     [COL.EFFORTS, d.efforts], [COL.NOTES_EFFORTS, d.notesEfforts],
     [COL.GATHERINGS, d.gatherings], [COL.NOTES_GATHERINGS, d.notesGatherings],
-  ].map(([col, value]) => ({
-    range: `${MASTER_TAB}!${colLetter(col as number)}${sheetRow}`,
-    values: [[value ?? '']],
-  }));
+  ].filter(([, value]) => value !== undefined)
+    .map(([col, value]) => ({
+      range: `${MASTER_TAB}!${colLetter(col as number)}${sheetRow}`,
+      values: [[(value ?? '') as string]],
+    }));
 
   await sheetsBatchUpdate(MASTER_SHEET_ID, updates);
   return { success: true, savedBy: userEmail, savedAt: new Date().toISOString() };
