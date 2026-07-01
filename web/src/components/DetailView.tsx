@@ -253,9 +253,10 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
   const [abmAssistantNames, setAbmAssistantNames] = useState<string[]>(() => detail.abmAssistantNames);
   const [showAbmAssistantModal, setShowAbmAssistantModal] = useState(false);
 
-  const canWrite  = role === 'read-write' || role === 'admin';
-  const isAdmin   = role === 'admin';
-  const isReadOnly = role === 'read';
+  const canWrite       = role === 'read-write' || role === 'collaborator' || role === 'admin';
+  const isAdmin        = role === 'admin';
+  const canManageAccess = role === 'admin' || role === 'collaborator';
+  const isReadOnly     = role === 'read';
 
   const set = useCallback(<K extends keyof FormState>(key: K, val: FormState[K]) => {
     setForm(f => ({ ...f, [key]: val }));
@@ -530,8 +531,8 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           </div>
         </div>
 
-        {/* Manage Access — admin only */}
-        {isAdmin && (
+        {/* Manage Access — collaborator and admin */}
+        {canManageAccess && (
           <div className="card">
             <div className="card-header">Manage Access</div>
             <div className="card-body">

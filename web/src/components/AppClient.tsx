@@ -81,7 +81,7 @@ export default function AppClient() {
   }
 
   const roleMap = initialData.access.roleMap;
-  const isGlobalAdmin = roleMap['*'] === 'admin';
+  const isGlobalAdmin = roleMap['*'] === 'admin' || roleMap['*'] === 'collaborator';
 
   return (
     <>

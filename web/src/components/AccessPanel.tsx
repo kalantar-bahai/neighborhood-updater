@@ -8,7 +8,7 @@ interface Props {
   roleMap: Record<string, Role>;
 }
 
-const ROLES: Role[] = ['read', 'read-write', 'admin'];
+const ROLES: Role[] = ['read', 'read-write', 'collaborator', 'admin'];
 
 export default function AccessPanel({ nucleus, roleMap }: Props) {
   const [entries, setEntries] = useState<AccessEntry[]>([]);

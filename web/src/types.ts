@@ -1,4 +1,4 @@
-export type Role = 'read' | 'read-write' | 'admin';
+export type Role = 'read' | 'read-write' | 'collaborator' | 'admin';
 
 export interface AccessEntry {
   name: string;

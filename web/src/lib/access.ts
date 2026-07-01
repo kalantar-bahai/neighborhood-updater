@@ -4,7 +4,7 @@ import type { Role, AccessEntry } from '@/types';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
-const ROLE_RANK: Record<Role, number> = { 'read': 1, 'read-write': 2, 'admin': 3 };
+const ROLE_RANK: Record<Role, number> = { 'read': 1, 'read-write': 2, 'collaborator': 3, 'admin': 4 };
 
 function higher(a: Role, b: Role): Role {
   return ROLE_RANK[a] >= ROLE_RANK[b] ? a : b;

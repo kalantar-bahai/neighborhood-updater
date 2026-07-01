@@ -6,11 +6,15 @@ import type { AccessEntry, Role } from '@/types';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
-const ROLES: Role[] = ['read', 'read-write', 'admin'];
+const ROLES: Role[] = ['read', 'read-write', 'collaborator', 'admin'];
+
+function canManage(role: Role | undefined): boolean {
+  return role === 'admin' || role === 'collaborator';
+}
 
 function callerCanManage(roleMap: Record<string, Role>, nucleus: string): boolean {
   const key = norm(nucleus);
-  return roleMap[key] === 'admin' || roleMap['*'] === 'admin';
+  return canManage(roleMap[key]) || canManage(roleMap['*']);
 }
 
 export const GET = auth(async (req) => {
@@ -23,7 +27,7 @@ export const GET = auth(async (req) => {
 
   const adminNuclei = new Set(
     Object.entries(access.roleMap)
-      .filter(([, role]) => role === 'admin')
+      .filter(([, role]) => canManage(role))
       .map(([nucleus]) => nucleus)
   );
   if (adminNuclei.size === 0) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
