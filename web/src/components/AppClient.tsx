@@ -67,6 +67,7 @@ export default function AppClient() {
       <DetailView
         detail={detail}
         role={role}
+        roleMap={initialData.access.roleMap}
         email={initialData.email}
         showBack={initialData.rows.length > 1}
         spreadsheetUrl={initialData.spreadsheetUrl}

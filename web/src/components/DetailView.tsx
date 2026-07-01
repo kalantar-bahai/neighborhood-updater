@@ -8,6 +8,7 @@ import NamedListModal from './NamedListModal';
 interface Props {
   detail: NucleusDetail;
   role: Role;
+  roleMap: Record<string, Role>;
   email: string;
   showBack: boolean;
   spreadsheetUrl: string;
@@ -235,7 +236,7 @@ function ConcentricDiagram({ data }: { data: { label: string; value: string }[] 
   );
 }
 
-export default function DetailView({ detail, role, email, showBack, spreadsheetUrl, onBack, onSaved }: Props) {
+export default function DetailView({ detail, role, roleMap, email, showBack, spreadsheetUrl, onBack, onSaved }: Props) {
   const { row, srp } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   const [isDirty, setIsDirty] = useState(false);
