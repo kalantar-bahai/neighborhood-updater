@@ -2,7 +2,7 @@ export const MASTER_SHEET_ID = process.env.MASTER_SHEET_ID!;
 export const SRP_SHEET_ID    = process.env.SRP_SHEET_ID!;
 
 export const MASTER_TAB  = 'Nuclei';
-export const ACCESS_TAB  = 'GlobalAccess';
+export const ACCESS_TAB  = 'Access';
 export const DEV_TAB     = 'Devotionals';
 export const EDU_TAB     = 'Education';
 
@@ -90,4 +90,11 @@ export const ACC_COL = {
   NUCLEUS:             4,
   TYPE:                5,
   NAME:                6,
+} as const;
+
+export const ACCESS_COL = {
+  NAME:    0,
+  EMAIL:   1,
+  ROLE:    2,
+  NUCLEUS: 3,
 } as const;
