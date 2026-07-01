@@ -443,11 +443,11 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
                   </tr>
                 </thead>
                 <tbody>
-                  <ActRow label="Children's Classes (CCs)" userVals={form.activities.ccs} srpVals={srp?.ccs ?? null}
+                  <ActRow label="Children's Classes" userVals={form.activities.ccs} srpVals={srp?.ccs ?? null}
                     onChange={(f, v) => setAct('ccs', f, v)} onReset={() => resetToSrp('ccs')} />
-                  <ActRow label="Junior Youth Groups (JYGs)" userVals={form.activities.jygs} srpVals={srp?.jygs ?? null}
+                  <ActRow label="Junior Youth Groups" userVals={form.activities.jygs} srpVals={srp?.jygs ?? null}
                     onChange={(f, v) => setAct('jygs', f, v)} onReset={() => resetToSrp('jygs')} />
-                  <ActRow label="Study Circles (SCs)" userVals={form.activities.scs} srpVals={srp?.scs ?? null}
+                  <ActRow label="Study Circles" userVals={form.activities.scs} srpVals={srp?.scs ?? null}
                     onChange={(f, v) => setAct('scs', f, v)} onReset={() => resetToSrp('scs')} />
                   <TotalRow label="Total Educational Activities" totals={edTotal} />
                   <ActRow label="Devotionals" userVals={form.activities.devotionals} srpVals={srp?.devotionals ?? null}
