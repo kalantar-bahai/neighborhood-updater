@@ -58,7 +58,7 @@ describe('getAccess', () => {
     if (result.role === 'none') return;
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0][COL.NUCLEUS]).toBe('Alpha');
-    expect(result.roleMap['Alpha']).toBe('read');
+    expect(result.roleMap['alpha']).toBe('read');
   });
 
   test('multiple entries for same user union their rows', async () => {
@@ -70,8 +70,8 @@ describe('getAccess', () => {
     expect(result.role).not.toBe('none');
     if (result.role === 'none') return;
     expect(result.rows).toHaveLength(2);
-    expect(result.roleMap['Alpha']).toBe('read');
-    expect(result.roleMap['Beta']).toBe('read-write');
+    expect(result.roleMap['alpha']).toBe('read');
+    expect(result.roleMap['beta']).toBe('read-write');
   });
 
   test('higher role wins when same nucleus appears twice', async () => {
@@ -81,7 +81,7 @@ describe('getAccess', () => {
     ]);
     const result = await getAccess('eve@x.com');
     if (result.role === 'none') return;
-    expect(result.roleMap['Alpha']).toBe('admin');
+    expect(result.roleMap['alpha']).toBe('admin');
     expect(result.rows).toHaveLength(1);
   });
 

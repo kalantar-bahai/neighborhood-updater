@@ -7,7 +7,7 @@ import { COL, WORKER_TYPES } from '@/lib/config';
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
 function effectiveRole(roleMap: Record<string, string>, nucleus: string) {
-  return roleMap[nucleus] ?? roleMap['*'] ?? null;
+  return roleMap[norm(nucleus)] ?? roleMap['*'] ?? null;
 }
 
 export const GET = auth(async (req) => {

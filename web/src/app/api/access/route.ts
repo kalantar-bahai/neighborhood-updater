@@ -9,7 +9,8 @@ function norm(s: string) { return (s || '').toLowerCase().trim(); }
 const ROLES: Role[] = ['read', 'read-write', 'admin'];
 
 function callerCanManage(roleMap: Record<string, Role>, nucleus: string): boolean {
-  return roleMap[nucleus] === 'admin' || roleMap['*'] === 'admin';
+  const key = norm(nucleus);
+  return roleMap[key] === 'admin' || roleMap['*'] === 'admin';
 }
 
 export const GET = auth(async (req) => {

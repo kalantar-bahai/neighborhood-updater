@@ -25,7 +25,7 @@ export async function getAccess(email: string): Promise<UserAccess | { role: 'no
 
   const roleMap: Record<string, Role> = {};
   for (const entry of userEntries) {
-    const key = entry.nucleus;
+    const key = norm(entry.nucleus);
     roleMap[key] = key in roleMap ? higher(roleMap[key], entry.role) : entry.role;
   }
 

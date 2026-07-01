@@ -5,6 +5,8 @@ import { InitialData, NucleusDetail, Role } from '@/types';
 import Picker from './Picker';
 import DetailView from './DetailView';
 
+function norm(s: string) { return (s || '').toLowerCase().trim(); }
+
 export default function AppClient() {
   const [initialData, setInitialData] = useState<InitialData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export default function AppClient() {
 
   if (detail && selectedNucleus) {
     const roleMap = initialData.access.roleMap;
-    const role: Role = (roleMap[selectedNucleus] ?? roleMap['*'] ?? 'read') as Role;
+    const role: Role = (roleMap[norm(selectedNucleus)] ?? roleMap['*'] ?? 'read') as Role;
     return (
       <DetailView
         detail={detail}
