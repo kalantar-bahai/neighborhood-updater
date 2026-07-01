@@ -97,10 +97,11 @@ export function parseSrpData(devRow: string[] | null, eduRow: string[] | null) {
 }
 
 export async function getRowData(nucleusName: string) {
-  const [masterRows, devRows, eduRows, accompanierNames, protagonistNames] = await Promise.all([
+  const [masterRows, devRows, eduRows, accompanierNames, protagonistNames, abmAssistantNames] = await Promise.all([
     getAllMasterRows(), getAllDevRows(), getAllEduRows(),
     getWorkerNames(nucleusName, 'accompanier'),
     getWorkerNames(nucleusName, 'protagonist'),
+    getWorkerNames(nucleusName, 'abm-assistant'),
   ]);
 
   const masterRow = masterRows.find(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
@@ -119,6 +120,7 @@ export async function getRowData(nucleusName: string) {
     srp: parseSrpData(lookup(devRows, DEV_COL.NAME), lookup(eduRows, EDU_COL.NAME)),
     accompanierNames,
     protagonistNames,
+    abmAssistantNames,
   };
 }
 

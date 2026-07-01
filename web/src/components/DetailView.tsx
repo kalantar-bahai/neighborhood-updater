@@ -247,6 +247,8 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
   const [showAccompaniersModal, setShowAccompaniersModal] = useState(false);
   const [protagonistNames, setProtagonistNames] = useState<string[]>(() => detail.protagonistNames);
   const [showProtagonistsModal, setShowProtagonistsModal] = useState(false);
+  const [abmAssistantNames, setAbmAssistantNames] = useState<string[]>(() => detail.abmAssistantNames);
+  const [showAbmAssistantModal, setShowAbmAssistantModal] = useState(false);
 
   const set = useCallback(<K extends keyof FormState>(key: K, val: FormState[K]) => {
     setForm(f => ({ ...f, [key]: val }));
@@ -380,10 +382,16 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
               <Field label="Nucleus / Pocket" value={row.nucleus} readonly />
               <Field label="Stage"            value={row.stage}   readonly />
             </div>
-            <div className="field-grid-3">
-              <Field label="Contact"      value={row.contact}  readonly />
+            <div className="field-grid-4">
+              <Field label="Contact"                   value={row.contact}  readonly />
               <Field label="Contact Email"             value={row.email}    readonly />
               <Field label="Auxiliary Board Member(s)" value={row.auxBoard} readonly />
+              <Field
+                label="ABm Assistant"
+                value={abmAssistantNames.join(', ')}
+                readonly
+                onLabelClick={() => setShowAbmAssistantModal(true)}
+              />
             </div>
           </div>
         </div>
@@ -550,6 +558,20 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
             setShowProtagonistsModal(false);
           }}
           onClose={() => setShowProtagonistsModal(false)}
+        />
+      )}
+
+      {showAbmAssistantModal && (
+        <NamedListModal
+          title="ABm Assistant"
+          type="abm-assistant"
+          nucleus={row.nucleus}
+          initialNames={abmAssistantNames}
+          onSave={names => {
+            setAbmAssistantNames(names);
+            setShowAbmAssistantModal(false);
+          }}
+          onClose={() => setShowAbmAssistantModal(false)}
         />
       )}
 

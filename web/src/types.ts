@@ -67,6 +67,7 @@ export interface NucleusDetail {
   srp: SrpData | null;
   accompanierNames: string[];
   protagonistNames: string[];
+  abmAssistantNames: string[];
 }
 
 export interface InitialData {
