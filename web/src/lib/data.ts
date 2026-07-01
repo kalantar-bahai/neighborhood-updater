@@ -182,7 +182,7 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
   };
 
   const updates = [
-    [COL.LOCALITY, d.locality], [COL.TYPE, d.nucleusType], [COL.STAGE, d.stage], [COL.CONTACT, d.contact],
+    [COL.LOCALITY, d.locality], [COL.STAGE, d.stage], [COL.CONTACT, d.contact],
     [COL.EMAIL, d.email], [COL.AUX_BOARD, d.auxBoard], [COL.MAKEUP, d.makeup],
     [COL.TOTAL_POP, d.totalPop], [COL.TOTAL_HH, d.totalHH],
     [COL.IND_NUM, d.indNum],

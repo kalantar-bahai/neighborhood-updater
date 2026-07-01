@@ -380,19 +380,7 @@ export default function DetailView({ detail, email, showBack, spreadsheetUrl, on
             <div className="field-grid-4">
               <Field label="Locality"         value={row.locality} readonly />
               <Field label="Nucleus / Pocket" value={row.nucleus}  readonly />
-              <div className="field">
-                <label>Type</label>
-                <select
-                  value={form.nucleusType || ''}
-                  onChange={e => set('nucleusType', e.target.value)}
-                  style={{ padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, background: 'white', color: '#2d3748' }}
-                >
-                  <option value="">—</option>
-                  <option value="Neighborhood">Neighborhood</option>
-                  <option value="Network">Network</option>
-                  <option value="Population">Population</option>
-                </select>
-              </div>
+              <Field label="Type" value={row.nucleusType} readonly />
               <Field label="Stage"            value={row.stage}    readonly />
             </div>
             <div className="field-grid-4">
