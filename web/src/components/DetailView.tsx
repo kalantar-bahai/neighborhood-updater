@@ -252,6 +252,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
   const [showProtagonistsModal, setShowProtagonistsModal] = useState(false);
   const [abmAssistantNames, setAbmAssistantNames] = useState<string[]>(() => detail.abmAssistantNames);
   const [showAbmAssistantModal, setShowAbmAssistantModal] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
 
   const canWrite       = role === 'read-write' || role === 'collaborator' || role === 'admin';
   const isAdmin        = role === 'admin';
@@ -534,10 +535,19 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
         {/* Manage Access — collaborator and admin */}
         {canManageAccess && (
           <div className="card">
-            <div className="card-header">Manage Access</div>
-            <div className="card-body">
-              <AccessPanel nucleus={row.nucleus} roleMap={roleMap} />
+            <div
+              className="card-header"
+              onClick={() => setAccessOpen(o => !o)}
+              style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              Manage Access
+              <span style={{ fontSize: 11 }}>{accessOpen ? '▼' : '▶'}</span>
             </div>
+            {accessOpen && (
+              <div className="card-body">
+                <AccessPanel nucleus={row.nucleus} roleMap={roleMap} />
+              </div>
+            )}
           </div>
         )}
       </div>

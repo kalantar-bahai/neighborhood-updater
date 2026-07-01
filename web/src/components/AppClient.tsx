@@ -14,6 +14,7 @@ export default function AppClient() {
   const [detail, setDetail] = useState<NucleusDetail | null>(null);
   const [selectedNucleus, setSelectedNucleus] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/initial-data')
@@ -95,10 +96,19 @@ export default function AppClient() {
       {isGlobalAdmin && (
         <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 16px 32px' }}>
           <div className="card">
-            <div className="card-header">Manage Access</div>
-            <div className="card-body">
-              <AccessPanel roleMap={roleMap} />
+            <div
+              className="card-header"
+              onClick={() => setAccessOpen(o => !o)}
+              style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              Manage Access
+              <span style={{ fontSize: 11 }}>{accessOpen ? '▼' : '▶'}</span>
             </div>
+            {accessOpen && (
+              <div className="card-body">
+                <AccessPanel roleMap={roleMap} />
+              </div>
+            )}
           </div>
         </div>
       )}
