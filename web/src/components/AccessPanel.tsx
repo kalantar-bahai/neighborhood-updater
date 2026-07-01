@@ -14,6 +14,7 @@ export default function AccessPanel({ nucleusName, roleMap }: Props) {
   const [entries, setEntries] = useState<AccessEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [opError, setOpError] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<Role>('read');
@@ -36,25 +37,31 @@ export default function AccessPanel({ nucleusName, roleMap }: Props) {
   async function handleAdd() {
     if (!newName.trim() || !newEmail.trim()) return;
     setSaving(true);
-    const entry: AccessEntry = {
-      name: newName.trim(),
-      email: newEmail.trim(),
-      role: newRole,
-      nucleus: newNucleus,
-    };
-    const res = await fetch('/api/access', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entry),
-    });
-    const data = await res.json();
-    setSaving(false);
-    if (!res.ok) { setError(data.error || 'Failed to add'); return; }
-    setEntries(prev => [...prev, entry]);
-    setNewName('');
-    setNewEmail('');
-    setNewRole('read');
-    setNewNucleus(nucleusName);
+    setOpError(null);
+    try {
+      const entry: AccessEntry = {
+        name: newName.trim(),
+        email: newEmail.trim(),
+        role: newRole,
+        nucleus: newNucleus,
+      };
+      const res = await fetch('/api/access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+      });
+      const data = await res.json();
+      if (!res.ok) { setOpError(data.error || 'Failed to add'); return; }
+      setEntries(prev => [...prev, entry]);
+      setNewName('');
+      setNewEmail('');
+      setNewRole('read');
+      setNewNucleus(nucleusName);
+    } catch {
+      setOpError('Network error — please try again');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleRemove(entry: AccessEntry) {
@@ -63,7 +70,7 @@ export default function AccessPanel({ nucleusName, roleMap }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: entry.email, nucleus: entry.nucleus }),
     });
-    if (!res.ok) return;
+    if (!res.ok) { setOpError('Failed to remove entry'); return; }
     setEntries(prev => prev.filter(e => !(e.email === entry.email && e.nucleus === entry.nucleus)));
   }
 
@@ -86,8 +93,8 @@ export default function AccessPanel({ nucleusName, roleMap }: Props) {
             </tr>
           </thead>
           <tbody>
-            {entries.map((e, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid #f7fafc' }}>
+            {entries.map((e) => (
+              <tr key={`${e.email}-${e.nucleus}`} style={{ borderBottom: '1px solid #f7fafc' }}>
                 <td style={{ padding: '4px 8px' }}>{e.name}</td>
                 <td style={{ padding: '4px 8px', color: '#718096' }}>{e.email}</td>
                 <td style={{ padding: '4px 8px' }}>{e.role}</td>
@@ -135,6 +142,7 @@ export default function AccessPanel({ nucleusName, roleMap }: Props) {
           Add
         </button>
       </div>
+      {opError && <div style={{ fontSize: 13, color: '#e53e3e', marginTop: 6 }}>{opError}</div>}
     </div>
   );
 }
