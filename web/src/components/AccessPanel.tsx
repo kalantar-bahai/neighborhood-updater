@@ -168,14 +168,15 @@ export default function AccessPanel({ nucleus, roleMap }: Props) {
       {entries.length === 0 ? (
         <div style={{ fontSize: 13, color: '#718096', marginBottom: 12 }}>No access entries yet.</div>
       ) : (
+        <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 12 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+              <th style={{ width: 56 }}></th>
               <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: '#4a5568' }}>Name</th>
               <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: '#4a5568' }}>Email</th>
               <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: '#4a5568' }}>Role</th>
               <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, color: '#4a5568' }}>Nucleus</th>
-              <th style={{ width: 56 }}></th>
             </tr>
           </thead>
           <tbody>
@@ -186,6 +187,10 @@ export default function AccessPanel({ nucleus, roleMap }: Props) {
                 <tr key={key} style={{ borderBottom: '1px solid #f7fafc' }}>
                   {isEditing && editForm ? (
                     <>
+                      <td style={{ padding: '4px 8px', whiteSpace: 'nowrap' }}>
+                        {iconBtn(handleSaveEdit, 'Save', '#276749', <IcoCheck />)}
+                        {iconBtn(cancelEdit, 'Cancel', '#718096', <IcoX />)}
+                      </td>
                       <td style={{ padding: '4px 8px' }}>
                         <input value={editForm.name} onChange={ev => setEditForm(f => f && ({ ...f, name: ev.target.value }))} style={{ fontSize: 13, width: '100%' }} />
                       </td>
@@ -203,21 +208,17 @@ export default function AccessPanel({ nucleus, roleMap }: Props) {
                           : <span style={{ color: '#718096' }}>{e.nucleus}</span>
                         }
                       </td>
-                      <td style={{ padding: '4px 8px', whiteSpace: 'nowrap' }}>
-                        {iconBtn(handleSaveEdit, 'Save', '#276749', <IcoCheck />)}
-                        {iconBtn(cancelEdit, 'Cancel', '#718096', <IcoX />)}
-                      </td>
                     </>
                   ) : (
                     <>
-                      <td style={{ padding: '4px 8px' }}>{e.name}</td>
-                      <td style={{ padding: '4px 8px', color: '#718096' }}>{e.email}</td>
-                      <td style={{ padding: '4px 8px' }}>{e.role}</td>
-                      <td style={{ padding: '4px 8px', color: '#718096' }}>{e.nucleus}</td>
                       <td style={{ padding: '4px 8px', whiteSpace: 'nowrap' }}>
                         {iconBtn(() => startEdit(e), 'Edit', '#3182ce', <IcoPencil />)}
                         {iconBtn(() => handleRemove(e), 'Remove', '#e53e3e', <IcoTrash />)}
                       </td>
+                      <td style={{ padding: '4px 8px' }}>{e.name}</td>
+                      <td style={{ padding: '4px 8px', color: '#718096' }}>{e.email}</td>
+                      <td style={{ padding: '4px 8px' }}>{e.role}</td>
+                      <td style={{ padding: '4px 8px', color: '#718096' }}>{e.nucleus}</td>
                     </>
                   )}
                 </tr>
@@ -225,6 +226,7 @@ export default function AccessPanel({ nucleus, roleMap }: Props) {
             })}
           </tbody>
         </table>
+        </div>
       )}
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
