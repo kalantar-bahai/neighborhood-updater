@@ -5,7 +5,9 @@ import {
   MASTER_DATA_ROW, SRP_DATA_ROW,
   COL, DEV_COL, EDU_COL,
   WORKERS_TAB, WORKERS_DATA_ROW, ACC_COL,
+  ACCESS_COL,
 } from './config';
+import type { AccessEntry } from '@/types';
 
 function normalize(row: string[], numCols: number): string[] {
   const r = row ? [...row] : [];
@@ -17,14 +19,30 @@ function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
 function stripCommas(s: string) { return s ? s.replace(/,/g, '') : s; }
 
+export async function getAccessEntries(): Promise<AccessEntry[]> {
+  const rows = await sheetsGet(MASTER_SHEET_ID, `${ACCESS_TAB}!A:D`);
+  return rows
+    .filter(r => (r[ACCESS_COL.EMAIL] || '').trim() !== '')
+    .map(r => ({
+      name:    r[ACCESS_COL.NAME]    || '',
+      email:   r[ACCESS_COL.EMAIL]   || '',
+      role:    (r[ACCESS_COL.ROLE]   || 'read') as AccessEntry['role'],
+      nucleus: r[ACCESS_COL.NUCLEUS] || '*',
+    }));
+}
+
+export async function saveAccessEntries(entries: AccessEntry[]): Promise<void> {
+  await sheetsClear(MASTER_SHEET_ID, `${ACCESS_TAB}!A:D`);
+  if (entries.length === 0) return;
+  await sheetsBatchUpdate(MASTER_SHEET_ID, [{
+    range: `${ACCESS_TAB}!A1`,
+    values: entries.map(e => [e.name, e.email, e.role, e.nucleus]),
+  }]);
+}
+
 export async function getAllMasterRows() {
   const rows = await sheetsGet(MASTER_SHEET_ID, `${MASTER_TAB}!A${MASTER_DATA_ROW}:AY`);
   return rows.map(r => normalize(r, 51));
-}
-
-export async function getGlobalList() {
-  const rows = await sheetsGet(MASTER_SHEET_ID, `${ACCESS_TAB}!A:A`);
-  return rows.flatMap(r => r[0] ? [r[0]] : []);
 }
 
 export async function getAllDevRows() {

@@ -9,7 +9,9 @@ vi.mock('./sheets', () => ({
 import { sheetsGet, sheetsClear, sheetsBatchUpdate } from './sheets';
 import { parseRow, findSrpRow, parseSrpData } from './data';
 import { getWorkerNames, saveWorkerNames } from './data';
-import { COL, DEV_COL, EDU_COL, ACC_COL } from './config';
+import { getAccessEntries, saveAccessEntries } from './data';
+import { COL, DEV_COL, EDU_COL, ACC_COL, ACCESS_COL } from './config';
+import type { AccessEntry } from '@/types';
 
 const mockSheetsGet = vi.mocked(sheetsGet);
 const mockSheetsClear = vi.mocked(sheetsClear);
@@ -266,5 +268,68 @@ describe('saveWorkerNames', () => {
 
     const rows = mockSheetsBatchUpdate.mock.calls[0][1][0].values as string[][];
     expect(rows).toEqual([['Charlotte', 'C1', 'Charlotte', '', 'Alpha', 'accompanier', 'Alice']]);
+  });
+});
+
+describe('getAccessEntries', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  test('returns parsed access entries from sheet', async () => {
+    mockSheetsGet.mockResolvedValue([
+      ['Alice Smith', 'alice@x.com', 'admin', '*'],
+      ['Bob Jones',   'bob@x.com',   'read',  'Alpha'],
+    ]);
+    const result = await getAccessEntries();
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ name: 'Alice Smith', email: 'alice@x.com', role: 'admin', nucleus: '*' });
+    expect(result[1]).toEqual({ name: 'Bob Jones',   email: 'bob@x.com',   role: 'read',  nucleus: 'Alpha' });
+  });
+
+  test('skips rows with missing email', async () => {
+    mockSheetsGet.mockResolvedValue([
+      ['Alice', 'alice@x.com', 'read-write', 'Beta'],
+      ['',      '',            'read',       'Gamma'],
+    ]);
+    const result = await getAccessEntries();
+    expect(result).toHaveLength(1);
+    expect(result[0].email).toBe('alice@x.com');
+  });
+
+  test('returns empty array when tab is empty', async () => {
+    mockSheetsGet.mockResolvedValue([]);
+    const result = await getAccessEntries();
+    expect(result).toEqual([]);
+  });
+});
+
+describe('saveAccessEntries', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const entries: AccessEntry[] = [
+    { name: 'Alice', email: 'alice@x.com', role: 'admin',      nucleus: '*'     },
+    { name: 'Bob',   email: 'bob@x.com',   role: 'read-write', nucleus: 'Alpha' },
+  ];
+
+  test('clears tab and writes all entries', async () => {
+    mockSheetsClear.mockResolvedValue(undefined);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+
+    await saveAccessEntries(entries);
+
+    expect(mockSheetsClear).toHaveBeenCalledOnce();
+    expect(mockSheetsBatchUpdate).toHaveBeenCalledOnce();
+    const rows = mockSheetsBatchUpdate.mock.calls[0][1][0].values as string[][];
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toEqual(['Alice', 'alice@x.com', 'admin',      '*'    ]);
+    expect(rows[1]).toEqual(['Bob',   'bob@x.com',   'read-write', 'Alpha']);
+  });
+
+  test('clears without writing when entries list is empty', async () => {
+    mockSheetsClear.mockResolvedValue(undefined);
+
+    await saveAccessEntries([]);
+
+    expect(mockSheetsClear).toHaveBeenCalledOnce();
+    expect(mockSheetsBatchUpdate).not.toHaveBeenCalled();
   });
 });
