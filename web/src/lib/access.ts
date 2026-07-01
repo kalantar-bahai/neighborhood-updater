@@ -1,17 +1,43 @@
-import { getAllMasterRows, getGlobalList } from './data';
+import { getAllMasterRows, getAccessEntries } from './data';
 import { COL } from './config';
+import type { Role, AccessEntry } from '@/types';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
-export async function getAuthorizedRows(email: string) {
-  const [allRows, globalList] = await Promise.all([getAllMasterRows(), getGlobalList()]);
+const ROLE_RANK: Record<Role, number> = { 'read': 1, 'read-write': 2, 'admin': 3 };
 
-  if (globalList.some(e => norm(e) === norm(email))) {
-    return { role: 'global' as const, rows: allRows };
+function higher(a: Role, b: Role): Role {
+  return ROLE_RANK[a] >= ROLE_RANK[b] ? a : b;
+}
+
+export interface UserAccess {
+  role: Role;
+  entries: AccessEntry[];
+  roleMap: Record<string, Role>;
+  rows: string[][];
+}
+
+export async function getAccess(email: string): Promise<UserAccess | { role: 'none'; rows: [] }> {
+  const [allRows, allEntries] = await Promise.all([getAllMasterRows(), getAccessEntries()]);
+
+  const userEntries = allEntries.filter(e => norm(e.email) === norm(email));
+  if (userEntries.length === 0) return { role: 'none', rows: [] };
+
+  const roleMap: Record<string, Role> = {};
+  for (const entry of userEntries) {
+    const key = entry.nucleus;
+    roleMap[key] = key in roleMap ? higher(roleMap[key], entry.role) : entry.role;
   }
 
-  const rows = allRows.filter(r => norm(r[COL.EMAIL]) === norm(email));
-  if (rows.length === 0) return { role: 'none' as const, rows: [] };
+  const hasWildcard = '*' in roleMap;
+  const nucleusSet = new Set(Object.keys(roleMap).map(norm));
+  const rows = hasWildcard
+    ? allRows
+    : allRows.filter(r => nucleusSet.has(norm(r[COL.NUCLEUS])));
 
-  return { role: 'contact' as const, rows };
+  // Determine top-level role (highest across all entries — used only for
+  // quick 'access denied' vs 'has some access' checks at the route level)
+  const topRole = Object.values(roleMap).reduce(higher);
+
+  return { role: topRole, entries: userEntries, roleMap, rows };
 }
