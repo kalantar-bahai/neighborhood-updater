@@ -9,8 +9,7 @@ function norm(s: string) { return (s || '').toLowerCase().trim(); }
 const ROLES: Role[] = ['read', 'read-write', 'admin'];
 
 function callerCanManage(roleMap: Record<string, Role>, nucleus: string): boolean {
-  const role = roleMap[nucleus] ?? roleMap['*'] ?? null;
-  return role === 'admin';
+  return roleMap[nucleus] === 'admin' || roleMap['*'] === 'admin';
 }
 
 export const GET = auth(async (req) => {
@@ -43,7 +42,12 @@ export const POST = auth(async (req) => {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const body = await req.json() as Partial<AccessEntry>;
+  let body: Partial<AccessEntry>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
   const { name, email, role, nucleus } = body;
   if (!name || !email || !role || !nucleus) {
     return NextResponse.json({ error: 'Missing required fields: name, email, role, nucleus' }, { status: 400 });
@@ -67,7 +71,13 @@ export const DELETE = auth(async (req) => {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const { email, nucleus } = await req.json() as { email: string; nucleus: string };
+  let body: { email: string; nucleus: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+  const { email, nucleus } = body;
   if (!email || !nucleus) {
     return NextResponse.json({ error: 'Missing required fields: email, nucleus' }, { status: 400 });
   }
