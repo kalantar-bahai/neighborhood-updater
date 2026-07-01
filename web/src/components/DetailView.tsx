@@ -385,7 +385,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-          <button onClick={() => setShowDiagram(true)} title="Concentric Circle" aria-label="Concentric Circle" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
+          <button onClick={() => setShowDiagram(true)} title="Concentric Circles" aria-label="Concentric Circles" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
             <IcoDiagram />
           </button>
           <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" title="Open spreadsheet" aria-label="Open spreadsheet" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', textDecoration: 'none' }}>
@@ -531,7 +531,6 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               <div className="srp-ref">SRP Facilitators: <strong>{srp.facilitators}</strong></div>
             )}
             <div className="divider" />
-            <Field label="Prevalence Level" value={form.level} onChange={v => set('level', v)} />
             <div className="field">
               <label>Notes</label>
               <textarea value={form.notesPrevalence || ''} onChange={e => set('notesPrevalence', e.target.value)} />
@@ -544,9 +543,9 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           <div className="card-header">Additional Details</div>
           <div className="card-body">
             <div className="detail-grid">
-              <ToggleItem label="Social Action Presence" value={form.presence} notes={form.notesPresence}
+              <ToggleItem label="Social Action" value={form.presence} notes={form.notesPresence}
                 onToggle={v => set('presence', v)} onNotes={v => set('notesPresence', v)} />
-              <ToggleItem label="Gatherings / Festivals" value={form.gatherings} notes={form.notesGatherings}
+              <ToggleItem label="Regular Gatherings / Festivals" value={form.gatherings} notes={form.notesGatherings}
                 onToggle={v => set('gatherings', v)} onNotes={v => set('notesGatherings', v)} />
             </div>
           </div>
