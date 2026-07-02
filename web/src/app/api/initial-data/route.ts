@@ -21,11 +21,31 @@ export const GET = auth(async (req) => {
     );
   }
 
+  const debugRows: object[] = [];
+
   const authorizedRows = access.rows
     .filter(r => (r[COL.NUCLEUS] || '').trim() !== '')
     .map(r => {
       const parsed = parseRow(r);
       const acts = Object.values(parsed.activities);
+      const totalAct  = acts.reduce((s, a) => s + n(a.act),  0);
+      const totalPart = acts.reduce((s, a) => s + n(a.part), 0);
+      const totalFof  = acts.reduce((s, a) => s + n(a.fof),  0);
+
+      if (debugRows.length < 5) {
+        debugRows.push({
+          nucleus: r[COL.NUCLEUS],
+          rawCols: {
+            CC_ACT:  r[COL.CC_ACT],  CC_PART:  r[COL.CC_PART],  CC_FOF:  r[COL.CC_FOF],
+            JYG_ACT: r[COL.JYG_ACT], JYG_PART: r[COL.JYG_PART], JYG_FOF: r[COL.JYG_FOF],
+            SC_ACT:  r[COL.SC_ACT],  SC_PART:  r[COL.SC_PART],  SC_FOF:  r[COL.SC_FOF],
+            DEV_ACT: r[COL.DEV_ACT], DEV_PART: r[COL.DEV_PART], DEV_FOF: r[COL.DEV_FOF],
+          },
+          parsedActivities: parsed.activities,
+          computed: { totalAct, totalPart, totalFof },
+        });
+      }
+
       return {
         nucleus:       r[COL.NUCLEUS],
         parentNucleus: r[COL.PARENT_NUCLEUS],
@@ -34,11 +54,13 @@ export const GET = auth(async (req) => {
         locality:      r[COL.LOCALITY],
         nucleusType:   r[COL.TYPE],
         stage:         r[COL.STAGE],
-        totalAct:  acts.reduce((s, a) => s + n(a.act),  0),
-        totalPart: acts.reduce((s, a) => s + n(a.part), 0),
-        totalFof:  acts.reduce((s, a) => s + n(a.fof),  0),
+        totalAct,
+        totalPart,
+        totalFof,
       };
     });
+
+  console.log('[initial-data] debug rows:', JSON.stringify(debugRows, null, 2));
 
   const devRows = await getAllDevRows();
   const srpNames = devRows.map(r => (r[DEV_COL.NAME] || '').toLowerCase().trim());
@@ -50,5 +72,6 @@ export const GET = auth(async (req) => {
     email,
     srpNames,
     spreadsheetUrl,
+    debug: debugRows,
   });
 });

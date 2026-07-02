@@ -21,6 +21,7 @@ export default function AppClient() {
       .then(r => r.json())
       .then(data => {
         if (data.error) { setError(data.error); return; }
+        console.log('[initial-data] debug:', JSON.stringify(data.debug, null, 2));
         setInitialData(data);
         if (data.rows.length === 1) loadNucleus(data.rows[0].nucleus);
       })
