@@ -31,9 +31,9 @@ export const GET = auth(async (req) => {
       locality:      r[COL.LOCALITY],
       nucleusType:   r[COL.TYPE],
       stage:         r[COL.STAGE],
-      totalAct:  pi(r[COL.CC_ACT])  + pi(r[COL.JYG_ACT])  + pi(r[COL.SC_ACT])  + pi(r[COL.DEV_ACT]),
-      totalPart: pi(r[COL.CC_PART]) + pi(r[COL.JYG_PART]) + pi(r[COL.SC_PART]) + pi(r[COL.DEV_PART]),
-      totalFof:  pi(r[COL.CC_FOF])  + pi(r[COL.JYG_FOF])  + pi(r[COL.SC_FOF])  + pi(r[COL.DEV_FOF]),
+      totalAct:  pi(r[COL.TOTAL_ACT]),
+      totalPart: pi(r[COL.TOTAL_PART]),
+      totalFof:  pi(r[COL.TOTAL_FOF]),
     }));
 
   const devRows = await getAllDevRows();
