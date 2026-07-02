@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getAccess } from '@/lib/access';
-import { getAllDevRows } from '@/lib/data';
+import { getAllDevRows, parseRow } from '@/lib/data';
 import { COL, DEV_COL } from '@/lib/config';
 
-function pi(v: string) { return parseInt(v, 10) || 0; }
+function n(v: string) { return parseInt(v || '0', 10) || 0; }
 
 export const GET = auth(async (req) => {
   if (!req.auth?.user?.email) {
@@ -23,18 +23,22 @@ export const GET = auth(async (req) => {
 
   const authorizedRows = access.rows
     .filter(r => (r[COL.NUCLEUS] || '').trim() !== '')
-    .map(r => ({
-      nucleus:       r[COL.NUCLEUS],
-      parentNucleus: r[COL.PARENT_NUCLEUS],
-      grouping:      r[COL.GROUPING],
-      cluster:       r[COL.CLUSTER],
-      locality:      r[COL.LOCALITY],
-      nucleusType:   r[COL.TYPE],
-      stage:         r[COL.STAGE],
-      totalAct:  pi(r[COL.TOTAL_ACT]),
-      totalPart: pi(r[COL.TOTAL_PART]),
-      totalFof:  pi(r[COL.TOTAL_FOF]),
-    }));
+    .map(r => {
+      const parsed = parseRow(r);
+      const acts = Object.values(parsed.activities);
+      return {
+        nucleus:       r[COL.NUCLEUS],
+        parentNucleus: r[COL.PARENT_NUCLEUS],
+        grouping:      r[COL.GROUPING],
+        cluster:       r[COL.CLUSTER],
+        locality:      r[COL.LOCALITY],
+        nucleusType:   r[COL.TYPE],
+        stage:         r[COL.STAGE],
+        totalAct:  acts.reduce((s, a) => s + n(a.act),  0),
+        totalPart: acts.reduce((s, a) => s + n(a.part), 0),
+        totalFof:  acts.reduce((s, a) => s + n(a.fof),  0),
+      };
+    });
 
   const devRows = await getAllDevRows();
   const srpNames = devRows.map(r => (r[DEV_COL.NAME] || '').toLowerCase().trim());

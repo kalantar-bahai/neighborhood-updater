@@ -90,17 +90,18 @@ export default function AppClient() {
     population:   { label: 'Population',   bg: '#e9d8fd', color: '#553c9a', border: '#d6bcfa' },
   };
 
-  const typeSummaries = Object.entries(
-    initialData.rows.reduce<Record<string, { act: number; part: number; fof: number; count: number }>>((acc, r) => {
-      const key = (r.nucleusType || '').toLowerCase().trim() || 'neighborhood';
-      if (!acc[key]) acc[key] = { act: 0, part: 0, fof: 0, count: 0 };
-      acc[key].act   += r.totalAct  || 0;
-      acc[key].part  += r.totalPart || 0;
-      acc[key].fof   += r.totalFof  || 0;
-      acc[key].count += 1;
-      return acc;
-    }, {})
-  ).filter(([key]) => key in TYPE_META);
+  const typeTotals = initialData.rows.reduce<Record<string, { act: number; part: number; fof: number; count: number }>>((acc, r) => {
+    const key = (r.nucleusType || '').toLowerCase().trim() || 'neighborhood';
+    if (!acc[key]) acc[key] = { act: 0, part: 0, fof: 0, count: 0 };
+    acc[key].act   += r.totalAct  || 0;
+    acc[key].part  += r.totalPart || 0;
+    acc[key].fof   += r.totalFof  || 0;
+    acc[key].count += 1;
+    return acc;
+  }, {});
+  const typeSummaries = (['neighborhood', 'network', 'population'] as const)
+    .filter(key => key in typeTotals)
+    .map(key => [key, typeTotals[key]] as const);
 
   return (
     <>
