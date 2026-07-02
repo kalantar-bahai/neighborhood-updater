@@ -21,7 +21,6 @@ export default function AppClient() {
       .then(r => r.json())
       .then(data => {
         if (data.error) { setError(data.error); return; }
-        console.log('[initial-data] debug:', JSON.stringify(data.debug, null, 2));
         setInitialData(data);
         if (data.rows.length === 1) loadNucleus(data.rows[0].nucleus);
       })
@@ -100,9 +99,7 @@ export default function AppClient() {
     acc[key].count += 1;
     return acc;
   }, {});
-  console.log('[client] first 3 rows:', initialData.rows.slice(0, 3).map(r => ({ nucleus: r.nucleus, nucleusType: r.nucleusType, totalAct: r.totalAct, totalPart: r.totalPart, totalFof: r.totalFof })));
-  console.log('[client] typeTotals:', typeTotals);
-  const typeSummaries = (['neighborhood', 'network', 'population'] as const)
+const typeSummaries = (['neighborhood', 'network', 'population'] as const)
     .filter(key => key in typeTotals)
     .map(key => [key, typeTotals[key]] as const);
 
