@@ -4,6 +4,8 @@ import { getAccess } from '@/lib/access';
 import { getAllDevRows } from '@/lib/data';
 import { COL, DEV_COL } from '@/lib/config';
 
+function pi(v: string) { return parseInt(v, 10) || 0; }
+
 export const GET = auth(async (req) => {
   if (!req.auth?.user?.email) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
@@ -29,6 +31,9 @@ export const GET = auth(async (req) => {
       locality:      r[COL.LOCALITY],
       nucleusType:   r[COL.TYPE],
       stage:         r[COL.STAGE],
+      totalAct:  pi(r[COL.CC_ACT])  + pi(r[COL.JYG_ACT])  + pi(r[COL.SC_ACT])  + pi(r[COL.DEV_ACT]),
+      totalPart: pi(r[COL.CC_PART]) + pi(r[COL.JYG_PART]) + pi(r[COL.SC_PART]) + pi(r[COL.DEV_PART]),
+      totalFof:  pi(r[COL.CC_FOF])  + pi(r[COL.JYG_FOF])  + pi(r[COL.SC_FOF])  + pi(r[COL.DEV_FOF]),
     }));
 
   const devRows = await getAllDevRows();

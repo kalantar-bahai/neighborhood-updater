@@ -21,6 +21,9 @@ export interface NucleusSummary {
   locality: string;
   nucleusType: string;
   stage: string;
+  totalAct: number;
+  totalPart: number;
+  totalFof: number;
 }
 
 export interface NucleusRow {
