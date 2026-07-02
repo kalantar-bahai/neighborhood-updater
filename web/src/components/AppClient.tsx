@@ -16,7 +16,7 @@ export default function AppClient() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
 
-  useEffect(() => {
+  function loadInitialData() {
     fetch('/api/initial-data')
       .then(r => r.json())
       .then(data => {
@@ -25,7 +25,9 @@ export default function AppClient() {
         if (data.rows.length === 1) loadNucleus(data.rows[0].nucleus);
       })
       .catch(() => setError('Failed to load. Please refresh.'));
-  }, []);
+  }
+
+  useEffect(() => { loadInitialData(); }, []);
 
   function loadNucleus(name: string) {
     setLoadingDetail(true);
@@ -44,6 +46,7 @@ export default function AppClient() {
   function handleBack() {
     setDetail(null);
     setSelectedNucleus(null);
+    loadInitialData();
   }
 
   if (error) {
