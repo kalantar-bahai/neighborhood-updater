@@ -94,9 +94,9 @@ export default function AppClient() {
     initialData.rows.reduce<Record<string, { act: number; part: number; fof: number; count: number }>>((acc, r) => {
       const key = (r.nucleusType || '').toLowerCase().trim() || 'neighborhood';
       if (!acc[key]) acc[key] = { act: 0, part: 0, fof: 0, count: 0 };
-      acc[key].act   += r.totalAct;
-      acc[key].part  += r.totalPart;
-      acc[key].fof   += r.totalFof;
+      acc[key].act   += r.totalAct  || 0;
+      acc[key].part  += r.totalPart || 0;
+      acc[key].fof   += r.totalFof  || 0;
       acc[key].count += 1;
       return acc;
     }, {})
