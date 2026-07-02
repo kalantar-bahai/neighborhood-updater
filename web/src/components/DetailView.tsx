@@ -15,6 +15,8 @@ interface Props {
   spreadsheetUrl: string;
   onBack: () => void;
   onSaved: (savedBy: string, savedAt: string) => void;
+  isNew?: boolean;
+  onCreated?: (name: string) => void;
 }
 
 type FormState = NucleusRow;
@@ -199,6 +201,15 @@ const IcoSync = () => (
   </svg>
 );
 
+const LOCALITY_OPTIONS = [
+  '', 'Apex', 'Carrboro', 'Cary', 'Chapel Hill', 'Durham', 'Durham County',
+  'Garner', 'Hillsborough', 'Holly Springs', 'Knightdale', 'Morrisville',
+  'Orange County', 'Raleigh', 'Rolesville', 'Wake County', 'Wake Forest',
+  'Wendell', 'Zebulon',
+];
+const TYPE_OPTIONS  = ['', 'Neighborhood', 'Network', 'Population'];
+const STAGE_OPTIONS = ['', 'Potential/1', 'Initial/2', 'Emerging/3', 'Expanding/4', 'Advanced/5', 'Advanced+/6'];
+
 // Bounding box centered in 540×310 viewBox (70px h-margin, 55px v-margin each side).
 // textY = top of ring at tx + 16, where top = cy - ry×√(1−((tx−cx)/rx)²)
 // This places each label at a consistent distance below the ring's upper arc at its text x.
@@ -250,7 +261,7 @@ function ConcentricDiagram({ data }: { data: { label: string; value: string; onC
   );
 }
 
-export default function DetailView({ detail, role, roleMap, email, showBack, spreadsheetUrl, onBack, onSaved }: Props) {
+export default function DetailView({ detail, role, roleMap, email, showBack, spreadsheetUrl, onBack, onSaved, isNew, onCreated }: Props) {
   const { row, srp } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   const [isDirty, setIsDirty] = useState(false);
@@ -265,8 +276,12 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
   const [showProtagonistsModal, setShowProtagonistsModal] = useState(false);
   const [abmAssistantNames, setAbmAssistantNames] = useState<string[]>(() => detail.abmAssistantNames);
   const [showAbmAssistantModal, setShowAbmAssistantModal] = useState(false);
-  const [identityOpen, setIdentityOpen] = useState(false);
+  const [identityOpen, setIdentityOpen] = useState(!!isNew);
   const [accessOpen, setAccessOpen] = useState(false);
+  const [dangerOpen, setDangerOpen] = useState(false);
+  const [deleteInput, setDeleteInput] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const canWrite       = role === 'read-write' || role === 'collaborator' || role === 'admin';
   const isAdmin        = role === 'admin';
@@ -296,7 +311,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
     setSaveStatus({ msg: 'Saving...', type: 'idle' });
     try {
       const payload: Record<string, unknown> = { ...form };
-      if (isAdmin) {
+      if (isAdmin || isNew) {
         payload.identity = {
           nucleus:        form.nucleus,
           parentNucleus:  form.parentNucleus,
@@ -307,18 +322,34 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           nucleusType:    form.nucleusType,
         };
       }
-      const res = await fetch('/api/nucleus', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: row.nucleus, formData: payload }),
-      });
+
+      let res: Response;
+      if (isNew) {
+        res = await fetch('/api/nucleus', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ formData: payload }),
+        });
+      } else {
+        res = await fetch('/api/nucleus', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: row.nucleus, formData: payload }),
+        });
+      }
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Save failed');
-      setSaveStatus({ msg: 'Saved successfully', type: 'success' });
-      setIsDirty(false);
-      setLastUpdatedBy(data.savedBy || email);
-      setLastUpdatedAt(data.savedAt || new Date().toISOString());
-      onSaved(data.savedBy || email, data.savedAt || new Date().toISOString());
+
+      if (isNew) {
+        onCreated?.(form.nucleus);
+      } else {
+        setSaveStatus({ msg: 'Saved successfully', type: 'success' });
+        setIsDirty(false);
+        setLastUpdatedBy(data.savedBy || email);
+        setLastUpdatedAt(data.savedAt || new Date().toISOString());
+        onSaved(data.savedBy || email, data.savedAt || new Date().toISOString());
+      }
     } catch (e: unknown) {
       setSaveStatus({ msg: `Save failed: ${e instanceof Error ? e.message : String(e)}`, type: 'error' });
     } finally {
@@ -358,6 +389,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
     form.protagonists, form.accompaniers,
     ...actVals,
   ].some(v => !isValidInt(v));
+  const cannotSave = hasIntErrors || (!!isNew && !form.nucleus.trim());
 
   const hasAnyActPart = actKeys.some(k => form.activities[k].part !== '');
   const diagramData = [
@@ -377,26 +409,30 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
     <>
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0 }}>
-          {showBack && <button className="back-btn" onClick={handleBack}>← Back</button>}
+          {(showBack || isNew) && <button className="back-btn" onClick={handleBack}>← {isNew ? 'Cancel' : 'Back'}</button>}
           <div style={{ minWidth: 0 }}>
-            <h1>{row.nucleus}</h1>
-            <div className="meta">{row.clusterCode} · {row.cluster} · {row.locality}</div>
-            {updatedLine && <div className="last-updated">{updatedLine}</div>}
+            <h1>{isNew ? 'New Nucleus' : row.nucleus}</h1>
+            {!isNew && <div className="meta">{row.clusterCode} · {row.cluster} · {row.locality}</div>}
+            {!isNew && updatedLine && <div className="last-updated">{updatedLine}</div>}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-          <button onClick={() => setShowDiagram(true)} title="Concentric Circles" aria-label="Concentric Circles" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
-            <IcoDiagram />
-          </button>
-          <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" title="Open spreadsheet" aria-label="Open spreadsheet" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', textDecoration: 'none' }}>
-            <IcoExternalLink />
-          </a>
+          {!isNew && (
+            <button onClick={() => setShowDiagram(true)} title="Concentric Circles" aria-label="Concentric Circles" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
+              <IcoDiagram />
+            </button>
+          )}
+          {!isNew && (
+            <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" title="Open spreadsheet" aria-label="Open spreadsheet" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', textDecoration: 'none' }}>
+              <IcoExternalLink />
+            </a>
+          )}
           <button onClick={handleSignOut} title="Sign out" aria-label="Sign out" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
             <IcoLogOut />
           </button>
           {!isReadOnly && (
-            <button className="save-btn" disabled={saving || hasIntErrors} onClick={handleSave} title="Save to spreadsheet" aria-label="Save to spreadsheet" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 12px' }}>
-              <IcoSave /><span className="save-btn-label">Save</span>
+            <button className="save-btn" disabled={saving || cannotSave} onClick={handleSave} title="Save to spreadsheet" aria-label="Save to spreadsheet" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 12px' }}>
+              <IcoSave /><span className="save-btn-label">{isNew ? 'Create' : 'Save'}</span>
             </button>
           )}
         </div>
@@ -421,10 +457,19 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               <Field label="PG"           value={form.pg}          onChange={isAdmin ? v => set('pg', v)          : undefined} readonly={!isAdmin} />
             </div>
             <div className="field-grid-4">
-              <Field label="Locality"         value={form.locality}     onChange={isAdmin ? v => set('locality', v)     : undefined} readonly={!isAdmin} />
-              <Field label="Nucleus / Pocket" value={form.nucleus}      onChange={isAdmin  ? v => set('nucleus', v)      : undefined} readonly={!isAdmin} />
-              <Field label="Type"             value={form.nucleusType}  onChange={isAdmin  ? v => set('nucleusType', v)  : undefined} readonly={!isAdmin} />
-              <Field label="Stage"            value={form.stage}        onChange={isAdmin ? v => set('stage', v)        : undefined} readonly={!isAdmin} />
+              {isAdmin
+                ? <SelectField label="Locality" value={form.locality} options={LOCALITY_OPTIONS} onChange={v => set('locality', v)} />
+                : <Field label="Locality" value={form.locality} readonly />
+              }
+              <Field label="Nucleus / Pocket" value={form.nucleus} onChange={isAdmin ? v => set('nucleus', v) : undefined} readonly={!isAdmin} />
+              {isAdmin
+                ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => set('nucleusType', v)} />
+                : <Field label="Type" value={form.nucleusType} readonly />
+              }
+              {isAdmin
+                ? <SelectField label="Stage" value={form.stage} options={STAGE_OPTIONS} onChange={v => set('stage', v)} />
+                : <Field label="Stage" value={form.stage} readonly />
+              }
             </div>
             <div className="field-grid-4">
               <Field label="Contact"                   value={form.contact}  onChange={isAdmin ? v => set('contact', v)  : undefined} readonly={!isAdmin} />
@@ -567,7 +612,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
         </div>
 
         {/* Manage Access — collaborator and admin */}
-        {canManageAccess && (
+        {canManageAccess && !isNew && (
           <div className="card">
             <div
               className="card-header"
@@ -579,6 +624,66 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
             {accessOpen && (
               <div className="card-body">
                 <AccessPanel nucleus={row.nucleus} roleMap={roleMap} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Danger Zone — admin only, existing nuclei */}
+        {isAdmin && !isNew && (
+          <div className="card" style={{ borderColor: '#fed7d7' }}>
+            <div
+              className="card-header"
+              onClick={() => setDangerOpen(o => !o)}
+              style={{ cursor: 'pointer', userSelect: 'none', background: '#fff5f5', borderBottomColor: '#fed7d7', color: '#c53030' }}
+            >
+              <span><span style={{ fontSize: 11, marginRight: 6 }}>{dangerOpen ? '▼' : '▶'}</span>Danger Zone</span>
+            </div>
+            {dangerOpen && (
+              <div className="card-body">
+                <p style={{ fontSize: 13, color: '#744210', background: '#fffbeb', border: '1px solid #f6e05e', borderRadius: 6, padding: '8px 12px', margin: 0 }}>
+                  Deleting a nucleus permanently removes it from the spreadsheet. This cannot be undone.
+                </p>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 4 }}>
+                  <div className="field" style={{ flex: 1, margin: 0 }}>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: '#c53030', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                      Type &ldquo;{row.nucleus}&rdquo; to confirm
+                    </label>
+                    <input
+                      type="text"
+                      value={deleteInput}
+                      onChange={e => { setDeleteInput(e.target.value); setDeleteError(null); }}
+                      placeholder={row.nucleus}
+                      style={{ fontSize: 13 }}
+                    />
+                  </div>
+                  <button
+                    disabled={deleting || deleteInput !== row.nucleus}
+                    onClick={async () => {
+                      setDeleting(true);
+                      setDeleteError(null);
+                      try {
+                        const res = await fetch(`/api/nucleus?name=${encodeURIComponent(row.nucleus)}`, { method: 'DELETE' });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || 'Delete failed');
+                        onBack();
+                      } catch (e: unknown) {
+                        setDeleteError(e instanceof Error ? e.message : 'Delete failed');
+                      } finally {
+                        setDeleting(false);
+                      }
+                    }}
+                    style={{
+                      fontSize: 13, fontWeight: 600, padding: '7px 16px', borderRadius: 6, border: 'none',
+                      background: deleteInput === row.nucleus ? '#c53030' : '#a0aec0',
+                      color: 'white', cursor: deleteInput === row.nucleus ? 'pointer' : 'default',
+                      whiteSpace: 'nowrap', alignSelf: 'flex-end', marginBottom: 1,
+                    }}
+                  >
+                    {deleting ? 'Deleting…' : 'Delete nucleus'}
+                  </button>
+                </div>
+                {deleteError && <div style={{ fontSize: 13, color: '#c53030', marginTop: 4 }}>{deleteError}</div>}
               </div>
             )}
           </div>
@@ -656,8 +761,13 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
         </span>
         {!isReadOnly && (
           <>
-            <button className="btn-cancel" onClick={handleDiscard}>Discard changes</button>
-            <button className="btn-save" disabled={saving || hasIntErrors} onClick={handleSave}>Save to spreadsheet</button>
+            {isNew
+              ? <button className="btn-cancel" onClick={handleBack}>Cancel</button>
+              : <button className="btn-cancel" onClick={handleDiscard}>Discard changes</button>
+            }
+            <button className="btn-save" disabled={saving || cannotSave} onClick={handleSave}>
+              {isNew ? 'Create nucleus' : 'Save to spreadsheet'}
+            </button>
           </>
         )}
       </div>

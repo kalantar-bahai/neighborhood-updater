@@ -1,4 +1,4 @@
-import { sheetsGet, sheetsBatchUpdate, sheetsClear } from './sheets';
+import { sheetsGet, sheetsBatchUpdate, sheetsClear, sheetsDeleteRow } from './sheets';
 import {
   MASTER_SHEET_ID, SRP_SHEET_ID,
   MASTER_TAB, ACCESS_TAB, DEV_TAB, EDU_TAB,
@@ -185,6 +185,83 @@ export async function saveWorkerNames(
       values: combined,
     }]);
   }
+}
+
+export async function deleteRowData(nucleusName: string): Promise<void> {
+  const allRows = await getAllMasterRows();
+  const rowIndex = allRows.findIndex(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
+  if (rowIndex === -1) throw new Error(`Row not found: ${nucleusName}`);
+  const sheetRowIndex = MASTER_DATA_ROW + rowIndex - 1; // 0-based index for deleteDimension
+  await sheetsDeleteRow(MASTER_SHEET_ID, MASTER_TAB, sheetRowIndex);
+}
+
+export async function createRowData(formData: Record<string, unknown>, userEmail: string) {
+  const allRows = await getAllMasterRows();
+  const d = formData as any;
+  const newNucleus = ((d.identity?.nucleus) || '').trim();
+
+  if (!newNucleus) throw new Error('Nucleus name is required');
+
+  if (allRows.some(r => norm(r[COL.NUCLEUS]) === norm(newNucleus))) {
+    const err = new Error(`A nucleus named "${newNucleus}" already exists`);
+    (err as any).code = 'CONFLICT';
+    throw err;
+  }
+
+  const sheetRow = MASTER_DATA_ROW + allRows.length;
+  const newRow = new Array(52).fill('');
+
+  newRow[COL.GROUPING]       = d.identity?.grouping       || '';
+  newRow[COL.CLUSTER]        = d.identity?.cluster        || '';
+  newRow[COL.PG]             = d.identity?.pg             || '';
+  newRow[COL.CLUSTER_CODE]   = d.identity?.clusterCode    || '';
+  newRow[COL.LOCALITY]       = d.locality                 || '';
+  newRow[COL.NUCLEUS]        = d.identity?.nucleus        || '';
+  newRow[COL.PARENT_NUCLEUS] = d.identity?.parentNucleus  || '';
+  newRow[COL.TYPE]           = d.identity?.nucleusType    || '';
+  newRow[COL.STAGE]          = d.stage                    || '';
+  newRow[COL.CONTACT]        = d.contact                  || '';
+  newRow[COL.EMAIL]          = d.email                    || '';
+  newRow[COL.AUX_BOARD]      = d.auxBoard                 || '';
+  newRow[COL.MAKEUP]         = d.makeup                   || '';
+  newRow[COL.TOTAL_POP]      = d.totalPop                 || '';
+  newRow[COL.TOTAL_HH]       = d.totalHH                  || '';
+  newRow[COL.IND_NUM]        = d.indNum                   || '';
+  newRow[COL.HH_NUM]         = d.hhNum                    || '';
+  newRow[COL.CC_ACT]         = d.activities?.ccs?.act     || '';
+  newRow[COL.CC_PART]        = d.activities?.ccs?.part    || '';
+  newRow[COL.CC_FOF]         = d.activities?.ccs?.fof     || '';
+  newRow[COL.JYG_ACT]        = d.activities?.jygs?.act    || '';
+  newRow[COL.JYG_PART]       = d.activities?.jygs?.part   || '';
+  newRow[COL.JYG_FOF]        = d.activities?.jygs?.fof    || '';
+  newRow[COL.SC_ACT]         = d.activities?.scs?.act     || '';
+  newRow[COL.SC_PART]        = d.activities?.scs?.part    || '';
+  newRow[COL.SC_FOF]         = d.activities?.scs?.fof     || '';
+  newRow[COL.DEV_ACT]        = d.activities?.devotionals?.act  || '';
+  newRow[COL.DEV_PART]       = d.activities?.devotionals?.part || '';
+  newRow[COL.DEV_FOF]        = d.activities?.devotionals?.fof  || '';
+  newRow[COL.PROTAGONISTS]   = d.protagonists             || '';
+  newRow[COL.ACCOMPANIERS]   = d.accompaniers             || '';
+  newRow[COL.LEVEL]          = d.level                    || '';
+  newRow[COL.NOTES_PREVALENCE] = d.notesPrevalence        || '';
+  newRow[COL.SUPPORTED]      = d.supported                || '';
+  newRow[COL.NOTES_SUPPORTED]= d.notesSupported           || '';
+  newRow[COL.PRESENCE]       = d.presence                 || '';
+  newRow[COL.NOTES_PRESENCE] = d.notesPresence            || '';
+  newRow[COL.INVOLVED]       = d.involved                 || '';
+  newRow[COL.NOTES_INVOLVED] = d.notesInvolved            || '';
+  newRow[COL.EFFORTS]        = d.efforts                  || '';
+  newRow[COL.NOTES_EFFORTS]  = d.notesEfforts             || '';
+  newRow[COL.GATHERINGS]     = d.gatherings               || '';
+  newRow[COL.NOTES_GATHERINGS] = d.notesGatherings        || '';
+  newRow[COL.NARRATIVE]      = d.narrative                || '';
+
+  await sheetsBatchUpdate(MASTER_SHEET_ID, [{
+    range: `${MASTER_TAB}!A${sheetRow}`,
+    values: [newRow],
+  }]);
+
+  return { success: true, savedBy: userEmail, savedAt: new Date().toISOString() };
 }
 
 export async function saveRowData(nucleusName: string, formData: Record<string, unknown>, userEmail: string) {

@@ -224,7 +224,7 @@
 .detail-item textarea { width: 100%; border: 1px solid #cbd5e0; border-radius: 6px; padding: 7px 9px; font-size: 12px; font-family: inherit; resize: vertical; min-height: 52px; }
 
 /* ── Picker ───────────────────────────────────────────────────────────────── */
-.picker-container { max-width: 600px; margin: 24px auto; padding: 0 12px; }
+.picker-container { max-width: 800px; margin: 24px auto; padding: 0 16px; }
 .picker-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
 .picker-sub { font-size: 13px; color: #718096; margin-bottom: 16px; }
 .grouping-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #a0aec0; padding: 14px 4px 4px; }

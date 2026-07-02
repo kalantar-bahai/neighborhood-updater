@@ -9,6 +9,7 @@ interface Props {
   srpNames: string[];
   onSelect: (name: string) => void;
   onSignOut: () => void;
+  onAdd?: () => void;
 }
 
 function typeBadgeStyle(nucleusType: string): React.CSSProperties {
@@ -19,7 +20,7 @@ function typeBadgeStyle(nucleusType: string): React.CSSProperties {
   return {};
 }
 
-export default function Picker({ rows, email, srpNames, onSelect, onSignOut }: Props) {
+export default function Picker({ rows, email, srpNames, onSelect, onSignOut, onAdd }: Props) {
   const [openClusters, setOpenClusters] = useState<Set<string>>(new Set());
   const [openPockets, setOpenPockets] = useState<Set<string>>(new Set());
 
@@ -137,9 +138,16 @@ export default function Picker({ rows, email, srpNames, onSelect, onSignOut }: P
     <div className="picker-container">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
         <div className="picker-title">My Nuclei</div>
-        <button onClick={onSignOut} style={{ fontSize: 12, color: '#718096', background: 'none', border: '1px solid #cbd5e0', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
-          Sign out
-        </button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {onAdd && (
+            <button onClick={onAdd} style={{ fontSize: 12, color: '#2b6cb0', background: '#ebf4ff', border: '1px solid #bee3f8', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 600 }}>
+              + Add
+            </button>
+          )}
+          <button onClick={onSignOut} style={{ fontSize: 12, color: '#718096', background: 'none', border: '1px solid #cbd5e0', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
+            Sign out
+          </button>
+        </div>
       </div>
       <div className="picker-sub">{email}</div>
 
