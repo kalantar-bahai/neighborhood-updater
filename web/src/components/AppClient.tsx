@@ -100,6 +100,8 @@ export default function AppClient() {
     acc[key].count += 1;
     return acc;
   }, {});
+  console.log('[client] first 3 rows:', initialData.rows.slice(0, 3).map(r => ({ nucleus: r.nucleus, nucleusType: r.nucleusType, totalAct: r.totalAct, totalPart: r.totalPart, totalFof: r.totalFof })));
+  console.log('[client] typeTotals:', typeTotals);
   const typeSummaries = (['neighborhood', 'network', 'population'] as const)
     .filter(key => key in typeTotals)
     .map(key => [key, typeTotals[key]] as const);
