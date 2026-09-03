@@ -256,12 +256,12 @@ function ConcentricDiagram({ data }: { data: { label: string; value: string; onC
         <text
           key={i}
           x={r.tx} y={r.textY}
-          textAnchor="start" fontSize={12} fontWeight={600} fill={r.textFill}
+          textAnchor="start" fontSize={12} fontWeight={400} fill={r.textFill}
           onClick={data[i].onClick}
           style={data[i].onClick ? { cursor: 'pointer' } : undefined}
           textDecoration={data[i].onClick ? 'underline' : undefined}
         >
-          {formatNum(data[i].value)} {data[i].label}
+          <tspan fontWeight={700}>{formatNum(data[i].value)}</tspan> {data[i].label}
         </text>
       ))}
     </svg>
@@ -301,7 +301,9 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
       <line x1={cx} y1={cy - ARINGS[1].r} x2={cx} y2={cy + ARINGS[1].r} stroke="white" strokeWidth={1.5} strokeDasharray="6 5" />
 
       {/* Residing — outside all circles */}
-      <text x={cx} y={28} textAnchor="middle" fontSize={13} fontWeight={700} fill="#2d3748">{formatNum(residing.value)} {residing.label}</text>
+      <text x={cx} y={28} textAnchor="middle" fontSize={13} fontWeight={400} fill="#2d3748">
+        <tspan fontWeight={700}>{formatNum(residing.value)}</tspan> {residing.label}
+      </text>
 
       <defs>
         <path id="aligned-arc-outer" fill="none" d={`M ${oLeftX},${oLeftY} A ${outerMid},${outerMid} 0 0,1 ${oRightX},${oRightY}`} />
@@ -309,9 +311,9 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 
       {/* Outer ring: single label curving across the top of its band */}
       {rings[0]?.single && (
-        <text fontSize={12} fontWeight={600} fill={ARINGS[0].textFill} dominantBaseline="middle">
+        <text fontSize={12} fontWeight={400} fill={ARINGS[0].textFill} dominantBaseline="middle">
           <textPath href="#aligned-arc-outer" startOffset="50%" textAnchor="middle">
-            {formatNum(rings[0].single.value)} {rings[0].single.label}
+            <tspan fontWeight={700}>{formatNum(rings[0].single.value)}</tspan> {rings[0].single.label}
           </textPath>
         </text>
       )}
@@ -333,15 +335,15 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
               <path id={idL} fill="none" d={`M ${leftX},${leftY} A ${mid},${mid} 0 0,1 ${topX},${topY}`} />
             </defs>
             {ring.right && (
-              <text fontSize={11} fontWeight={600} fill={ARINGS[i].textFill} dominantBaseline="middle"
+              <text fontSize={11} fontWeight={400} fill={ARINGS[i].textFill} dominantBaseline="middle"
                 onClick={ring.right.onClick} style={ring.right.onClick ? { cursor: 'pointer' } : undefined}>
-                <textPath href={`#${idR}`} startOffset="50%" textAnchor="middle">{formatNum(ring.right.value)} {ring.right.label}</textPath>
+                <textPath href={`#${idR}`} startOffset="50%" textAnchor="middle"><tspan fontWeight={700}>{formatNum(ring.right.value)}</tspan> {ring.right.label}</textPath>
               </text>
             )}
             {ring.left && (
-              <text fontSize={11} fontWeight={600} fill={ARINGS[i].textFill} dominantBaseline="middle"
+              <text fontSize={11} fontWeight={400} fill={ARINGS[i].textFill} dominantBaseline="middle"
                 onClick={ring.left.onClick} style={ring.left.onClick ? { cursor: 'pointer' } : undefined}>
-                <textPath href={`#${idL}`} startOffset="50%" textAnchor="middle">{formatNum(ring.left.value)} {ring.left.label}</textPath>
+                <textPath href={`#${idL}`} startOffset="50%" textAnchor="middle"><tspan fontWeight={700}>{formatNum(ring.left.value)}</tspan> {ring.left.label}</textPath>
               </text>
             )}
           </g>
@@ -356,17 +358,17 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
           <g>
             {ring.right && (
               <g transform={`rotate(-90 ${cx + vx} ${cy})`} onClick={ring.right.onClick} style={ring.right.onClick ? { cursor: 'pointer' } : undefined}>
-                <text x={cx + vx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={11} fontWeight={600} fill={ARINGS[3].textFill}
+                <text x={cx + vx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={11} fontWeight={400} fill={ARINGS[3].textFill}
                   textDecoration={ring.right.onClick ? 'underline' : undefined}>
-                  {formatNum(ring.right.value)} {ring.right.label}
+                  <tspan fontWeight={700}>{formatNum(ring.right.value)}</tspan> {ring.right.label}
                 </text>
               </g>
             )}
             {ring.left && (
               <g transform={`rotate(-90 ${cx - vx} ${cy})`} onClick={ring.left.onClick} style={ring.left.onClick ? { cursor: 'pointer' } : undefined}>
-                <text x={cx - vx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={11} fontWeight={600} fill={ARINGS[3].textFill}
+                <text x={cx - vx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={11} fontWeight={400} fill={ARINGS[3].textFill}
                   textDecoration={ring.left.onClick ? 'underline' : undefined}>
-                  {formatNum(ring.left.value)} {ring.left.label}
+                  <tspan fontWeight={700}>{formatNum(ring.left.value)}</tspan> {ring.left.label}
                 </text>
               </g>
             )}
