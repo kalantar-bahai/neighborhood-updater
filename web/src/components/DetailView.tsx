@@ -231,7 +231,7 @@ const RINGS = [
 
 function formatNum(v: string): string {
   const n = parseInt(v, 10);
-  if (!v || isNaN(n)) return '—';
+  if (!v || isNaN(n)) return '____';
   if (n < 1000) return String(n);
   if (n < 100000) {
     const k = n / 1000;
