@@ -200,6 +200,13 @@ const IcoSync = () => (
     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
   </svg>
 );
+const IcoDiagram2 = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/>
+    <line x1="12" y1="2.5" x2="12" y2="6" strokeDasharray="1.6 1.6"/>
+    <line x1="12" y1="18" x2="12" y2="21.5" strokeDasharray="1.6 1.6"/>
+  </svg>
+);
 
 const LOCALITY_OPTIONS = [
   '', 'Apex', 'Carrboro', 'Cary', 'Chapel Hill', 'Durham', 'Durham County',
@@ -213,12 +220,12 @@ const STAGE_OPTIONS = ['', 'Potential/1', 'Initial/2', 'Emerging/3', 'Expanding/
 // Bounding box centered in 540×310 viewBox (70px h-margin, 55px v-margin each side).
 // textY = top of ring at tx + 16, where top = cy - ry×√(1−((tx−cx)/rx)²)
 // This places each label at a consistent distance below the ring's upper arc at its text x.
+// 5 rings evenly spaced: rx 200→40 (step 40), ry 100→20 (step 20), cx 270→170 (step 25), cy 155→195 (step 10).
 const RINGS = [
   { cx: 270, cy: 155, rx: 200, ry: 100, fill: '#dbeafe', textFill: '#1e3a8a', tx: 286, textY:  71 },
-  { cx: 250, cy: 163, rx: 168, ry:  84, fill: '#bfdbfe', textFill: '#1e3a8a', tx: 266, textY:  95 },
-  { cx: 230, cy: 171, rx: 136, ry:  68, fill: '#93c5fd', textFill: '#1e3a8a', tx: 246, textY: 119 },
-  { cx: 210, cy: 179, rx: 104, ry:  52, fill: '#60a5fa', textFill: '#1e3a8a', tx: 226, textY: 144 },
-  { cx: 190, cy: 187, rx:  72, ry:  36, fill: '#2563eb', textFill: '#ffffff', tx: 206, textY: 168 },
+  { cx: 245, cy: 165, rx: 160, ry:  80, fill: '#93c5fd', textFill: '#1e3a8a', tx: 261, textY: 101 },
+  { cx: 220, cy: 175, rx: 120, ry:  60, fill: '#60a5fa', textFill: '#1e3a8a', tx: 236, textY: 132 },
+  { cx: 195, cy: 185, rx:  80, ry:  40, fill: '#2563eb', textFill: '#ffffff', tx: 211, textY: 162 },
   { cx: 170, cy: 195, rx:  40, ry:  20, fill: '#1e3a8a', textFill: '#ffffff', tx: 186, textY: 193 },
 ];
 
@@ -261,6 +268,115 @@ function ConcentricDiagram({ data }: { data: { label: string; value: string; onC
   );
 }
 
+// Aligned (centered) diagram: 4 concentric circles sharing one center, plus a label
+// placed outside all circles for "Residing". Ordered outer -> inner, matching content
+// order below: band for ring i sits between ARINGS[i+1].r (or 0) and ARINGS[i].r.
+const ACX = 220, ACY = 230;
+const ARINGS = [
+  { r: 190, fill: '#93c5fd', textFill: '#1e3a8a' }, // In conversation (outer, single label)
+  { r: 145, fill: '#60a5fa', textFill: '#1e3a8a' }, // In core activity / Participating
+  { r: 100, fill: '#2563eb', textFill: '#ffffff' }, // Facilitating / Promoting
+  { r:  55, fill: '#1e3a8a', textFill: '#ffffff' }, // Accompanying / Helping (innermost)
+];
+
+type AlignedLabel = { label: string; value: string; onClick?: () => void };
+type AlignedRingContent = { single?: AlignedLabel; right?: AlignedLabel; left?: AlignedLabel };
+
+const ATOP = -Math.PI / 2, ARIGHT = 0, ALEFT = Math.PI;
+function arcPoint(r: number, angle: number): [number, number] {
+  return [ACX + r * Math.cos(angle), ACY + r * Math.sin(angle)];
+}
+
+function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingContent[]; residing: AlignedLabel }) {
+  const cx = ACX, cy = ACY;
+  const outerMid = (ARINGS[0].r + ARINGS[1].r) / 2;
+  const [oLeftX, oLeftY] = arcPoint(outerMid, ALEFT);
+  const [oRightX, oRightY] = arcPoint(outerMid, ARIGHT);
+  return (
+    <svg viewBox="0 0 440 480" style={{ width: '100%', display: 'block' }}>
+      {ARINGS.map((r, i) => (
+        <circle key={i} cx={cx} cy={cy} r={r.r} fill={r.fill} stroke="white" strokeWidth={1.5} />
+      ))}
+      {/* Dashed vertical line through the inner 3 rings only; stops before the outer "In conversation" ring. */}
+      <line x1={cx} y1={cy - ARINGS[1].r} x2={cx} y2={cy + ARINGS[1].r} stroke="white" strokeWidth={1.5} strokeDasharray="6 5" />
+
+      {/* Residing — outside all circles */}
+      <text x={cx} y={28} textAnchor="middle" fontSize={13} fontWeight={700} fill="#2d3748">{formatNum(residing.value)} {residing.label}</text>
+
+      <defs>
+        <path id="aligned-arc-outer" fill="none" d={`M ${oLeftX},${oLeftY} A ${outerMid},${outerMid} 0 0,1 ${oRightX},${oRightY}`} />
+      </defs>
+
+      {/* Outer ring: single label curving across the top of its band */}
+      {rings[0]?.single && (
+        <text fontSize={12} fontWeight={600} fill={ARINGS[0].textFill} dominantBaseline="middle">
+          <textPath href="#aligned-arc-outer" startOffset="50%" textAnchor="middle">
+            {formatNum(rings[0].single.value)} {rings[0].single.label}
+          </textPath>
+        </text>
+      )}
+
+      {/* Rings 1-2: right/left labels curving across the top of each band (toward the right/left edges) */}
+      {[1, 2].map(i => {
+        const outerR = ARINGS[i].r, innerR = ARINGS[i + 1].r;
+        const mid = (outerR + innerR) / 2;
+        const [topX, topY] = arcPoint(mid, ATOP);
+        const [rightX, rightY] = arcPoint(mid, ARIGHT);
+        const [leftX, leftY] = arcPoint(mid, ALEFT);
+        const idR = `aligned-arc-r-${i}`, idL = `aligned-arc-l-${i}`;
+        const ring = rings[i];
+        if (!ring) return null;
+        return (
+          <g key={i}>
+            <defs>
+              <path id={idR} fill="none" d={`M ${topX},${topY} A ${mid},${mid} 0 0,1 ${rightX},${rightY}`} />
+              <path id={idL} fill="none" d={`M ${leftX},${leftY} A ${mid},${mid} 0 0,1 ${topX},${topY}`} />
+            </defs>
+            {ring.right && (
+              <text fontSize={11} fontWeight={600} fill={ARINGS[i].textFill} dominantBaseline="middle"
+                onClick={ring.right.onClick} style={ring.right.onClick ? { cursor: 'pointer' } : undefined}>
+                <textPath href={`#${idR}`} startOffset="50%" textAnchor="middle">{formatNum(ring.right.value)} {ring.right.label}</textPath>
+              </text>
+            )}
+            {ring.left && (
+              <text fontSize={11} fontWeight={600} fill={ARINGS[i].textFill} dominantBaseline="middle"
+                onClick={ring.left.onClick} style={ring.left.onClick ? { cursor: 'pointer' } : undefined}>
+                <textPath href={`#${idL}`} startOffset="50%" textAnchor="middle">{formatNum(ring.left.value)} {ring.left.label}</textPath>
+              </text>
+            )}
+          </g>
+        );
+      })}
+
+      {/* Ring 3 (innermost): too small to curve long words legibly — use vertical text instead. */}
+      {rings[3] && (() => {
+        const vx = ARINGS[3].r * 0.45;
+        const ring = rings[3];
+        return (
+          <g>
+            {ring.right && (
+              <g transform={`rotate(-90 ${cx + vx} ${cy})`} onClick={ring.right.onClick} style={ring.right.onClick ? { cursor: 'pointer' } : undefined}>
+                <text x={cx + vx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={11} fontWeight={600} fill={ARINGS[3].textFill}
+                  textDecoration={ring.right.onClick ? 'underline' : undefined}>
+                  {formatNum(ring.right.value)} {ring.right.label}
+                </text>
+              </g>
+            )}
+            {ring.left && (
+              <g transform={`rotate(-90 ${cx - vx} ${cy})`} onClick={ring.left.onClick} style={ring.left.onClick ? { cursor: 'pointer' } : undefined}>
+                <text x={cx - vx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={11} fontWeight={600} fill={ARINGS[3].textFill}
+                  textDecoration={ring.left.onClick ? 'underline' : undefined}>
+                  {formatNum(ring.left.value)} {ring.left.label}
+                </text>
+              </g>
+            )}
+          </g>
+        );
+      })()}
+    </svg>
+  );
+}
+
 export default function DetailView({ detail, role, roleMap, email, showBack, spreadsheetUrl, onBack, onSaved, isNew, onCreated }: Props) {
   const { row, srp } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
@@ -270,6 +386,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
   const [lastUpdatedBy, setLastUpdatedBy] = useState('');
   const [lastUpdatedAt, setLastUpdatedAt] = useState('');
   const [showDiagram, setShowDiagram] = useState(false);
+  const [showDiagram2, setShowDiagram2] = useState(false);
   const [accompanierNames, setAccompanierNames] = useState<string[]>(() => detail.accompanierNames);
   const [showAccompaniersModal, setShowAccompaniersModal] = useState(false);
   const [protagonistNames, setProtagonistNames] = useState<string[]>(() => detail.protagonistNames);
@@ -393,12 +510,28 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
 
   const hasAnyActPart = actKeys.some(k => form.activities[k].part !== '');
   const diagramData = [
-    { label: 'Residing',              value: form.totalPop },
-    { label: 'Potential Connections', value: '' },
-    { label: 'Connected',             value: form.indNum },
-    { label: 'Participating',         value: hasAnyActPart ? String(allTotal.part) : '' },
-    { label: 'Sustaining',            value: form.protagonists,  onClick: () => setShowProtagonistsModal(true) },
-    { label: 'Accompanying',          value: form.accompaniers,  onClick: () => setShowAccompaniersModal(true) },
+    { label: 'Residing',      value: form.totalPop },
+    { label: 'Connected',     value: form.indNum },
+    { label: 'Participating', value: hasAnyActPart ? String(allTotal.part) : '' },
+    { label: 'Sustaining',    value: form.protagonists, onClick: () => setShowProtagonistsModal(true) },
+    { label: 'Accompanying',  value: form.accompaniers, onClick: () => setShowAccompaniersModal(true) },
+  ];
+
+  const alignedResiding = { label: 'Residing', value: form.totalPop };
+  const alignedRings: AlignedRingContent[] = [
+    { single: { label: 'In conversation', value: form.indNum } },
+    {
+      right: { label: 'In core activity', value: '' },
+      left:  { label: 'Participating',    value: hasAnyActPart ? String(allTotal.part) : '' },
+    },
+    {
+      right: { label: 'Facilitating', value: '' },
+      left:  { label: 'Promoting',    value: form.protagonists, onClick: () => setShowProtagonistsModal(true) },
+    },
+    {
+      right: { label: 'Accompanying', value: form.accompaniers, onClick: () => setShowAccompaniersModal(true) },
+      left:  { label: 'Helping',      value: '' },
+    },
   ];
 
   const updatedLine = lastUpdatedAt
@@ -420,6 +553,11 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           {!isNew && (
             <button onClick={() => setShowDiagram(true)} title="Concentric Circles" aria-label="Concentric Circles" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
               <IcoDiagram />
+            </button>
+          )}
+          {!isNew && (
+            <button onClick={() => setShowDiagram2(true)} title="Concentric Circles (Aligned)" aria-label="Concentric Circles (Aligned)" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
+              <IcoDiagram2 />
             </button>
           )}
           {!isNew && (
@@ -704,6 +842,24 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               <button onClick={() => setShowDiagram(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#718096', lineHeight: 1, padding: 0 }}>×</button>
             </div>
             <ConcentricDiagram data={diagramData} />
+          </div>
+        </div>
+      )}
+
+      {showDiagram2 && (
+        <div
+          onClick={() => setShowDiagram2(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: 12, padding: '20px 24px', maxWidth: 560, width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: '#2d3748' }}>{row.nucleus}</div>
+                <div style={{ fontSize: 11, color: '#718096', marginTop: 2 }}>{row.clusterCode} · {row.cluster} · {row.locality}</div>
+              </div>
+              <button onClick={() => setShowDiagram2(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#718096', lineHeight: 1, padding: 0 }}>×</button>
+            </div>
+            <AlignedConcentricDiagram rings={alignedRings} residing={alignedResiding} />
           </div>
         </div>
       )}
