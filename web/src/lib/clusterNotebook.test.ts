@@ -170,6 +170,25 @@ describe('updateNucleus', () => {
     });
     expect('communityGatheringDescription' in body.variables.patch).toBe(false);
   });
+
+  test('sends the narrative field', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: {
+        updateNucleus: {
+          stage: null, locality: null, populationMakeup: null,
+          population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+          hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+          narrative: 'A growing community of practice.',
+        },
+      },
+    }));
+
+    const result = await updateNucleus('Alpha', { narrative: 'A growing community of practice.' });
+
+    expect(result?.narrative).toBe('A growing community of practice.');
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables.patch).toEqual({ narrative: 'A growing community of practice.' });
+  });
 });
 
 describe('getDevotionalGathering', () => {

@@ -64,6 +64,7 @@ function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
     notesPresence: fields?.socialActionDescription ?? '',
     gatherings: boolToYesNo(fields?.hasCommunityGatherings),
     notesGatherings: fields?.communityGatheringDescription ?? '',
+    narrative: fields?.narrative ?? '',
   };
 }
 
@@ -187,9 +188,9 @@ export async function getRowData(nucleusName: string) {
 
   const row = parseRow(masterRow);
   // parseRow's devotionals/stage/locality/makeup/totalPop/totalHH/indNum/hhNum/presence/
-  // notesPresence/gatherings/notesGatherings reads (from the corresponding COL.* sheet columns)
-  // are overwritten here for the detail view. Devotionals: /api/initial-data's picker summary
-  // still depends on those same sheet columns — don't remove them. Everything else here:
+  // notesPresence/gatherings/notesGatherings/narrative reads (from the corresponding COL.* sheet
+  // columns) are overwritten here for the detail view. Devotionals: /api/initial-data's picker
+  // summary still depends on those same sheet columns — don't remove them. Everything else here:
   // /api/initial-data doesn't read these sheet columns, so they're fully dead.
   row.activities.devotionals = devotionalsFromClusterNotebook(devotionalGathering);
   Object.assign(row, nucleusFieldsFromClusterNotebook(nucleusFields));
@@ -358,7 +359,6 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     [COL.SUPPORTED, d.supported], [COL.NOTES_SUPPORTED, d.notesSupported],
     [COL.INVOLVED, d.involved], [COL.NOTES_INVOLVED, d.notesInvolved],
     [COL.EFFORTS, d.efforts], [COL.NOTES_EFFORTS, d.notesEfforts],
-    [COL.NARRATIVE, d.narrative],
   ].filter(([, value]) => value !== undefined)
     .map(([col, value]) => ({
       range: `${MASTER_TAB}!${colLetter(col as number)}${sheetRow}`,
@@ -379,6 +379,7 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     connectedPopulation?: number | null; connectedHouseholds?: number | null;
     hasSocialAction?: boolean | null; socialActionDescription?: string;
     hasCommunityGatherings?: boolean | null; communityGatheringDescription?: string;
+    narrative?: string;
   } = {};
   if (d.stage !== undefined) nucleusPatch.stage = d.stage;
   if (d.locality !== undefined) nucleusPatch.locality = d.locality;
@@ -391,6 +392,7 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
   if (d.notesPresence !== undefined) nucleusPatch.socialActionDescription = d.notesPresence;
   if (d.gatherings !== undefined) nucleusPatch.hasCommunityGatherings = toBoolOrNull(d.gatherings);
   if (d.notesGatherings !== undefined) nucleusPatch.communityGatheringDescription = d.notesGatherings;
+  if (d.narrative !== undefined) nucleusPatch.narrative = d.narrative;
   if (Object.keys(nucleusPatch).length > 0) {
     writes.push(updateNucleus(nucleusName, nucleusPatch));
   }

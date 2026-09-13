@@ -161,6 +161,7 @@ describe('getRowData', () => {
       stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students',
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
       hasSocialAction: true, socialActionDescription: 'Cleanup drive', hasCommunityGatherings: false, communityGatheringDescription: null,
+      narrative: 'A growing community of practice.',
     });
 
     const result = await getRowData('Alpha');
@@ -177,6 +178,7 @@ describe('getRowData', () => {
     expect(result?.row.notesPresence).toBe('Cleanup drive');
     expect(result?.row.gatherings).toBe('No');
     expect(result?.row.notesGatherings).toBe('');
+    expect(result?.row.narrative).toBe('A growing community of practice.');
   });
 
   test('renders a null cluster-notebook nucleus-fields value as empty strings', async () => {
@@ -195,6 +197,7 @@ describe('getRowData', () => {
     expect(result?.row.makeup).toBe('');
     expect(result?.row.presence).toBe('');
     expect(result?.row.gatherings).toBe('');
+    expect(result?.row.narrative).toBe('');
   });
 });
 
@@ -272,6 +275,7 @@ describe('saveRowData', () => {
       stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students',
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null,
     });
 
     const formData = { ...baseFormData, stage: 'Advanced/5', locality: 'Durham', makeup: 'Students' };
@@ -295,6 +299,7 @@ describe('saveRowData', () => {
       stage: null, locality: null, populationMakeup: null,
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null,
     });
 
     const formData = { ...baseFormData, totalPop: '500', totalHH: '120', indNum: '80', hhNum: '30' };
@@ -320,6 +325,7 @@ describe('saveRowData', () => {
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: true, socialActionDescription: 'Cleanup drive', hasCommunityGatherings: false, communityGatheringDescription: '',
+      narrative: null,
     });
 
     const formData = {
@@ -340,6 +346,29 @@ describe('saveRowData', () => {
     expect(writtenValues).not.toContain('Cleanup drive');
   });
 
+  test('writes narrative via cluster-notebook instead of the sheet', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateNucleus.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: 'A growing community of practice.',
+    });
+
+    const formData = { ...baseFormData, narrative: 'A growing community of practice.' };
+    await saveRowData('Alpha', formData, 'me@x.com');
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
+      locality: 'Durham', narrative: 'A growing community of practice.',
+    });
+
+    const updates = mockSheetsBatchUpdate.mock.calls[0][1] as { values: string[][] }[];
+    const writtenValues = updates.map(u => u.values[0][0]);
+    expect(writtenValues).not.toContain('A growing community of practice.');
+  });
+
   test('maps a never-touched presence/gatherings value to null, not false', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
@@ -348,6 +377,7 @@ describe('saveRowData', () => {
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null,
     });
 
     const formData = { ...baseFormData, presence: '', gatherings: '' };
@@ -366,6 +396,7 @@ describe('saveRowData', () => {
       stage: 'Advanced/5', locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null,
     });
 
     const formData: Record<string, unknown> = { ...baseFormData, stage: 'Advanced/5' };
