@@ -23,6 +23,11 @@ This is additive to what your own `docs/data-model.md` ("Nucleus Assistant" sect
 - protagonists/accompaniers as free-text counts (separate from the named worker lists in §4 — used today only as a cross-check "mismatch" signal against the named list length)
 - narrative (free text)
 
+**Correction, 2026-09-13** — verified directly against `web/src/components/DetailView.tsx`, since your read of which qualitative fields are live turned out wrong in both directions:
+- **Actually live in the UI today:** `stage` (dropdown, values `Potential/1, Initial/2, Emerging/3, Expanding/4, Advanced/5, Advanced+/6`), `presence`/`notesPresence` (the "Social Action" toggle — NOT `efforts`, which has no UI at all), `gatherings`/`notesGatherings` ("Regular Gatherings / Festivals" toggle, correctly mapped to your `hasCommunityGatherings`), and `notesPrevalence` (the general "Notes" field under "Workers & Prevalence", paired with protagonists/accompaniers, not with `level`).
+- **Actually dead (no UI, no plans to revive):** `level`, `supported`/`notesSupported`, `involved`/`notesInvolved`, `efforts`/`notesEfforts`.
+- **Field-name mapping is nucleus-assistant's job, not yours** — matches your own stated policy of not naming your fields after any one client's. Decided 2026-09-13: your `level` field (the one you're adding with values `Potential/Nascent/Emerging/Expanding/Advanced/Advanced+`, currently DB-only) is what our `stage` field maps to — those values are `stage`'s real value set, not our own (separate, dead) `level` field's. We'll wire our `stage` to your `level` once it's exposed via GraphQL. Our own `level` field stays unmapped/unmodeled — it's legacy data, not carried forward.
+
 ## 3. Nucleus detail (write)
 
 **Write**: update any subset of the above fields for one nucleus, by name. Today this is one `saveRowData(name, formData)` call that writes whichever fields are present in `formData` (partial update semantics — omitted fields are left alone). A single broad "patch nucleus" mutation (rather than one mutation per field) would match this pattern most directly, though per-field mutations (as already done for devotionals) also work if patch semantics are preserved per field.
