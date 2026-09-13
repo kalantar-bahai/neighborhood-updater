@@ -51,6 +51,20 @@ function boolToYesNo(value: boolean | null | undefined): string {
   return '';
 }
 
+// cluster-notebook's Cluster.growthMilestone stores SRP's own verbatim strings;
+// our UI's "PG" field uses short M1/M2/M3 codes. Confirmed 2026-09-13 (the user
+// directly): this is the complete set of values SRP produces, no others exist.
+const GROWTH_MILESTONE_TO_PG: Record<string, string> = {
+  'Programme of Growth (PG)': 'M1',
+  'Intensive Program of Growth (IPG)': 'M2',
+  'IPG Embracing Large Numbers': 'M3',
+};
+
+function pgFromGrowthMilestone(value: string | null | undefined): string {
+  if (!value) return '';
+  return GROWTH_MILESTONE_TO_PG[value] ?? '';
+}
+
 function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
   return {
     stage: fields?.stage ?? '',
@@ -65,6 +79,10 @@ function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
     gatherings: boolToYesNo(fields?.hasCommunityGatherings),
     notesGatherings: fields?.communityGatheringDescription ?? '',
     narrative: fields?.narrative ?? '',
+    // Read-only on cluster-notebook's side — no mutation exists for any of these three.
+    cluster: fields?.cluster.name ?? '',
+    grouping: fields?.cluster.groupOfClusters ?? '',
+    pg: pgFromGrowthMilestone(fields?.cluster.growthMilestone),
   };
 }
 
@@ -188,10 +206,12 @@ export async function getRowData(nucleusName: string) {
 
   const row = parseRow(masterRow);
   // parseRow's devotionals/stage/locality/makeup/totalPop/totalHH/indNum/hhNum/presence/
-  // notesPresence/gatherings/notesGatherings/narrative reads (from the corresponding COL.* sheet
-  // columns) are overwritten here for the detail view. Devotionals: /api/initial-data's picker
-  // summary still depends on those same sheet columns — don't remove them. Everything else here:
-  // /api/initial-data doesn't read these sheet columns, so they're fully dead.
+  // notesPresence/gatherings/notesGatherings/narrative/grouping/cluster/pg reads (from the
+  // corresponding COL.* sheet columns) are overwritten here for the detail view. Devotionals:
+  // /api/initial-data's picker summary still depends on those same sheet columns — don't remove
+  // them. Everything else here: /api/initial-data doesn't read these sheet columns, so they're
+  // fully dead. grouping/cluster/pg are read-only from cluster-notebook (no mutation exists for
+  // them there) — see saveRowData, which no longer writes them anywhere at all.
   row.activities.devotionals = devotionalsFromClusterNotebook(devotionalGathering);
   Object.assign(row, nucleusFieldsFromClusterNotebook(nucleusFields));
 
@@ -337,12 +357,12 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     return letter;
   };
 
+  // grouping/cluster/pg are deliberately absent here — read-only from cluster-notebook now
+  // (Cluster.groupOfClusters/name/growthMilestone, no mutation exists), so writing them to the
+  // sheet would be silently discarded on next load anyway.
   const identityPairs: [number, unknown][] = d.identity ? [
     [COL.NUCLEUS,        d.identity.nucleus],
     [COL.PARENT_NUCLEUS, d.identity.parentNucleus],
-    [COL.GROUPING,       d.identity.grouping],
-    [COL.CLUSTER,        d.identity.cluster],
-    [COL.PG,             d.identity.pg],
     [COL.CLUSTER_CODE,   d.identity.clusterCode],
     [COL.TYPE,           d.identity.nucleusType],
   ] : [];

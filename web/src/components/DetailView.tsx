@@ -586,10 +586,14 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           </div>
           {identityOpen && <div className="card-body">
             <div className="field-grid-4">
-              <Field label="Grouping"     value={form.grouping}    onChange={isAdmin ? v => set('grouping', v)    : undefined} readonly={!isAdmin} fromSheet />
+              {/* Grouping/Cluster/PG are read-only everywhere, like Locality: cluster-notebook
+                  derives them from Cluster.groupOfClusters/name/growthMilestone and has no
+                  mutation for any of the three (2026-09-13) — not an admin-permission
+                  distinction like Cluster Code, which stays sheet-only and editable. */}
+              <Field label="Grouping"     value={form.grouping}    readonly />
               <Field label="Cluster Code" value={form.clusterCode} onChange={isAdmin ? v => set('clusterCode', v) : undefined} readonly={!isAdmin} fromSheet />
-              <Field label="Cluster"      value={form.cluster}     onChange={isAdmin ? v => set('cluster', v)     : undefined} readonly={!isAdmin} fromSheet />
-              <Field label="PG"           value={form.pg}          onChange={isAdmin ? v => set('pg', v)          : undefined} readonly={!isAdmin} fromSheet />
+              <Field label="Cluster"      value={form.cluster}     readonly />
+              <Field label="PG"           value={form.pg}          readonly />
             </div>
             <div className="field-grid-4">
               {/* Locality is read-only everywhere: cluster-notebook derives it from

@@ -32,6 +32,12 @@ async function request<T>(query: string, variables: Record<string, unknown>): Pr
   return json.data as T;
 }
 
+export interface ClusterFields {
+  name: string;
+  groupOfClusters: string | null;
+  growthMilestone: string | null;
+}
+
 export interface NucleusFields {
   stage: string | null;
   locality: string | null;
@@ -45,6 +51,9 @@ export interface NucleusFields {
   hasCommunityGatherings: boolean | null;
   communityGatheringDescription: string | null;
   narrative: string | null;
+  // Read-only, no mutation on cluster-notebook's side for any of these three —
+  // every Nucleus is guaranteed a Cluster (non-null), per cluster-notebook 2026-09-13.
+  cluster: ClusterFields;
 }
 
 // Deliberately not `extends NucleusFields` — the picker (getAllNuclei's caller)
@@ -72,7 +81,8 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
 }
 
 const NUCLEUS_FIELDS_SELECTION = 'stage locality populationMakeup population households connectedPopulation connectedHouseholds '
-  + 'hasSocialAction socialActionDescription hasCommunityGatherings communityGatheringDescription narrative';
+  + 'hasSocialAction socialActionDescription hasCommunityGatherings communityGatheringDescription narrative '
+  + 'cluster { name groupOfClusters growthMilestone }';
 
 export async function getNucleusFields(nucleusName: string): Promise<NucleusFields | null> {
   const query = `

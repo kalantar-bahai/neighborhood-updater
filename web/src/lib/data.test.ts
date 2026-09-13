@@ -162,6 +162,7 @@ describe('getRowData', () => {
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
       hasSocialAction: true, socialActionDescription: 'Cleanup drive', hasCommunityGatherings: false, communityGatheringDescription: null,
       narrative: 'A growing community of practice.',
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers' },
     });
 
     const result = await getRowData('Alpha');
@@ -179,6 +180,56 @@ describe('getRowData', () => {
     expect(result?.row.gatherings).toBe('No');
     expect(result?.row.notesGatherings).toBe('');
     expect(result?.row.narrative).toBe('A growing community of practice.');
+    expect(result?.row.cluster).toBe('NC-215 Triangle');
+    expect(result?.row.grouping).toBe('NC Eastern');
+    expect(result?.row.pg).toBe('M3');
+  });
+
+  test('translates all three known growthMilestone values to M1/M2/M3', async () => {
+    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
+    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
+      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
+      return [];
+    });
+    mockGetDevotionalGathering.mockResolvedValue(null);
+
+    const cases: [string, string][] = [
+      ['Programme of Growth (PG)', 'M1'],
+      ['Intensive Program of Growth (IPG)', 'M2'],
+      ['IPG Embracing Large Numbers', 'M3'],
+    ];
+    for (const [growthMilestone, expectedPg] of cases) {
+      mockGetNucleusFields.mockResolvedValue({
+        stage: null, locality: null, populationMakeup: null,
+        population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+        hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+        narrative: null,
+        cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone },
+      });
+      const result = await getRowData('Alpha');
+      expect(result?.row.pg).toBe(expectedPg);
+    }
+  });
+
+  test('renders a null growthMilestone as an empty pg, not a mismatched code', async () => {
+    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
+    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
+      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
+      return [];
+    });
+    mockGetDevotionalGathering.mockResolvedValue(null);
+    mockGetNucleusFields.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
+    });
+
+    const result = await getRowData('Alpha');
+
+    expect(result?.row.pg).toBe('');
+    expect(result?.row.grouping).toBe('');
   });
 
   test('renders a null cluster-notebook nucleus-fields value as empty strings', async () => {
@@ -276,6 +327,7 @@ describe('saveRowData', () => {
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
     });
 
     const formData = { ...baseFormData, stage: 'Advanced/5', locality: 'Durham', makeup: 'Students' };
@@ -302,6 +354,7 @@ describe('saveRowData', () => {
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
     });
 
     const formData = { ...baseFormData, totalPop: '500', totalHH: '120', indNum: '80', hhNum: '30' };
@@ -328,6 +381,7 @@ describe('saveRowData', () => {
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: true, socialActionDescription: 'Cleanup drive', hasCommunityGatherings: false, communityGatheringDescription: '',
       narrative: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
     });
 
     const formData = {
@@ -356,6 +410,7 @@ describe('saveRowData', () => {
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: 'A growing community of practice.',
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
     });
 
     const formData = { ...baseFormData, narrative: 'A growing community of practice.' };
@@ -370,6 +425,29 @@ describe('saveRowData', () => {
     expect(writtenValues).not.toContain('A growing community of practice.');
   });
 
+  test('never writes grouping/cluster/pg anywhere -- read-only from cluster-notebook, no mutation exists', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockResolvedValue(null);
+
+    const formData = {
+      ...baseFormData,
+      identity: {
+        nucleus: 'Alpha', parentNucleus: '', grouping: 'NC Eastern',
+        cluster: 'NC-215 Triangle', pg: 'M3', clusterCode: 'NC-215', nucleusType: 'Neighborhood',
+      },
+    };
+    await saveRowData('Alpha', formData, 'me@x.com');
+
+    const updates = mockSheetsBatchUpdate.mock.calls[0][1] as { values: string[][] }[];
+    const writtenValues = updates.map(u => u.values[0][0]);
+    expect(writtenValues).not.toContain('NC Eastern');
+    expect(writtenValues).not.toContain('NC-215 Triangle');
+    expect(writtenValues).not.toContain('M3');
+    // clusterCode is unaffected -- still sheet-only, no cluster-notebook equivalent
+    expect(writtenValues).toContain('NC-215');
+  });
+
   test('maps a never-touched presence/gatherings value to null, not false', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
@@ -379,6 +457,7 @@ describe('saveRowData', () => {
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
     });
 
     const formData = { ...baseFormData, presence: '', gatherings: '' };
@@ -398,6 +477,7 @@ describe('saveRowData', () => {
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
     });
 
     const formData: Record<string, unknown> = { ...baseFormData, stage: 'Advanced/5' };

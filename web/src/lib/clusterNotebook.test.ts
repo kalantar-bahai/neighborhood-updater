@@ -72,6 +72,23 @@ describe('getNucleusFields', () => {
     expect(result).toBeNull();
   });
 
+  test('requests and returns the nested cluster fields (read-only, no mutation)', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: {
+        nucleus: {
+          stage: null, locality: null, populationMakeup: null,
+          cluster: { name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers' },
+        },
+      },
+    }));
+
+    const result = await getNucleusFields('Alpha');
+
+    expect(result?.cluster).toEqual({ name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers' });
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('cluster { name groupOfClusters growthMilestone }');
+  });
+
   test('returns population/households/connected* fields', async () => {
     mockFetch.mockResolvedValue(jsonResponse({
       data: {
