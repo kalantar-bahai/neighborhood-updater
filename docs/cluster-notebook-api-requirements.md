@@ -48,11 +48,15 @@ This is additive to what your own `docs/data-model.md` ("Nucleus Assistant" sect
 
 ## 5. Worker lists (named-list pattern)
 
-**Read**: given a nucleus name and a role type (`accompanier` | `protagonist` | `abm-assistant`), return an ordered list of names.
+**Done, 2026-09-13.** Worker lists are now backed by your `Individual`/`RoleInNE` model end to end, not free-text strings.
 
-**Write**: replace the full ordered list for a (nucleus, type) pair. Order is meaningful (not alphabetized) — add/remove/reorder all currently expressed as "send the new full ordered list."
+**Read**: `nucleus(name).workers(role)` returns ordered `Individual` records (`id`, `firstName`, `familyName`, `middleNames`, `nickname`, `sex`, `phone`, `email`, `ageCategory`). We display `individualDisplayName` — first + middle + family, falling back to `(unnamed)`, with `nickname` appended in parens.
 
-Per your data model, this is exactly the "Worker role assignment" / `RoleInNE` generalization — today these are unlinked free-text name strings, not `Individual` references. We'd want this to resolve to real `Individual` records (matching-or-creating on entry) once that entity exists on your side; until then, a plain string-list read/write is the minimum viable version. More role types beyond these three are expected over time — worth keeping the type as an open string/enum rather than hardcoding three values.
+**Write**: `updateNucleusWorkers(nucleusName, role, personIds: [String!]!)` replaces the full ordered list for a (nucleus, type) pair, taking `Individual.id`s rather than name strings — matches our "send the new full ordered list" pattern exactly.
+
+**New**: `individuals(nucleusName, search)` (PII-scoped search by the nucleus's cluster) and `createIndividual(name, nucleusName)` (full-string name only) back a search-or-create UX in the worker-list editor — type to search, click a suggestion to add, or press Enter with no match to create a brand-new `Individual` and add them in one step. No `Individual` update mutation exists yet, so the editor never offers renaming an existing person — only add/remove/reorder.
+
+Wired into nucleus-assistant: `getRowData`/`getNucleusWorkers`, `/api/workers` (read/write personIds), new `/api/individuals` (search/create). 34+ new/updated tests, all passing.
 
 **Cross-check signal**: the `protagonists`/`accompaniers` free-text count fields in §2 are compared against these lists' lengths client-side to flag a "mismatch" (not auto-reconciled). No API implication beyond exposing both.
 
@@ -69,7 +73,7 @@ The Devotionals/Education report aggregates (scraped into our own Sheet by `srp-
 Given devotionals (§2/§3, one of four activity rollups) is done, natural next slices in rough order of value/effort:
 1. **Done, 2026-09-13.** The other three activity rollups (cc/jyg/sc) — same shape as devotionals, `ActivitySummaryOverride` already generalizes to them. `updateActivitySummary` is live; not yet wired into nucleus-assistant's own code (only devotionals is wired so far).
 2. **Partially done, 2026-09-13.** `stage`/`locality`/`populationMakeup` are live via `updateNucleus(name, patch: NucleusPatch)` and wired into nucleus-assistant's `getRowData`/`saveRowData` (not `createRowData` — see below). Remaining standard fields (contact, email, auxBoard) still deferred, per your own note that contact/auxBoard are Individual-role concepts.
-3. Worker lists (§5) — needs a decision on your side about `Individual` modeling first, per your own "no Individual entity modeled yet" limitation.
+3. **Done, 2026-09-13.** Worker lists (§5) — now backed by `Individual`/`RoleInNE`, search-or-create UX wired up.
 4. Identity fields + create/delete (§4) — lowest frequency of use, fine to defer. Note: `createRowData` (nucleus creation) still writes `stage`/`locality`/`populationMakeup`/devotionals to the Sheet only, deliberately not wired to `updateNucleus`/`updateActivitySummary` — you have no create-nucleus mutation, so those calls would always fail for a brand-new nucleus. This is the real blocker on wiring nucleus creation, not a decision we're deferring for other reasons. **Partially done, 2026-09-13**: `grouping`/`cluster`/`pg` (`Cluster.groupOfClusters`/`name`/`growthMilestone`) are wired read-only — confirmed with the user: `grouping` = Group of Clusters (the SRP tier above Cluster), `pg` = Program of Growth milestone code (M1/M2/M3, mapped from your three verbatim strings), `clusterCode` needs no field, parsed from `cluster.name` — **done, 2026-09-13**: derived client-side (first whitespace-separated token of `cluster.name`), no longer a stored/editable field on our side either. `contact`/`email`/`auxBoard` remain unaddressed, still deferred per your Individual-role-concept note. `parentNucleus`/`nucleus` (the name itself) remain sheet-only.
 
 **`nucleusType` — done, 2026-09-13.** You exposed `nucleusType` (query + patch); it always reads "Neighborhood" when `location` is set. Initially held this back over a miscategorization concern (our picker groups nuclei into Neighborhood/Network/Population cards by this field), but the user corrected the premise: Network/Population nuclei aren't location-bound by definition, so they'd never have a `location` set and would naturally take the settable path, keeping their real stored type. The override only ever fires for nuclei that are already location-bound Neighborhoods — not a data-corruption risk. Wired up on both the detail view and the picker (`/api/initial-data`, matching how locality/stage/devotionals are sourced there).
