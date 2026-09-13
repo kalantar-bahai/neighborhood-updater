@@ -146,6 +146,30 @@ describe('updateNucleus', () => {
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: null,
     });
   });
+
+  test('sends the tri-state social-action/gatherings booleans, including explicit false', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: {
+        updateNucleus: {
+          stage: null, locality: null, populationMakeup: null,
+          population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+          hasSocialAction: true, socialActionDescription: 'Cleanup drive', hasCommunityGatherings: false, communityGatheringDescription: null,
+        },
+      },
+    }));
+
+    const result = await updateNucleus('Alpha', {
+      hasSocialAction: true, socialActionDescription: 'Cleanup drive', hasCommunityGatherings: false,
+    });
+
+    expect(result?.hasSocialAction).toBe(true);
+    expect(result?.hasCommunityGatherings).toBe(false);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables.patch).toEqual({
+      hasSocialAction: true, socialActionDescription: 'Cleanup drive', hasCommunityGatherings: false,
+    });
+    expect('communityGatheringDescription' in body.variables.patch).toBe(false);
+  });
 });
 
 describe('getDevotionalGathering', () => {

@@ -40,6 +40,10 @@ export interface NucleusFields {
   households: number | null;
   connectedPopulation: number | null;
   connectedHouseholds: number | null;
+  hasSocialAction: boolean | null;
+  socialActionDescription: string | null;
+  hasCommunityGatherings: boolean | null;
+  communityGatheringDescription: string | null;
 }
 
 // Deliberately not `extends NucleusFields` — the picker (getAllNuclei's caller)
@@ -66,7 +70,8 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
   return data.nuclei;
 }
 
-const NUCLEUS_FIELDS_SELECTION = 'stage locality populationMakeup population households connectedPopulation connectedHouseholds';
+const NUCLEUS_FIELDS_SELECTION = 'stage locality populationMakeup population households connectedPopulation connectedHouseholds '
+  + 'hasSocialAction socialActionDescription hasCommunityGatherings communityGatheringDescription';
 
 export async function getNucleusFields(nucleusName: string): Promise<NucleusFields | null> {
   const query = `
@@ -84,6 +89,8 @@ export async function updateNucleus(
     stage?: string; locality?: string; populationMakeup?: string;
     population?: number | null; households?: number | null;
     connectedPopulation?: number | null; connectedHouseholds?: number | null;
+    hasSocialAction?: boolean | null; socialActionDescription?: string;
+    hasCommunityGatherings?: boolean | null; communityGatheringDescription?: string;
   }
 ): Promise<NucleusFields | null> {
   const mutation = `

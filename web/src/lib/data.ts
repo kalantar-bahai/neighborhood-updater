@@ -35,6 +35,22 @@ function toIntOrNull(value: unknown): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
+// Tri-state mapping for our Yes/No toggles onto cluster-notebook's nullable
+// booleans: 'Yes' -> true, 'No' -> explicit false, anything else (never
+// touched) -> null. Symmetric with boolToYesNo below.
+function toBoolOrNull(value: unknown): boolean | null {
+  const v = String(value ?? '').trim().toLowerCase();
+  if (v === 'yes') return true;
+  if (v === 'no') return false;
+  return null;
+}
+
+function boolToYesNo(value: boolean | null | undefined): string {
+  if (value === true) return 'Yes';
+  if (value === false) return 'No';
+  return '';
+}
+
 function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
   return {
     stage: fields?.stage ?? '',
@@ -44,6 +60,10 @@ function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
     totalHH: fields?.households != null ? String(fields.households) : '',
     indNum: fields?.connectedPopulation != null ? String(fields.connectedPopulation) : '',
     hhNum: fields?.connectedHouseholds != null ? String(fields.connectedHouseholds) : '',
+    presence: boolToYesNo(fields?.hasSocialAction),
+    notesPresence: fields?.socialActionDescription ?? '',
+    gatherings: boolToYesNo(fields?.hasCommunityGatherings),
+    notesGatherings: fields?.communityGatheringDescription ?? '',
   };
 }
 
@@ -166,11 +186,11 @@ export async function getRowData(nucleusName: string) {
   };
 
   const row = parseRow(masterRow);
-  // parseRow's devotionals/stage/locality/makeup/totalPop/totalHH/indNum/hhNum reads (from
-  // COL.DEV_ACT/PART/FOF/STAGE/LOCALITY/MAKEUP/TOTAL_POP/TOTAL_HH/IND_NUM/HH_NUM) are overwritten
-  // here for the detail view. Devotionals: /api/initial-data's picker summary still depends on
-  // those same sheet columns — don't remove them. Everything else here: /api/initial-data doesn't
-  // read these sheet columns, so they're fully dead.
+  // parseRow's devotionals/stage/locality/makeup/totalPop/totalHH/indNum/hhNum/presence/
+  // notesPresence/gatherings/notesGatherings reads (from the corresponding COL.* sheet columns)
+  // are overwritten here for the detail view. Devotionals: /api/initial-data's picker summary
+  // still depends on those same sheet columns — don't remove them. Everything else here:
+  // /api/initial-data doesn't read these sheet columns, so they're fully dead.
   row.activities.devotionals = devotionalsFromClusterNotebook(devotionalGathering);
   Object.assign(row, nucleusFieldsFromClusterNotebook(nucleusFields));
 
@@ -336,10 +356,8 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     [COL.PROTAGONISTS, d.protagonists], [COL.ACCOMPANIERS, d.accompaniers],
     [COL.LEVEL, d.level], [COL.NOTES_PREVALENCE, d.notesPrevalence],
     [COL.SUPPORTED, d.supported], [COL.NOTES_SUPPORTED, d.notesSupported],
-    [COL.PRESENCE, d.presence], [COL.NOTES_PRESENCE, d.notesPresence],
     [COL.INVOLVED, d.involved], [COL.NOTES_INVOLVED, d.notesInvolved],
     [COL.EFFORTS, d.efforts], [COL.NOTES_EFFORTS, d.notesEfforts],
-    [COL.GATHERINGS, d.gatherings], [COL.NOTES_GATHERINGS, d.notesGatherings],
     [COL.NARRATIVE, d.narrative],
   ].filter(([, value]) => value !== undefined)
     .map(([col, value]) => ({
@@ -359,6 +377,8 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     stage?: string; locality?: string; populationMakeup?: string;
     population?: number | null; households?: number | null;
     connectedPopulation?: number | null; connectedHouseholds?: number | null;
+    hasSocialAction?: boolean | null; socialActionDescription?: string;
+    hasCommunityGatherings?: boolean | null; communityGatheringDescription?: string;
   } = {};
   if (d.stage !== undefined) nucleusPatch.stage = d.stage;
   if (d.locality !== undefined) nucleusPatch.locality = d.locality;
@@ -367,6 +387,10 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
   if (d.totalHH !== undefined) nucleusPatch.households = toIntOrNull(d.totalHH);
   if (d.indNum !== undefined) nucleusPatch.connectedPopulation = toIntOrNull(d.indNum);
   if (d.hhNum !== undefined) nucleusPatch.connectedHouseholds = toIntOrNull(d.hhNum);
+  if (d.presence !== undefined) nucleusPatch.hasSocialAction = toBoolOrNull(d.presence);
+  if (d.notesPresence !== undefined) nucleusPatch.socialActionDescription = d.notesPresence;
+  if (d.gatherings !== undefined) nucleusPatch.hasCommunityGatherings = toBoolOrNull(d.gatherings);
+  if (d.notesGatherings !== undefined) nucleusPatch.communityGatheringDescription = d.notesGatherings;
   if (Object.keys(nucleusPatch).length > 0) {
     writes.push(updateNucleus(nucleusName, nucleusPatch));
   }

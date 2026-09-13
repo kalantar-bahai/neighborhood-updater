@@ -726,7 +726,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
         </div>
 
         {/* Additional Details */}
-        <div className="card from-sheet">
+        <div className="card">
           <div className="card-header">Additional Details</div>
           <div className="card-body">
             <div className="detail-grid">

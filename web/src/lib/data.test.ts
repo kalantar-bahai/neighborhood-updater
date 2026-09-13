@@ -160,6 +160,7 @@ describe('getRowData', () => {
     mockGetNucleusFields.mockResolvedValue({
       stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students',
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
+      hasSocialAction: true, socialActionDescription: 'Cleanup drive', hasCommunityGatherings: false, communityGatheringDescription: null,
     });
 
     const result = await getRowData('Alpha');
@@ -172,6 +173,10 @@ describe('getRowData', () => {
     expect(result?.row.totalHH).toBe('120');
     expect(result?.row.indNum).toBe('80');
     expect(result?.row.hhNum).toBe('30');
+    expect(result?.row.presence).toBe('Yes');
+    expect(result?.row.notesPresence).toBe('Cleanup drive');
+    expect(result?.row.gatherings).toBe('No');
+    expect(result?.row.notesGatherings).toBe('');
   });
 
   test('renders a null cluster-notebook nucleus-fields value as empty strings', async () => {
@@ -188,6 +193,8 @@ describe('getRowData', () => {
     expect(result?.row.stage).toBe('');
     expect(result?.row.locality).toBe('');
     expect(result?.row.makeup).toBe('');
+    expect(result?.row.presence).toBe('');
+    expect(result?.row.gatherings).toBe('');
   });
 });
 
@@ -264,6 +271,7 @@ describe('saveRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students',
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
     });
 
     const formData = { ...baseFormData, stage: 'Advanced/5', locality: 'Durham', makeup: 'Students' };
@@ -286,6 +294,7 @@ describe('saveRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
     });
 
     const formData = { ...baseFormData, totalPop: '500', totalHH: '120', indNum: '80', hhNum: '30' };
@@ -303,6 +312,52 @@ describe('saveRowData', () => {
     expect(writtenValues).not.toContain('30');
   });
 
+  test('writes presence/gatherings as tri-state booleans via cluster-notebook instead of the sheet', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateNucleus.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: true, socialActionDescription: 'Cleanup drive', hasCommunityGatherings: false, communityGatheringDescription: '',
+    });
+
+    const formData = {
+      ...baseFormData,
+      presence: 'Yes', notesPresence: 'Cleanup drive',
+      gatherings: 'No', notesGatherings: '',
+    };
+    await saveRowData('Alpha', formData, 'me@x.com');
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
+      locality: 'Durham',
+      hasSocialAction: true, socialActionDescription: 'Cleanup drive',
+      hasCommunityGatherings: false, communityGatheringDescription: '',
+    });
+
+    const updates = mockSheetsBatchUpdate.mock.calls[0][1] as { values: string[][] }[];
+    const writtenValues = updates.map(u => u.values[0][0]);
+    expect(writtenValues).not.toContain('Cleanup drive');
+  });
+
+  test('maps a never-touched presence/gatherings value to null, not false', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateNucleus.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+    });
+
+    const formData = { ...baseFormData, presence: '', gatherings: '' };
+    await saveRowData('Alpha', formData, 'me@x.com');
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
+      locality: 'Durham', hasSocialAction: null, hasCommunityGatherings: null,
+    });
+  });
+
   test('omits patch fields the caller did not provide, rather than sending them as blank', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
@@ -310,6 +365,7 @@ describe('saveRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: 'Advanced/5', locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
     });
 
     const formData: Record<string, unknown> = { ...baseFormData, stage: 'Advanced/5' };
