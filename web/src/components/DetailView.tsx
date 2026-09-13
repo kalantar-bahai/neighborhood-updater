@@ -390,6 +390,8 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
   const [showProtagonistsModal, setShowProtagonistsModal] = useState(false);
   const [abmAssistantNames, setAbmAssistantNames] = useState<Worker[]>(() => detail.abmAssistantNames);
   const [showAbmAssistantModal, setShowAbmAssistantModal] = useState(false);
+  const [contactNames, setContactNames] = useState<Worker[]>(() => detail.contactNames);
+  const [showContactModal, setShowContactModal] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(!!isNew);
   const [accessOpen, setAccessOpen] = useState(false);
   const [dangerOpen, setDangerOpen] = useState(false);
@@ -619,8 +621,15 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               }
             </div>
             <div className="field-grid-4">
-              <Field label="Contact"                   value={form.contact}  onChange={isAdmin ? v => set('contact', v)  : undefined} readonly={!isAdmin} fromSheet />
-              <Field label="Contact Email"             value={form.email}    onChange={isAdmin ? v => set('email', v)    : undefined} readonly={!isAdmin} fromSheet />
+              <Field
+                label="Contact"
+                value={contactNames[0]?.name ?? ''}
+                readonly
+                onLabelClick={isAdmin ? () => setShowContactModal(true) : undefined}
+              />
+              {/* Derived from the Contact Individual's own email field -- no separate
+                  stored value, so there's nothing to edit here directly. */}
+              <Field label="Contact Email" value={contactNames[0]?.email ?? ''} readonly />
               <Field label="Auxiliary Board Member(s)" value={form.auxBoard} onChange={isAdmin ? v => set('auxBoard', v) : undefined} readonly={!isAdmin} fromSheet />
               <Field
                 label="ABm Assistant"
@@ -912,6 +921,18 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           workers={abmAssistantNames}
           onChange={workers => setAbmAssistantNames(workers)}
           onClose={() => setShowAbmAssistantModal(false)}
+        />
+      )}
+
+      {showContactModal && (
+        <WorkerListModal
+          title="Contact"
+          role="contact"
+          nucleus={row.nucleus}
+          workers={contactNames}
+          single
+          onChange={workers => setContactNames(workers)}
+          onClose={() => setShowContactModal(false)}
         />
       )}
 

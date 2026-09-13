@@ -147,8 +147,6 @@ export function parseRow(row: string[]) {
     parentNucleus:       row[COL.PARENT_NUCLEUS],
     nucleusType:         row[COL.TYPE],
     stage:               row[COL.STAGE],
-    contact:             row[COL.CONTACT],
-    email:               row[COL.EMAIL],
     auxBoard:            row[COL.AUX_BOARD],
     makeup:              row[COL.MAKEUP],
     totalPop:            stripCommas(row[COL.TOTAL_POP]),
@@ -198,15 +196,16 @@ export function parseSrpData(devRow: string[] | null, eduRow: string[] | null) {
 }
 
 function toWorkers(individuals: Individual[]): Worker[] {
-  return individuals.map(ind => ({ id: ind.id, name: individualDisplayName(ind) }));
+  return individuals.map(ind => ({ id: ind.id, name: individualDisplayName(ind), email: ind.email }));
 }
 
 export async function getRowData(nucleusName: string) {
-  const [masterRows, devRows, eduRows, accompanierWorkers, protagonistWorkers, abmAssistantWorkers, devotionalGathering, nucleusFields] = await Promise.all([
+  const [masterRows, devRows, eduRows, accompanierWorkers, protagonistWorkers, abmAssistantWorkers, contactWorkers, devotionalGathering, nucleusFields] = await Promise.all([
     getAllMasterRows(), getAllDevRows(), getAllEduRows(),
     getNucleusWorkers(nucleusName, 'accompanier'),
     getNucleusWorkers(nucleusName, 'protagonist'),
     getNucleusWorkers(nucleusName, 'abm-assistant'),
+    getNucleusWorkers(nucleusName, 'contact'),
     getDevotionalGathering(nucleusName),
     getNucleusFields(nucleusName),
   ]);
@@ -244,6 +243,7 @@ export async function getRowData(nucleusName: string) {
     accompanierNames: toWorkers(accompanierWorkers),
     protagonistNames: toWorkers(protagonistWorkers),
     abmAssistantNames: toWorkers(abmAssistantWorkers),
+    contactNames: toWorkers(contactWorkers),
   };
 }
 
@@ -280,8 +280,6 @@ export async function createRowData(formData: Record<string, unknown>, userEmail
   newRow[COL.PARENT_NUCLEUS] = d.identity?.parentNucleus  || '';
   newRow[COL.TYPE]           = d.identity?.nucleusType    || '';
   newRow[COL.STAGE]          = d.stage                    || '';
-  newRow[COL.CONTACT]        = d.contact                  || '';
-  newRow[COL.EMAIL]          = d.email                    || '';
   newRow[COL.AUX_BOARD]      = d.auxBoard                 || '';
   newRow[COL.MAKEUP]         = d.makeup                   || '';
   newRow[COL.TOTAL_POP]      = d.totalPop                 || '';
@@ -353,8 +351,7 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
 
   const updates = [
     ...identityPairs,
-    [COL.CONTACT, d.contact],
-    [COL.EMAIL, d.email], [COL.AUX_BOARD, d.auxBoard],
+    [COL.AUX_BOARD, d.auxBoard],
     [COL.CC_ACT, d.activities.ccs.act], [COL.CC_PART, d.activities.ccs.part], [COL.CC_FOF, d.activities.ccs.fof],
     [COL.JYG_ACT, d.activities.jygs.act], [COL.JYG_PART, d.activities.jygs.part], [COL.JYG_FOF, d.activities.jygs.fof],
     [COL.SC_ACT, d.activities.scs.act], [COL.SC_PART, d.activities.scs.part], [COL.SC_FOF, d.activities.scs.fof],

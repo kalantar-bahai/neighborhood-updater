@@ -36,8 +36,6 @@ export interface NucleusRow {
   clusterCode: string;
   locality: string;
   stage: string;
-  contact: string;
-  email: string;
   auxBoard: string;
   makeup: string;
   totalPop: string;
@@ -80,9 +78,12 @@ export interface SrpData {
 // A worker-list entry -- backed by a real cluster-notebook Individual record now,
 // not a free-text string. `id` is what gets sent back on save; `name` is a
 // display-only string composed from the Individual's actual name fields.
+// `email` is the Individual's own email field, surfaced for the Contact role
+// where we display it directly rather than storing a separate email string.
 export interface Worker {
   id: string;
   name: string;
+  email: string | null;
 }
 
 export interface NucleusDetail {
@@ -91,6 +92,8 @@ export interface NucleusDetail {
   accompanierNames: Worker[];
   protagonistNames: Worker[];
   abmAssistantNames: Worker[];
+  // At most one entry -- Contact is a single-person role, unlike the other three.
+  contactNames: Worker[];
 }
 
 export interface InitialData {

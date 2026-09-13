@@ -48,8 +48,6 @@ export const POST = auth(async (req) => {
     delete formData.identity;
     delete formData.locality;
     delete formData.stage;
-    delete formData.contact;
-    delete formData.email;
     delete formData.auxBoard;
   }
 

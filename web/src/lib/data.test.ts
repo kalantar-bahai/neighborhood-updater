@@ -49,13 +49,11 @@ describe('parseRow', () => {
       [COL.GROUPING]: 'NC Piedmont',
       [COL.CLUSTER]: 'Charlotte Area',
       [COL.NUCLEUS]: 'Albemarle Corridor',
-      [COL.EMAIL]: 'mike@x.com',
     });
     const result = parseRow(row);
     expect(result.grouping).toBe('NC Piedmont');
     expect(result.cluster).toBe('Charlotte Area');
     expect(result.nucleus).toBe('Albemarle Corridor');
-    expect(result.email).toBe('mike@x.com');
   });
 
   test('maps activity fields into nested object', () => {
@@ -321,7 +319,7 @@ describe('getRowData', () => {
     expect(result?.row.narrative).toBe('');
   });
 
-  test('fetches accompanier/protagonist/abm-assistant workers from cluster-notebook, mapped to {id, name}', async () => {
+  test('fetches accompanier/protagonist/abm-assistant/contact workers from cluster-notebook, mapped to {id, name, email}', async () => {
     const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
     mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
       if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
@@ -329,11 +327,12 @@ describe('getRowData', () => {
     });
     mockGetDevotionalGathering.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue(null);
-    const blank = { familyName: null, middleNames: null, nickname: null, sex: null, phone: null, email: null, ageCategory: null };
+    const blank = { familyName: null, middleNames: null, nickname: null, sex: null, phone: null, ageCategory: null };
     mockGetNucleusWorkers.mockImplementation(async (_name: string, role: string) => {
-      if (role === 'accompanier') return [{ id: '1', firstName: 'Alice', ...blank }];
-      if (role === 'protagonist') return [{ id: '2', firstName: 'Bob', ...blank }];
-      if (role === 'abm-assistant') return [{ id: '3', firstName: 'Carol', ...blank }];
+      if (role === 'accompanier') return [{ id: '1', firstName: 'Alice', email: null, ...blank }];
+      if (role === 'protagonist') return [{ id: '2', firstName: 'Bob', email: null, ...blank }];
+      if (role === 'abm-assistant') return [{ id: '3', firstName: 'Carol', email: null, ...blank }];
+      if (role === 'contact') return [{ id: '4', firstName: 'Dave', email: 'dave@x.com', ...blank }];
       return [];
     });
 
@@ -342,9 +341,11 @@ describe('getRowData', () => {
     expect(mockGetNucleusWorkers).toHaveBeenCalledWith('Alpha', 'accompanier');
     expect(mockGetNucleusWorkers).toHaveBeenCalledWith('Alpha', 'protagonist');
     expect(mockGetNucleusWorkers).toHaveBeenCalledWith('Alpha', 'abm-assistant');
-    expect(result?.accompanierNames).toEqual([{ id: '1', name: 'Alice' }]);
-    expect(result?.protagonistNames).toEqual([{ id: '2', name: 'Bob' }]);
-    expect(result?.abmAssistantNames).toEqual([{ id: '3', name: 'Carol' }]);
+    expect(mockGetNucleusWorkers).toHaveBeenCalledWith('Alpha', 'contact');
+    expect(result?.accompanierNames).toEqual([{ id: '1', name: 'Alice', email: null }]);
+    expect(result?.protagonistNames).toEqual([{ id: '2', name: 'Bob', email: null }]);
+    expect(result?.abmAssistantNames).toEqual([{ id: '3', name: 'Carol', email: null }]);
+    expect(result?.contactNames).toEqual([{ id: '4', name: 'Dave', email: 'dave@x.com' }]);
   });
 });
 

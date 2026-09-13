@@ -13,7 +13,7 @@ function effectiveRole(roleMap: Record<string, string>, nucleus: string) {
 }
 
 function toWorkers(individuals: Individual[]): Worker[] {
-  return individuals.map(ind => ({ id: ind.id, name: individualDisplayName(ind) }));
+  return individuals.map(ind => ({ id: ind.id, name: individualDisplayName(ind), email: ind.email }));
 }
 
 export const GET = auth(async (req) => {
@@ -56,7 +56,9 @@ export const POST = auth(async (req) => {
 
   const role = effectiveRole(access.roleMap, nucleus);
   if (!role || role === 'read') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-  if (type === 'abm-assistant' && role !== 'admin') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  if ((type === 'abm-assistant' || type === 'contact') && role !== 'admin') {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  }
 
   const workers = await updateNucleusWorkers(nucleus, type, personIds);
   return NextResponse.json({ workers: toWorkers(workers) });

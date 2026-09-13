@@ -9,6 +9,9 @@ interface Props {
   nucleus: string;
   workers: Worker[];
   importWorkers?: Worker[];
+  // Single-valued role (e.g. contact): picking or creating someone replaces
+  // the current occupant instead of appending, and reorder controls are hidden.
+  single?: boolean;
   onChange: (workers: Worker[]) => void;
   onClose: () => void;
 }
@@ -37,7 +40,7 @@ function iconBtn(onClick: () => void, title: string, color: string, children: Re
 // updateNucleusWorkers takes the full ordered list each call (2026-09-13, confirmed
 // with the user: the old batch-everything design was a spreadsheet-write limitation,
 // not a real UX requirement).
-export default function WorkerListModal({ title, role, nucleus, workers, importWorkers, onChange, onClose }: Props) {
+export default function WorkerListModal({ title, role, nucleus, workers, importWorkers, single, onChange, onClose }: Props) {
   const [list, setList] = useState<Worker[]>(workers);
   const [input, setInput] = useState('');
   const [suggestions, setSuggestions] = useState<Worker[]>([]);
@@ -106,7 +109,7 @@ export default function WorkerListModal({ title, role, nucleus, workers, importW
   function addWorker(worker: Worker) {
     setInput('');
     setSuggestions([]);
-    void saveWorkers([...list.map(w => w.id), worker.id]);
+    void saveWorkers(single ? [worker.id] : [...list.map(w => w.id), worker.id]);
   }
 
   async function createAndAdd(name: string) {
@@ -123,7 +126,7 @@ export default function WorkerListModal({ title, role, nucleus, workers, importW
       setInput('');
       setSuggestions([]);
       setSaving(false);
-      await saveWorkers([...list.map(w => w.id), data.id]);
+      await saveWorkers(single ? [data.id] : [...list.map(w => w.id), data.id]);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
       setSaving(false);
@@ -203,14 +206,20 @@ export default function WorkerListModal({ title, role, nucleus, workers, importW
 
         <div style={{ overflowY: 'auto', flex: 1, marginBottom: 12 }}>
           {list.length === 0 && (
-            <div style={{ color: '#a0aec0', fontSize: 13, padding: '8px 0' }}>No names added yet.</div>
+            <div style={{ color: '#a0aec0', fontSize: 13, padding: '8px 0' }}>
+              {single ? 'No contact assigned yet.' : 'No names added yet.'}
+            </div>
           )}
           {list.map((worker, i) => (
             <div key={worker.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
-              <button onClick={() => moveUp(i)} disabled={i === 0}
-                style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: i === 0 ? '#cbd5e0' : '#718096', fontSize: 12, padding: '2px 4px' }}>↑</button>
-              <button onClick={() => moveDown(i)} disabled={i === list.length - 1}
-                style={{ background: 'none', border: 'none', cursor: i === list.length - 1 ? 'default' : 'pointer', color: i === list.length - 1 ? '#cbd5e0' : '#718096', fontSize: 12, padding: '2px 4px' }}>↓</button>
+              {!single && (
+                <>
+                  <button onClick={() => moveUp(i)} disabled={i === 0}
+                    style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: i === 0 ? '#cbd5e0' : '#718096', fontSize: 12, padding: '2px 4px' }}>↑</button>
+                  <button onClick={() => moveDown(i)} disabled={i === list.length - 1}
+                    style={{ background: 'none', border: 'none', cursor: i === list.length - 1 ? 'default' : 'pointer', color: i === list.length - 1 ? '#cbd5e0' : '#718096', fontSize: 12, padding: '2px 4px' }}>↓</button>
+                </>
+              )}
               <span style={{ flex: 1, fontSize: 14 }}>{worker.name}</span>
               {iconBtn(() => remove(worker.id), 'Remove', '#e53e3e', <IcoTrash />)}
             </div>

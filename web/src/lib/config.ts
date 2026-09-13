@@ -19,8 +19,8 @@ export const COL = {
   PARENT_NUCLEUS:      6,
   TYPE:                7,
   STAGE:               8,
-  CONTACT:             9,
-  EMAIL:               10,
+  CONTACT:             9,  // dead: contact is now the 'contact' role in cluster-notebook
+  EMAIL:               10, // dead: contact email now comes from that Individual's own email field
   AUX_BOARD:           11,
   MAKEUP:              12,
   TOTAL_POP:           13,
@@ -78,9 +78,11 @@ export const EDU_COL = {
   FACILITATORS: 10,
 } as const;
 
-// Worker lists (accompanier/protagonist/abm-assistant) now live entirely in
-// cluster-notebook (Individual + RoleInNE) -- no Sheet tab/columns for them anymore.
-export const WORKER_TYPES = ['accompanier', 'protagonist', 'abm-assistant'] as const;
+// Worker/role lists (accompanier/protagonist/abm-assistant/contact) now live
+// entirely in cluster-notebook (Individual + RoleInNE) -- no Sheet tab/columns
+// for them anymore. `contact` is single-valued (see WorkerListModal's `single`
+// prop) but otherwise uses the same read/write shape as the others.
+export const WORKER_TYPES = ['accompanier', 'protagonist', 'abm-assistant', 'contact'] as const;
 export type WorkerType = typeof WORKER_TYPES[number];
 
 export const ACCESS_COL = {

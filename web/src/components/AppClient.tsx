@@ -72,7 +72,7 @@ export default function AppClient() {
     const emptyDetail: NucleusDetail = {
       row: {
         nucleus: '', parentNucleus: '', nucleusType: '', grouping: 'NC Eastern', cluster: 'Triangle',
-        pg: 'M3', clusterCode: 'NC-215', locality: '', stage: '', contact: '', email: '',
+        pg: 'M3', clusterCode: 'NC-215', locality: '', stage: '',
         auxBoard: '', makeup: '', totalPop: '', totalHH: '', indNum: '', indPct: '',
         hhNum: '', hhPct: '',
         activities: {
@@ -90,6 +90,7 @@ export default function AppClient() {
       accompanierNames: [],
       protagonistNames: [],
       abmAssistantNames: [],
+      contactNames: [],
     };
     return (
       <DetailView
