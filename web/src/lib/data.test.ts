@@ -13,6 +13,18 @@ import { getAccessEntries, saveAccessEntries } from './data';
 import { COL, DEV_COL, EDU_COL, ACC_COL, ACCESS_COL } from './config';
 import type { AccessEntry } from '@/types';
 
+vi.mock('./clusterNotebook', () => ({
+  getDevotionalGathering: vi.fn(),
+  updateDevotionalGathering: vi.fn(),
+}));
+
+import { getDevotionalGathering, updateDevotionalGathering } from './clusterNotebook';
+import { getRowData, saveRowData } from './data';
+import { MASTER_TAB } from './config';
+
+const mockGetDevotionalGathering = vi.mocked(getDevotionalGathering);
+const mockUpdateDevotionalGathering = vi.mocked(updateDevotionalGathering);
+
 const mockSheetsGet = vi.mocked(sheetsGet);
 const mockSheetsClear = vi.mocked(sheetsClear);
 const mockSheetsBatchUpdate = vi.mocked(sheetsBatchUpdate);
@@ -75,6 +87,49 @@ describe('parseRow', () => {
     expect(result.nucleus).toBe('');
     expect(result.nucleusType).toBe('');
     expect(result.activities.ccs).toEqual({ act: '', part: '', fof: '' });
+  });
+});
+
+describe('getRowData', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  test('overrides devotionals with cluster-notebook data, ignoring the sheet columns', async () => {
+    const masterRow = makeRow({
+      [COL.NUCLEUS]: 'Alpha',
+      [COL.DEV_ACT]: '999', [COL.DEV_PART]: '999', [COL.DEV_FOF]: '999',
+    });
+    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
+      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
+      return [];
+    });
+    mockGetDevotionalGathering.mockResolvedValue({ number: 4, participants: 30, participantsFof: 10 });
+
+    const result = await getRowData('Alpha');
+
+    expect(mockGetDevotionalGathering).toHaveBeenCalledWith('Alpha');
+    expect(result?.row.activities.devotionals).toEqual({ act: '4', part: '30', fof: '10' });
+  });
+
+  test('renders a null cluster-notebook value as empty strings', async () => {
+    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
+    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
+      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
+      return [];
+    });
+    mockGetDevotionalGathering.mockResolvedValue(null);
+
+    const result = await getRowData('Alpha');
+
+    expect(result?.row.activities.devotionals).toEqual({ act: '', part: '', fof: '' });
+  });
+
+  test('returns null when the nucleus is not found in the sheet', async () => {
+    mockSheetsGet.mockResolvedValue([]);
+    mockGetDevotionalGathering.mockResolvedValue(null);
+
+    const result = await getRowData('Nonexistent');
+
+    expect(result).toBeNull();
   });
 });
 

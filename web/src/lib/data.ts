@@ -7,6 +7,8 @@ import {
   WORKERS_TAB, WORKERS_DATA_ROW, ACC_COL,
   ACCESS_COL,
 } from './config';
+import { getDevotionalGathering, updateDevotionalGathering } from './clusterNotebook';
+import type { DevotionalGathering } from './clusterNotebook';
 import type { AccessEntry } from '@/types';
 
 function normalize(row: string[], numCols: number): string[] {
@@ -18,6 +20,14 @@ function normalize(row: string[], numCols: number): string[] {
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
 function stripCommas(s: string) { return s ? s.replace(/,/g, '') : s; }
+
+function devotionalsFromClusterNotebook(dg: DevotionalGathering | null) {
+  return {
+    act: dg?.number != null ? String(dg.number) : '',
+    part: dg?.participants != null ? String(dg.participants) : '',
+    fof: dg?.participantsFof != null ? String(dg.participantsFof) : '',
+  };
+}
 
 export async function getAccessEntries(): Promise<AccessEntry[]> {
   const rows = await sheetsGet(MASTER_SHEET_ID, `${ACCESS_TAB}!A2:D`);
@@ -117,11 +127,12 @@ export function parseSrpData(devRow: string[] | null, eduRow: string[] | null) {
 }
 
 export async function getRowData(nucleusName: string) {
-  const [masterRows, devRows, eduRows, accompanierNames, protagonistNames, abmAssistantNames] = await Promise.all([
+  const [masterRows, devRows, eduRows, accompanierNames, protagonistNames, abmAssistantNames, devotionalGathering] = await Promise.all([
     getAllMasterRows(), getAllDevRows(), getAllEduRows(),
     getWorkerNames(nucleusName, 'accompanier'),
     getWorkerNames(nucleusName, 'protagonist'),
     getWorkerNames(nucleusName, 'abm-assistant'),
+    getDevotionalGathering(nucleusName),
   ]);
 
   const masterRow = masterRows.find(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
@@ -135,8 +146,11 @@ export async function getRowData(nucleusName: string) {
     return match;
   };
 
+  const row = parseRow(masterRow);
+  row.activities.devotionals = devotionalsFromClusterNotebook(devotionalGathering);
+
   return {
-    row: parseRow(masterRow),
+    row,
     srp: parseSrpData(lookup(devRows, DEV_COL.NAME), lookup(eduRows, EDU_COL.NAME)),
     accompanierNames,
     protagonistNames,
