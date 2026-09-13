@@ -17,7 +17,7 @@ This is additive to what your own `docs/data-model.md` ("Nucleus Assistant" sect
 **Read**: one nucleus by name, full `NucleusRow` shape:
 - Identity: nucleus name, parentNucleus, nucleusType, grouping, cluster, pg, clusterCode (admin-only to edit, see §7)
 - Standard: locality, stage, contact name + email, auxBoard, makeup
-- Population: totalPop, totalHH, indNum, indPct, hhNum, hhPct (currently hand-entered aggregates; per your data model, should become derived rollups once real Individual/Household records exist — until then, needs to accept a manually-entered aggregate)
+- Population: totalPop, totalHH, indNum, indPct, hhNum, hhPct (currently hand-entered aggregates; per your data model, should become derived rollups once real Individual/Household records exist — until then, needs to accept a manually-entered aggregate). **Done, 2026-09-13**: totalPop/totalHH/indNum/hhNum now wired to your `population`/`households`/`connectedPopulation`/`connectedHouseholds` fields. indPct/hhPct remain purely client-side computed (percentage of total) — no cluster-notebook equivalent, confirmed not needed.
 - Activities: four rollups (ccs, jygs, scs, devotionals), each `{act, part, fof}` — devotionals already covered by `devotionalGathering`; need the same shape for cc/jyg/sc (your `ActivitySummaryOverride` entity already generalizes this — just needs the other three `activityType` values wired to query/mutation)
 - Qualitative fields, each paired with notes: level, supported/notesSupported, presence/notesPresence, involved/notesInvolved, efforts/notesEfforts, gatherings/notesGatherings
 - protagonists/accompaniers as free-text counts (separate from the named worker lists in §4 — used today only as a cross-check "mismatch" signal against the named list length)
