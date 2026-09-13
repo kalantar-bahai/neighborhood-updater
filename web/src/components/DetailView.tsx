@@ -106,12 +106,13 @@ function PairField({ label, numVal, pctVal, onNumChange, pctReadonly, numInteger
   );
 }
 
-function ActRow({ label, userVals, srpVals, onChange, onReset }: {
+function ActRow({ label, userVals, srpVals, onChange, onReset, fromSheet }: {
   label: string;
   userVals: Activity;
   srpVals: Activity | null;
   onChange: (field: keyof Activity, v: string) => void;
   onReset: () => void;
+  fromSheet?: boolean;
 }) {
   const actDiffers  = srpVals !== null && (userVals.act  || '') !== (srpVals.act  || '');
   const partDiffers = srpVals !== null && (userVals.part || '') !== (srpVals.part || '');
@@ -124,7 +125,7 @@ function ActRow({ label, userVals, srpVals, onChange, onReset }: {
   }
 
   return (
-    <tr>
+    <tr className={fromSheet ? 'from-sheet' : undefined}>
       <td className="row-label" style={{ textAlign: 'right', paddingLeft: 4, paddingRight: 10 }}>{label}</td>
       <td><input type="text" value={userVals.act || ''} className={cls(actDiffers, userVals.act)} onChange={e => onChange('act', e.target.value)} /></td>
       <td><input type="text" value={userVals.part || ''} className={cls(partDiffers, userVals.part)} onChange={e => onChange('part', e.target.value)} /></td>
@@ -581,7 +582,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
       <div className="container">
 
         {/* Identity */}
-        <div className="card">
+        <div className="card from-sheet">
           <div
             className="card-header"
             onClick={() => setIdentityOpen(o => !o)}
@@ -626,7 +627,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
         </div>
 
         {/* Population */}
-        <div className="card">
+        <div className="card from-sheet">
           <div className="card-header">Population</div>
           <div className="card-body">
             <div className="field-grid-2">
@@ -673,11 +674,11 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
                 </thead>
                 <tbody>
                   <ActRow label="Children's Classes" userVals={form.activities.ccs} srpVals={srp?.ccs ?? null}
-                    onChange={(f, v) => setAct('ccs', f, v)} onReset={() => resetToSrp('ccs')} />
+                    onChange={(f, v) => setAct('ccs', f, v)} onReset={() => resetToSrp('ccs')} fromSheet />
                   <ActRow label="Junior Youth Groups" userVals={form.activities.jygs} srpVals={srp?.jygs ?? null}
-                    onChange={(f, v) => setAct('jygs', f, v)} onReset={() => resetToSrp('jygs')} />
+                    onChange={(f, v) => setAct('jygs', f, v)} onReset={() => resetToSrp('jygs')} fromSheet />
                   <ActRow label="Study Circles" userVals={form.activities.scs} srpVals={srp?.scs ?? null}
-                    onChange={(f, v) => setAct('scs', f, v)} onReset={() => resetToSrp('scs')} />
+                    onChange={(f, v) => setAct('scs', f, v)} onReset={() => resetToSrp('scs')} fromSheet />
                   <TotalRow label="Total Educational Activities" totals={edTotal} />
                   <ActRow label="Devotional Gatherings" userVals={form.activities.devotionals} srpVals={srp?.devotionals ?? null}
                     onChange={(f, v) => setAct('devotionals', f, v)} onReset={() => resetToSrp('devotionals')} />
@@ -689,7 +690,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
         </div>
 
         {/* Workers & Prevalence */}
-        <div className="card">
+        <div className="card from-sheet">
           <div className="card-header">Workers &amp; Prevalence</div>
           <div className="card-body">
             <div className="field-grid-2">
@@ -724,7 +725,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
         </div>
 
         {/* Additional Details */}
-        <div className="card">
+        <div className="card from-sheet">
           <div className="card-header">Additional Details</div>
           <div className="card-body">
             <div className="detail-grid">
@@ -737,7 +738,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
         </div>
 
         {/* Narrative */}
-        <div className="card">
+        <div className="card from-sheet">
           <div className="card-header">Narrative</div>
           <div className="card-body">
             <div className="field">

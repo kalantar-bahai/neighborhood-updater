@@ -93,6 +93,12 @@
 
 /* ── Cards ────────────────────────────────────────────────────────────────── */
 .card { background: white; border-radius: 10px; border: 1px solid #e2e8f0; overflow: hidden; }
+
+/* TEMPORARY migration-progress indicator: purple outline marks data still sourced
+   from the Google Sheet (vs. migrated to cluster-notebook). Remove once the
+   Sheets -> cluster-notebook migration is complete. */
+.from-sheet { outline: 2px solid #9333ea; outline-offset: 2px; }
+tr.from-sheet { outline-offset: -1px; }
 .card-header {
   background: #ebf4ff;
   border-bottom: 1px solid #bee3f8;
