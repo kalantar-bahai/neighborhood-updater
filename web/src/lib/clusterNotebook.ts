@@ -51,16 +51,19 @@ export async function updateDevotionalGathering(
   nucleusName: string,
   fields: { number?: number | null; participants?: number | null; participantsFof?: number | null }
 ): Promise<DevotionalGathering | null> {
+  // updateDevotionalGathering was removed 2026-09-13 in favor of one shared
+  // mutation across all four activity types — see cluster-notebook/schema.graphql.
   const mutation = `
     mutation UpdateDevotionalGathering($nucleusName: String!, $number: Int, $participants: Int, $participantsFof: Int) {
-      updateDevotionalGathering(
-        nucleusName: $nucleusName, number: $number, participants: $participants, participantsFof: $participantsFof
+      updateActivitySummary(
+        nucleusName: $nucleusName, activityType: DEVOTIONAL_GATHERING,
+        number: $number, participants: $participants, participantsFof: $participantsFof
       ) {
         devotionalGathering { number participants participantsFof }
       }
     }
   `;
-  const data = await request<{ updateDevotionalGathering: { devotionalGathering: DevotionalGathering | null } | null }>(
+  const data = await request<{ updateActivitySummary: { devotionalGathering: DevotionalGathering | null } | null }>(
     mutation,
     {
       nucleusName,
@@ -69,8 +72,8 @@ export async function updateDevotionalGathering(
       participantsFof: fields.participantsFof ?? null,
     }
   );
-  if (data.updateDevotionalGathering === null) {
+  if (data.updateActivitySummary === null) {
     throw new Error(`cluster-notebook has no nucleus named "${nucleusName}" — devotional gathering not saved`);
   }
-  return data.updateDevotionalGathering.devotionalGathering ?? null;
+  return data.updateActivitySummary.devotionalGathering ?? null;
 }

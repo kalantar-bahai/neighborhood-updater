@@ -63,9 +63,9 @@ describe('getDevotionalGathering', () => {
 });
 
 describe('updateDevotionalGathering', () => {
-  test('sends a mutation with the given fields and returns the updated value', async () => {
+  test('sends the shared updateActivitySummary mutation with the given fields and returns the updated value', async () => {
     mockFetch.mockResolvedValue(jsonResponse({
-      data: { updateDevotionalGathering: { devotionalGathering: { number: 5, participants: 40, participantsFof: 12 } } },
+      data: { updateActivitySummary: { devotionalGathering: { number: 5, participants: 40, participantsFof: 12 } } },
     }));
 
     const result = await updateDevotionalGathering('Alpha', { number: 5, participants: 40, participantsFof: 12 });
@@ -74,11 +74,13 @@ describe('updateDevotionalGathering', () => {
     const [, init] = mockFetch.mock.calls[0];
     const body = JSON.parse(init.body as string);
     expect(body.variables).toEqual({ nucleusName: 'Alpha', number: 5, participants: 40, participantsFof: 12 });
+    expect(body.query).toContain('updateActivitySummary');
+    expect(body.query).toContain('DEVOTIONAL_GATHERING');
   });
 
   test('defaults omitted fields to null', async () => {
     mockFetch.mockResolvedValue(jsonResponse({
-      data: { updateDevotionalGathering: { devotionalGathering: { number: null, participants: null, participantsFof: null } } },
+      data: { updateActivitySummary: { devotionalGathering: { number: null, participants: null, participantsFof: null } } },
     }));
 
     await updateDevotionalGathering('Alpha', {});
@@ -89,7 +91,7 @@ describe('updateDevotionalGathering', () => {
   });
 
   test('throws when the mutation returns null (no matching nucleus)', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: { updateDevotionalGathering: null } }));
+    mockFetch.mockResolvedValue(jsonResponse({ data: { updateActivitySummary: null } }));
 
     await expect(updateDevotionalGathering('Nonexistent', { number: 5 })).rejects.toThrow('cluster-notebook has no nucleus named "Nonexistent"');
   });
