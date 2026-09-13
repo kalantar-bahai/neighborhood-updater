@@ -78,20 +78,10 @@ export const EDU_COL = {
   FACILITATORS: 10,
 } as const;
 
-export const WORKERS_TAB = 'Workers';
-export const WORKERS_DATA_ROW = 2;
+// Worker lists (accompanier/protagonist/abm-assistant) now live entirely in
+// cluster-notebook (Individual + RoleInNE) -- no Sheet tab/columns for them anymore.
 export const WORKER_TYPES = ['accompanier', 'protagonist', 'abm-assistant'] as const;
 export type WorkerType = typeof WORKER_TYPES[number];
-
-export const ACC_COL = {
-  CLUSTER:             0,
-  CLUSTER_CODE:        1,
-  LOCALITY:            2,
-  PARENT_NUCLEUS:      3,
-  NUCLEUS:             4,
-  TYPE:                5,
-  NAME:                6,
-} as const;
 
 export const ACCESS_COL = {
   NAME:    0,

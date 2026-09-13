@@ -77,12 +77,20 @@ export interface SrpData {
   devotionals: Activity | null;
 }
 
+// A worker-list entry -- backed by a real cluster-notebook Individual record now,
+// not a free-text string. `id` is what gets sent back on save; `name` is a
+// display-only string composed from the Individual's actual name fields.
+export interface Worker {
+  id: string;
+  name: string;
+}
+
 export interface NucleusDetail {
   row: NucleusRow;
   srp: SrpData | null;
-  accompanierNames: string[];
-  protagonistNames: string[];
-  abmAssistantNames: string[];
+  accompanierNames: Worker[];
+  protagonistNames: Worker[];
+  abmAssistantNames: Worker[];
 }
 
 export interface InitialData {

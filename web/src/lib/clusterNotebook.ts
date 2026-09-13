@@ -176,3 +176,84 @@ export async function updateDevotionalGathering(
   }
   return data.updateActivitySummary.devotionalGathering ?? null;
 }
+
+export interface Individual {
+  id: string;
+  firstName: string | null;
+  familyName: string | null;
+  middleNames: string | null;
+  nickname: string | null;
+  sex: string | null;
+  phone: string | null;
+  email: string | null;
+  ageCategory: string | null;
+}
+
+const INDIVIDUAL_SELECTION = 'id firstName familyName middleNames nickname sex phone email ageCategory';
+
+// Simple display-name composition -- cluster-notebook's Individual already has
+// firstName/middleNames/familyName/nickname as separate fields (unlike SRP's own
+// single-string convention), so no parsing needed, just a readable join.
+export function individualDisplayName(ind: Individual): string {
+  const parts = [ind.firstName, ind.middleNames, ind.familyName].filter(Boolean);
+  const name = parts.join(' ') || '(unnamed)';
+  return ind.nickname ? `${name} (${ind.nickname})` : name;
+}
+
+// PII-scoped to the cluster containing nucleusName (via existing role assignments) --
+// never notebook-wide. `search` is optional token matching across name fields; pass
+// undefined/omit for no filter (still scoped to the cluster).
+export async function searchIndividuals(nucleusName: string, search?: string): Promise<Individual[]> {
+  const query = `
+    query SearchIndividuals($nucleusName: String!, $search: String) {
+      individuals(nucleusName: $nucleusName, search: $search) { ${INDIVIDUAL_SELECTION} }
+    }
+  `;
+  const data = await request<{ individuals: Individual[] }>(query, { nucleusName, search: search ?? null });
+  return data.individuals;
+}
+
+// Intentionally dumb on cluster-notebook's side: `name` becomes the entire
+// firstName, nothing else populated or split. Reconciling with a real SRP record
+// is a separate, not-yet-built step.
+export async function createIndividual(name: string, nucleusName: string): Promise<Individual> {
+  const mutation = `
+    mutation CreateIndividual($name: String!, $nucleusName: String!) {
+      createIndividual(name: $name, nucleusName: $nucleusName) { ${INDIVIDUAL_SELECTION} }
+    }
+  `;
+  const data = await request<{ createIndividual: Individual | null }>(mutation, { name, nucleusName });
+  if (data.createIndividual === null) {
+    throw new Error(`cluster-notebook has no nucleus named "${nucleusName}" — individual not created`);
+  }
+  return data.createIndividual;
+}
+
+// `role` is a fully open string on cluster-notebook's side (no fixed enum) --
+// "accompanier"/"protagonist"/"abm-assistant" today, anything else works the same way.
+export async function getNucleusWorkers(nucleusName: string, role: string): Promise<Individual[]> {
+  const query = `
+    query GetNucleusWorkers($name: String!, $role: String!) {
+      nucleus(name: $name) { workers(role: $role) { ${INDIVIDUAL_SELECTION} } }
+    }
+  `;
+  const data = await request<{ nucleus: { workers: Individual[] } | null }>(query, { name: nucleusName, role });
+  return data.nucleus?.workers ?? [];
+}
+
+// Full-list replace, same pattern as updateNucleus -- personIds is the complete
+// ordered list for this (nucleus, role) pair, not an incremental add/remove.
+export async function updateNucleusWorkers(nucleusName: string, role: string, personIds: string[]): Promise<Individual[]> {
+  const mutation = `
+    mutation UpdateNucleusWorkers($name: String!, $role: String!, $personIds: [String!]!) {
+      updateNucleusWorkers(nucleusName: $name, role: $role, personIds: $personIds) {
+        workers(role: $role) { ${INDIVIDUAL_SELECTION} }
+      }
+    }
+  `;
+  const data = await request<{ updateNucleusWorkers: { workers: Individual[] } | null }>(mutation, { name: nucleusName, role, personIds });
+  if (data.updateNucleusWorkers === null) {
+    throw new Error(`cluster-notebook has no nucleus named "${nucleusName}" — workers not saved`);
+  }
+  return data.updateNucleusWorkers.workers;
+}

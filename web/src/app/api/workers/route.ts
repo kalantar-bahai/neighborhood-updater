@@ -1,13 +1,19 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getAccess } from '@/lib/access';
-import { getAllMasterRows, getWorkerNames, saveWorkerNames } from '@/lib/data';
-import { COL, WORKER_TYPES } from '@/lib/config';
+import { getNucleusWorkers, updateNucleusWorkers, individualDisplayName } from '@/lib/clusterNotebook';
+import type { Individual } from '@/lib/clusterNotebook';
+import { WORKER_TYPES } from '@/lib/config';
+import type { Worker } from '@/types';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
 function effectiveRole(roleMap: Record<string, string>, nucleus: string) {
   return roleMap[norm(nucleus)] ?? roleMap['*'] ?? null;
+}
+
+function toWorkers(individuals: Individual[]): Worker[] {
+  return individuals.map(ind => ({ id: ind.id, name: individualDisplayName(ind) }));
 }
 
 export const GET = auth(async (req) => {
@@ -27,8 +33,8 @@ export const GET = auth(async (req) => {
   if (access.role === 'none') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   if (!effectiveRole(access.roleMap, name)) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
-  const names = await getWorkerNames(name, type);
-  return NextResponse.json({ names });
+  const workers = await getNucleusWorkers(name, type);
+  return NextResponse.json({ workers: toWorkers(workers) });
 });
 
 export const POST = auth(async (req) => {
@@ -36,13 +42,13 @@ export const POST = auth(async (req) => {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const { nucleus, type, names } = await req.json();
+  const { nucleus, type, personIds } = await req.json();
   if (!nucleus) return NextResponse.json({ error: 'Missing nucleus' }, { status: 400 });
   if (!type) return NextResponse.json({ error: 'Missing type' }, { status: 400 });
   if (!WORKER_TYPES.includes(type as typeof WORKER_TYPES[number])) {
     return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
   }
-  if (!Array.isArray(names)) return NextResponse.json({ error: 'names must be an array' }, { status: 400 });
+  if (!Array.isArray(personIds)) return NextResponse.json({ error: 'personIds must be an array' }, { status: 400 });
 
   const email = req.auth.user.email;
   const access = await getAccess(email);
@@ -52,17 +58,6 @@ export const POST = auth(async (req) => {
   if (!role || role === 'read') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   if (type === 'abm-assistant' && role !== 'admin') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
-  const allRows = await getAllMasterRows();
-  const masterRow = allRows.find(r => norm(r[COL.NUCLEUS]) === norm(nucleus));
-  if (!masterRow) return NextResponse.json({ error: `Not found: ${nucleus}` }, { status: 404 });
-
-  const context = {
-    cluster:       masterRow[COL.CLUSTER],
-    clusterCode:   masterRow[COL.CLUSTER_CODE],
-    locality:      masterRow[COL.LOCALITY],
-    parentNucleus: masterRow[COL.PARENT_NUCLEUS],
-  };
-
-  await saveWorkerNames(masterRow[COL.NUCLEUS], type, names, context);
-  return NextResponse.json({ success: true });
+  const workers = await updateNucleusWorkers(nucleus, type, personIds);
+  return NextResponse.json({ workers: toWorkers(workers) });
 });

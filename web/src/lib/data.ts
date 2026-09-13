@@ -4,12 +4,14 @@ import {
   MASTER_TAB, ACCESS_TAB, DEV_TAB, EDU_TAB,
   MASTER_DATA_ROW, SRP_DATA_ROW,
   COL, DEV_COL, EDU_COL,
-  WORKERS_TAB, WORKERS_DATA_ROW, ACC_COL,
   ACCESS_COL,
 } from './config';
-import { getDevotionalGathering, updateDevotionalGathering, getNucleusFields, updateNucleus } from './clusterNotebook';
-import type { DevotionalGathering, NucleusFields } from './clusterNotebook';
-import type { AccessEntry } from '@/types';
+import {
+  getDevotionalGathering, updateDevotionalGathering, getNucleusFields, updateNucleus,
+  getNucleusWorkers, individualDisplayName,
+} from './clusterNotebook';
+import type { DevotionalGathering, NucleusFields, Individual } from './clusterNotebook';
+import type { AccessEntry, Worker } from '@/types';
 
 function normalize(row: string[], numCols: number): string[] {
   const r = row ? [...row] : [];
@@ -195,12 +197,16 @@ export function parseSrpData(devRow: string[] | null, eduRow: string[] | null) {
   };
 }
 
+function toWorkers(individuals: Individual[]): Worker[] {
+  return individuals.map(ind => ({ id: ind.id, name: individualDisplayName(ind) }));
+}
+
 export async function getRowData(nucleusName: string) {
-  const [masterRows, devRows, eduRows, accompanierNames, protagonistNames, abmAssistantNames, devotionalGathering, nucleusFields] = await Promise.all([
+  const [masterRows, devRows, eduRows, accompanierWorkers, protagonistWorkers, abmAssistantWorkers, devotionalGathering, nucleusFields] = await Promise.all([
     getAllMasterRows(), getAllDevRows(), getAllEduRows(),
-    getWorkerNames(nucleusName, 'accompanier'),
-    getWorkerNames(nucleusName, 'protagonist'),
-    getWorkerNames(nucleusName, 'abm-assistant'),
+    getNucleusWorkers(nucleusName, 'accompanier'),
+    getNucleusWorkers(nucleusName, 'protagonist'),
+    getNucleusWorkers(nucleusName, 'abm-assistant'),
     getDevotionalGathering(nucleusName),
     getNucleusFields(nucleusName),
   ]);
@@ -235,53 +241,10 @@ export async function getRowData(nucleusName: string) {
   return {
     row,
     srp: parseSrpData(lookup(devRows, DEV_COL.NAME), lookup(eduRows, EDU_COL.NAME)),
-    accompanierNames,
-    protagonistNames,
-    abmAssistantNames,
+    accompanierNames: toWorkers(accompanierWorkers),
+    protagonistNames: toWorkers(protagonistWorkers),
+    abmAssistantNames: toWorkers(abmAssistantWorkers),
   };
-}
-
-async function getAllWorkerRows() {
-  const rows = await sheetsGet(MASTER_SHEET_ID, `${WORKERS_TAB}!A${WORKERS_DATA_ROW}:G`);
-  return rows.map(r => normalize(r, 7));
-}
-
-export async function getWorkerNames(nucleusName: string, type: string): Promise<string[]> {
-  const rows = await getAllWorkerRows();
-  const needle = norm(nucleusName);
-  return rows
-    .filter(r => norm(r[ACC_COL.NUCLEUS]) === needle && norm(r[ACC_COL.TYPE]) === norm(type))
-    .map(r => r[ACC_COL.NAME]);
-}
-
-export async function saveWorkerNames(
-  nucleusName: string,
-  type: string,
-  names: string[],
-  context: { cluster: string; clusterCode: string; locality: string; parentNucleus: string }
-): Promise<void> {
-  const allRows = await getAllWorkerRows();
-  const needle = norm(nucleusName);
-  const otherRows = allRows.filter(r =>
-    !(norm(r[ACC_COL.NUCLEUS]) === needle && norm(r[ACC_COL.TYPE]) === norm(type))
-  );
-  const newRows = names.map(name => [
-    context.cluster,
-    context.clusterCode,
-    context.locality,
-    context.parentNucleus,
-    nucleusName,
-    type,
-    name,
-  ]);
-  const combined = [...otherRows, ...newRows];
-  await sheetsClear(MASTER_SHEET_ID, `${WORKERS_TAB}!A${WORKERS_DATA_ROW}:G`);
-  if (combined.length > 0) {
-    await sheetsBatchUpdate(MASTER_SHEET_ID, [{
-      range: `${WORKERS_TAB}!A${WORKERS_DATA_ROW}`,
-      values: combined,
-    }]);
-  }
 }
 
 export async function deleteRowData(nucleusName: string): Promise<void> {

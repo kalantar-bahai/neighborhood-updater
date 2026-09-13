@@ -1,5 +1,9 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { getDevotionalGathering, updateDevotionalGathering, getAllNuclei, getNucleusFields, updateNucleus } from './clusterNotebook';
+import {
+  getDevotionalGathering, updateDevotionalGathering, getAllNuclei, getNucleusFields, updateNucleus,
+  searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
+} from './clusterNotebook';
+import type { Individual } from './clusterNotebook';
 
 const mockFetch = vi.fn();
 
@@ -315,5 +319,103 @@ describe('updateDevotionalGathering', () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { updateActivitySummary: null } }));
 
     await expect(updateDevotionalGathering('Nonexistent', { number: 5 })).rejects.toThrow('cluster-notebook has no nucleus named "Nonexistent"');
+  });
+});
+
+describe('individualDisplayName', () => {
+  test('joins first/middle/family names', () => {
+    const ind: Individual = { id: '1', firstName: 'Jane', middleNames: 'Q', familyName: 'Doe', nickname: null, sex: null, phone: null, email: null, ageCategory: null };
+    expect(individualDisplayName(ind)).toBe('Jane Q Doe');
+  });
+
+  test('appends nickname in parentheses when present', () => {
+    const ind: Individual = { id: '1', firstName: 'Jane', middleNames: null, familyName: 'Doe', nickname: 'JJ', sex: null, phone: null, email: null, ageCategory: null };
+    expect(individualDisplayName(ind)).toBe('Jane Doe (JJ)');
+  });
+
+  test('falls back to (unnamed) when no name parts exist', () => {
+    const ind: Individual = { id: '1', firstName: null, middleNames: null, familyName: null, nickname: null, sex: null, phone: null, email: null, ageCategory: null };
+    expect(individualDisplayName(ind)).toBe('(unnamed)');
+  });
+});
+
+describe('searchIndividuals', () => {
+  test('sends the nucleusName and search term, scoped to that nucleus\'s cluster', async () => {
+    const alice: Individual = { id: '1', firstName: 'Alice', familyName: 'Smith', middleNames: null, nickname: null, sex: null, phone: null, email: null, ageCategory: 'Adult' };
+    mockFetch.mockResolvedValue(jsonResponse({ data: { individuals: [alice] } }));
+
+    const result = await searchIndividuals('Alpha', 'Ali');
+
+    expect(result).toEqual([alice]);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ nucleusName: 'Alpha', search: 'Ali' });
+  });
+
+  test('sends null search when omitted', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { individuals: [] } }));
+
+    await searchIndividuals('Alpha');
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ nucleusName: 'Alpha', search: null });
+  });
+});
+
+describe('createIndividual', () => {
+  test('sends name and nucleusName, returns the created individual', async () => {
+    const created: Individual = { id: '99', firstName: 'New Person', familyName: null, middleNames: null, nickname: null, sex: null, phone: null, email: null, ageCategory: null };
+    mockFetch.mockResolvedValue(jsonResponse({ data: { createIndividual: created } }));
+
+    const result = await createIndividual('New Person', 'Alpha');
+
+    expect(result).toEqual(created);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ name: 'New Person', nucleusName: 'Alpha' });
+  });
+
+  test('throws when the nucleus is not found', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { createIndividual: null } }));
+
+    await expect(createIndividual('New Person', 'Nonexistent')).rejects.toThrow('cluster-notebook has no nucleus named "Nonexistent"');
+  });
+});
+
+describe('getNucleusWorkers', () => {
+  test('returns the workers for the given role', async () => {
+    const bob: Individual = { id: '2', firstName: 'Bob', familyName: null, middleNames: null, nickname: null, sex: null, phone: null, email: null, ageCategory: null };
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { workers: [bob] } } }));
+
+    const result = await getNucleusWorkers('Alpha', 'accompanier');
+
+    expect(result).toEqual([bob]);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ name: 'Alpha', role: 'accompanier' });
+  });
+
+  test('returns an empty array when the nucleus is not found', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: null } }));
+
+    const result = await getNucleusWorkers('Nonexistent', 'accompanier');
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe('updateNucleusWorkers', () => {
+  test('sends the full ordered personIds list and returns the updated workers', async () => {
+    const bob: Individual = { id: '2', firstName: 'Bob', familyName: null, middleNames: null, nickname: null, sex: null, phone: null, email: null, ageCategory: null };
+    mockFetch.mockResolvedValue(jsonResponse({ data: { updateNucleusWorkers: { workers: [bob] } } }));
+
+    const result = await updateNucleusWorkers('Alpha', 'accompanier', ['2']);
+
+    expect(result).toEqual([bob]);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ name: 'Alpha', role: 'accompanier', personIds: ['2'] });
+  });
+
+  test('throws when the mutation returns null (no matching nucleus)', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { updateNucleusWorkers: null } }));
+
+    await expect(updateNucleusWorkers('Nonexistent', 'accompanier', [])).rejects.toThrow('cluster-notebook has no nucleus named "Nonexistent"');
   });
 });

@@ -8,9 +8,8 @@ vi.mock('./sheets', () => ({
 
 import { sheetsGet, sheetsClear, sheetsBatchUpdate } from './sheets';
 import { parseRow, findSrpRow, parseSrpData } from './data';
-import { getWorkerNames, saveWorkerNames } from './data';
 import { getAccessEntries, saveAccessEntries } from './data';
-import { COL, DEV_COL, EDU_COL, ACC_COL, ACCESS_COL } from './config';
+import { COL, DEV_COL, EDU_COL, ACCESS_COL } from './config';
 import type { AccessEntry } from '@/types';
 
 vi.mock('./clusterNotebook', () => ({
@@ -18,9 +17,13 @@ vi.mock('./clusterNotebook', () => ({
   updateDevotionalGathering: vi.fn(),
   getNucleusFields: vi.fn(),
   updateNucleus: vi.fn(),
+  getNucleusWorkers: vi.fn(),
+  individualDisplayName: vi.fn((ind: { firstName?: string | null }) => ind.firstName ?? ''),
 }));
 
-import { getDevotionalGathering, updateDevotionalGathering, getNucleusFields, updateNucleus } from './clusterNotebook';
+import {
+  getDevotionalGathering, updateDevotionalGathering, getNucleusFields, updateNucleus, getNucleusWorkers,
+} from './clusterNotebook';
 import { getRowData, saveRowData } from './data';
 import { MASTER_TAB } from './config';
 
@@ -28,6 +31,7 @@ const mockGetDevotionalGathering = vi.mocked(getDevotionalGathering);
 const mockUpdateDevotionalGathering = vi.mocked(updateDevotionalGathering);
 const mockGetNucleusFields = vi.mocked(getNucleusFields);
 const mockUpdateNucleus = vi.mocked(updateNucleus);
+const mockGetNucleusWorkers = vi.mocked(getNucleusWorkers);
 
 const mockSheetsGet = vi.mocked(sheetsGet);
 const mockSheetsClear = vi.mocked(sheetsClear);
@@ -95,7 +99,11 @@ describe('parseRow', () => {
 });
 
 describe('getRowData', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default: no workers, for tests that don't care about the worker lists specifically.
+    mockGetNucleusWorkers.mockResolvedValue([]);
+  });
 
   test('overrides devotionals with cluster-notebook data, ignoring the sheet columns', async () => {
     const masterRow = makeRow({
@@ -311,6 +319,32 @@ describe('getRowData', () => {
     expect(result?.row.presence).toBe('');
     expect(result?.row.gatherings).toBe('');
     expect(result?.row.narrative).toBe('');
+  });
+
+  test('fetches accompanier/protagonist/abm-assistant workers from cluster-notebook, mapped to {id, name}', async () => {
+    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
+    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
+      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
+      return [];
+    });
+    mockGetDevotionalGathering.mockResolvedValue(null);
+    mockGetNucleusFields.mockResolvedValue(null);
+    const blank = { familyName: null, middleNames: null, nickname: null, sex: null, phone: null, email: null, ageCategory: null };
+    mockGetNucleusWorkers.mockImplementation(async (_name: string, role: string) => {
+      if (role === 'accompanier') return [{ id: '1', firstName: 'Alice', ...blank }];
+      if (role === 'protagonist') return [{ id: '2', firstName: 'Bob', ...blank }];
+      if (role === 'abm-assistant') return [{ id: '3', firstName: 'Carol', ...blank }];
+      return [];
+    });
+
+    const result = await getRowData('Alpha');
+
+    expect(mockGetNucleusWorkers).toHaveBeenCalledWith('Alpha', 'accompanier');
+    expect(mockGetNucleusWorkers).toHaveBeenCalledWith('Alpha', 'protagonist');
+    expect(mockGetNucleusWorkers).toHaveBeenCalledWith('Alpha', 'abm-assistant');
+    expect(result?.accompanierNames).toEqual([{ id: '1', name: 'Alice' }]);
+    expect(result?.protagonistNames).toEqual([{ id: '2', name: 'Bob' }]);
+    expect(result?.abmAssistantNames).toEqual([{ id: '3', name: 'Carol' }]);
   });
 });
 
@@ -693,125 +727,6 @@ describe('parseSrpData', () => {
   });
 });
 
-describe('getWorkerNames', () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  function makeAccRow(overrides: Record<number, string> = {}): string[] {
-    const row = new Array(7).fill('');
-    Object.entries(overrides).forEach(([k, v]) => { row[Number(k)] = v; });
-    return row;
-  }
-
-  test('returns names in row order for matching neighborhood and type', async () => {
-    mockSheetsGet.mockResolvedValue([
-      makeAccRow({ [ACC_COL.NUCLEUS]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Alice' }),
-      makeAccRow({ [ACC_COL.NUCLEUS]: 'Beta',  [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Bob' }),
-      makeAccRow({ [ACC_COL.NUCLEUS]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Charlie' }),
-    ]);
-    const result = await getWorkerNames('Alpha', 'accompanier');
-    expect(result).toEqual(['Alice', 'Charlie']);
-  });
-
-  test('is case-insensitive for both nucleus and type', async () => {
-    mockSheetsGet.mockResolvedValue([
-      makeAccRow({ [ACC_COL.NUCLEUS]: 'ALPHA', [ACC_COL.TYPE]: 'Accompanier', [ACC_COL.NAME]: 'Alice' }),
-    ]);
-    const result = await getWorkerNames('alpha', 'accompanier');
-    expect(result).toEqual(['Alice']);
-  });
-
-  test('returns empty when nucleus matches but type does not', async () => {
-    mockSheetsGet.mockResolvedValue([
-      makeAccRow({ [ACC_COL.NUCLEUS]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Alice' }),
-    ]);
-    const result = await getWorkerNames('Alpha', 'protagonist');
-    expect(result).toEqual([]);
-  });
-
-  test('returns empty array when no rows match nucleus', async () => {
-    mockSheetsGet.mockResolvedValue([
-      makeAccRow({ [ACC_COL.NUCLEUS]: 'Beta', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Bob' }),
-    ]);
-    const result = await getWorkerNames('Alpha', 'accompanier');
-    expect(result).toEqual([]);
-  });
-
-  test('returns empty array when tab is empty', async () => {
-    mockSheetsGet.mockResolvedValue([]);
-    const result = await getWorkerNames('Alpha', 'accompanier');
-    expect(result).toEqual([]);
-  });
-});
-
-describe('saveWorkerNames', () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  const ctx = { cluster: 'Charlotte', clusterCode: 'C1', locality: 'Charlotte', parentNucleus: '' };
-
-  function makeAccRow(overrides: Record<number, string> = {}): string[] {
-    const row = new Array(7).fill('');
-    Object.entries(overrides).forEach(([k, v]) => { row[Number(k)] = v; });
-    return row;
-  }
-
-  test('replaces rows for nucleus+type and preserves other nuclei', async () => {
-    mockSheetsGet.mockResolvedValue([
-      makeAccRow({ [ACC_COL.NUCLEUS]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Old Name' }),
-      makeAccRow({ [ACC_COL.NUCLEUS]: 'Beta',  [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Bob' }),
-    ]);
-    mockSheetsClear.mockResolvedValue(undefined);
-    mockSheetsBatchUpdate.mockResolvedValue(undefined);
-
-    await saveWorkerNames('Alpha', 'accompanier', ['Alice', 'Charlie'], ctx);
-
-    expect(mockSheetsClear).toHaveBeenCalledOnce();
-    expect(mockSheetsBatchUpdate).toHaveBeenCalledOnce();
-    const rows = mockSheetsBatchUpdate.mock.calls[0][1][0].values as string[][];
-    expect(rows).toHaveLength(3);
-    expect(rows[0][ACC_COL.NUCLEUS]).toBe('Beta');
-    expect(rows[1]).toEqual(['Charlotte', 'C1', 'Charlotte', '', 'Alpha', 'accompanier', 'Alice']);
-    expect(rows[2]).toEqual(['Charlotte', 'C1', 'Charlotte', '', 'Alpha', 'accompanier', 'Charlie']);
-  });
-
-  test('preserves rows of a different type for the same neighborhood', async () => {
-    mockSheetsGet.mockResolvedValue([
-      makeAccRow({ [ACC_COL.NUCLEUS]: 'Alpha', [ACC_COL.TYPE]: 'protagonist', [ACC_COL.NAME]: 'ProtagA' }),
-      makeAccRow({ [ACC_COL.NUCLEUS]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'OldAcc' }),
-    ]);
-    mockSheetsClear.mockResolvedValue(undefined);
-    mockSheetsBatchUpdate.mockResolvedValue(undefined);
-
-    await saveWorkerNames('Alpha', 'accompanier', ['NewAcc'], ctx);
-
-    const rows = mockSheetsBatchUpdate.mock.calls[0][1][0].values as string[][];
-    expect(rows).toHaveLength(2);
-    expect(rows[0][ACC_COL.TYPE]).toBe('protagonist');
-    expect(rows[1]).toEqual(['Charlotte', 'C1', 'Charlotte', '', 'Alpha', 'accompanier', 'NewAcc']);
-  });
-
-  test('clears without writing when names list is empty', async () => {
-    mockSheetsGet.mockResolvedValue([
-      makeAccRow({ [ACC_COL.NUCLEUS]: 'Alpha', [ACC_COL.TYPE]: 'accompanier', [ACC_COL.NAME]: 'Alice' }),
-    ]);
-    mockSheetsClear.mockResolvedValue(undefined);
-
-    await saveWorkerNames('Alpha', 'accompanier', [], ctx);
-
-    expect(mockSheetsClear).toHaveBeenCalledOnce();
-    expect(mockSheetsBatchUpdate).not.toHaveBeenCalled();
-  });
-
-  test('writes only new rows when tab was empty', async () => {
-    mockSheetsGet.mockResolvedValue([]);
-    mockSheetsClear.mockResolvedValue(undefined);
-    mockSheetsBatchUpdate.mockResolvedValue(undefined);
-
-    await saveWorkerNames('Alpha', 'accompanier', ['Alice'], ctx);
-
-    const rows = mockSheetsBatchUpdate.mock.calls[0][1][0].values as string[][];
-    expect(rows).toEqual([['Charlotte', 'C1', 'Charlotte', '', 'Alpha', 'accompanier', 'Alice']]);
-  });
-});
 
 describe('getAccessEntries', () => {
   beforeEach(() => vi.clearAllMocks());

@@ -2,8 +2,8 @@
 
 import { useState, useCallback } from 'react';
 import { NucleusDetail, NucleusRow, Activity, SrpData } from '@/types';
-import type { Role } from '@/types';
-import NamedListModal from './NamedListModal';
+import type { Role, Worker } from '@/types';
+import WorkerListModal from './WorkerListModal';
 import AccessPanel from './AccessPanel';
 
 interface Props {
@@ -384,11 +384,11 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
   const [lastUpdatedAt, setLastUpdatedAt] = useState('');
   const [showDiagram, setShowDiagram] = useState(false);
   const [showDiagram2, setShowDiagram2] = useState(false);
-  const [accompanierNames, setAccompanierNames] = useState<string[]>(() => detail.accompanierNames);
+  const [accompanierNames, setAccompanierNames] = useState<Worker[]>(() => detail.accompanierNames);
   const [showAccompaniersModal, setShowAccompaniersModal] = useState(false);
-  const [protagonistNames, setProtagonistNames] = useState<string[]>(() => detail.protagonistNames);
+  const [protagonistNames, setProtagonistNames] = useState<Worker[]>(() => detail.protagonistNames);
   const [showProtagonistsModal, setShowProtagonistsModal] = useState(false);
-  const [abmAssistantNames, setAbmAssistantNames] = useState<string[]>(() => detail.abmAssistantNames);
+  const [abmAssistantNames, setAbmAssistantNames] = useState<Worker[]>(() => detail.abmAssistantNames);
   const [showAbmAssistantModal, setShowAbmAssistantModal] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(!!isNew);
   const [accessOpen, setAccessOpen] = useState(false);
@@ -624,10 +624,9 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               <Field label="Auxiliary Board Member(s)" value={form.auxBoard} onChange={isAdmin ? v => set('auxBoard', v) : undefined} readonly={!isAdmin} fromSheet />
               <Field
                 label="ABm Assistant"
-                value={abmAssistantNames.join(', ')}
+                value={abmAssistantNames.map(w => w.name).join(', ')}
                 readonly
                 onLabelClick={isAdmin ? () => setShowAbmAssistantModal(true) : undefined}
-                fromSheet
               />
             </div>
           </div>}
@@ -875,48 +874,43 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
       )}
 
       {showAccompaniersModal && (
-        <NamedListModal
+        <WorkerListModal
           title="Accompaniers in Nucleus"
-          type="accompanier"
+          role="accompanier"
           nucleus={row.nucleus}
-          initialNames={accompanierNames}
-          onSave={names => {
+          workers={accompanierNames}
+          onChange={workers => {
             const wasInSync = accompanierNames.length === parseInt(form.accompaniers || '0', 10);
-            setAccompanierNames(names);
-            if (wasInSync) set('accompaniers', String(names.length));
-            setShowAccompaniersModal(false);
+            setAccompanierNames(workers);
+            if (wasInSync) set('accompaniers', String(workers.length));
           }}
           onClose={() => setShowAccompaniersModal(false)}
         />
       )}
 
       {showProtagonistsModal && (
-        <NamedListModal
+        <WorkerListModal
           title="Protagonists / Workers"
-          type="protagonist"
+          role="protagonist"
           nucleus={row.nucleus}
-          initialNames={protagonistNames}
-          importNames={accompanierNames}
-          onSave={names => {
+          workers={protagonistNames}
+          importWorkers={accompanierNames}
+          onChange={workers => {
             const wasInSync = protagonistNames.length === parseInt(form.protagonists || '0', 10);
-            setProtagonistNames(names);
-            if (wasInSync) set('protagonists', String(names.length));
-            setShowProtagonistsModal(false);
+            setProtagonistNames(workers);
+            if (wasInSync) set('protagonists', String(workers.length));
           }}
           onClose={() => setShowProtagonistsModal(false)}
         />
       )}
 
       {showAbmAssistantModal && (
-        <NamedListModal
+        <WorkerListModal
           title="ABm Assistant"
-          type="abm-assistant"
+          role="abm-assistant"
           nucleus={row.nucleus}
-          initialNames={abmAssistantNames}
-          onSave={names => {
-            setAbmAssistantNames(names);
-            setShowAbmAssistantModal(false);
-          }}
+          workers={abmAssistantNames}
+          onChange={workers => setAbmAssistantNames(workers)}
           onClose={() => setShowAbmAssistantModal(false)}
         />
       )}
