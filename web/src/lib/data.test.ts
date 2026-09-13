@@ -162,6 +162,7 @@ describe('getRowData', () => {
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
       hasSocialAction: true, socialActionDescription: 'Cleanup drive', hasCommunityGatherings: false, communityGatheringDescription: null,
       narrative: 'A growing community of practice.',
+      nucleusType: 'Neighborhood',
       cluster: { name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers' },
     });
 
@@ -184,6 +185,7 @@ describe('getRowData', () => {
     expect(result?.row.grouping).toBe('NC Eastern');
     expect(result?.row.pg).toBe('M3');
     expect(result?.row.clusterCode).toBe('NC-215');
+    expect(result?.row.nucleusType).toBe('Neighborhood');
   });
 
   test('derives clusterCode as the first token of cluster.name', async () => {
@@ -198,6 +200,7 @@ describe('getRowData', () => {
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
+      nucleusType: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
     });
 
@@ -218,6 +221,7 @@ describe('getRowData', () => {
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
+      nucleusType: null,
       cluster: { name: '', groupOfClusters: null, growthMilestone: null },
     });
 
@@ -245,6 +249,7 @@ describe('getRowData', () => {
         population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
         hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
         narrative: null,
+        nucleusType: 'Neighborhood',
         cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone },
       });
       const result = await getRowData('Alpha');
@@ -264,6 +269,7 @@ describe('getRowData', () => {
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
+      nucleusType: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
     });
 
@@ -368,6 +374,7 @@ describe('saveRowData', () => {
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
+      nucleusType: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
     });
 
@@ -395,6 +402,7 @@ describe('saveRowData', () => {
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
+      nucleusType: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
     });
 
@@ -422,6 +430,7 @@ describe('saveRowData', () => {
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: true, socialActionDescription: 'Cleanup drive', hasCommunityGatherings: false, communityGatheringDescription: '',
       narrative: null,
+      nucleusType: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
     });
 
@@ -451,6 +460,7 @@ describe('saveRowData', () => {
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: 'A growing community of practice.',
+      nucleusType: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
     });
 
@@ -487,6 +497,54 @@ describe('saveRowData', () => {
     expect(writtenValues).not.toContain('M3');
     // clusterCode is now derived client-side from cluster.name, not stored/written anywhere either
     expect(writtenValues).not.toContain('NC-215');
+    // nucleusType no longer goes to the sheet either -- it's part of the cluster-notebook patch now
+    expect(writtenValues).not.toContain('Neighborhood');
+  });
+
+  test('writes nucleusType via cluster-notebook instead of the sheet', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateNucleus.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: 'Network',
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
+    });
+
+    const formData = {
+      ...baseFormData,
+      identity: { nucleus: 'Alpha', parentNucleus: '', nucleusType: 'Network' },
+    };
+    await saveRowData('Alpha', formData, 'me@x.com');
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
+      nucleusType: 'Network',
+    });
+  });
+
+  test('does not patch nucleusType when a save includes other identity fields but omits it', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateNucleus.mockResolvedValue({
+      stage: 'Advanced/5', locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
+    });
+
+    // identity present (admin save), but nucleusType specifically omitted from it.
+    const formData = {
+      ...baseFormData,
+      stage: 'Advanced/5',
+      identity: { nucleus: 'Alpha', parentNucleus: '' },
+    };
+    await saveRowData('Alpha', formData, 'me@x.com');
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { stage: 'Advanced/5' });
   });
 
   test('maps a never-touched presence/gatherings value to null, not false', async () => {
@@ -498,6 +556,7 @@ describe('saveRowData', () => {
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
+      nucleusType: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
     });
 
@@ -518,6 +577,7 @@ describe('saveRowData', () => {
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
+      nucleusType: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
     });
 

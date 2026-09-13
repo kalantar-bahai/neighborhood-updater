@@ -54,6 +54,11 @@ export interface NucleusFields {
   // Read-only, no mutation on cluster-notebook's side for any of these three —
   // every Nucleus is guaranteed a Cluster (non-null), per cluster-notebook 2026-09-13.
   cluster: ClusterFields;
+  // Writable, but only meaningfully so when the nucleus has no `location`: when a
+  // location IS set, this always reads "Neighborhood" regardless of what's stored
+  // or written (cluster-notebook 2026-09-13). By design, not a bug -- Network/
+  // Population nuclei aren't location-bound, so they naturally take the settable path.
+  nucleusType: string | null;
 }
 
 // Deliberately not `extends NucleusFields` — the picker (getAllNuclei's caller)
@@ -64,6 +69,7 @@ export interface NucleusSummary {
   stage: string | null;
   locality: string | null;
   populationMakeup: string | null;
+  nucleusType: string | null;
   devotionalGathering: DevotionalGathering | null;
 }
 
@@ -71,7 +77,7 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
   const query = `
     query GetAllNuclei {
       nuclei {
-        name stage locality populationMakeup
+        name stage locality populationMakeup nucleusType
         devotionalGathering { number participants participantsFof }
       }
     }
@@ -81,7 +87,7 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
 }
 
 const NUCLEUS_FIELDS_SELECTION = 'stage locality populationMakeup population households connectedPopulation connectedHouseholds '
-  + 'hasSocialAction socialActionDescription hasCommunityGatherings communityGatheringDescription narrative '
+  + 'hasSocialAction socialActionDescription hasCommunityGatherings communityGatheringDescription narrative nucleusType '
   + 'cluster { name groupOfClusters growthMilestone }';
 
 export async function getNucleusFields(nucleusName: string): Promise<NucleusFields | null> {
@@ -108,6 +114,7 @@ export async function updateNucleus(
     hasSocialAction?: boolean | null; socialActionDescription?: string;
     hasCommunityGatherings?: boolean | null; communityGatheringDescription?: string;
     narrative?: string;
+    nucleusType?: string;
   }
 ): Promise<NucleusFields | null> {
   const mutation = `

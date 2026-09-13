@@ -604,8 +604,8 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               <Field label="Locality" value={form.locality} readonly />
               <Field label="Nucleus" value={form.nucleus} onChange={isAdmin ? v => set('nucleus', v) : undefined} readonly={!isAdmin} fromSheet />
               {isAdmin
-                ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => set('nucleusType', v)} fromSheet />
-                : <Field label="Type" value={form.nucleusType} readonly fromSheet />
+                ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => set('nucleusType', v)} />
+                : <Field label="Type" value={form.nucleusType} readonly />
               }
               {isAdmin
                 ? <SelectField label="Stage" value={form.stage} options={STAGE_OPTIONS} onChange={v => set('stage', v)} />

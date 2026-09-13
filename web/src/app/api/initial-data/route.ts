@@ -31,10 +31,12 @@ export const GET = auth(async (req) => {
   // longer needs it (either fully complete, or once partial-migration testing
   // isn't the priority).
   //
-  // Also overrides locality/stage/devotionals below with cluster-notebook's own
-  // values rather than the (now possibly stale) sheet columns, for the same
-  // nuclei this call already fetched — avoids reintroducing the staleness this
-  // migration is removing field-by-field.
+  // Also overrides locality/stage/nucleusType/devotionals below with cluster-notebook's
+  // own values rather than the (now possibly stale) sheet columns, for the same nuclei
+  // this call already fetched — avoids reintroducing the staleness this migration is
+  // removing field-by-field. grouping/cluster in the summary below are NOT yet migrated
+  // (still `r[COL.GROUPING]`/`r[COL.CLUSTER]`) — out of scope for this pass; revisit if
+  // the picker's own grouping/cluster display needs the same treatment later.
   const [clusterNotebookNuclei, devRows] = await Promise.all([getAllNuclei(), getAllDevRows()]);
   const clusterNotebookByName = new Map(clusterNotebookNuclei.map(nuc => [norm(nuc.name), nuc]));
 
@@ -52,7 +54,7 @@ export const GET = auth(async (req) => {
         grouping:      r[COL.GROUPING],
         cluster:       r[COL.CLUSTER],
         locality:      cn.locality ?? '',
-        nucleusType:   r[COL.TYPE],
+        nucleusType:   cn.nucleusType ?? '',
         stage:         cn.stage ?? '',
         totalAct:  acts.reduce((s, a) => s + n(a.act),  0),
         totalPart: acts.reduce((s, a) => s + n(a.part), 0),

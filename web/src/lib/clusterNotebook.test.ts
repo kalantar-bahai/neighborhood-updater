@@ -18,12 +18,12 @@ function jsonResponse(body: unknown, ok = true, status = 200) {
 }
 
 describe('getAllNuclei', () => {
-  test('returns the full nucleus list with fields and devotionalGathering', async () => {
+  test('returns the full nucleus list with fields, nucleusType, and devotionalGathering', async () => {
     mockFetch.mockResolvedValue(jsonResponse({
       data: {
         nuclei: [
-          { name: 'Alpha', stage: 'Initial/2', locality: 'Durham', populationMakeup: 'Mixed', devotionalGathering: { number: 4, participants: 30, participantsFof: 10 } },
-          { name: 'Beta', stage: null, locality: null, populationMakeup: null, devotionalGathering: null },
+          { name: 'Alpha', stage: 'Initial/2', locality: 'Durham', populationMakeup: 'Mixed', nucleusType: 'Neighborhood', devotionalGathering: { number: 4, participants: 30, participantsFof: 10 } },
+          { name: 'Beta', stage: null, locality: null, populationMakeup: null, nucleusType: null, devotionalGathering: null },
         ],
       },
     }));
@@ -31,9 +31,11 @@ describe('getAllNuclei', () => {
     const result = await getAllNuclei();
 
     expect(result).toEqual([
-      { name: 'Alpha', stage: 'Initial/2', locality: 'Durham', populationMakeup: 'Mixed', devotionalGathering: { number: 4, participants: 30, participantsFof: 10 } },
-      { name: 'Beta', stage: null, locality: null, populationMakeup: null, devotionalGathering: null },
+      { name: 'Alpha', stage: 'Initial/2', locality: 'Durham', populationMakeup: 'Mixed', nucleusType: 'Neighborhood', devotionalGathering: { number: 4, participants: 30, participantsFof: 10 } },
+      { name: 'Beta', stage: null, locality: null, populationMakeup: null, nucleusType: null, devotionalGathering: null },
     ]);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('nucleusType');
   });
 
   test('returns an empty array when there are no nuclei', async () => {
@@ -214,6 +216,25 @@ describe('updateNucleus', () => {
     expect(result?.narrative).toBe('A growing community of practice.');
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables.patch).toEqual({ narrative: 'A growing community of practice.' });
+  });
+
+  test('sends the nucleusType field', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: {
+        updateNucleus: {
+          stage: null, locality: null, populationMakeup: null,
+          population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+          hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+          narrative: null, nucleusType: 'Network',
+        },
+      },
+    }));
+
+    const result = await updateNucleus('Alpha', { nucleusType: 'Network' });
+
+    expect(result?.nucleusType).toBe('Network');
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables.patch).toEqual({ nucleusType: 'Network' });
   });
 });
 

@@ -92,6 +92,9 @@ function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
     pg: pgFromGrowthMilestone(fields?.cluster.growthMilestone),
     // Derived client-side (not a cluster-notebook field at all) from cluster.name.
     clusterCode: clusterCodeFromClusterName(fields?.cluster.name),
+    // Writable, but only truly settable when the nucleus has no location — see
+    // NucleusFields.nucleusType's own comment in clusterNotebook.ts.
+    nucleusType: fields?.nucleusType ?? '',
   };
 }
 
@@ -215,13 +218,14 @@ export async function getRowData(nucleusName: string) {
 
   const row = parseRow(masterRow);
   // parseRow's devotionals/stage/locality/makeup/totalPop/totalHH/indNum/hhNum/presence/
-  // notesPresence/gatherings/notesGatherings/narrative/grouping/cluster/pg/clusterCode reads
-  // (from the corresponding COL.* sheet columns) are overwritten here for the detail view.
-  // Devotionals: /api/initial-data's picker summary still depends on those same sheet columns —
-  // don't remove them. Everything else here: /api/initial-data doesn't read these sheet columns,
-  // so they're fully dead. grouping/cluster/pg are read-only from cluster-notebook (no mutation
-  // exists for them there); clusterCode is derived client-side from cluster.name, not read from
-  // anywhere — see saveRowData, which no longer writes any of the four anywhere at all.
+  // notesPresence/gatherings/notesGatherings/narrative/grouping/cluster/pg/clusterCode/
+  // nucleusType reads (from the corresponding COL.* sheet columns) are overwritten here for the
+  // detail view. Devotionals: /api/initial-data's picker summary still depends on those same
+  // sheet columns — don't remove them. Everything else here: /api/initial-data doesn't read
+  // these sheet columns anymore either (nucleusType is now sourced from cluster-notebook there
+  // too, see that route) — they're fully dead. grouping/cluster/pg are read-only from
+  // cluster-notebook (no mutation exists for them there); clusterCode is derived client-side
+  // from cluster.name, not read from anywhere.
   row.activities.devotionals = devotionalsFromClusterNotebook(devotionalGathering);
   Object.assign(row, nucleusFieldsFromClusterNotebook(nucleusFields));
 
@@ -367,14 +371,15 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     return letter;
   };
 
-  // grouping/cluster/pg/clusterCode are deliberately absent here — grouping/cluster/pg are
-  // read-only from cluster-notebook now (Cluster.groupOfClusters/name/growthMilestone, no
-  // mutation exists); clusterCode is derived client-side from cluster.name, not a stored field
-  // at all. Writing any of them to the sheet would be silently discarded on next load anyway.
+  // grouping/cluster/pg/clusterCode/nucleusType are deliberately absent here —
+  // grouping/cluster/pg are read-only from cluster-notebook now
+  // (Cluster.groupOfClusters/name/growthMilestone, no mutation exists); clusterCode is derived
+  // client-side from cluster.name, not a stored field at all; nucleusType moved to
+  // cluster-notebook's own Nucleus.nucleusType (see nucleusPatch below). Writing any of them to
+  // the sheet would be silently discarded on next load anyway.
   const identityPairs: [number, unknown][] = d.identity ? [
     [COL.NUCLEUS,        d.identity.nucleus],
     [COL.PARENT_NUCLEUS, d.identity.parentNucleus],
-    [COL.TYPE,           d.identity.nucleusType],
   ] : [];
 
   const updates = [
@@ -414,6 +419,7 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     hasSocialAction?: boolean | null; socialActionDescription?: string;
     hasCommunityGatherings?: boolean | null; communityGatheringDescription?: string;
     narrative?: string;
+    nucleusType?: string;
   } = {};
   if (d.stage !== undefined) nucleusPatch.stage = d.stage;
   if (d.makeup !== undefined) nucleusPatch.populationMakeup = d.makeup;
@@ -426,6 +432,8 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
   if (d.gatherings !== undefined) nucleusPatch.hasCommunityGatherings = toBoolOrNull(d.gatherings);
   if (d.notesGatherings !== undefined) nucleusPatch.communityGatheringDescription = d.notesGatherings;
   if (d.narrative !== undefined) nucleusPatch.narrative = d.narrative;
+  // nucleusType is nested under identity (admin/create-only), unlike the other patch fields above.
+  if (d.identity && d.identity.nucleusType !== undefined) nucleusPatch.nucleusType = d.identity.nucleusType;
   if (Object.keys(nucleusPatch).length > 0) {
     writes.push(updateNucleus(nucleusName, nucleusPatch));
   }
