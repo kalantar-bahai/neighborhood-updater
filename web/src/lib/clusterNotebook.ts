@@ -32,6 +32,16 @@ async function request<T>(query: string, variables: Record<string, unknown>): Pr
   return json.data as T;
 }
 
+export async function getNucleusNames(): Promise<string[]> {
+  const query = `
+    query GetNucleusNames {
+      nuclei { name }
+    }
+  `;
+  const data = await request<{ nuclei: { name: string }[] }>(query, {});
+  return data.nuclei.map(n => n.name);
+}
+
 export async function getDevotionalGathering(nucleusName: string): Promise<DevotionalGathering | null> {
   const query = `
     query GetNucleusDevotionalGathering($name: String!) {

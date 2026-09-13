@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { getDevotionalGathering, updateDevotionalGathering } from './clusterNotebook';
+import { getDevotionalGathering, updateDevotionalGathering, getNucleusNames } from './clusterNotebook';
 
 const mockFetch = vi.fn();
 
@@ -16,6 +16,32 @@ function jsonResponse(body: unknown, ok = true, status = 200) {
     json: async () => body,
   };
 }
+
+describe('getNucleusNames', () => {
+  test('returns the flat list of nucleus names', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: { nuclei: [{ name: 'Alpha' }, { name: 'Beta' }] },
+    }));
+
+    const result = await getNucleusNames();
+
+    expect(result).toEqual(['Alpha', 'Beta']);
+  });
+
+  test('returns an empty array when there are no nuclei', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nuclei: [] } }));
+
+    const result = await getNucleusNames();
+
+    expect(result).toEqual([]);
+  });
+
+  test('throws when the request fails', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({}, false, 500));
+
+    await expect(getNucleusNames()).rejects.toThrow('cluster-notebook request failed: 500');
+  });
+});
 
 describe('getDevotionalGathering', () => {
   test('sends a query for the nucleus and returns its devotionalGathering', async () => {
