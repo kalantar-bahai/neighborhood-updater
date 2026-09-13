@@ -632,19 +632,19 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           <div className="card-header">Population</div>
           <div className="card-body">
             <div className="field-grid-2">
-              <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} integer fromSheet />
-              <Field label="Total Households" value={form.totalHH}  onChange={v => set('totalHH', v)} integer fromSheet />
+              <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} integer />
+              <Field label="Total Households" value={form.totalHH}  onChange={v => set('totalHH', v)} integer />
             </div>
             <div className="field-grid-2">
               <PairField
                 label="Individuals Connected"
                 numVal={form.indNum} pctVal={computedPct(form.indNum, form.totalPop)}
-                onNumChange={v => set('indNum', v)} pctReadonly numInteger fromSheet
+                onNumChange={v => set('indNum', v)} pctReadonly numInteger
               />
               <PairField
                 label="Households Connected"
                 numVal={form.hhNum} pctVal={computedPct(form.hhNum, form.totalHH)}
-                onNumChange={v => set('hhNum', v)} pctReadonly numInteger fromSheet
+                onNumChange={v => set('hhNum', v)} pctReadonly numInteger
               />
             </div>
             <div className="field">

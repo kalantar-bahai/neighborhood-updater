@@ -157,7 +157,10 @@ describe('getRowData', () => {
       return [];
     });
     mockGetDevotionalGathering.mockResolvedValue(null);
-    mockGetNucleusFields.mockResolvedValue({ stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students' });
+    mockGetNucleusFields.mockResolvedValue({
+      stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students',
+      population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
+    });
 
     const result = await getRowData('Alpha');
 
@@ -165,6 +168,10 @@ describe('getRowData', () => {
     expect(result?.row.stage).toBe('Advanced/5');
     expect(result?.row.locality).toBe('Durham');
     expect(result?.row.makeup).toBe('Students');
+    expect(result?.row.totalPop).toBe('500');
+    expect(result?.row.totalHH).toBe('120');
+    expect(result?.row.indNum).toBe('80');
+    expect(result?.row.hhNum).toBe('30');
   });
 
   test('renders a null cluster-notebook nucleus-fields value as empty strings', async () => {
@@ -254,7 +261,10 @@ describe('saveRowData', () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
     mockUpdateDevotionalGathering.mockResolvedValue(null);
-    mockUpdateNucleus.mockResolvedValue({ stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students' });
+    mockUpdateNucleus.mockResolvedValue({
+      stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students',
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+    });
 
     const formData = { ...baseFormData, stage: 'Advanced/5', locality: 'Durham', makeup: 'Students' };
     await saveRowData('Alpha', formData, 'me@x.com');
@@ -269,11 +279,38 @@ describe('saveRowData', () => {
     expect(writtenValues).not.toContain('Students');
   });
 
+  test('writes population/households/connected* via cluster-notebook instead of the sheet', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateNucleus.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
+    });
+
+    const formData = { ...baseFormData, totalPop: '500', totalHH: '120', indNum: '80', hhNum: '30' };
+    await saveRowData('Alpha', formData, 'me@x.com');
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
+      locality: 'Durham', population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
+    });
+
+    const updates = mockSheetsBatchUpdate.mock.calls[0][1] as { values: string[][] }[];
+    const writtenValues = updates.map(u => u.values[0][0]);
+    expect(writtenValues).not.toContain('500');
+    expect(writtenValues).not.toContain('120');
+    expect(writtenValues).not.toContain('80');
+    expect(writtenValues).not.toContain('30');
+  });
+
   test('omits patch fields the caller did not provide, rather than sending them as blank', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
     mockUpdateDevotionalGathering.mockResolvedValue(null);
-    mockUpdateNucleus.mockResolvedValue({ stage: 'Advanced/5', locality: null, populationMakeup: null });
+    mockUpdateNucleus.mockResolvedValue({
+      stage: 'Advanced/5', locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+    });
 
     const formData: Record<string, unknown> = { ...baseFormData, stage: 'Advanced/5' };
     delete formData.locality;

@@ -40,6 +40,10 @@ function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
     stage: fields?.stage ?? '',
     locality: fields?.locality ?? '',
     makeup: fields?.populationMakeup ?? '',
+    totalPop: fields?.population != null ? String(fields.population) : '',
+    totalHH: fields?.households != null ? String(fields.households) : '',
+    indNum: fields?.connectedPopulation != null ? String(fields.connectedPopulation) : '',
+    hhNum: fields?.connectedHouseholds != null ? String(fields.connectedHouseholds) : '',
   };
 }
 
@@ -162,10 +166,11 @@ export async function getRowData(nucleusName: string) {
   };
 
   const row = parseRow(masterRow);
-  // parseRow's devotionals/stage/locality/makeup reads (from COL.DEV_ACT/PART/FOF/STAGE/LOCALITY/MAKEUP)
-  // are overwritten here for the detail view. Devotionals: /api/initial-data's picker summary still
-  // depends on those same sheet columns — don't remove them. Stage/locality: /api/initial-data reads
-  // from cluster-notebook directly now (see that route), so those two sheet columns are fully dead.
+  // parseRow's devotionals/stage/locality/makeup/totalPop/totalHH/indNum/hhNum reads (from
+  // COL.DEV_ACT/PART/FOF/STAGE/LOCALITY/MAKEUP/TOTAL_POP/TOTAL_HH/IND_NUM/HH_NUM) are overwritten
+  // here for the detail view. Devotionals: /api/initial-data's picker summary still depends on
+  // those same sheet columns — don't remove them. Everything else here: /api/initial-data doesn't
+  // read these sheet columns, so they're fully dead.
   row.activities.devotionals = devotionalsFromClusterNotebook(devotionalGathering);
   Object.assign(row, nucleusFieldsFromClusterNotebook(nucleusFields));
 
@@ -325,9 +330,6 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     ...identityPairs,
     [COL.CONTACT, d.contact],
     [COL.EMAIL, d.email], [COL.AUX_BOARD, d.auxBoard],
-    [COL.TOTAL_POP, d.totalPop], [COL.TOTAL_HH, d.totalHH],
-    [COL.IND_NUM, d.indNum],
-    [COL.HH_NUM, d.hhNum],
     [COL.CC_ACT, d.activities.ccs.act], [COL.CC_PART, d.activities.ccs.part], [COL.CC_FOF, d.activities.ccs.fof],
     [COL.JYG_ACT, d.activities.jygs.act], [COL.JYG_PART, d.activities.jygs.part], [COL.JYG_FOF, d.activities.jygs.fof],
     [COL.SC_ACT, d.activities.scs.act], [COL.SC_PART, d.activities.scs.part], [COL.SC_FOF, d.activities.scs.fof],
@@ -353,10 +355,18 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
       participantsFof: toIntOrNull(d.activities.devotionals.fof),
     }));
   }
-  const nucleusPatch: { stage?: string; locality?: string; populationMakeup?: string } = {};
+  const nucleusPatch: {
+    stage?: string; locality?: string; populationMakeup?: string;
+    population?: number | null; households?: number | null;
+    connectedPopulation?: number | null; connectedHouseholds?: number | null;
+  } = {};
   if (d.stage !== undefined) nucleusPatch.stage = d.stage;
   if (d.locality !== undefined) nucleusPatch.locality = d.locality;
   if (d.makeup !== undefined) nucleusPatch.populationMakeup = d.makeup;
+  if (d.totalPop !== undefined) nucleusPatch.population = toIntOrNull(d.totalPop);
+  if (d.totalHH !== undefined) nucleusPatch.households = toIntOrNull(d.totalHH);
+  if (d.indNum !== undefined) nucleusPatch.connectedPopulation = toIntOrNull(d.indNum);
+  if (d.hhNum !== undefined) nucleusPatch.connectedHouseholds = toIntOrNull(d.hhNum);
   if (Object.keys(nucleusPatch).length > 0) {
     writes.push(updateNucleus(nucleusName, nucleusPatch));
   }

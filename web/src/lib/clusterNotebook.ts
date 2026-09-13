@@ -36,10 +36,20 @@ export interface NucleusFields {
   stage: string | null;
   locality: string | null;
   populationMakeup: string | null;
+  population: number | null;
+  households: number | null;
+  connectedPopulation: number | null;
+  connectedHouseholds: number | null;
 }
 
-export interface NucleusSummary extends NucleusFields {
+// Deliberately not `extends NucleusFields` — the picker (getAllNuclei's caller)
+// doesn't need population/households/connected*, and its query below doesn't
+// request them, so keep this decoupled from NucleusFields' full shape.
+export interface NucleusSummary {
   name: string;
+  stage: string | null;
+  locality: string | null;
+  populationMakeup: string | null;
   devotionalGathering: DevotionalGathering | null;
 }
 
@@ -56,10 +66,12 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
   return data.nuclei;
 }
 
+const NUCLEUS_FIELDS_SELECTION = 'stage locality populationMakeup population households connectedPopulation connectedHouseholds';
+
 export async function getNucleusFields(nucleusName: string): Promise<NucleusFields | null> {
   const query = `
     query GetNucleusFields($name: String!) {
-      nucleus(name: $name) { stage locality populationMakeup }
+      nucleus(name: $name) { ${NUCLEUS_FIELDS_SELECTION} }
     }
   `;
   const data = await request<{ nucleus: NucleusFields | null }>(query, { name: nucleusName });
@@ -68,12 +80,16 @@ export async function getNucleusFields(nucleusName: string): Promise<NucleusFiel
 
 export async function updateNucleus(
   nucleusName: string,
-  patch: { stage?: string; locality?: string; populationMakeup?: string }
+  patch: {
+    stage?: string; locality?: string; populationMakeup?: string;
+    population?: number | null; households?: number | null;
+    connectedPopulation?: number | null; connectedHouseholds?: number | null;
+  }
 ): Promise<NucleusFields | null> {
   const mutation = `
     mutation UpdateNucleus($name: String!, $patch: NucleusPatch!) {
       updateNucleus(name: $name, patch: $patch) {
-        stage locality populationMakeup
+        ${NUCLEUS_FIELDS_SELECTION}
       }
     }
   `;

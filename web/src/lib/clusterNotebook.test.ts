@@ -71,6 +71,24 @@ describe('getNucleusFields', () => {
 
     expect(result).toBeNull();
   });
+
+  test('returns population/households/connected* fields', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: {
+        nucleus: {
+          stage: null, locality: null, populationMakeup: null,
+          population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
+        },
+      },
+    }));
+
+    const result = await getNucleusFields('Alpha');
+
+    expect(result).toEqual({
+      stage: null, locality: null, populationMakeup: null,
+      population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
+    });
+  });
 });
 
 describe('updateNucleus', () => {
@@ -103,6 +121,30 @@ describe('updateNucleus', () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { updateNucleus: null } }));
 
     await expect(updateNucleus('Nonexistent', { stage: 'Advanced/5' })).rejects.toThrow('cluster-notebook has no nucleus named "Nonexistent"');
+  });
+
+  test('sends population/households/connected* fields, including explicit null to clear', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: {
+        updateNucleus: {
+          stage: null, locality: null, populationMakeup: null,
+          population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: null,
+        },
+      },
+    }));
+
+    const result = await updateNucleus('Alpha', {
+      population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: null,
+    });
+
+    expect(result).toEqual({
+      stage: null, locality: null, populationMakeup: null,
+      population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: null,
+    });
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables.patch).toEqual({
+      population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: null,
+    });
   });
 });
 
