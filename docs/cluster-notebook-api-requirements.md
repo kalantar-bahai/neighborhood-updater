@@ -61,9 +61,9 @@ The Devotionals/Education report aggregates (scraped into our own Sheet by `srp-
 ## Suggested next-slice ordering
 
 Given devotionals (§2/§3, one of four activity rollups) is done, natural next slices in rough order of value/effort:
-1. The other three activity rollups (cc/jyg/sc) — same shape as devotionals, `ActivitySummaryOverride` already generalizes to them.
-2. Standard fields (§2/§3 minus activities) as a single patch-style mutation — unblocks retiring most of `saveRowData`'s sheet-column writes at once.
+1. **Done, 2026-09-13.** The other three activity rollups (cc/jyg/sc) — same shape as devotionals, `ActivitySummaryOverride` already generalizes to them. `updateActivitySummary` is live; not yet wired into nucleus-assistant's own code (only devotionals is wired so far).
+2. **Partially done, 2026-09-13.** `stage`/`locality`/`populationMakeup` are live via `updateNucleus(name, patch: NucleusPatch)` and wired into nucleus-assistant's `getRowData`/`saveRowData` (not `createRowData` — see below). Remaining standard fields (contact, email, auxBoard) still deferred, per your own note that contact/auxBoard are Individual-role concepts.
 3. Worker lists (§5) — needs a decision on your side about `Individual` modeling first, per your own "no Individual entity modeled yet" limitation.
-4. Identity fields + create/delete (§4) — lowest frequency of use, fine to defer.
+4. Identity fields + create/delete (§4) — lowest frequency of use, fine to defer. Note: `createRowData` (nucleus creation) still writes `stage`/`locality`/`populationMakeup`/devotionals to the Sheet only, deliberately not wired to `updateNucleus`/`updateActivitySummary` — you have no create-nucleus mutation, so those calls would always fail for a brand-new nucleus. This is the real blocker on wiring nucleus creation, not a decision we're deferring for other reasons.
 
 No response needed by any deadline — this is context for whatever schema-design work you're already doing. Happy to answer follow-up questions about any field's exact current semantics.
