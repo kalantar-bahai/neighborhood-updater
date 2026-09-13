@@ -65,6 +65,13 @@ function pgFromGrowthMilestone(value: string | null | undefined): string {
   return GROWTH_MILESTONE_TO_PG[value] ?? '';
 }
 
+// clusterCode has no separate field on cluster-notebook's side (confirmed 2026-09-13) --
+// it's just the first whitespace-separated token of the cluster's full name,
+// e.g. "NC-215" from "NC-215 Triangle". Derived here rather than stored/edited.
+function clusterCodeFromClusterName(name: string | undefined): string {
+  return (name || '').trim().split(/\s+/)[0] || '';
+}
+
 function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
   return {
     stage: fields?.stage ?? '',
@@ -83,6 +90,8 @@ function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
     cluster: fields?.cluster.name ?? '',
     grouping: fields?.cluster.groupOfClusters ?? '',
     pg: pgFromGrowthMilestone(fields?.cluster.growthMilestone),
+    // Derived client-side (not a cluster-notebook field at all) from cluster.name.
+    clusterCode: clusterCodeFromClusterName(fields?.cluster.name),
   };
 }
 
@@ -206,12 +215,13 @@ export async function getRowData(nucleusName: string) {
 
   const row = parseRow(masterRow);
   // parseRow's devotionals/stage/locality/makeup/totalPop/totalHH/indNum/hhNum/presence/
-  // notesPresence/gatherings/notesGatherings/narrative/grouping/cluster/pg reads (from the
-  // corresponding COL.* sheet columns) are overwritten here for the detail view. Devotionals:
-  // /api/initial-data's picker summary still depends on those same sheet columns — don't remove
-  // them. Everything else here: /api/initial-data doesn't read these sheet columns, so they're
-  // fully dead. grouping/cluster/pg are read-only from cluster-notebook (no mutation exists for
-  // them there) — see saveRowData, which no longer writes them anywhere at all.
+  // notesPresence/gatherings/notesGatherings/narrative/grouping/cluster/pg/clusterCode reads
+  // (from the corresponding COL.* sheet columns) are overwritten here for the detail view.
+  // Devotionals: /api/initial-data's picker summary still depends on those same sheet columns —
+  // don't remove them. Everything else here: /api/initial-data doesn't read these sheet columns,
+  // so they're fully dead. grouping/cluster/pg are read-only from cluster-notebook (no mutation
+  // exists for them there); clusterCode is derived client-side from cluster.name, not read from
+  // anywhere — see saveRowData, which no longer writes any of the four anywhere at all.
   row.activities.devotionals = devotionalsFromClusterNotebook(devotionalGathering);
   Object.assign(row, nucleusFieldsFromClusterNotebook(nucleusFields));
 
@@ -357,13 +367,13 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     return letter;
   };
 
-  // grouping/cluster/pg are deliberately absent here — read-only from cluster-notebook now
-  // (Cluster.groupOfClusters/name/growthMilestone, no mutation exists), so writing them to the
-  // sheet would be silently discarded on next load anyway.
+  // grouping/cluster/pg/clusterCode are deliberately absent here — grouping/cluster/pg are
+  // read-only from cluster-notebook now (Cluster.groupOfClusters/name/growthMilestone, no
+  // mutation exists); clusterCode is derived client-side from cluster.name, not a stored field
+  // at all. Writing any of them to the sheet would be silently discarded on next load anyway.
   const identityPairs: [number, unknown][] = d.identity ? [
     [COL.NUCLEUS,        d.identity.nucleus],
     [COL.PARENT_NUCLEUS, d.identity.parentNucleus],
-    [COL.CLUSTER_CODE,   d.identity.clusterCode],
     [COL.TYPE,           d.identity.nucleusType],
   ] : [];
 

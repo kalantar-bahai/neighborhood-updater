@@ -183,6 +183,47 @@ describe('getRowData', () => {
     expect(result?.row.cluster).toBe('NC-215 Triangle');
     expect(result?.row.grouping).toBe('NC Eastern');
     expect(result?.row.pg).toBe('M3');
+    expect(result?.row.clusterCode).toBe('NC-215');
+  });
+
+  test('derives clusterCode as the first token of cluster.name', async () => {
+    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
+    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
+      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
+      return [];
+    });
+    mockGetDevotionalGathering.mockResolvedValue(null);
+    mockGetNucleusFields.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
+    });
+
+    const result = await getRowData('Alpha');
+
+    expect(result?.row.clusterCode).toBe('NC-215');
+  });
+
+  test('derives an empty clusterCode when the cluster name is empty', async () => {
+    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
+    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
+      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
+      return [];
+    });
+    mockGetDevotionalGathering.mockResolvedValue(null);
+    mockGetNucleusFields.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null,
+      cluster: { name: '', groupOfClusters: null, growthMilestone: null },
+    });
+
+    const result = await getRowData('Alpha');
+
+    expect(result?.row.clusterCode).toBe('');
   });
 
   test('translates all three known growthMilestone values to M1/M2/M3', async () => {
@@ -425,7 +466,7 @@ describe('saveRowData', () => {
     expect(writtenValues).not.toContain('A growing community of practice.');
   });
 
-  test('never writes grouping/cluster/pg anywhere -- read-only from cluster-notebook, no mutation exists', async () => {
+  test('never writes grouping/cluster/pg/clusterCode anywhere -- read-only or derived, no write path exists', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
     mockUpdateDevotionalGathering.mockResolvedValue(null);
@@ -444,8 +485,8 @@ describe('saveRowData', () => {
     expect(writtenValues).not.toContain('NC Eastern');
     expect(writtenValues).not.toContain('NC-215 Triangle');
     expect(writtenValues).not.toContain('M3');
-    // clusterCode is unaffected -- still sheet-only, no cluster-notebook equivalent
-    expect(writtenValues).toContain('NC-215');
+    // clusterCode is now derived client-side from cluster.name, not stored/written anywhere either
+    expect(writtenValues).not.toContain('NC-215');
   });
 
   test('maps a never-touched presence/gatherings value to null, not false', async () => {

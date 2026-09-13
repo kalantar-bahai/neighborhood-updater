@@ -586,12 +586,13 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           </div>
           {identityOpen && <div className="card-body">
             <div className="field-grid-4">
-              {/* Grouping/Cluster/PG are read-only everywhere, like Locality: cluster-notebook
-                  derives them from Cluster.groupOfClusters/name/growthMilestone and has no
-                  mutation for any of the three (2026-09-13) — not an admin-permission
-                  distinction like Cluster Code, which stays sheet-only and editable. */}
+              {/* Grouping/Cluster/PG/Cluster Code are all read-only now: Grouping/Cluster/PG
+                  because cluster-notebook derives them from Cluster.groupOfClusters/name/
+                  growthMilestone with no mutation for any of the three (2026-09-13); Cluster
+                  Code because it's not a stored field at all anymore, just the first token of
+                  cluster.name, computed in nucleusFieldsFromClusterNotebook (data.ts). */}
               <Field label="Grouping"     value={form.grouping}    readonly />
-              <Field label="Cluster Code" value={form.clusterCode} onChange={isAdmin ? v => set('clusterCode', v) : undefined} readonly={!isAdmin} fromSheet />
+              <Field label="Cluster Code" value={form.clusterCode} readonly />
               <Field label="Cluster"      value={form.cluster}     readonly />
               <Field label="PG"           value={form.pg}          readonly />
             </div>
@@ -601,7 +602,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
                   it (removed from NucleusPatch 2026-09-13) — not an admin-permission
                   distinction like the other Identity fields. */}
               <Field label="Locality" value={form.locality} readonly />
-              <Field label="Nucleus / Pocket" value={form.nucleus} onChange={isAdmin ? v => set('nucleus', v) : undefined} readonly={!isAdmin} fromSheet />
+              <Field label="Nucleus" value={form.nucleus} onChange={isAdmin ? v => set('nucleus', v) : undefined} readonly={!isAdmin} fromSheet />
               {isAdmin
                 ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => set('nucleusType', v)} fromSheet />
                 : <Field label="Type" value={form.nucleusType} readonly fromSheet />
