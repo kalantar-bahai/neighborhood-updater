@@ -87,4 +87,10 @@ describe('updateDevotionalGathering', () => {
     const body = JSON.parse(init.body as string);
     expect(body.variables).toEqual({ nucleusName: 'Alpha', number: null, participants: null, participantsFof: null });
   });
+
+  test('throws when the mutation returns null (no matching nucleus)', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { updateDevotionalGathering: null } }));
+
+    await expect(updateDevotionalGathering('Nonexistent', { number: 5 })).rejects.toThrow('cluster-notebook has no nucleus named "Nonexistent"');
+  });
 });

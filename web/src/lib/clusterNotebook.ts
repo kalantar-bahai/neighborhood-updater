@@ -26,6 +26,9 @@ async function request<T>(query: string, variables: Record<string, unknown>): Pr
   if (json.errors?.length) {
     throw new Error(`cluster-notebook GraphQL error: ${json.errors.map(e => e.message).join('; ')}`);
   }
+  if (json.data === undefined) {
+    throw new Error('cluster-notebook response contained neither data nor errors');
+  }
   return json.data as T;
 }
 
@@ -66,5 +69,8 @@ export async function updateDevotionalGathering(
       participantsFof: fields.participantsFof ?? null,
     }
   );
-  return data.updateDevotionalGathering?.devotionalGathering ?? null;
+  if (data.updateDevotionalGathering === null) {
+    throw new Error(`cluster-notebook has no nucleus named "${nucleusName}" — devotional gathering not saved`);
+  }
+  return data.updateDevotionalGathering.devotionalGathering ?? null;
 }
