@@ -19,7 +19,7 @@ vi.mock('./clusterNotebook', () => ({
 }));
 
 import { getDevotionalGathering, updateDevotionalGathering } from './clusterNotebook';
-import { getRowData, saveRowData } from './data';
+import { getRowData, saveRowData, createRowData } from './data';
 import { MASTER_TAB } from './config';
 
 const mockGetDevotionalGathering = vi.mocked(getDevotionalGathering);
@@ -131,6 +131,17 @@ describe('getRowData', () => {
 
     expect(result).toBeNull();
   });
+
+  test('propagates a cluster-notebook read failure', async () => {
+    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
+    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
+      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
+      return [];
+    });
+    mockGetDevotionalGathering.mockRejectedValue(new Error('cluster-notebook request failed: 500 Internal Server Error'));
+
+    await expect(getRowData('Alpha')).rejects.toThrow('cluster-notebook request failed');
+  });
 });
 
 describe('saveRowData', () => {
@@ -189,6 +200,72 @@ describe('saveRowData', () => {
     expect(mockUpdateDevotionalGathering).toHaveBeenCalledWith('Alpha', {
       number: 1200, participants: 900, participantsFof: 0,
     });
+  });
+
+  test('propagates a cluster-notebook write failure instead of reporting success', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockRejectedValue(new Error('cluster-notebook has no nucleus named "Alpha" — devotional gathering not saved'));
+
+    await expect(saveRowData('Alpha', baseFormData, 'me@x.com')).rejects.toThrow('cluster-notebook has no nucleus named "Alpha"');
+  });
+});
+
+describe('createRowData', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const newFormData = {
+    identity: { nucleus: 'Gamma' },
+    activities: {
+      ccs:  { act: '1', part: '2', fof: '3' },
+      jygs: { act: '', part: '', fof: '' },
+      scs:  { act: '', part: '', fof: '' },
+      devotionals: { act: '5', part: '40', fof: '12' },
+    },
+  };
+
+  test('writes the new row to the sheet without the old DEV_ACT/PART/FOF values', async () => {
+    mockSheetsGet.mockResolvedValue([]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockResolvedValue({ number: 5, participants: 40, participantsFof: 12 });
+
+    await createRowData(newFormData, 'me@x.com');
+
+    const values = mockSheetsBatchUpdate.mock.calls[0][1][0].values[0] as string[];
+    expect(values[COL.DEV_ACT]).toBe('');
+    expect(values[COL.DEV_PART]).toBe('');
+    expect(values[COL.DEV_FOF]).toBe('');
+    expect(values[COL.CC_ACT]).toBe('1'); // other activity fields still written to the sheet
+  });
+
+  test('sends the parsed devotionals to cluster-notebook when provided', async () => {
+    mockSheetsGet.mockResolvedValue([]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockResolvedValue({ number: 5, participants: 40, participantsFof: 12 });
+
+    await createRowData(newFormData, 'me@x.com');
+
+    expect(mockUpdateDevotionalGathering).toHaveBeenCalledWith('Gamma', {
+      number: 5, participants: 40, participantsFof: 12,
+    });
+  });
+
+  test('skips the cluster-notebook call when devotionals are not provided', async () => {
+    mockSheetsGet.mockResolvedValue([]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+
+    const formData = { identity: { nucleus: 'Gamma' } };
+    await createRowData(formData, 'me@x.com');
+
+    expect(mockUpdateDevotionalGathering).not.toHaveBeenCalled();
+  });
+
+  test('propagates a cluster-notebook write failure for a brand-new nucleus', async () => {
+    mockSheetsGet.mockResolvedValue([]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockRejectedValue(new Error('cluster-notebook has no nucleus named "Gamma" — devotional gathering not saved'));
+
+    await expect(createRowData(newFormData, 'me@x.com')).rejects.toThrow('cluster-notebook has no nucleus named "Gamma"');
   });
 });
 

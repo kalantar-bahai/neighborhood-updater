@@ -153,6 +153,8 @@ export async function getRowData(nucleusName: string) {
   };
 
   const row = parseRow(masterRow);
+  // parseRow's devotionals read (from COL.DEV_ACT/PART/FOF) is overwritten here for the detail view,
+  // but /api/initial-data's picker summary still depends on those same sheet columns — don't remove them.
   row.activities.devotionals = devotionalsFromClusterNotebook(devotionalGathering);
 
   return {
@@ -257,9 +259,6 @@ export async function createRowData(formData: Record<string, unknown>, userEmail
   newRow[COL.SC_ACT]         = d.activities?.scs?.act     || '';
   newRow[COL.SC_PART]        = d.activities?.scs?.part    || '';
   newRow[COL.SC_FOF]         = d.activities?.scs?.fof     || '';
-  newRow[COL.DEV_ACT]        = d.activities?.devotionals?.act  || '';
-  newRow[COL.DEV_PART]       = d.activities?.devotionals?.part || '';
-  newRow[COL.DEV_FOF]        = d.activities?.devotionals?.fof  || '';
   newRow[COL.PROTAGONISTS]   = d.protagonists             || '';
   newRow[COL.ACCOMPANIERS]   = d.accompaniers             || '';
   newRow[COL.LEVEL]          = d.level                    || '';
@@ -280,6 +279,14 @@ export async function createRowData(formData: Record<string, unknown>, userEmail
     range: `${MASTER_TAB}!A${sheetRow}`,
     values: [newRow],
   }]);
+
+  if (d.activities?.devotionals) {
+    await updateDevotionalGathering(newNucleus, {
+      number: toIntOrNull(d.activities.devotionals.act),
+      participants: toIntOrNull(d.activities.devotionals.part),
+      participantsFof: toIntOrNull(d.activities.devotionals.fof),
+    });
+  }
 
   return { success: true, savedBy: userEmail, savedAt: new Date().toISOString() };
 }
