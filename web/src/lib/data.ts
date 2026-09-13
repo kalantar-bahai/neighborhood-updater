@@ -29,6 +29,12 @@ function devotionalsFromClusterNotebook(dg: DevotionalGathering | null) {
   };
 }
 
+function toIntOrNull(value: unknown): number | null {
+  const cleaned = stripCommas(String(value ?? ''));
+  const n = parseInt(cleaned, 10);
+  return Number.isNaN(n) ? null : n;
+}
+
 export async function getAccessEntries(): Promise<AccessEntry[]> {
   const rows = await sheetsGet(MASTER_SHEET_ID, `${ACCESS_TAB}!A2:D`);
   return rows
@@ -311,7 +317,6 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     [COL.CC_ACT, d.activities.ccs.act], [COL.CC_PART, d.activities.ccs.part], [COL.CC_FOF, d.activities.ccs.fof],
     [COL.JYG_ACT, d.activities.jygs.act], [COL.JYG_PART, d.activities.jygs.part], [COL.JYG_FOF, d.activities.jygs.fof],
     [COL.SC_ACT, d.activities.scs.act], [COL.SC_PART, d.activities.scs.part], [COL.SC_FOF, d.activities.scs.fof],
-    [COL.DEV_ACT, d.activities.devotionals.act], [COL.DEV_PART, d.activities.devotionals.part], [COL.DEV_FOF, d.activities.devotionals.fof],
     [COL.PROTAGONISTS, d.protagonists], [COL.ACCOMPANIERS, d.accompaniers],
     [COL.LEVEL, d.level], [COL.NOTES_PREVALENCE, d.notesPrevalence],
     [COL.SUPPORTED, d.supported], [COL.NOTES_SUPPORTED, d.notesSupported],
@@ -326,6 +331,15 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
       values: [[(value ?? '') as string]],
     }));
 
-  await sheetsBatchUpdate(MASTER_SHEET_ID, updates);
+  const writes: Promise<unknown>[] = [sheetsBatchUpdate(MASTER_SHEET_ID, updates)];
+  if (d.activities?.devotionals) {
+    writes.push(updateDevotionalGathering(nucleusName, {
+      number: toIntOrNull(d.activities.devotionals.act),
+      participants: toIntOrNull(d.activities.devotionals.part),
+      participantsFof: toIntOrNull(d.activities.devotionals.fof),
+    }));
+  }
+  await Promise.all(writes);
+
   return { success: true, savedBy: userEmail, savedAt: new Date().toISOString() };
 }

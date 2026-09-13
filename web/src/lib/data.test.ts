@@ -133,6 +133,65 @@ describe('getRowData', () => {
   });
 });
 
+describe('saveRowData', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const baseFormData = {
+    locality: 'Durham',
+    activities: {
+      ccs:  { act: '1', part: '2', fof: '3' },
+      jygs: { act: '', part: '', fof: '' },
+      scs:  { act: '', part: '', fof: '' },
+      devotionals: { act: '5', part: '40', fof: '12' },
+    },
+  };
+
+  test('writes devotionals via cluster-notebook instead of the sheet', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockResolvedValue({ number: 5, participants: 40, participantsFof: 12 });
+
+    await saveRowData('Alpha', baseFormData, 'me@x.com');
+
+    expect(mockUpdateDevotionalGathering).toHaveBeenCalledWith('Alpha', {
+      number: 5, participants: 40, participantsFof: 12,
+    });
+
+    const updates = mockSheetsBatchUpdate.mock.calls[0][1] as { values: string[][] }[];
+    const writtenValues = updates.map(u => u.values[0][0]);
+    expect(writtenValues).toContain('1'); // ccs.act still written to the sheet
+    expect(writtenValues).not.toContain('5');  // devotionals.act must NOT reach the sheet
+    expect(writtenValues).not.toContain('40'); // devotionals.part must NOT reach the sheet
+    expect(writtenValues).not.toContain('12'); // devotionals.fof must NOT reach the sheet
+  });
+
+  test('sends null fields to cluster-notebook when devotionals values are blank', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockResolvedValue(null);
+
+    const formData = { ...baseFormData, activities: { ...baseFormData.activities, devotionals: { act: '', part: '', fof: '' } } };
+    await saveRowData('Alpha', formData, 'me@x.com');
+
+    expect(mockUpdateDevotionalGathering).toHaveBeenCalledWith('Alpha', {
+      number: null, participants: null, participantsFof: null,
+    });
+  });
+
+  test('strips commas before sending devotionals counts to cluster-notebook', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockResolvedValue(null);
+
+    const formData = { ...baseFormData, activities: { ...baseFormData.activities, devotionals: { act: '1,200', part: '900', fof: '0' } } };
+    await saveRowData('Alpha', formData, 'me@x.com');
+
+    expect(mockUpdateDevotionalGathering).toHaveBeenCalledWith('Alpha', {
+      number: 1200, participants: 900, participantsFof: 0,
+    });
+  });
+});
+
 describe('findSrpRow', () => {
   const rows = [
     makeRow({ [DEV_COL.NAME]: 'Alabama' }),
