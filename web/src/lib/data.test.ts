@@ -16,14 +16,18 @@ import type { AccessEntry } from '@/types';
 vi.mock('./clusterNotebook', () => ({
   getDevotionalGathering: vi.fn(),
   updateDevotionalGathering: vi.fn(),
+  getNucleusFields: vi.fn(),
+  updateNucleus: vi.fn(),
 }));
 
-import { getDevotionalGathering, updateDevotionalGathering } from './clusterNotebook';
+import { getDevotionalGathering, updateDevotionalGathering, getNucleusFields, updateNucleus } from './clusterNotebook';
 import { getRowData, saveRowData } from './data';
 import { MASTER_TAB } from './config';
 
 const mockGetDevotionalGathering = vi.mocked(getDevotionalGathering);
 const mockUpdateDevotionalGathering = vi.mocked(updateDevotionalGathering);
+const mockGetNucleusFields = vi.mocked(getNucleusFields);
+const mockUpdateNucleus = vi.mocked(updateNucleus);
 
 const mockSheetsGet = vi.mocked(sheetsGet);
 const mockSheetsClear = vi.mocked(sheetsClear);
@@ -142,6 +146,42 @@ describe('getRowData', () => {
 
     await expect(getRowData('Alpha')).rejects.toThrow('cluster-notebook request failed');
   });
+
+  test('overrides stage/locality/makeup with cluster-notebook data, ignoring the sheet columns', async () => {
+    const masterRow = makeRow({
+      [COL.NUCLEUS]: 'Alpha',
+      [COL.STAGE]: 'stale-stage', [COL.LOCALITY]: 'stale-locality', [COL.MAKEUP]: 'stale-makeup',
+    });
+    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
+      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
+      return [];
+    });
+    mockGetDevotionalGathering.mockResolvedValue(null);
+    mockGetNucleusFields.mockResolvedValue({ stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students' });
+
+    const result = await getRowData('Alpha');
+
+    expect(mockGetNucleusFields).toHaveBeenCalledWith('Alpha');
+    expect(result?.row.stage).toBe('Advanced/5');
+    expect(result?.row.locality).toBe('Durham');
+    expect(result?.row.makeup).toBe('Students');
+  });
+
+  test('renders a null cluster-notebook nucleus-fields value as empty strings', async () => {
+    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
+    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
+      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
+      return [];
+    });
+    mockGetDevotionalGathering.mockResolvedValue(null);
+    mockGetNucleusFields.mockResolvedValue(null);
+
+    const result = await getRowData('Alpha');
+
+    expect(result?.row.stage).toBe('');
+    expect(result?.row.locality).toBe('');
+    expect(result?.row.makeup).toBe('');
+  });
 });
 
 describe('saveRowData', () => {
@@ -208,6 +248,50 @@ describe('saveRowData', () => {
     mockUpdateDevotionalGathering.mockRejectedValue(new Error('cluster-notebook has no nucleus named "Alpha" — devotional gathering not saved'));
 
     await expect(saveRowData('Alpha', baseFormData, 'me@x.com')).rejects.toThrow('cluster-notebook has no nucleus named "Alpha"');
+  });
+
+  test('writes stage/locality/makeup via cluster-notebook instead of the sheet', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateNucleus.mockResolvedValue({ stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students' });
+
+    const formData = { ...baseFormData, stage: 'Advanced/5', locality: 'Durham', makeup: 'Students' };
+    await saveRowData('Alpha', formData, 'me@x.com');
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
+      stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students',
+    });
+
+    const updates = mockSheetsBatchUpdate.mock.calls[0][1] as { values: string[][] }[];
+    const writtenValues = updates.map(u => u.values[0][0]);
+    expect(writtenValues).not.toContain('Advanced/5');
+    expect(writtenValues).not.toContain('Students');
+  });
+
+  test('omits patch fields the caller did not provide, rather than sending them as blank', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateNucleus.mockResolvedValue({ stage: 'Advanced/5', locality: null, populationMakeup: null });
+
+    const formData: Record<string, unknown> = { ...baseFormData, stage: 'Advanced/5' };
+    delete formData.locality;
+    await saveRowData('Alpha', formData, 'me@x.com');
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { stage: 'Advanced/5' });
+  });
+
+  test('does not call updateNucleus when none of stage/locality/makeup are present', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockUpdateDevotionalGathering.mockResolvedValue(null);
+
+    const formDataWithoutLocality: Record<string, unknown> = { ...baseFormData };
+    delete formDataWithoutLocality.locality;
+    await saveRowData('Alpha', formDataWithoutLocality, 'me@x.com');
+
+    expect(mockUpdateNucleus).not.toHaveBeenCalled();
   });
 });
 

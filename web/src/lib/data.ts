@@ -7,8 +7,8 @@ import {
   WORKERS_TAB, WORKERS_DATA_ROW, ACC_COL,
   ACCESS_COL,
 } from './config';
-import { getDevotionalGathering, updateDevotionalGathering } from './clusterNotebook';
-import type { DevotionalGathering } from './clusterNotebook';
+import { getDevotionalGathering, updateDevotionalGathering, getNucleusFields, updateNucleus } from './clusterNotebook';
+import type { DevotionalGathering, NucleusFields } from './clusterNotebook';
 import type { AccessEntry } from '@/types';
 
 function normalize(row: string[], numCols: number): string[] {
@@ -21,7 +21,7 @@ function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
 function stripCommas(s: string) { return s ? s.replace(/,/g, '') : s; }
 
-function devotionalsFromClusterNotebook(dg: DevotionalGathering | null) {
+export function devotionalsFromClusterNotebook(dg: DevotionalGathering | null) {
   return {
     act: dg?.number != null ? String(dg.number) : '',
     part: dg?.participants != null ? String(dg.participants) : '',
@@ -33,6 +33,14 @@ function toIntOrNull(value: unknown): number | null {
   const cleaned = stripCommas(String(value ?? ''));
   const n = parseInt(cleaned, 10);
   return Number.isNaN(n) ? null : n;
+}
+
+function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
+  return {
+    stage: fields?.stage ?? '',
+    locality: fields?.locality ?? '',
+    makeup: fields?.populationMakeup ?? '',
+  };
 }
 
 export async function getAccessEntries(): Promise<AccessEntry[]> {
@@ -133,12 +141,13 @@ export function parseSrpData(devRow: string[] | null, eduRow: string[] | null) {
 }
 
 export async function getRowData(nucleusName: string) {
-  const [masterRows, devRows, eduRows, accompanierNames, protagonistNames, abmAssistantNames, devotionalGathering] = await Promise.all([
+  const [masterRows, devRows, eduRows, accompanierNames, protagonistNames, abmAssistantNames, devotionalGathering, nucleusFields] = await Promise.all([
     getAllMasterRows(), getAllDevRows(), getAllEduRows(),
     getWorkerNames(nucleusName, 'accompanier'),
     getWorkerNames(nucleusName, 'protagonist'),
     getWorkerNames(nucleusName, 'abm-assistant'),
     getDevotionalGathering(nucleusName),
+    getNucleusFields(nucleusName),
   ]);
 
   const masterRow = masterRows.find(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
@@ -153,9 +162,12 @@ export async function getRowData(nucleusName: string) {
   };
 
   const row = parseRow(masterRow);
-  // parseRow's devotionals read (from COL.DEV_ACT/PART/FOF) is overwritten here for the detail view,
-  // but /api/initial-data's picker summary still depends on those same sheet columns — don't remove them.
+  // parseRow's devotionals/stage/locality/makeup reads (from COL.DEV_ACT/PART/FOF/STAGE/LOCALITY/MAKEUP)
+  // are overwritten here for the detail view. Devotionals: /api/initial-data's picker summary still
+  // depends on those same sheet columns — don't remove them. Stage/locality: /api/initial-data reads
+  // from cluster-notebook directly now (see that route), so those two sheet columns are fully dead.
   row.activities.devotionals = devotionalsFromClusterNotebook(devotionalGathering);
+  Object.assign(row, nucleusFieldsFromClusterNotebook(nucleusFields));
 
   return {
     row,
@@ -311,8 +323,8 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
 
   const updates = [
     ...identityPairs,
-    [COL.LOCALITY, d.locality], [COL.STAGE, d.stage], [COL.CONTACT, d.contact],
-    [COL.EMAIL, d.email], [COL.AUX_BOARD, d.auxBoard], [COL.MAKEUP, d.makeup],
+    [COL.CONTACT, d.contact],
+    [COL.EMAIL, d.email], [COL.AUX_BOARD, d.auxBoard],
     [COL.TOTAL_POP, d.totalPop], [COL.TOTAL_HH, d.totalHH],
     [COL.IND_NUM, d.indNum],
     [COL.HH_NUM, d.hhNum],
@@ -340,6 +352,13 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
       participants: toIntOrNull(d.activities.devotionals.part),
       participantsFof: toIntOrNull(d.activities.devotionals.fof),
     }));
+  }
+  const nucleusPatch: { stage?: string; locality?: string; populationMakeup?: string } = {};
+  if (d.stage !== undefined) nucleusPatch.stage = d.stage;
+  if (d.locality !== undefined) nucleusPatch.locality = d.locality;
+  if (d.makeup !== undefined) nucleusPatch.populationMakeup = d.makeup;
+  if (Object.keys(nucleusPatch).length > 0) {
+    writes.push(updateNucleus(nucleusName, nucleusPatch));
   }
   await Promise.all(writes);
 

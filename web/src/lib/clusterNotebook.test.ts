@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { getDevotionalGathering, updateDevotionalGathering, getNucleusNames } from './clusterNotebook';
+import { getDevotionalGathering, updateDevotionalGathering, getAllNuclei, getNucleusFields, updateNucleus } from './clusterNotebook';
 
 const mockFetch = vi.fn();
 
@@ -17,21 +17,29 @@ function jsonResponse(body: unknown, ok = true, status = 200) {
   };
 }
 
-describe('getNucleusNames', () => {
-  test('returns the flat list of nucleus names', async () => {
+describe('getAllNuclei', () => {
+  test('returns the full nucleus list with fields and devotionalGathering', async () => {
     mockFetch.mockResolvedValue(jsonResponse({
-      data: { nuclei: [{ name: 'Alpha' }, { name: 'Beta' }] },
+      data: {
+        nuclei: [
+          { name: 'Alpha', stage: 'Initial/2', locality: 'Durham', populationMakeup: 'Mixed', devotionalGathering: { number: 4, participants: 30, participantsFof: 10 } },
+          { name: 'Beta', stage: null, locality: null, populationMakeup: null, devotionalGathering: null },
+        ],
+      },
     }));
 
-    const result = await getNucleusNames();
+    const result = await getAllNuclei();
 
-    expect(result).toEqual(['Alpha', 'Beta']);
+    expect(result).toEqual([
+      { name: 'Alpha', stage: 'Initial/2', locality: 'Durham', populationMakeup: 'Mixed', devotionalGathering: { number: 4, participants: 30, participantsFof: 10 } },
+      { name: 'Beta', stage: null, locality: null, populationMakeup: null, devotionalGathering: null },
+    ]);
   });
 
   test('returns an empty array when there are no nuclei', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { nuclei: [] } }));
 
-    const result = await getNucleusNames();
+    const result = await getAllNuclei();
 
     expect(result).toEqual([]);
   });
@@ -39,7 +47,62 @@ describe('getNucleusNames', () => {
   test('throws when the request fails', async () => {
     mockFetch.mockResolvedValue(jsonResponse({}, false, 500));
 
-    await expect(getNucleusNames()).rejects.toThrow('cluster-notebook request failed: 500');
+    await expect(getAllNuclei()).rejects.toThrow('cluster-notebook request failed: 500');
+  });
+});
+
+describe('getNucleusFields', () => {
+  test('returns stage/locality/populationMakeup for the nucleus', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: { nucleus: { stage: 'Advanced/5', locality: 'Chapel Hill', populationMakeup: 'Students' } },
+    }));
+
+    const result = await getNucleusFields('Alpha');
+
+    expect(result).toEqual({ stage: 'Advanced/5', locality: 'Chapel Hill', populationMakeup: 'Students' });
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ name: 'Alpha' });
+  });
+
+  test('returns null when the nucleus is not found', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: null } }));
+
+    const result = await getNucleusFields('Nonexistent');
+
+    expect(result).toBeNull();
+  });
+});
+
+describe('updateNucleus', () => {
+  test('sends only the provided patch fields and returns the updated value', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: { updateNucleus: { stage: 'Advanced/5', locality: 'Durham', populationMakeup: null } },
+    }));
+
+    const result = await updateNucleus('Alpha', { stage: 'Advanced/5', locality: 'Durham' });
+
+    expect(result).toEqual({ stage: 'Advanced/5', locality: 'Durham', populationMakeup: null });
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ name: 'Alpha', patch: { stage: 'Advanced/5', locality: 'Durham' } });
+  });
+
+  test('omits patch fields the caller did not provide, rather than sending null', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: { updateNucleus: { stage: 'Advanced/5', locality: null, populationMakeup: null } },
+    }));
+
+    await updateNucleus('Alpha', { stage: 'Advanced/5' });
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables.patch).toEqual({ stage: 'Advanced/5' });
+    expect('locality' in body.variables.patch).toBe(false);
+    expect('populationMakeup' in body.variables.patch).toBe(false);
+  });
+
+  test('throws when the mutation returns null (no matching nucleus)', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { updateNucleus: null } }));
+
+    await expect(updateNucleus('Nonexistent', { stage: 'Advanced/5' })).rejects.toThrow('cluster-notebook has no nucleus named "Nonexistent"');
   });
 });
 

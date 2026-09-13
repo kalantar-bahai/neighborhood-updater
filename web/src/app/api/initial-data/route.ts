@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getAccess } from '@/lib/access';
-import { getAllDevRows, parseRow } from '@/lib/data';
-import { getNucleusNames } from '@/lib/clusterNotebook';
+import { getAllDevRows, parseRow, devotionalsFromClusterNotebook } from '@/lib/data';
+import { getAllNuclei } from '@/lib/clusterNotebook';
 import { COL, DEV_COL } from '@/lib/config';
 
 function n(v: string) { return parseInt(v || '0', 10) || 0; }
@@ -30,23 +30,30 @@ export const GET = auth(async (req) => {
   // no-silent-degradation design. Remove this filter once the migration no
   // longer needs it (either fully complete, or once partial-migration testing
   // isn't the priority).
-  const [clusterNotebookNamesList, devRows] = await Promise.all([getNucleusNames(), getAllDevRows()]);
-  const clusterNotebookNames = new Set(clusterNotebookNamesList.map(norm));
+  //
+  // Also overrides locality/stage/devotionals below with cluster-notebook's own
+  // values rather than the (now possibly stale) sheet columns, for the same
+  // nuclei this call already fetched — avoids reintroducing the staleness this
+  // migration is removing field-by-field.
+  const [clusterNotebookNuclei, devRows] = await Promise.all([getAllNuclei(), getAllDevRows()]);
+  const clusterNotebookByName = new Map(clusterNotebookNuclei.map(nuc => [norm(nuc.name), nuc]));
 
   const authorizedRows = access.rows
     .filter(r => (r[COL.NUCLEUS] || '').trim() !== '')
-    .filter(r => clusterNotebookNames.has(norm(r[COL.NUCLEUS])))
+    .filter(r => clusterNotebookByName.has(norm(r[COL.NUCLEUS])))
     .map(r => {
+      const cn = clusterNotebookByName.get(norm(r[COL.NUCLEUS]))!;
       const parsed = parseRow(r);
+      parsed.activities.devotionals = devotionalsFromClusterNotebook(cn.devotionalGathering);
       const acts = Object.values(parsed.activities);
       return {
         nucleus:       r[COL.NUCLEUS],
         parentNucleus: r[COL.PARENT_NUCLEUS],
         grouping:      r[COL.GROUPING],
         cluster:       r[COL.CLUSTER],
-        locality:      r[COL.LOCALITY],
+        locality:      cn.locality ?? '',
         nucleusType:   r[COL.TYPE],
-        stage:         r[COL.STAGE],
+        stage:         cn.stage ?? '',
         totalAct:  acts.reduce((s, a) => s + n(a.act),  0),
         totalPart: acts.reduce((s, a) => s + n(a.part), 0),
         totalFof:  acts.reduce((s, a) => s + n(a.fof),  0),

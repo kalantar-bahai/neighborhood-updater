@@ -32,14 +32,56 @@ async function request<T>(query: string, variables: Record<string, unknown>): Pr
   return json.data as T;
 }
 
-export async function getNucleusNames(): Promise<string[]> {
+export interface NucleusFields {
+  stage: string | null;
+  locality: string | null;
+  populationMakeup: string | null;
+}
+
+export interface NucleusSummary extends NucleusFields {
+  name: string;
+  devotionalGathering: DevotionalGathering | null;
+}
+
+export async function getAllNuclei(): Promise<NucleusSummary[]> {
   const query = `
-    query GetNucleusNames {
-      nuclei { name }
+    query GetAllNuclei {
+      nuclei {
+        name stage locality populationMakeup
+        devotionalGathering { number participants participantsFof }
+      }
     }
   `;
-  const data = await request<{ nuclei: { name: string }[] }>(query, {});
-  return data.nuclei.map(n => n.name);
+  const data = await request<{ nuclei: NucleusSummary[] }>(query, {});
+  return data.nuclei;
+}
+
+export async function getNucleusFields(nucleusName: string): Promise<NucleusFields | null> {
+  const query = `
+    query GetNucleusFields($name: String!) {
+      nucleus(name: $name) { stage locality populationMakeup }
+    }
+  `;
+  const data = await request<{ nucleus: NucleusFields | null }>(query, { name: nucleusName });
+  return data.nucleus;
+}
+
+export async function updateNucleus(
+  nucleusName: string,
+  patch: { stage?: string; locality?: string; populationMakeup?: string }
+): Promise<NucleusFields | null> {
+  const mutation = `
+    mutation UpdateNucleus($name: String!, $patch: NucleusPatch!) {
+      updateNucleus(name: $name, patch: $patch) {
+        stage locality populationMakeup
+      }
+    }
+  `;
+  const data = await request<{ updateNucleus: NucleusFields | null }>(mutation, { name: nucleusName, patch });
+  if (data.updateNucleus === null) {
+    throw new Error(`cluster-notebook has no nucleus named "${nucleusName}" — nucleus fields not saved`);
+  }
+  return data.updateNucleus;
 }
 
 export async function getDevotionalGathering(nucleusName: string): Promise<DevotionalGathering | null> {
