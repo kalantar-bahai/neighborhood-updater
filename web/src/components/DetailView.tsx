@@ -209,12 +209,6 @@ const IcoDiagram2 = () => (
   </svg>
 );
 
-const LOCALITY_OPTIONS = [
-  '', 'Apex', 'Carrboro', 'Cary', 'Chapel Hill', 'Durham', 'Durham County',
-  'Garner', 'Hillsborough', 'Holly Springs', 'Knightdale', 'Morrisville',
-  'Orange County', 'Raleigh', 'Rolesville', 'Wake County', 'Wake Forest',
-  'Wendell', 'Zebulon',
-];
 const TYPE_OPTIONS  = ['', 'Neighborhood', 'Network', 'Population'];
 const STAGE_OPTIONS = ['', 'Potential/1', 'Initial/2', 'Emerging/3', 'Expanding/4', 'Advanced/5', 'Advanced+/6'];
 
@@ -598,10 +592,11 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               <Field label="PG"           value={form.pg}          onChange={isAdmin ? v => set('pg', v)          : undefined} readonly={!isAdmin} fromSheet />
             </div>
             <div className="field-grid-4">
-              {isAdmin
-                ? <SelectField label="Locality" value={form.locality} options={LOCALITY_OPTIONS} onChange={v => set('locality', v)} />
-                : <Field label="Locality" value={form.locality} readonly />
-              }
+              {/* Locality is read-only everywhere: cluster-notebook derives it from
+                  Nucleus.location's own containment chain, and has no write path for
+                  it (removed from NucleusPatch 2026-09-13) — not an admin-permission
+                  distinction like the other Identity fields. */}
+              <Field label="Locality" value={form.locality} readonly />
               <Field label="Nucleus / Pocket" value={form.nucleus} onChange={isAdmin ? v => set('nucleus', v) : undefined} readonly={!isAdmin} fromSheet />
               {isAdmin
                 ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => set('nucleusType', v)} fromSheet />

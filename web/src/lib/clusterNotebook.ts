@@ -86,8 +86,13 @@ export async function getNucleusFields(nucleusName: string): Promise<NucleusFiel
 
 export async function updateNucleus(
   nucleusName: string,
+  // NOTE: no `locality` here — REMOVED from NucleusPatch 2026-09-13. `locality`
+  // is now a read-only derived value (walked up from Nucleus.location's own
+  // containment chain), not a hand-entered field; cluster-notebook has no
+  // write path for it at all right now (setting `location` isn't wired up
+  // either). It's still readable via NucleusFields/getNucleusFields/getAllNuclei.
   patch: {
-    stage?: string; locality?: string; populationMakeup?: string;
+    stage?: string; populationMakeup?: string;
     population?: number | null; households?: number | null;
     connectedPopulation?: number | null; connectedHouseholds?: number | null;
     hasSocialAction?: boolean | null; socialActionDescription?: string;

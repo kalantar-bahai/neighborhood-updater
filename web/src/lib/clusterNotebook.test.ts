@@ -94,14 +94,23 @@ describe('getNucleusFields', () => {
 describe('updateNucleus', () => {
   test('sends only the provided patch fields and returns the updated value', async () => {
     mockFetch.mockResolvedValue(jsonResponse({
-      data: { updateNucleus: { stage: 'Advanced/5', locality: 'Durham', populationMakeup: null } },
+      data: { updateNucleus: { stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students' } },
     }));
 
-    const result = await updateNucleus('Alpha', { stage: 'Advanced/5', locality: 'Durham' });
+    const result = await updateNucleus('Alpha', { stage: 'Advanced/5', populationMakeup: 'Students' });
 
-    expect(result).toEqual({ stage: 'Advanced/5', locality: 'Durham', populationMakeup: null });
+    expect(result).toEqual({ stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students' });
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
-    expect(body.variables).toEqual({ name: 'Alpha', patch: { stage: 'Advanced/5', locality: 'Durham' } });
+    expect(body.variables).toEqual({ name: 'Alpha', patch: { stage: 'Advanced/5', populationMakeup: 'Students' } });
+  });
+
+  test('locality is not a valid patch field — cluster-notebook removed it 2026-09-13 (now read-only, derived)', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      errors: [{ message: "Field 'locality' is not defined by type 'NucleusPatch'." }],
+    }));
+
+    // @ts-expect-error locality is intentionally not part of the patch type anymore
+    await expect(updateNucleus('Alpha', { locality: 'Durham' })).rejects.toThrow("Field 'locality' is not defined");
   });
 
   test('omits patch fields the caller did not provide, rather than sending null', async () => {

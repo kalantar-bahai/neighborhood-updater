@@ -373,8 +373,12 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
       participantsFof: toIntOrNull(d.activities.devotionals.fof),
     }));
   }
+  // NOTE: no `locality` patching — cluster-notebook removed NucleusPatch.locality
+  // 2026-09-13 (it's now a read-only value derived from Nucleus.location's own
+  // containment chain, not a hand-entered field). We still read it in
+  // nucleusFieldsFromClusterNotebook; there's just no write path anymore.
   const nucleusPatch: {
-    stage?: string; locality?: string; populationMakeup?: string;
+    stage?: string; populationMakeup?: string;
     population?: number | null; households?: number | null;
     connectedPopulation?: number | null; connectedHouseholds?: number | null;
     hasSocialAction?: boolean | null; socialActionDescription?: string;
@@ -382,7 +386,6 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     narrative?: string;
   } = {};
   if (d.stage !== undefined) nucleusPatch.stage = d.stage;
-  if (d.locality !== undefined) nucleusPatch.locality = d.locality;
   if (d.makeup !== undefined) nucleusPatch.populationMakeup = d.makeup;
   if (d.totalPop !== undefined) nucleusPatch.population = toIntOrNull(d.totalPop);
   if (d.totalHH !== undefined) nucleusPatch.households = toIntOrNull(d.totalHH);

@@ -281,8 +281,10 @@ describe('saveRowData', () => {
     const formData = { ...baseFormData, stage: 'Advanced/5', locality: 'Durham', makeup: 'Students' };
     await saveRowData('Alpha', formData, 'me@x.com');
 
+    // locality is intentionally absent here even though formData has it: cluster-notebook
+    // removed NucleusPatch.locality 2026-09-13 (now read-only, derived from Nucleus.location).
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
-      stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students',
+      stage: 'Advanced/5', populationMakeup: 'Students',
     });
 
     const updates = mockSheetsBatchUpdate.mock.calls[0][1] as { values: string[][] }[];
@@ -306,7 +308,7 @@ describe('saveRowData', () => {
     await saveRowData('Alpha', formData, 'me@x.com');
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
-      locality: 'Durham', population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
+      population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
     });
 
     const updates = mockSheetsBatchUpdate.mock.calls[0][1] as { values: string[][] }[];
@@ -336,7 +338,6 @@ describe('saveRowData', () => {
     await saveRowData('Alpha', formData, 'me@x.com');
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
-      locality: 'Durham',
       hasSocialAction: true, socialActionDescription: 'Cleanup drive',
       hasCommunityGatherings: false, communityGatheringDescription: '',
     });
@@ -361,7 +362,7 @@ describe('saveRowData', () => {
     await saveRowData('Alpha', formData, 'me@x.com');
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
-      locality: 'Durham', narrative: 'A growing community of practice.',
+      narrative: 'A growing community of practice.',
     });
 
     const updates = mockSheetsBatchUpdate.mock.calls[0][1] as { values: string[][] }[];
@@ -384,7 +385,7 @@ describe('saveRowData', () => {
     await saveRowData('Alpha', formData, 'me@x.com');
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
-      locality: 'Durham', hasSocialAction: null, hasCommunityGatherings: null,
+      hasSocialAction: null, hasCommunityGatherings: null,
     });
   });
 
@@ -400,20 +401,20 @@ describe('saveRowData', () => {
     });
 
     const formData: Record<string, unknown> = { ...baseFormData, stage: 'Advanced/5' };
-    delete formData.locality;
+    delete formData.makeup;
     await saveRowData('Alpha', formData, 'me@x.com');
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { stage: 'Advanced/5' });
   });
 
-  test('does not call updateNucleus when none of stage/locality/makeup are present', async () => {
+  test('does not call updateNucleus when no cluster-notebook-backed nucleus field is present', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
     mockUpdateDevotionalGathering.mockResolvedValue(null);
 
-    const formDataWithoutLocality: Record<string, unknown> = { ...baseFormData };
-    delete formDataWithoutLocality.locality;
-    await saveRowData('Alpha', formDataWithoutLocality, 'me@x.com');
+    // baseFormData's own `locality` is never patchable (read-only, derived on
+    // cluster-notebook's side) — plain baseFormData alone shouldn't trigger a call.
+    await saveRowData('Alpha', baseFormData, 'me@x.com');
 
     expect(mockUpdateNucleus).not.toHaveBeenCalled();
   });
