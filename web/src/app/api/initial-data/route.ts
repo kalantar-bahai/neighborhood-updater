@@ -31,25 +31,33 @@ export const GET = auth(async (req) => {
   // longer needs it (either fully complete, or once partial-migration testing
   // isn't the priority).
   //
-  // Also overrides locality/stage/nucleusType/devotionals below with cluster-notebook's
-  // own values rather than the (now possibly stale) sheet columns, for the same nuclei
-  // this call already fetched — avoids reintroducing the staleness this migration is
-  // removing field-by-field. grouping/cluster in the summary below are NOT yet migrated
-  // (still `r[COL.GROUPING]`/`r[COL.CLUSTER]`) — out of scope for this pass; revisit if
-  // the picker's own grouping/cluster display needs the same treatment later.
+  // The list of valid nuclei is cluster-notebook's, not the Sheet's (2026-09-13,
+  // the user directly) -- this loop is driven by clusterNotebookNuclei, and the
+  // `nucleus` value returned below is cluster-notebook's own name, not the Sheet's
+  // copy of it. The Sheet is consulted only for per-user authorization (does this
+  // user have a row for this name?) and for fields not yet migrated. Also overrides
+  // locality/stage/nucleusType/devotionals with cluster-notebook's own values rather
+  // than the (now possibly stale) sheet columns — avoids reintroducing the staleness
+  // this migration is removing field-by-field. grouping/cluster in the summary below
+  // are NOT yet migrated (still `r[COL.GROUPING]`/`r[COL.CLUSTER]`) — out of scope for
+  // this pass; revisit if the picker's own grouping/cluster display needs the same
+  // treatment later.
   const [clusterNotebookNuclei, devRows] = await Promise.all([getAllNuclei(), getAllDevRows()]);
-  const clusterNotebookByName = new Map(clusterNotebookNuclei.map(nuc => [norm(nuc.name), nuc]));
+  const authorizedByName = new Map(
+    access.rows
+      .filter(r => (r[COL.NUCLEUS] || '').trim() !== '')
+      .map(r => [norm(r[COL.NUCLEUS]), r] as const)
+  );
 
-  const authorizedRows = access.rows
-    .filter(r => (r[COL.NUCLEUS] || '').trim() !== '')
-    .filter(r => clusterNotebookByName.has(norm(r[COL.NUCLEUS])))
-    .map(r => {
-      const cn = clusterNotebookByName.get(norm(r[COL.NUCLEUS]))!;
+  const authorizedRows = clusterNotebookNuclei
+    .filter(cn => authorizedByName.has(norm(cn.name)))
+    .map(cn => {
+      const r = authorizedByName.get(norm(cn.name))!;
       const parsed = parseRow(r);
       parsed.activities.devotionals = devotionalsFromClusterNotebook(cn.devotionalGathering);
       const acts = Object.values(parsed.activities);
       return {
-        nucleus:       r[COL.NUCLEUS],
+        nucleus:       cn.name,
         parentNucleus: r[COL.PARENT_NUCLEUS],
         grouping:      r[COL.GROUPING],
         cluster:       r[COL.CLUSTER],

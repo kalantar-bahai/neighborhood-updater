@@ -217,15 +217,18 @@ export async function getRowData(nucleusName: string) {
   };
 
   const row = parseRow(masterRow);
-  // parseRow's devotionals/stage/locality/makeup/totalPop/totalHH/indNum/hhNum/presence/
+  // parseRow's nucleus/devotionals/stage/locality/makeup/totalPop/totalHH/indNum/hhNum/presence/
   // notesPresence/gatherings/notesGatherings/narrative/grouping/cluster/pg/clusterCode/
-  // nucleusType reads (from the corresponding COL.* sheet columns) are overwritten here for the
-  // detail view. Devotionals: /api/initial-data's picker summary still depends on those same
-  // sheet columns — don't remove them. Everything else here: /api/initial-data doesn't read
-  // these sheet columns anymore either (nucleusType is now sourced from cluster-notebook there
-  // too, see that route) — they're fully dead. grouping/cluster/pg are read-only from
-  // cluster-notebook (no mutation exists for them there); clusterCode is derived client-side
-  // from cluster.name, not read from anywhere.
+  // nucleusType reads (from the corresponding COL.* sheet columns) are all overwritten below —
+  // none of these sheet columns are read by anything else anymore either (/api/initial-data's
+  // picker summary sources the same fields from cluster-notebook now too), so they're fully
+  // dead. grouping/cluster/pg are read-only from cluster-notebook (no mutation exists for them
+  // there); clusterCode is derived client-side from cluster.name, not read from anywhere.
+  // nucleus itself: the list of valid nuclei comes from cluster-notebook, not the Sheet
+  // (2026-09-13, the user directly) — `nucleusName` (this function's own parameter) already IS
+  // that canonical value once it flows from the picker, so it's authoritative here too, not the
+  // Sheet's own (possibly stale, or just differently-cased) copy of the same name.
+  row.nucleus = nucleusName;
   row.activities.devotionals = devotionalsFromClusterNotebook(devotionalGathering);
   Object.assign(row, nucleusFieldsFromClusterNotebook(nucleusFields));
 
@@ -371,14 +374,17 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     return letter;
   };
 
-  // grouping/cluster/pg/clusterCode/nucleusType are deliberately absent here —
+  // nucleus/grouping/cluster/pg/clusterCode/nucleusType are deliberately absent here —
+  // nucleus (the name itself) is no longer editable at all: cluster-notebook's own name is
+  // the canonical identifier now (2026-09-13, the user directly), and cluster-notebook has no
+  // rename mutation, so writing a new name to the sheet would just silently revert on next
+  // load (the picker/detail view would keep showing cluster-notebook's unchanged name).
   // grouping/cluster/pg are read-only from cluster-notebook now
   // (Cluster.groupOfClusters/name/growthMilestone, no mutation exists); clusterCode is derived
   // client-side from cluster.name, not a stored field at all; nucleusType moved to
   // cluster-notebook's own Nucleus.nucleusType (see nucleusPatch below). Writing any of them to
   // the sheet would be silently discarded on next load anyway.
   const identityPairs: [number, unknown][] = d.identity ? [
-    [COL.NUCLEUS,        d.identity.nucleus],
     [COL.PARENT_NUCLEUS, d.identity.parentNucleus],
   ] : [];
 

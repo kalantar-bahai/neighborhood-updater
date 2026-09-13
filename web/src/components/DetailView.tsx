@@ -600,9 +600,15 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               {/* Locality is read-only everywhere: cluster-notebook derives it from
                   Nucleus.location's own containment chain, and has no write path for
                   it (removed from NucleusPatch 2026-09-13) — not an admin-permission
-                  distinction like the other Identity fields. */}
+                  distinction like the other Identity fields. Nucleus (the name itself)
+                  is read-only for an EXISTING nucleus: cluster-notebook's own name is now
+                  the canonical identifier (2026-09-13, the user directly) and cluster-notebook
+                  has no rename mutation — an edit here would silently revert on next load.
+                  Still editable while creating a brand-new nucleus (isNew): it doesn't exist
+                  in cluster-notebook yet, so there's no canonical name to protect, and
+                  createRowData still needs a typed name to create the Sheet row at all. */}
               <Field label="Locality" value={form.locality} readonly />
-              <Field label="Nucleus" value={form.nucleus} onChange={isAdmin ? v => set('nucleus', v) : undefined} readonly={!isAdmin} fromSheet />
+              <Field label="Nucleus" value={form.nucleus} onChange={isNew ? v => set('nucleus', v) : undefined} readonly={!isNew} />
               {isAdmin
                 ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => set('nucleusType', v)} />
                 : <Field label="Type" value={form.nucleusType} readonly />

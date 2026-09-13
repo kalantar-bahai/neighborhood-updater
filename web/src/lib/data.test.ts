@@ -136,6 +136,21 @@ describe('getRowData', () => {
     expect(result).toBeNull();
   });
 
+  test('uses the caller-supplied nucleusName as the canonical name, not the sheet\'s own copy', async () => {
+    // The sheet's own COL.NUCLEUS value differs in case/whitespace from the name the
+    // caller (ultimately cluster-notebook, via the picker) looked this row up by.
+    const masterRow = makeRow({ [COL.NUCLEUS]: '  alpha  ' });
+    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
+      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
+      return [];
+    });
+    mockGetDevotionalGathering.mockResolvedValue(null);
+
+    const result = await getRowData('Alpha');
+
+    expect(result?.row.nucleus).toBe('Alpha');
+  });
+
   test('propagates a cluster-notebook read failure', async () => {
     const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
     mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
@@ -476,15 +491,18 @@ describe('saveRowData', () => {
     expect(writtenValues).not.toContain('A growing community of practice.');
   });
 
-  test('never writes grouping/cluster/pg/clusterCode anywhere -- read-only or derived, no write path exists', async () => {
+  test('never writes nucleus/grouping/cluster/pg/clusterCode anywhere -- read-only, derived, or no rename support', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
     mockUpdateDevotionalGathering.mockResolvedValue(null);
 
     const formData = {
       ...baseFormData,
+      // "Renamed" simulates an attempted rename via the (now read-only) Nucleus field --
+      // cluster-notebook has no rename mutation, so this must never reach the sheet either,
+      // or the app would show a name the picker/cluster-notebook doesn't recognize.
       identity: {
-        nucleus: 'Alpha', parentNucleus: '', grouping: 'NC Eastern',
+        nucleus: 'Renamed', parentNucleus: '', grouping: 'NC Eastern',
         cluster: 'NC-215 Triangle', pg: 'M3', clusterCode: 'NC-215', nucleusType: 'Neighborhood',
       },
     };
@@ -492,6 +510,7 @@ describe('saveRowData', () => {
 
     const updates = mockSheetsBatchUpdate.mock.calls[0][1] as { values: string[][] }[];
     const writtenValues = updates.map(u => u.values[0][0]);
+    expect(writtenValues).not.toContain('Renamed');
     expect(writtenValues).not.toContain('NC Eastern');
     expect(writtenValues).not.toContain('NC-215 Triangle');
     expect(writtenValues).not.toContain('M3');
