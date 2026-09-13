@@ -33,8 +33,10 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 The devotional-gathering field is served by `cluster-notebook`, a separate service. Run it alongside this app:
 
+`cluster-notebook` must be checked out as a sibling of this repository (i.e. `neighborhood/` and `cluster-notebook/` share a parent directory). From inside your `cluster-notebook` checkout, run:
+
 ```bash
-cd ../../cluster-notebook && .venv/bin/uvicorn cluster_notebook.app:app --reload
+.venv/bin/uvicorn cluster_notebook.app:app --reload
 ```
 
 It listens on `http://localhost:8000` by default (matches `CLUSTER_NOTEBOOK_URL` in `.env.local`). Requires a local Postgres instance per `cluster-notebook`'s own README/`.env`.
