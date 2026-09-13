@@ -43,14 +43,14 @@ function actTotal(acts: (Activity | undefined)[]) {
   }), { act: 0, part: 0, fof: 0 });
 }
 
-function Field({ label, value, onChange, readonly, type, integer, onLabelClick, highlighted, onSync }: {
+function Field({ label, value, onChange, readonly, type, integer, onLabelClick, highlighted, onSync, fromSheet }: {
   label: string; value: string; onChange?: (v: string) => void; readonly?: boolean; type?: string; integer?: boolean;
-  onLabelClick?: () => void; highlighted?: boolean; onSync?: () => void;
+  onLabelClick?: () => void; highlighted?: boolean; onSync?: () => void; fromSheet?: boolean;
 }) {
   const hasError = integer && !readonly && !isValidInt(value);
   const cls = [readonly ? 'ro' : '', hasError ? 'error' : '', highlighted ? 'overridden' : ''].filter(Boolean).join(' ');
   return (
-    <div className="field">
+    <div className={`field${fromSheet ? ' from-sheet' : ''}`}>
       {onLabelClick
         ? <label onClick={onLabelClick} style={{ cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>{label} <IcoList /></label>
         : <label>{label}</label>
@@ -77,11 +77,11 @@ function Field({ label, value, onChange, readonly, type, integer, onLabelClick, 
   );
 }
 
-function SelectField({ label, value, options, onChange }: {
-  label: string; value: string; options: string[]; onChange: (v: string) => void;
+function SelectField({ label, value, options, onChange, fromSheet }: {
+  label: string; value: string; options: string[]; onChange: (v: string) => void; fromSheet?: boolean;
 }) {
   return (
-    <div className="field">
+    <div className={`field${fromSheet ? ' from-sheet' : ''}`}>
       <label>{label}</label>
       <select value={value || ''} onChange={e => onChange(e.target.value)}>
         {options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
@@ -90,13 +90,13 @@ function SelectField({ label, value, options, onChange }: {
   );
 }
 
-function PairField({ label, numVal, pctVal, onNumChange, pctReadonly, numInteger }: {
+function PairField({ label, numVal, pctVal, onNumChange, pctReadonly, numInteger, fromSheet }: {
   label: string; numVal: string; pctVal: string;
-  onNumChange: (v: string) => void; pctReadonly?: boolean; numInteger?: boolean;
+  onNumChange: (v: string) => void; pctReadonly?: boolean; numInteger?: boolean; fromSheet?: boolean;
 }) {
   const hasError = numInteger && !isValidInt(numVal);
   return (
-    <div className="pair-field">
+    <div className={`pair-field${fromSheet ? ' from-sheet' : ''}`}>
       <label>{label}</label>
       <div className="pair-inputs">
         <input type="text" value={numVal || ''} placeholder="#" className={hasError ? 'error' : undefined} onChange={e => onNumChange(e.target.value)} />
@@ -582,7 +582,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
       <div className="container">
 
         {/* Identity */}
-        <div className="card from-sheet">
+        <div className="card">
           <div
             className="card-header"
             onClick={() => setIdentityOpen(o => !o)}
@@ -592,20 +592,20 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           </div>
           {identityOpen && <div className="card-body">
             <div className="field-grid-4">
-              <Field label="Grouping"     value={form.grouping}    onChange={isAdmin ? v => set('grouping', v)    : undefined} readonly={!isAdmin} />
-              <Field label="Cluster Code" value={form.clusterCode} onChange={isAdmin ? v => set('clusterCode', v) : undefined} readonly={!isAdmin} />
-              <Field label="Cluster"      value={form.cluster}     onChange={isAdmin ? v => set('cluster', v)     : undefined} readonly={!isAdmin} />
-              <Field label="PG"           value={form.pg}          onChange={isAdmin ? v => set('pg', v)          : undefined} readonly={!isAdmin} />
+              <Field label="Grouping"     value={form.grouping}    onChange={isAdmin ? v => set('grouping', v)    : undefined} readonly={!isAdmin} fromSheet />
+              <Field label="Cluster Code" value={form.clusterCode} onChange={isAdmin ? v => set('clusterCode', v) : undefined} readonly={!isAdmin} fromSheet />
+              <Field label="Cluster"      value={form.cluster}     onChange={isAdmin ? v => set('cluster', v)     : undefined} readonly={!isAdmin} fromSheet />
+              <Field label="PG"           value={form.pg}          onChange={isAdmin ? v => set('pg', v)          : undefined} readonly={!isAdmin} fromSheet />
             </div>
             <div className="field-grid-4">
               {isAdmin
                 ? <SelectField label="Locality" value={form.locality} options={LOCALITY_OPTIONS} onChange={v => set('locality', v)} />
                 : <Field label="Locality" value={form.locality} readonly />
               }
-              <Field label="Nucleus / Pocket" value={form.nucleus} onChange={isAdmin ? v => set('nucleus', v) : undefined} readonly={!isAdmin} />
+              <Field label="Nucleus / Pocket" value={form.nucleus} onChange={isAdmin ? v => set('nucleus', v) : undefined} readonly={!isAdmin} fromSheet />
               {isAdmin
-                ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => set('nucleusType', v)} />
-                : <Field label="Type" value={form.nucleusType} readonly />
+                ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => set('nucleusType', v)} fromSheet />
+                : <Field label="Type" value={form.nucleusType} readonly fromSheet />
               }
               {isAdmin
                 ? <SelectField label="Stage" value={form.stage} options={STAGE_OPTIONS} onChange={v => set('stage', v)} />
@@ -613,37 +613,38 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               }
             </div>
             <div className="field-grid-4">
-              <Field label="Contact"                   value={form.contact}  onChange={isAdmin ? v => set('contact', v)  : undefined} readonly={!isAdmin} />
-              <Field label="Contact Email"             value={form.email}    onChange={isAdmin ? v => set('email', v)    : undefined} readonly={!isAdmin} />
-              <Field label="Auxiliary Board Member(s)" value={form.auxBoard} onChange={isAdmin ? v => set('auxBoard', v) : undefined} readonly={!isAdmin} />
+              <Field label="Contact"                   value={form.contact}  onChange={isAdmin ? v => set('contact', v)  : undefined} readonly={!isAdmin} fromSheet />
+              <Field label="Contact Email"             value={form.email}    onChange={isAdmin ? v => set('email', v)    : undefined} readonly={!isAdmin} fromSheet />
+              <Field label="Auxiliary Board Member(s)" value={form.auxBoard} onChange={isAdmin ? v => set('auxBoard', v) : undefined} readonly={!isAdmin} fromSheet />
               <Field
                 label="ABm Assistant"
                 value={abmAssistantNames.join(', ')}
                 readonly
                 onLabelClick={isAdmin ? () => setShowAbmAssistantModal(true) : undefined}
+                fromSheet
               />
             </div>
           </div>}
         </div>
 
         {/* Population */}
-        <div className="card from-sheet">
+        <div className="card">
           <div className="card-header">Population</div>
           <div className="card-body">
             <div className="field-grid-2">
-              <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} integer />
-              <Field label="Total Households" value={form.totalHH}  onChange={v => set('totalHH', v)} integer />
+              <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} integer fromSheet />
+              <Field label="Total Households" value={form.totalHH}  onChange={v => set('totalHH', v)} integer fromSheet />
             </div>
             <div className="field-grid-2">
               <PairField
                 label="Individuals Connected"
                 numVal={form.indNum} pctVal={computedPct(form.indNum, form.totalPop)}
-                onNumChange={v => set('indNum', v)} pctReadonly numInteger
+                onNumChange={v => set('indNum', v)} pctReadonly numInteger fromSheet
               />
               <PairField
                 label="Households Connected"
                 numVal={form.hhNum} pctVal={computedPct(form.hhNum, form.totalHH)}
-                onNumChange={v => set('hhNum', v)} pctReadonly numInteger
+                onNumChange={v => set('hhNum', v)} pctReadonly numInteger fromSheet
               />
             </div>
             <div className="field">
