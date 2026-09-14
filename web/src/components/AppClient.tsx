@@ -90,6 +90,7 @@ export default function AppClient() {
       protagonistNames: [],
       abmAssistantNames: [],
       contactNames: [],
+      promoterNames: [],
     };
     return (
       <DetailView

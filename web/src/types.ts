@@ -94,6 +94,7 @@ export interface NucleusDetail {
   abmAssistantNames: Worker[];
   // At most one entry -- Contact is a single-person role, unlike the other three.
   contactNames: Worker[];
+  promoterNames: Worker[];
 }
 
 export interface InitialData {

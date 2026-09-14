@@ -383,6 +383,8 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
   const [showAbmAssistantModal, setShowAbmAssistantModal] = useState(false);
   const [contactNames, setContactNames] = useState<Worker[]>(() => detail.contactNames);
   const [showContactModal, setShowContactModal] = useState(false);
+  const [promoterNames, setPromoterNames] = useState<Worker[]>(() => detail.promoterNames);
+  const [showPromotersModal, setShowPromotersModal] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(!!isNew);
   const [accessOpen, setAccessOpen] = useState(false);
   const [dangerOpen, setDangerOpen] = useState(false);
@@ -627,16 +629,28 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           </div>}
         </div>
 
-        {/* Overview (formerly "Workers & Prevalence"). Mixed-source now: protagonists/
-            accompaniers are still Sheet-sourced free-text counts, facilitators is
-            cluster-notebook-sourced -- so the fromSheet marker moved to field level
-            instead of the whole card, per the established per-field convention. */}
+        {/* Overview (formerly "Workers & Prevalence"). Mixed-source now: Helpers/
+            Accompanying are still Sheet-sourced free-text counts, Facilitating Core
+            Activity is cluster-notebook-sourced, Participants/In Core Activity are
+            computed totals from the Activities card -- so the fromSheet marker moved
+            to field level instead of the whole card, per the established per-field
+            convention. Promoters is a new role (2026-09-14), backed by cluster-notebook
+            like Contact/ABm Assistant, no free-text count of its own. */}
         <div className="card">
           <div className="card-header">Overview</div>
           <div className="card-body">
             <div className="field-grid-3">
+              {/* Copied from the Activities card's totals, not independently entered --
+                  same non-editable treatment as Facilitating Core Activity below. */}
+              <Field label="Participants" value={String(allTotal.part)} readonly />
               <Field
-                label="Protagonists / Workers"
+                label="Promoters"
+                value={promoterNames.map(w => w.name).join(', ')}
+                readonly
+                onLabelClick={() => setShowPromotersModal(true)}
+              />
+              <Field
+                label="Helpers"
                 value={form.protagonists}
                 onChange={v => set('protagonists', v)}
                 integer
@@ -645,8 +659,12 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
                 onSync={() => set('protagonists', String(protagonistNames.length))}
                 fromSheet
               />
+            </div>
+            <div className="field-grid-3">
+              <Field label="In Core Activity" value={String(edTotal.part)} readonly />
+              <Field label="Facilitating Core Activity" value={form.facilitators} readonly />
               <Field
-                label="Accompaniers in Nucleus"
+                label="Accompanying"
                 value={form.accompaniers}
                 onChange={v => set('accompaniers', v)}
                 integer
@@ -655,7 +673,6 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
                 onSync={() => set('accompaniers', String(accompanierNames.length))}
                 fromSheet
               />
-              <Field label="Facilitators" value={form.facilitators} readonly />
             </div>
           </div>
         </div>
@@ -915,6 +932,17 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           single
           onChange={workers => setContactNames(workers)}
           onClose={() => setShowContactModal(false)}
+        />
+      )}
+
+      {showPromotersModal && (
+        <WorkerListModal
+          title="Promoters"
+          role="promoter"
+          nucleus={row.nucleus}
+          workers={promoterNames}
+          onChange={workers => setPromoterNames(workers)}
+          onClose={() => setShowPromotersModal(false)}
         />
       )}
 

@@ -336,7 +336,7 @@ describe('getRowData', () => {
     expect(result?.row.auxBoard).toBe('');
   });
 
-  test('fetches accompanier/protagonist/abm-assistant/contact workers from cluster-notebook, mapped to {id, name, email}', async () => {
+  test('fetches accompanier/protagonist/abm-assistant/contact/promoter workers from cluster-notebook, mapped to {id, name, email}', async () => {
     const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
     mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
       if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
@@ -350,6 +350,7 @@ describe('getRowData', () => {
       if (role === 'protagonist') return [{ id: '2', firstName: 'Bob', email: null, ...blank }];
       if (role === 'abm-assistant') return [{ id: '3', firstName: 'Carol', email: null, ...blank }];
       if (role === 'contact') return [{ id: '4', firstName: 'Dave', email: 'dave@x.com', ...blank }];
+      if (role === 'promoter') return [{ id: '5', firstName: 'Erin', email: null, ...blank }];
       return [];
     });
 
@@ -359,10 +360,12 @@ describe('getRowData', () => {
     expect(mockGetNucleusWorkers).toHaveBeenCalledWith('Alpha', 'protagonist');
     expect(mockGetNucleusWorkers).toHaveBeenCalledWith('Alpha', 'abm-assistant');
     expect(mockGetNucleusWorkers).toHaveBeenCalledWith('Alpha', 'contact');
+    expect(mockGetNucleusWorkers).toHaveBeenCalledWith('Alpha', 'promoter');
     expect(result?.accompanierNames).toEqual([{ id: '1', name: 'Alice', email: null }]);
     expect(result?.protagonistNames).toEqual([{ id: '2', name: 'Bob', email: null }]);
     expect(result?.abmAssistantNames).toEqual([{ id: '3', name: 'Carol', email: null }]);
     expect(result?.contactNames).toEqual([{ id: '4', name: 'Dave', email: 'dave@x.com' }]);
+    expect(result?.promoterNames).toEqual([{ id: '5', name: 'Erin', email: null }]);
   });
 });
 

@@ -211,12 +211,13 @@ function toWorkers(individuals: Individual[]): Worker[] {
 }
 
 export async function getRowData(nucleusName: string) {
-  const [masterRows, accompanierWorkers, protagonistWorkers, abmAssistantWorkers, contactWorkers, activitySummaries, nucleusFields] = await Promise.all([
+  const [masterRows, accompanierWorkers, protagonistWorkers, abmAssistantWorkers, contactWorkers, promoterWorkers, activitySummaries, nucleusFields] = await Promise.all([
     getAllMasterRows(),
     getNucleusWorkers(nucleusName, 'accompanier'),
     getNucleusWorkers(nucleusName, 'protagonist'),
     getNucleusWorkers(nucleusName, 'abm-assistant'),
     getNucleusWorkers(nucleusName, 'contact'),
+    getNucleusWorkers(nucleusName, 'promoter'),
     getActivitySummaries(nucleusName),
     getNucleusFields(nucleusName),
   ]);
@@ -250,6 +251,7 @@ export async function getRowData(nucleusName: string) {
     protagonistNames: toWorkers(protagonistWorkers),
     abmAssistantNames: toWorkers(abmAssistantWorkers),
     contactNames: toWorkers(contactWorkers),
+    promoterNames: toWorkers(promoterWorkers),
   };
 }
 

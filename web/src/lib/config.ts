@@ -76,11 +76,13 @@ export const DEV_COL = {
   NATIONAL_COMMUNITY: 9, DEV_ACT: 10, DEV_PART: 11, DEV_FOF: 12, COMMENTS: 13,
 } as const;
 
-// Worker/role lists (accompanier/protagonist/abm-assistant/contact) now live
+// Worker/role lists (accompanier/protagonist/abm-assistant/contact/promoter) now live
 // entirely in cluster-notebook (Individual + RoleInNE) -- no Sheet tab/columns
 // for them anymore. `contact` is single-valued (see WorkerListModal's `single`
-// prop) but otherwise uses the same read/write shape as the others.
-export const WORKER_TYPES = ['accompanier', 'protagonist', 'abm-assistant', 'contact'] as const;
+// prop) but otherwise uses the same read/write shape as the others. `promoter`
+// (2026-09-14, Overview card restructure) is a fresh role, not tied to any prior
+// Sheet-sourced field.
+export const WORKER_TYPES = ['accompanier', 'protagonist', 'abm-assistant', 'contact', 'promoter'] as const;
 export type WorkerType = typeof WORKER_TYPES[number];
 
 export const ACCESS_COL = {
