@@ -19,13 +19,14 @@ vi.mock('./clusterNotebook', () => ({
   getNucleusFields: vi.fn(),
   updateNucleus: vi.fn(),
   getNucleusWorkers: vi.fn(),
+  createNucleus: vi.fn(),
   individualDisplayName: vi.fn((ind: { firstName?: string | null }) => ind.firstName ?? ''),
 }));
 
 import {
-  getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus, getNucleusWorkers,
+  getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus, getNucleusWorkers, createNucleus,
 } from './clusterNotebook';
-import { getRowData, saveRowData } from './data';
+import { getRowData, saveRowData, createRowData } from './data';
 import { MASTER_TAB } from './config';
 
 const mockGetActivitySummaries = vi.mocked(getActivitySummaries);
@@ -33,6 +34,7 @@ const mockUpdateActivitySummary = vi.mocked(updateActivitySummary);
 const mockGetNucleusFields = vi.mocked(getNucleusFields);
 const mockUpdateNucleus = vi.mocked(updateNucleus);
 const mockGetNucleusWorkers = vi.mocked(getNucleusWorkers);
+const mockCreateNucleus = vi.mocked(createNucleus);
 
 const mockSheetsGet = vi.mocked(sheetsGet);
 const mockSheetsClear = vi.mocked(sheetsClear);
@@ -661,6 +663,117 @@ describe('saveRowData', () => {
     await saveRowData('Alpha', baseFormData, 'me@x.com');
 
     expect(mockUpdateNucleus).not.toHaveBeenCalled();
+  });
+});
+
+describe('createRowData', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const baseCreateFormData = {
+    identity: { nucleus: 'Riverside', cluster: 'NC-215 Triangle' },
+    activities: {
+      ccs:  { act: '', part: '', fof: '' },
+      jygs: { act: '', part: '', fof: '' },
+      scs:  { act: '', part: '', fof: '' },
+      devotionals: { act: '', part: '', fof: '' },
+    },
+  };
+
+  test('creates via cluster-notebook, then writes a minimal sheet stub row', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockCreateNucleus.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+    });
+
+    await createRowData(baseCreateFormData, 'me@x.com');
+
+    expect(mockCreateNucleus).toHaveBeenCalledWith('Riverside', 'NC-215 Triangle');
+    const updates = mockSheetsBatchUpdate.mock.calls[0][1] as { range: string; values: string[][] }[];
+    expect(updates).toHaveLength(1);
+    const [newRow] = updates[0].values;
+    expect(newRow[COL.NUCLEUS]).toBe('Riverside');
+    // Grouping/Cluster/PG/ClusterCode/Locality/Stage etc. are NOT seeded into the sheet
+    // anymore -- getRowData overwrites all of them from cluster-notebook on next load.
+    expect(newRow[COL.GROUPING]).toBe('');
+    expect(newRow[COL.CLUSTER]).toBe('');
+  });
+
+  test('throws when nucleus name is missing', async () => {
+    await expect(createRowData({ identity: { cluster: 'NC-215 Triangle' } }, 'me@x.com'))
+      .rejects.toThrow('Nucleus name is required');
+    expect(mockCreateNucleus).not.toHaveBeenCalled();
+  });
+
+  test('throws when cluster is missing', async () => {
+    await expect(createRowData({ identity: { nucleus: 'Riverside' } }, 'me@x.com'))
+      .rejects.toThrow('Cluster is required');
+    expect(mockCreateNucleus).not.toHaveBeenCalled();
+  });
+
+  test('rejects a name already present in the sheet, without calling cluster-notebook', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Riverside' })]);
+
+    await expect(createRowData(baseCreateFormData, 'me@x.com')).rejects.toThrow('already exists');
+    expect(mockCreateNucleus).not.toHaveBeenCalled();
+  });
+
+  test('maps a duplicate-name error from cluster-notebook to the same CONFLICT code', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockCreateNucleus.mockRejectedValue(new Error("cluster-notebook GraphQL error: A nucleus named 'Riverside' already exists."));
+
+    let caught: unknown;
+    try {
+      await createRowData(baseCreateFormData, 'me@x.com');
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toContain('already exists');
+    expect((caught as { code?: string }).code).toBe('CONFLICT');
+  });
+
+  test('throws a BAD_CLUSTER-coded error when the cluster name is not found', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockCreateNucleus.mockResolvedValue(null);
+
+    let caught: unknown;
+    try {
+      await createRowData(baseCreateFormData, 'me@x.com');
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as { code?: string }).code).toBe('BAD_CLUSTER');
+    expect(mockSheetsBatchUpdate).not.toHaveBeenCalled();
+  });
+
+  test('pushes activity and nucleus-patch writes through cluster-notebook, same as saveRowData', async () => {
+    mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
+    mockSheetsBatchUpdate.mockResolvedValue(undefined);
+    mockCreateNucleus.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+    });
+    mockUpdateActivitySummary.mockResolvedValue(null);
+    mockUpdateNucleus.mockResolvedValue(null);
+
+    const formData = {
+      ...baseCreateFormData,
+      stage: 'Initial/2',
+      activities: { ...baseCreateFormData.activities, ccs: { act: '1', part: '2', fof: '3' } },
+    };
+    await createRowData(formData, 'me@x.com');
+
+    expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Riverside', 'CHILDRENS_CLASS', { number: 1, participants: 2, participantsFof: 3 });
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Riverside', { stage: 'Initial/2' });
   });
 });
 

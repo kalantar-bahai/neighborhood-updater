@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getAccess } from '@/lib/access';
-import { getRowData, saveRowData, createRowData, deleteRowData } from '@/lib/data';
+import { getRowData, saveRowData, createRowData, deleteRowData, CodedError } from '@/lib/data';
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
 function effectiveRole(roleMap: Record<string, string>, nucleus: string) {
@@ -91,8 +91,11 @@ export const PUT = auth(async (req) => {
     const result = await createRowData(formData, email);
     return NextResponse.json(result);
   } catch (e: unknown) {
-    if (e instanceof Error && (e as any).code === 'CONFLICT') {
+    if (e instanceof CodedError && e.code === 'CONFLICT') {
       return NextResponse.json({ error: e.message }, { status: 409 });
+    }
+    if (e instanceof CodedError && e.code === 'BAD_CLUSTER') {
+      return NextResponse.json({ error: e.message }, { status: 400 });
     }
     throw e;
   }

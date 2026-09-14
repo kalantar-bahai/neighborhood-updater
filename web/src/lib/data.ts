@@ -8,10 +8,18 @@ import {
 } from './config';
 import {
   getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus,
-  getNucleusWorkers, individualDisplayName,
+  getNucleusWorkers, individualDisplayName, createNucleus,
 } from './clusterNotebook';
 import type { ActivitySummary, ActivitySummaries, ActivityType, NucleusFields, Individual } from './clusterNotebook';
 import type { AccessEntry, Activity, Worker } from '@/types';
+
+// Lets callers (route handlers) distinguish error cases (e.g. 409 vs 400)
+// without an `as any` cast on `.code`.
+export class CodedError extends Error {
+  constructor(message: string, public code: string) {
+    super(message);
+  }
+}
 
 function normalize(row: string[], numCols: number): string[] {
   const r = row ? [...row] : [];
@@ -257,59 +265,123 @@ export async function deleteRowData(nucleusName: string): Promise<void> {
   await sheetsDeleteRow(MASTER_SHEET_ID, MASTER_TAB, sheetRowIndex);
 }
 
+// Shape of the bits of submitted form data activityUpdateWrites/
+// nucleusPatchFromFormData actually read -- formData itself arrives as
+// Record<string, unknown> from the API route, so this is a narrowing, not a
+// claim about the full form shape.
+interface FormDataInput {
+  activities?: Partial<Record<'ccs' | 'jygs' | 'scs' | 'devotionals', { act?: string; part?: string; fof?: string }>>;
+  stage?: string; makeup?: string;
+  totalPop?: string; totalHH?: string; indNum?: string; hhNum?: string;
+  presence?: string; notesPresence?: string;
+  gatherings?: string; notesGatherings?: string;
+  narrative?: string;
+  identity?: { nucleusType?: string };
+}
+
+// Shared between createRowData and saveRowData -- each of the four activity
+// rollups writes straight to cluster-notebook's updateActivitySummary, one call
+// per activity type present in the submitted form.
+function activityUpdateWrites(nucleusName: string, d: FormDataInput): Promise<unknown>[] {
+  const ACTIVITY_KEYS: [keyof NonNullable<FormDataInput['activities']>, ActivityType][] = [
+    ['ccs', 'CHILDRENS_CLASS'],
+    ['jygs', 'JUNIOR_YOUTH_GROUP'],
+    ['scs', 'STUDY_CIRCLE'],
+    ['devotionals', 'DEVOTIONAL_GATHERING'],
+  ];
+  const writes: Promise<unknown>[] = [];
+  for (const [key, activityType] of ACTIVITY_KEYS) {
+    const act = d.activities?.[key];
+    if (act) {
+      writes.push(updateActivitySummary(nucleusName, activityType, {
+        number: toIntOrNull(act.act),
+        participants: toIntOrNull(act.part),
+        participantsFof: toIntOrNull(act.fof),
+      }));
+    }
+  }
+  return writes;
+}
+
+// Shared between createRowData and saveRowData -- builds the same NucleusPatch
+// shape from submitted form data either way. No `locality`: cluster-notebook
+// removed NucleusPatch.locality 2026-09-13 (it's now a read-only value derived
+// from Nucleus.location's own containment chain, not a hand-entered field).
+function nucleusPatchFromFormData(d: FormDataInput) {
+  const nucleusPatch: {
+    stage?: string; populationMakeup?: string;
+    population?: number | null; households?: number | null;
+    connectedPopulation?: number | null; connectedHouseholds?: number | null;
+    hasSocialAction?: boolean | null; socialActionDescription?: string;
+    hasCommunityGatherings?: boolean | null; communityGatheringDescription?: string;
+    narrative?: string;
+    nucleusType?: string;
+  } = {};
+  if (d.stage !== undefined) nucleusPatch.stage = d.stage;
+  if (d.makeup !== undefined) nucleusPatch.populationMakeup = d.makeup;
+  if (d.totalPop !== undefined) nucleusPatch.population = toIntOrNull(d.totalPop);
+  if (d.totalHH !== undefined) nucleusPatch.households = toIntOrNull(d.totalHH);
+  if (d.indNum !== undefined) nucleusPatch.connectedPopulation = toIntOrNull(d.indNum);
+  if (d.hhNum !== undefined) nucleusPatch.connectedHouseholds = toIntOrNull(d.hhNum);
+  if (d.presence !== undefined) nucleusPatch.hasSocialAction = toBoolOrNull(d.presence);
+  if (d.notesPresence !== undefined) nucleusPatch.socialActionDescription = d.notesPresence;
+  if (d.gatherings !== undefined) nucleusPatch.hasCommunityGatherings = toBoolOrNull(d.gatherings);
+  if (d.notesGatherings !== undefined) nucleusPatch.communityGatheringDescription = d.notesGatherings;
+  if (d.narrative !== undefined) nucleusPatch.narrative = d.narrative;
+  // nucleusType is nested under identity (admin/create-only), unlike the other patch fields above.
+  if (d.identity && d.identity.nucleusType !== undefined) nucleusPatch.nucleusType = d.identity.nucleusType;
+  return nucleusPatch;
+}
+
+// Identity (name + cluster) is established via cluster-notebook's createNucleus,
+// 2026-09-14 -- everything else (stage, population, activities, narrative, etc.)
+// goes through the exact same update calls saveRowData uses for editing, not a
+// separate seed-write. We still write a minimal Sheet stub row (just the name and
+// parent), because our own access-control matching (getAccess, still Sheet-based
+// per docs §6) requires a Sheet row to exist for a nucleus to be visible in the
+// picker at all -- independent of whether it exists in cluster-notebook.
 export async function createRowData(formData: Record<string, unknown>, userEmail: string) {
-  const allRows = await getAllMasterRows();
   const d = formData as any;
   const newNucleus = ((d.identity?.nucleus) || '').trim();
+  const clusterName = ((d.identity?.cluster) || '').trim();
 
   if (!newNucleus) throw new Error('Nucleus name is required');
+  if (!clusterName) throw new Error('Cluster is required');
 
+  const allRows = await getAllMasterRows();
   if (allRows.some(r => norm(r[COL.NUCLEUS]) === norm(newNucleus))) {
-    const err = new Error(`A nucleus named "${newNucleus}" already exists`);
-    (err as any).code = 'CONFLICT';
-    throw err;
+    throw new CodedError(`A nucleus named "${newNucleus}" already exists`, 'CONFLICT');
+  }
+
+  let created;
+  try {
+    created = await createNucleus(newNucleus, clusterName);
+  } catch (e) {
+    // Global uniqueness is enforced at cluster-notebook's DB level too (2026-09-14) --
+    // treat their duplicate-name error the same as our own pre-check above.
+    if (e instanceof Error && /already exists/i.test(e.message)) {
+      throw new CodedError(`A nucleus named "${newNucleus}" already exists`, 'CONFLICT');
+    }
+    throw e;
+  }
+  if (created === null) {
+    throw new CodedError(`cluster-notebook has no cluster named "${clusterName}" — nucleus not created`, 'BAD_CLUSTER');
   }
 
   const sheetRow = MASTER_DATA_ROW + allRows.length;
   const newRow = new Array(52).fill('');
+  newRow[COL.NUCLEUS]        = newNucleus;
+  newRow[COL.PARENT_NUCLEUS] = d.identity?.parentNucleus || '';
 
-  newRow[COL.GROUPING]       = d.identity?.grouping       || '';
-  newRow[COL.CLUSTER]        = d.identity?.cluster        || '';
-  newRow[COL.PG]             = d.identity?.pg             || '';
-  newRow[COL.CLUSTER_CODE]   = d.identity?.clusterCode    || '';
-  newRow[COL.LOCALITY]       = d.locality                 || '';
-  newRow[COL.NUCLEUS]        = d.identity?.nucleus        || '';
-  newRow[COL.PARENT_NUCLEUS] = d.identity?.parentNucleus  || '';
-  newRow[COL.TYPE]           = d.identity?.nucleusType    || '';
-  newRow[COL.STAGE]          = d.stage                    || '';
-  newRow[COL.AUX_BOARD]      = d.auxBoard                 || '';
-  newRow[COL.MAKEUP]         = d.makeup                   || '';
-  newRow[COL.TOTAL_POP]      = d.totalPop                 || '';
-  newRow[COL.TOTAL_HH]       = d.totalHH                  || '';
-  newRow[COL.IND_NUM]        = d.indNum                   || '';
-  newRow[COL.HH_NUM]         = d.hhNum                    || '';
-  newRow[COL.CC_ACT]         = d.activities?.ccs?.act     || '';
-  newRow[COL.CC_PART]        = d.activities?.ccs?.part    || '';
-  newRow[COL.CC_FOF]         = d.activities?.ccs?.fof     || '';
-  newRow[COL.JYG_ACT]        = d.activities?.jygs?.act    || '';
-  newRow[COL.JYG_PART]       = d.activities?.jygs?.part   || '';
-  newRow[COL.JYG_FOF]        = d.activities?.jygs?.fof    || '';
-  newRow[COL.SC_ACT]         = d.activities?.scs?.act     || '';
-  newRow[COL.SC_PART]        = d.activities?.scs?.part    || '';
-  newRow[COL.SC_FOF]         = d.activities?.scs?.fof     || '';
-  newRow[COL.DEV_ACT]        = d.activities?.devotionals?.act  || '';
-  newRow[COL.DEV_PART]       = d.activities?.devotionals?.part || '';
-  newRow[COL.DEV_FOF]        = d.activities?.devotionals?.fof  || '';
-  newRow[COL.PRESENCE]       = d.presence                 || '';
-  newRow[COL.NOTES_PRESENCE] = d.notesPresence            || '';
-  newRow[COL.GATHERINGS]     = d.gatherings               || '';
-  newRow[COL.NOTES_GATHERINGS] = d.notesGatherings        || '';
-  newRow[COL.NARRATIVE]      = d.narrative                || '';
-
-  await sheetsBatchUpdate(MASTER_SHEET_ID, [{
-    range: `${MASTER_TAB}!A${sheetRow}`,
-    values: [newRow],
-  }]);
+  const writes: Promise<unknown>[] = [
+    sheetsBatchUpdate(MASTER_SHEET_ID, [{ range: `${MASTER_TAB}!A${sheetRow}`, values: [newRow] }]),
+    ...activityUpdateWrites(newNucleus, d),
+  ];
+  const nucleusPatch = nucleusPatchFromFormData(d);
+  if (Object.keys(nucleusPatch).length > 0) {
+    writes.push(updateNucleus(newNucleus, nucleusPatch));
+  }
+  await Promise.all(writes);
 
   return { success: true, savedBy: userEmail, savedAt: new Date().toISOString() };
 }
@@ -349,52 +421,14 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
       values: [[(value ?? '') as string]],
     }));
 
-  const writes: Promise<unknown>[] = [sheetsBatchUpdate(MASTER_SHEET_ID, updates)];
   // cc/jyg/sc/devotionals are no longer Sheet columns at all (see COL.CC_ACT etc.'s
   // "dead" comments) -- each now writes straight to cluster-notebook's shared
   // updateActivitySummary mutation, one call per activity type.
-  const ACTIVITY_KEYS: [keyof typeof d.activities, ActivityType][] = [
-    ['ccs', 'CHILDRENS_CLASS'],
-    ['jygs', 'JUNIOR_YOUTH_GROUP'],
-    ['scs', 'STUDY_CIRCLE'],
-    ['devotionals', 'DEVOTIONAL_GATHERING'],
+  const writes: Promise<unknown>[] = [
+    sheetsBatchUpdate(MASTER_SHEET_ID, updates),
+    ...activityUpdateWrites(nucleusName, d),
   ];
-  for (const [key, activityType] of ACTIVITY_KEYS) {
-    const act = d.activities?.[key];
-    if (act) {
-      writes.push(updateActivitySummary(nucleusName, activityType, {
-        number: toIntOrNull(act.act),
-        participants: toIntOrNull(act.part),
-        participantsFof: toIntOrNull(act.fof),
-      }));
-    }
-  }
-  // NOTE: no `locality` patching — cluster-notebook removed NucleusPatch.locality
-  // 2026-09-13 (it's now a read-only value derived from Nucleus.location's own
-  // containment chain, not a hand-entered field). We still read it in
-  // nucleusFieldsFromClusterNotebook; there's just no write path anymore.
-  const nucleusPatch: {
-    stage?: string; populationMakeup?: string;
-    population?: number | null; households?: number | null;
-    connectedPopulation?: number | null; connectedHouseholds?: number | null;
-    hasSocialAction?: boolean | null; socialActionDescription?: string;
-    hasCommunityGatherings?: boolean | null; communityGatheringDescription?: string;
-    narrative?: string;
-    nucleusType?: string;
-  } = {};
-  if (d.stage !== undefined) nucleusPatch.stage = d.stage;
-  if (d.makeup !== undefined) nucleusPatch.populationMakeup = d.makeup;
-  if (d.totalPop !== undefined) nucleusPatch.population = toIntOrNull(d.totalPop);
-  if (d.totalHH !== undefined) nucleusPatch.households = toIntOrNull(d.totalHH);
-  if (d.indNum !== undefined) nucleusPatch.connectedPopulation = toIntOrNull(d.indNum);
-  if (d.hhNum !== undefined) nucleusPatch.connectedHouseholds = toIntOrNull(d.hhNum);
-  if (d.presence !== undefined) nucleusPatch.hasSocialAction = toBoolOrNull(d.presence);
-  if (d.notesPresence !== undefined) nucleusPatch.socialActionDescription = d.notesPresence;
-  if (d.gatherings !== undefined) nucleusPatch.hasCommunityGatherings = toBoolOrNull(d.gatherings);
-  if (d.notesGatherings !== undefined) nucleusPatch.communityGatheringDescription = d.notesGatherings;
-  if (d.narrative !== undefined) nucleusPatch.narrative = d.narrative;
-  // nucleusType is nested under identity (admin/create-only), unlike the other patch fields above.
-  if (d.identity && d.identity.nucleusType !== undefined) nucleusPatch.nucleusType = d.identity.nucleusType;
+  const nucleusPatch = nucleusPatchFromFormData(d);
   if (Object.keys(nucleusPatch).length > 0) {
     writes.push(updateNucleus(nucleusName, nucleusPatch));
   }

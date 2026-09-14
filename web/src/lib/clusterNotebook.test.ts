@@ -2,6 +2,7 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import {
   getActivitySummaries, updateActivitySummary, getAllNuclei, getNucleusFields, updateNucleus,
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
+  getClusters, createNucleus,
 } from './clusterNotebook';
 import type { Individual } from './clusterNotebook';
 
@@ -64,6 +65,75 @@ describe('getAllNuclei', () => {
     mockFetch.mockResolvedValue(jsonResponse({}, false, 500));
 
     await expect(getAllNuclei()).rejects.toThrow('cluster-notebook request failed: 500');
+  });
+});
+
+describe('getClusters', () => {
+  test('returns the full cluster list', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: {
+        clusters: [
+          { name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers', auxiliaryBoardMembers: 'Pat Doe (Propagation)' },
+          { name: 'NC-330 Foothills', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+        ],
+      },
+    }));
+
+    const result = await getClusters();
+
+    expect(result).toEqual([
+      { name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers', auxiliaryBoardMembers: 'Pat Doe (Propagation)' },
+      { name: 'NC-330 Foothills', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+    ]);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('clusters {');
+  });
+
+  test('returns an empty array when there are no clusters', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { clusters: [] } }));
+
+    const result = await getClusters();
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe('createNucleus', () => {
+  test('sends name and clusterName, returns the created nucleus fields', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: {
+        createNucleus: {
+          stage: null, locality: null, populationMakeup: null,
+          population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+          hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+          narrative: null, nucleusType: null,
+          cluster: { name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers', auxiliaryBoardMembers: null },
+        },
+      },
+    }));
+
+    const result = await createNucleus('Airport Gardens', 'NC-215 Triangle');
+
+    expect(result?.cluster.name).toBe('NC-215 Triangle');
+    expect(result?.stage).toBeNull();
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ name: 'Airport Gardens', clusterName: 'NC-215 Triangle' });
+  });
+
+  test('returns null when the cluster name is not found', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { createNucleus: null } }));
+
+    const result = await createNucleus('Airport Gardens', 'Nonexistent Cluster');
+
+    expect(result).toBeNull();
+  });
+
+  test('throws (does not return null) when the name is already taken', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      errors: [{ message: "A nucleus named 'Airport Gardens' already exists." }],
+    }));
+
+    await expect(createNucleus('Airport Gardens', 'NC-215 Triangle')).rejects.toThrow('already exists');
   });
 });
 

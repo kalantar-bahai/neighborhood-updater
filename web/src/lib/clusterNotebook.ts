@@ -96,6 +96,39 @@ export interface NucleusSummary {
   studyCircles: ActivitySummary | null;
 }
 
+// No top-level clusters query existed until 2026-09-14 (Cluster was only reachable
+// nested under Nucleus.cluster) -- added specifically to back our "+Add" cluster
+// picker. Deliberately no inline cluster creation: clusters are real, SRP-sourced
+// geographic entities, not something a user invents ad hoc.
+export async function getClusters(): Promise<ClusterFields[]> {
+  const query = `
+    query GetClusters {
+      clusters { name groupOfClusters growthMilestone auxiliaryBoardMembers }
+    }
+  `;
+  const data = await request<{ clusters: ClusterFields[] }>(query, {});
+  return data.clusters;
+}
+
+// Identity-only at creation -- everything else (location, nucleusType, stage,
+// population, activities, worker roles) goes through the same update mutations
+// used for editing, not through this call. Returns null for an unknown
+// clusterName (same "not found -> null" convention as everywhere else); throws a
+// real GraphQL error for a duplicate name (global uniqueness, enforced at the DB
+// level on cluster-notebook's side, 2026-09-14) -- distinguishable from the null
+// case so callers can tell "bad cluster" from "name taken".
+export async function createNucleus(name: string, clusterName: string): Promise<NucleusFields | null> {
+  const mutation = `
+    mutation CreateNucleus($name: String!, $clusterName: String!) {
+      createNucleus(name: $name, clusterName: $clusterName) {
+        ${NUCLEUS_FIELDS_SELECTION}
+      }
+    }
+  `;
+  const data = await request<{ createNucleus: NucleusFields | null }>(mutation, { name, clusterName });
+  return data.createNucleus;
+}
+
 export async function getAllNuclei(): Promise<NucleusSummary[]> {
   const query = `
     query GetAllNuclei {

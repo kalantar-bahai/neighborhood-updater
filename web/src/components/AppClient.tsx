@@ -71,8 +71,11 @@ export default function AppClient() {
   if (creatingNew) {
     const emptyDetail: NucleusDetail = {
       row: {
-        nucleus: '', parentNucleus: '', nucleusType: '', grouping: 'NC Eastern', cluster: 'Triangle',
-        pg: 'M3', clusterCode: 'NC-215', locality: '', stage: '',
+        // grouping/pg/clusterCode/locality are always blank at this point regardless of
+        // which cluster gets picked -- they're derived from cluster-notebook once the
+        // nucleus is created and round-trips through the normal getRowData load, 2026-09-14.
+        nucleus: '', parentNucleus: '', nucleusType: '', grouping: '', cluster: '',
+        pg: '', clusterCode: '', locality: '', stage: '',
         auxBoard: '', makeup: '', totalPop: '', totalHH: '', indNum: '', indPct: '',
         hhNum: '', hhPct: '',
         activities: {
@@ -102,6 +105,7 @@ export default function AppClient() {
         onSaved={() => {}}
         isNew
         onCreated={(name) => { setCreatingNew(false); loadNucleus(name); }}
+        clusterNames={initialData.clusterNames}
       />
     );
   }

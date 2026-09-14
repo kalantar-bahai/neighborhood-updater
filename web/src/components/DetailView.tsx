@@ -17,6 +17,9 @@ interface Props {
   onSaved: (savedBy: string, savedAt: string) => void;
   isNew?: boolean;
   onCreated?: (name: string) => void;
+  // Existing clusters only, for the "+Add" cluster picker (2026-09-14) -- always
+  // passed, but only ever rendered when isNew.
+  clusterNames?: string[];
 }
 
 type FormState = NucleusRow;
@@ -77,13 +80,14 @@ function Field({ label, value, onChange, readonly, type, integer, onLabelClick, 
   );
 }
 
-function SelectField({ label, value, options, onChange, fromSheet }: {
-  label: string; value: string; options: string[]; onChange: (v: string) => void; fromSheet?: boolean;
+function SelectField({ label, value, options, onChange, fromSheet, placeholder }: {
+  label: string; value: string; options: string[]; onChange: (v: string) => void; fromSheet?: boolean; placeholder?: string;
 }) {
   return (
     <div className={`field${fromSheet ? ' from-sheet' : ''}`}>
       <label>{label}</label>
       <select value={value || ''} onChange={e => onChange(e.target.value)}>
+        {placeholder && <option value="">{placeholder}</option>}
         {options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
       </select>
     </div>
@@ -365,7 +369,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
   );
 }
 
-export default function DetailView({ detail, role, roleMap, email, showBack, spreadsheetUrl, onBack, onSaved, isNew, onCreated }: Props) {
+export default function DetailView({ detail, role, roleMap, email, showBack, spreadsheetUrl, onBack, onSaved, isNew, onCreated, clusterNames }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   const [isDirty, setIsDirty] = useState(false);
@@ -484,7 +488,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
     form.totalPop, form.totalHH, form.indNum, form.hhNum,
     ...actVals,
   ].some(v => !isValidInt(v));
-  const cannotSave = hasIntErrors || (!!isNew && !form.nucleus.trim());
+  const cannotSave = hasIntErrors || (!!isNew && (!form.nucleus.trim() || !form.cluster.trim()));
 
   const hasAnyActPart = actKeys.some(k => form.activities[k].part !== '');
   // "Helping" here (relabeled from "Sustaining") is still the protagonist role --
@@ -574,14 +578,21 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           </div>
           {identityOpen && <div className="card-body">
             <div className="field-grid-4">
-              {/* Grouping/Cluster/PG/Cluster Code are all read-only now: Grouping/Cluster/PG
-                  because cluster-notebook derives them from Cluster.groupOfClusters/name/
-                  growthMilestone with no mutation for any of the three (2026-09-13); Cluster
-                  Code because it's not a stored field at all anymore, just the first token of
-                  cluster.name, computed in nucleusFieldsFromClusterNotebook (data.ts). */}
+              {/* Grouping/PG/Cluster Code are all read-only: Grouping/PG because
+                  cluster-notebook derives them from Cluster.groupOfClusters/growthMilestone
+                  with no mutation for either (2026-09-13); Cluster Code because it's not a
+                  stored field at all, just the first token of cluster.name, computed in
+                  nucleusFieldsFromClusterNotebook (data.ts). Cluster itself is read-only for
+                  an EXISTING nucleus (same no-mutation reasoning), but editable while
+                  creating a brand-new one (isNew): createNucleus needs a clusterName to
+                  establish the nucleus's identity, 2026-09-14. Picker only -- no inline
+                  cluster creation, clusters are real SRP-sourced geographic entities. */}
               <Field label="Grouping"     value={form.grouping}    readonly />
               <Field label="Cluster Code" value={form.clusterCode} readonly />
-              <Field label="Cluster"      value={form.cluster}     readonly />
+              {isNew
+                ? <SelectField label="Cluster" value={form.cluster} options={clusterNames ?? []} onChange={v => set('cluster', v)} placeholder="Select a cluster…" />
+                : <Field label="Cluster" value={form.cluster} readonly />
+              }
               <Field label="PG"           value={form.pg}          readonly />
             </div>
             <div className="field-grid-4">

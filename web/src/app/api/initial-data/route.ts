@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getAccess } from '@/lib/access';
 import { parseRow, activitiesFromClusterNotebook } from '@/lib/data';
-import { getAllNuclei } from '@/lib/clusterNotebook';
+import { getAllNuclei, getClusters } from '@/lib/clusterNotebook';
 import { COL } from '@/lib/config';
 
 function n(v: string) { return parseInt(v || '0', 10) || 0; }
@@ -43,7 +43,7 @@ export const GET = auth(async (req) => {
   // are NOT yet migrated (still `r[COL.GROUPING]`/`r[COL.CLUSTER]`) — out of scope for
   // this pass; revisit if the picker's own grouping/cluster display needs the same
   // treatment later.
-  const clusterNotebookNuclei = await getAllNuclei();
+  const [clusterNotebookNuclei, clusters] = await Promise.all([getAllNuclei(), getClusters()]);
   const authorizedByName = new Map(
     access.rows
       .filter(r => (r[COL.NUCLEUS] || '').trim() !== '')
@@ -77,5 +77,6 @@ export const GET = auth(async (req) => {
     rows: authorizedRows,
     email,
     spreadsheetUrl,
+    clusterNames: clusters.map(c => c.name),
   });
 });
