@@ -60,6 +60,8 @@ This is additive to what your own `docs/data-model.md` ("Nucleus Assistant" sect
 
 **New**: `individuals(nucleusName, search)` (PII-scoped search by the nucleus's cluster) and `createIndividual(name, nucleusName)` (full-string name only) back a search-or-create UX in the worker-list editor — type to search, click a suggestion to add, or press Enter with no match to create a brand-new `Individual` and add them in one step. No `Individual` update mutation exists yet, so the editor never offers renaming an existing person — only add/remove/reorder.
 
+**`promoter` — done, 2026-09-14.** Added as a fifth role value (alongside `accompanier`/`protagonist`/`abm-assistant`/`contact`), displayed as "Promoters" in a restructured Overview card. No schema change needed on your side — same as `contact`, this only worked because `role` is an open string. Multi-valued (not single, unlike `contact`), read-write access level (not admin-gated).
+
 Wired into nucleus-assistant: `getRowData`/`getNucleusWorkers`, `/api/workers` (read/write personIds), new `/api/individuals` (search/create). 34+ new/updated tests, all passing.
 
 **Cross-check signal**: the `protagonists`/`accompaniers` free-text count fields in §2 are compared against these lists' lengths client-side to flag a "mismatch" (not auto-reconciled). No API implication beyond exposing both.
