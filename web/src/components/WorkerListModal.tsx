@@ -80,8 +80,12 @@ export default function WorkerListModal({ title, role, nucleus, workers, importW
 
   function handleInputChange(value: string) {
     setInput(value);
+    // Clear on every keystroke, not just when empty -- otherwise Enter pressed
+    // right after typing (within the 250ms debounce) can act on stale suggestions
+    // from an earlier, shorter substring instead of the name just typed. That
+    // silently added/re-added the wrong (often already-present) person.
+    setSuggestions([]);
     if (!value.trim()) {
-      setSuggestions([]);
       setSearching(false);
     }
   }
