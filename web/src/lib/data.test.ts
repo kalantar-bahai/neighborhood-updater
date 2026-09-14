@@ -13,8 +13,8 @@ import { COL, DEV_COL, EDU_COL, ACCESS_COL } from './config';
 import type { AccessEntry } from '@/types';
 
 vi.mock('./clusterNotebook', () => ({
-  getDevotionalGathering: vi.fn(),
-  updateDevotionalGathering: vi.fn(),
+  getActivitySummaries: vi.fn(),
+  updateActivitySummary: vi.fn(),
   getNucleusFields: vi.fn(),
   updateNucleus: vi.fn(),
   getNucleusWorkers: vi.fn(),
@@ -22,13 +22,13 @@ vi.mock('./clusterNotebook', () => ({
 }));
 
 import {
-  getDevotionalGathering, updateDevotionalGathering, getNucleusFields, updateNucleus, getNucleusWorkers,
+  getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus, getNucleusWorkers,
 } from './clusterNotebook';
 import { getRowData, saveRowData } from './data';
 import { MASTER_TAB } from './config';
 
-const mockGetDevotionalGathering = vi.mocked(getDevotionalGathering);
-const mockUpdateDevotionalGathering = vi.mocked(updateDevotionalGathering);
+const mockGetActivitySummaries = vi.mocked(getActivitySummaries);
+const mockUpdateActivitySummary = vi.mocked(updateActivitySummary);
 const mockGetNucleusFields = vi.mocked(getNucleusFields);
 const mockUpdateNucleus = vi.mocked(updateNucleus);
 const mockGetNucleusWorkers = vi.mocked(getNucleusWorkers);
@@ -101,9 +101,11 @@ describe('getRowData', () => {
     vi.clearAllMocks();
     // Default: no workers, for tests that don't care about the worker lists specifically.
     mockGetNucleusWorkers.mockResolvedValue([]);
+    // Default: no activity data, for tests that don't care about the activities card specifically.
+    mockGetActivitySummaries.mockResolvedValue(null);
   });
 
-  test('overrides devotionals with cluster-notebook data, ignoring the sheet columns', async () => {
+  test('maps all four activity rollups from cluster-notebook, ignoring the sheet columns', async () => {
     const masterRow = makeRow({
       [COL.NUCLEUS]: 'Alpha',
       [COL.DEV_ACT]: '999', [COL.DEV_PART]: '999', [COL.DEV_FOF]: '999',
@@ -112,30 +114,37 @@ describe('getRowData', () => {
       if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
       return [];
     });
-    mockGetDevotionalGathering.mockResolvedValue({ number: 4, participants: 30, participantsFof: 10 });
+    mockGetActivitySummaries.mockResolvedValue({
+      devotionalGathering: { number: 4, participants: 30, participantsFof: 10, isOverridden: false },
+      childrensClasses: { number: 1, participants: 10, participantsFof: 2, isOverridden: true },
+      juniorYouthGroups: { number: 2, participants: 20, participantsFof: 3, isOverridden: false },
+      studyCircles: { number: 3, participants: 30, participantsFof: 4, isOverridden: false },
+    });
 
     const result = await getRowData('Alpha');
 
-    expect(mockGetDevotionalGathering).toHaveBeenCalledWith('Alpha');
-    expect(result?.row.activities.devotionals).toEqual({ act: '4', part: '30', fof: '10' });
+    expect(mockGetActivitySummaries).toHaveBeenCalledWith('Alpha');
+    expect(result?.row.activities.devotionals).toEqual({ act: '4', part: '30', fof: '10', isOverridden: false });
+    expect(result?.row.activities.ccs).toEqual({ act: '1', part: '10', fof: '2', isOverridden: true });
+    expect(result?.row.activities.jygs).toEqual({ act: '2', part: '20', fof: '3', isOverridden: false });
+    expect(result?.row.activities.scs).toEqual({ act: '3', part: '30', fof: '4', isOverridden: false });
   });
 
-  test('renders a null cluster-notebook value as empty strings', async () => {
+  test('renders a null cluster-notebook value as empty strings, not overridden', async () => {
     const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
     mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
       if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
       return [];
     });
-    mockGetDevotionalGathering.mockResolvedValue(null);
 
     const result = await getRowData('Alpha');
 
-    expect(result?.row.activities.devotionals).toEqual({ act: '', part: '', fof: '' });
+    expect(result?.row.activities.devotionals).toEqual({ act: '', part: '', fof: '', isOverridden: false });
+    expect(result?.row.activities.ccs).toEqual({ act: '', part: '', fof: '', isOverridden: false });
   });
 
   test('returns null when the nucleus is not found in the sheet', async () => {
     mockSheetsGet.mockResolvedValue([]);
-    mockGetDevotionalGathering.mockResolvedValue(null);
 
     const result = await getRowData('Nonexistent');
 
@@ -150,7 +159,7 @@ describe('getRowData', () => {
       if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
       return [];
     });
-    mockGetDevotionalGathering.mockResolvedValue(null);
+    mockGetActivitySummaries.mockResolvedValue(null);
 
     const result = await getRowData('Alpha');
 
@@ -163,7 +172,7 @@ describe('getRowData', () => {
       if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
       return [];
     });
-    mockGetDevotionalGathering.mockRejectedValue(new Error('cluster-notebook request failed: 500 Internal Server Error'));
+    mockGetActivitySummaries.mockRejectedValue(new Error('cluster-notebook request failed: 500 Internal Server Error'));
 
     await expect(getRowData('Alpha')).rejects.toThrow('cluster-notebook request failed');
   });
@@ -178,7 +187,7 @@ describe('getRowData', () => {
       if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
       return [];
     });
-    mockGetDevotionalGathering.mockResolvedValue(null);
+    mockGetActivitySummaries.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue({
       stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students',
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
@@ -220,7 +229,7 @@ describe('getRowData', () => {
       if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
       return [];
     });
-    mockGetDevotionalGathering.mockResolvedValue(null);
+    mockGetActivitySummaries.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
@@ -241,7 +250,7 @@ describe('getRowData', () => {
       if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
       return [];
     });
-    mockGetDevotionalGathering.mockResolvedValue(null);
+    mockGetActivitySummaries.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
@@ -262,7 +271,7 @@ describe('getRowData', () => {
       if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
       return [];
     });
-    mockGetDevotionalGathering.mockResolvedValue(null);
+    mockGetActivitySummaries.mockResolvedValue(null);
 
     const cases: [string, string][] = [
       ['Programme of Growth (PG)', 'M1'],
@@ -289,7 +298,7 @@ describe('getRowData', () => {
       if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
       return [];
     });
-    mockGetDevotionalGathering.mockResolvedValue(null);
+    mockGetActivitySummaries.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
@@ -311,7 +320,7 @@ describe('getRowData', () => {
       if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
       return [];
     });
-    mockGetDevotionalGathering.mockResolvedValue(null);
+    mockGetActivitySummaries.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue(null);
 
     const result = await getRowData('Alpha');
@@ -331,7 +340,7 @@ describe('getRowData', () => {
       if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
       return [];
     });
-    mockGetDevotionalGathering.mockResolvedValue(null);
+    mockGetActivitySummaries.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue(null);
     const blank = { familyName: null, middleNames: null, nickname: null, sex: null, phone: null, ageCategory: null };
     mockGetNucleusWorkers.mockImplementation(async (_name: string, role: string) => {
@@ -368,34 +377,34 @@ describe('saveRowData', () => {
     },
   };
 
-  test('writes devotionals via cluster-notebook instead of the sheet', async () => {
+  test('writes all four activity rollups via cluster-notebook instead of the sheet', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
-    mockUpdateDevotionalGathering.mockResolvedValue({ number: 5, participants: 40, participantsFof: 12 });
+    mockUpdateActivitySummary.mockResolvedValue(null);
 
     await saveRowData('Alpha', baseFormData, 'me@x.com');
 
-    expect(mockUpdateDevotionalGathering).toHaveBeenCalledWith('Alpha', {
-      number: 5, participants: 40, participantsFof: 12,
-    });
+    expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'CHILDRENS_CLASS', { number: 1, participants: 2, participantsFof: 3 });
+    expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'JUNIOR_YOUTH_GROUP', { number: null, participants: null, participantsFof: null });
+    expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'STUDY_CIRCLE', { number: null, participants: null, participantsFof: null });
+    expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'DEVOTIONAL_GATHERING', { number: 5, participants: 40, participantsFof: 12 });
 
     const updates = mockSheetsBatchUpdate.mock.calls[0][1] as { values: string[][] }[];
     const writtenValues = updates.map(u => u.values[0][0]);
-    expect(writtenValues).toContain('1'); // ccs.act still written to the sheet
-    expect(writtenValues).not.toContain('5');  // devotionals.act must NOT reach the sheet
-    expect(writtenValues).not.toContain('40'); // devotionals.part must NOT reach the sheet
-    expect(writtenValues).not.toContain('12'); // devotionals.fof must NOT reach the sheet
+    // None of the activity numbers reach the sheet anymore -- all four rollups go through
+    // updateActivitySummary now, not sheet columns.
+    for (const v of ['1', '2', '3', '5', '40', '12']) expect(writtenValues).not.toContain(v);
   });
 
   test('sends null fields to cluster-notebook when devotionals values are blank', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
-    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateActivitySummary.mockResolvedValue(null);
 
     const formData = { ...baseFormData, activities: { ...baseFormData.activities, devotionals: { act: '', part: '', fof: '' } } };
     await saveRowData('Alpha', formData, 'me@x.com');
 
-    expect(mockUpdateDevotionalGathering).toHaveBeenCalledWith('Alpha', {
+    expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'DEVOTIONAL_GATHERING', {
       number: null, participants: null, participantsFof: null,
     });
   });
@@ -403,12 +412,12 @@ describe('saveRowData', () => {
   test('strips commas before sending devotionals counts to cluster-notebook', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
-    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateActivitySummary.mockResolvedValue(null);
 
     const formData = { ...baseFormData, activities: { ...baseFormData.activities, devotionals: { act: '1,200', part: '900', fof: '0' } } };
     await saveRowData('Alpha', formData, 'me@x.com');
 
-    expect(mockUpdateDevotionalGathering).toHaveBeenCalledWith('Alpha', {
+    expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'DEVOTIONAL_GATHERING', {
       number: 1200, participants: 900, participantsFof: 0,
     });
   });
@@ -416,7 +425,7 @@ describe('saveRowData', () => {
   test('propagates a cluster-notebook write failure instead of reporting success', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
-    mockUpdateDevotionalGathering.mockRejectedValue(new Error('cluster-notebook has no nucleus named "Alpha" — devotional gathering not saved'));
+    mockUpdateActivitySummary.mockRejectedValue(new Error('cluster-notebook has no nucleus named "Alpha" — activity summary not saved'));
 
     await expect(saveRowData('Alpha', baseFormData, 'me@x.com')).rejects.toThrow('cluster-notebook has no nucleus named "Alpha"');
   });
@@ -424,7 +433,7 @@ describe('saveRowData', () => {
   test('writes stage/locality/makeup via cluster-notebook instead of the sheet', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
-    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue({
       stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students',
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
@@ -452,7 +461,7 @@ describe('saveRowData', () => {
   test('writes population/households/connected* via cluster-notebook instead of the sheet', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
-    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
@@ -480,7 +489,7 @@ describe('saveRowData', () => {
   test('writes presence/gatherings as tri-state booleans via cluster-notebook instead of the sheet', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
-    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
@@ -510,7 +519,7 @@ describe('saveRowData', () => {
   test('writes narrative via cluster-notebook instead of the sheet', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
-    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
@@ -535,7 +544,7 @@ describe('saveRowData', () => {
   test('never writes nucleus/grouping/cluster/pg/clusterCode anywhere -- read-only, derived, or no rename support', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
-    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateActivitySummary.mockResolvedValue(null);
 
     const formData = {
       ...baseFormData,
@@ -564,7 +573,7 @@ describe('saveRowData', () => {
   test('writes nucleusType via cluster-notebook instead of the sheet', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
-    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
@@ -587,7 +596,7 @@ describe('saveRowData', () => {
   test('does not patch nucleusType when a save includes other identity fields but omits it', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
-    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue({
       stage: 'Advanced/5', locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
@@ -610,7 +619,7 @@ describe('saveRowData', () => {
   test('maps a never-touched presence/gatherings value to null, not false', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
-    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
@@ -631,7 +640,7 @@ describe('saveRowData', () => {
   test('omits patch fields the caller did not provide, rather than sending them as blank', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
-    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue({
       stage: 'Advanced/5', locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
@@ -651,7 +660,7 @@ describe('saveRowData', () => {
   test('does not call updateNucleus when no cluster-notebook-backed nucleus field is present', async () => {
     mockSheetsGet.mockResolvedValue([makeRow({ [COL.NUCLEUS]: 'Alpha' })]);
     mockSheetsBatchUpdate.mockResolvedValue(undefined);
-    mockUpdateDevotionalGathering.mockResolvedValue(null);
+    mockUpdateActivitySummary.mockResolvedValue(null);
 
     // baseFormData's own `locality` is never patchable (read-only, derived on
     // cluster-notebook's side) — plain baseFormData alone shouldn't trigger a call.
@@ -688,49 +697,20 @@ describe('findSrpRow', () => {
 });
 
 describe('parseSrpData', () => {
-  function makeDevRow(overrides: Record<number, string> = {}): string[] {
-    const row = new Array(14).fill('');
-    Object.entries(overrides).forEach(([k, v]) => { row[Number(k)] = v; });
-    return row;
-  }
   function makeEduRow(overrides: Record<number, string> = {}): string[] {
     const row = new Array(11).fill('');
     Object.entries(overrides).forEach(([k, v]) => { row[Number(k)] = v; });
     return row;
   }
 
-  test('returns null when both rows are null', () => {
-    expect(parseSrpData(null, null)).toBeNull();
+  test('returns null when there is no edu row', () => {
+    expect(parseSrpData(null)).toBeNull();
   });
 
-  test('parses devotional activity from dev row', () => {
-    const devRow = makeDevRow({ [DEV_COL.DEV_ACT]: '4', [DEV_COL.DEV_PART]: '30', [DEV_COL.DEV_FOF]: '10' });
-    const result = parseSrpData(devRow, null);
-    expect(result?.devotionals).toEqual({ act: '4', part: '30', fof: '10' });
-    expect(result?.ccs).toBeNull();
-  });
-
-  test('parses educational activities from edu row', () => {
-    const eduRow = makeEduRow({
-      [EDU_COL.CC_ACT]: '3',  [EDU_COL.CC_PART]: '28',  [EDU_COL.CC_FOF]: '24',
-      [EDU_COL.JYG_ACT]: '5', [EDU_COL.JYG_PART]: '28', [EDU_COL.JYG_FOF]: '27',
-      [EDU_COL.SC_ACT]: '9',  [EDU_COL.SC_PART]: '26',  [EDU_COL.SC_FOF]: '23',
-      [EDU_COL.FACILITATORS]: 'Alice, Bob',
-    });
-    const result = parseSrpData(null, eduRow);
-    expect(result?.ccs).toEqual({ act: '3', part: '28', fof: '24' });
-    expect(result?.jygs).toEqual({ act: '5', part: '28', fof: '27' });
-    expect(result?.scs).toEqual({ act: '9', part: '26', fof: '23' });
+  test('parses facilitators from the edu row', () => {
+    const eduRow = makeEduRow({ [EDU_COL.FACILITATORS]: 'Alice, Bob' });
+    const result = parseSrpData(eduRow);
     expect(result?.facilitators).toBe('Alice, Bob');
-    expect(result?.devotionals).toBeNull();
-  });
-
-  test('combines both rows', () => {
-    const devRow = makeDevRow({ [DEV_COL.DEV_ACT]: '2', [DEV_COL.DEV_PART]: '15', [DEV_COL.DEV_FOF]: '5' });
-    const eduRow = makeEduRow({ [EDU_COL.CC_ACT]: '1', [EDU_COL.CC_PART]: '8', [EDU_COL.CC_FOF]: '3' });
-    const result = parseSrpData(devRow, eduRow);
-    expect(result?.devotionals).toEqual({ act: '2', part: '15', fof: '5' });
-    expect(result?.ccs).toEqual({ act: '1', part: '8', fof: '3' });
   });
 });
 

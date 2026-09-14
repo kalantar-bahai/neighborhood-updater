@@ -3,15 +3,15 @@ import {
   MASTER_SHEET_ID, SRP_SHEET_ID,
   MASTER_TAB, ACCESS_TAB, DEV_TAB, EDU_TAB,
   MASTER_DATA_ROW, SRP_DATA_ROW,
-  COL, DEV_COL, EDU_COL,
+  COL, EDU_COL,
   ACCESS_COL,
 } from './config';
 import {
-  getDevotionalGathering, updateDevotionalGathering, getNucleusFields, updateNucleus,
+  getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus,
   getNucleusWorkers, individualDisplayName,
 } from './clusterNotebook';
-import type { DevotionalGathering, NucleusFields, Individual } from './clusterNotebook';
-import type { AccessEntry, Worker } from '@/types';
+import type { ActivitySummary, ActivitySummaries, ActivityType, NucleusFields, Individual } from './clusterNotebook';
+import type { AccessEntry, Activity, Worker } from '@/types';
 
 function normalize(row: string[], numCols: number): string[] {
   const r = row ? [...row] : [];
@@ -23,11 +23,24 @@ function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
 function stripCommas(s: string) { return s ? s.replace(/,/g, '') : s; }
 
-export function devotionalsFromClusterNotebook(dg: DevotionalGathering | null) {
+function activityFromSummary(summary: ActivitySummary | null): Activity {
   return {
-    act: dg?.number != null ? String(dg.number) : '',
-    part: dg?.participants != null ? String(dg.participants) : '',
-    fof: dg?.participantsFof != null ? String(dg.participantsFof) : '',
+    act: summary?.number != null ? String(summary.number) : '',
+    part: summary?.participants != null ? String(summary.participants) : '',
+    fof: summary?.participantsFof != null ? String(summary.participantsFof) : '',
+    isOverridden: summary?.isOverridden ?? false,
+  };
+}
+
+// Maps all four cluster-notebook activity rollups onto NucleusRow.activities' shape.
+// Used both for a single nucleus's detail (getRowData) and the picker summary
+// (/api/initial-data), so both stay in sync rather than drifting apart.
+export function activitiesFromClusterNotebook(summaries: ActivitySummaries | null) {
+  return {
+    ccs: activityFromSummary(summaries?.childrensClasses ?? null),
+    jygs: activityFromSummary(summaries?.juniorYouthGroups ?? null),
+    scs: activityFromSummary(summaries?.studyCircles ?? null),
+    devotionals: activityFromSummary(summaries?.devotionalGathering ?? null),
   };
 }
 
@@ -185,15 +198,11 @@ export function findSrpRow(name: string, rows: string[][], nameCol: number) {
   return rows.find(r => norm(r[nameCol]) === needle) ?? null;
 }
 
-export function parseSrpData(devRow: string[] | null, eduRow: string[] | null) {
-  if (!devRow && !eduRow) return null;
-  return {
-    facilitators: eduRow ? eduRow[EDU_COL.FACILITATORS] : '',
-    ccs:          eduRow ? { act: eduRow[EDU_COL.CC_ACT],  part: eduRow[EDU_COL.CC_PART],  fof: eduRow[EDU_COL.CC_FOF]  } : null,
-    jygs:         eduRow ? { act: eduRow[EDU_COL.JYG_ACT], part: eduRow[EDU_COL.JYG_PART], fof: eduRow[EDU_COL.JYG_FOF] } : null,
-    scs:          eduRow ? { act: eduRow[EDU_COL.SC_ACT],  part: eduRow[EDU_COL.SC_PART],  fof: eduRow[EDU_COL.SC_FOF]  } : null,
-    devotionals:  devRow ? { act: devRow[DEV_COL.DEV_ACT], part: devRow[DEV_COL.DEV_PART], fof: devRow[DEV_COL.DEV_FOF] } : null,
-  };
+// cc/jyg/sc/devotionals numbers no longer come from here (see activitiesFromClusterNotebook) —
+// this now only carries facilitators, which cluster-notebook doesn't expose yet.
+export function parseSrpData(eduRow: string[] | null) {
+  if (!eduRow) return null;
+  return { facilitators: eduRow[EDU_COL.FACILITATORS] };
 }
 
 function toWorkers(individuals: Individual[]): Worker[] {
@@ -201,29 +210,29 @@ function toWorkers(individuals: Individual[]): Worker[] {
 }
 
 export async function getRowData(nucleusName: string) {
-  const [masterRows, devRows, eduRows, accompanierWorkers, protagonistWorkers, abmAssistantWorkers, contactWorkers, devotionalGathering, nucleusFields] = await Promise.all([
-    getAllMasterRows(), getAllDevRows(), getAllEduRows(),
+  const [masterRows, eduRows, accompanierWorkers, protagonistWorkers, abmAssistantWorkers, contactWorkers, activitySummaries, nucleusFields] = await Promise.all([
+    getAllMasterRows(), getAllEduRows(),
     getNucleusWorkers(nucleusName, 'accompanier'),
     getNucleusWorkers(nucleusName, 'protagonist'),
     getNucleusWorkers(nucleusName, 'abm-assistant'),
     getNucleusWorkers(nucleusName, 'contact'),
-    getDevotionalGathering(nucleusName),
+    getActivitySummaries(nucleusName),
     getNucleusFields(nucleusName),
   ]);
 
   const masterRow = masterRows.find(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
   if (!masterRow) return null;
 
-  const lookup = (rows: string[][], nameCol: number) => {
-    let match = findSrpRow(nucleusName, rows, nameCol);
-    if (!match && masterRow[COL.PARENT_NUCLEUS]) {
-      match = findSrpRow(`${masterRow[COL.PARENT_NUCLEUS]} - ${nucleusName}`, rows, nameCol);
-    }
-    return match;
-  };
+  // Devotionals no longer needs the Dev sheet at all (getAllDevRows is still used
+  // separately, for /api/initial-data's srpNames) -- only facilitators still comes
+  // from the Edu sheet.
+  let eduRow = findSrpRow(nucleusName, eduRows, EDU_COL.NAME);
+  if (!eduRow && masterRow[COL.PARENT_NUCLEUS]) {
+    eduRow = findSrpRow(`${masterRow[COL.PARENT_NUCLEUS]} - ${nucleusName}`, eduRows, EDU_COL.NAME);
+  }
 
   const row = parseRow(masterRow);
-  // parseRow's nucleus/devotionals/stage/locality/makeup/totalPop/totalHH/indNum/hhNum/presence/
+  // parseRow's nucleus/activities/stage/locality/makeup/totalPop/totalHH/indNum/hhNum/presence/
   // notesPresence/gatherings/notesGatherings/narrative/grouping/cluster/pg/clusterCode/
   // nucleusType/auxBoard reads (from the corresponding COL.* sheet columns) are all overwritten below —
   // none of these sheet columns are read by anything else anymore either (/api/initial-data's
@@ -235,12 +244,12 @@ export async function getRowData(nucleusName: string) {
   // that canonical value once it flows from the picker, so it's authoritative here too, not the
   // Sheet's own (possibly stale, or just differently-cased) copy of the same name.
   row.nucleus = nucleusName;
-  row.activities.devotionals = devotionalsFromClusterNotebook(devotionalGathering);
+  row.activities = activitiesFromClusterNotebook(activitySummaries);
   Object.assign(row, nucleusFieldsFromClusterNotebook(nucleusFields));
 
   return {
     row,
-    srp: parseSrpData(lookup(devRows, DEV_COL.NAME), lookup(eduRows, EDU_COL.NAME)),
+    srp: parseSrpData(eduRow),
     accompanierNames: toWorkers(accompanierWorkers),
     protagonistNames: toWorkers(protagonistWorkers),
     abmAssistantNames: toWorkers(abmAssistantWorkers),
@@ -352,9 +361,6 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
 
   const updates = [
     ...identityPairs,
-    [COL.CC_ACT, d.activities.ccs.act], [COL.CC_PART, d.activities.ccs.part], [COL.CC_FOF, d.activities.ccs.fof],
-    [COL.JYG_ACT, d.activities.jygs.act], [COL.JYG_PART, d.activities.jygs.part], [COL.JYG_FOF, d.activities.jygs.fof],
-    [COL.SC_ACT, d.activities.scs.act], [COL.SC_PART, d.activities.scs.part], [COL.SC_FOF, d.activities.scs.fof],
     [COL.PROTAGONISTS, d.protagonists], [COL.ACCOMPANIERS, d.accompaniers],
     [COL.LEVEL, d.level], [COL.NOTES_PREVALENCE, d.notesPrevalence],
     [COL.SUPPORTED, d.supported], [COL.NOTES_SUPPORTED, d.notesSupported],
@@ -367,12 +373,24 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
     }));
 
   const writes: Promise<unknown>[] = [sheetsBatchUpdate(MASTER_SHEET_ID, updates)];
-  if (d.activities?.devotionals) {
-    writes.push(updateDevotionalGathering(nucleusName, {
-      number: toIntOrNull(d.activities.devotionals.act),
-      participants: toIntOrNull(d.activities.devotionals.part),
-      participantsFof: toIntOrNull(d.activities.devotionals.fof),
-    }));
+  // cc/jyg/sc/devotionals are no longer Sheet columns at all (see COL.CC_ACT etc.'s
+  // "dead" comments) -- each now writes straight to cluster-notebook's shared
+  // updateActivitySummary mutation, one call per activity type.
+  const ACTIVITY_KEYS: [keyof typeof d.activities, ActivityType][] = [
+    ['ccs', 'CHILDRENS_CLASS'],
+    ['jygs', 'JUNIOR_YOUTH_GROUP'],
+    ['scs', 'STUDY_CIRCLE'],
+    ['devotionals', 'DEVOTIONAL_GATHERING'],
+  ];
+  for (const [key, activityType] of ACTIVITY_KEYS) {
+    const act = d.activities?.[key];
+    if (act) {
+      writes.push(updateActivitySummary(nucleusName, activityType, {
+        number: toIntOrNull(act.act),
+        participants: toIntOrNull(act.part),
+        participantsFof: toIntOrNull(act.fof),
+      }));
+    }
   }
   // NOTE: no `locality` patching — cluster-notebook removed NucleusPatch.locality
   // 2026-09-13 (it's now a read-only value derived from Nucleus.location's own

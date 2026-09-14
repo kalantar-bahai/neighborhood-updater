@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getAccess } from '@/lib/access';
-import { getAllDevRows, parseRow, devotionalsFromClusterNotebook } from '@/lib/data';
+import { getAllDevRows, parseRow, activitiesFromClusterNotebook } from '@/lib/data';
 import { getAllNuclei } from '@/lib/clusterNotebook';
 import { COL, DEV_COL } from '@/lib/config';
 
@@ -36,8 +36,9 @@ export const GET = auth(async (req) => {
   // `nucleus` value returned below is cluster-notebook's own name, not the Sheet's
   // copy of it. The Sheet is consulted only for per-user authorization (does this
   // user have a row for this name?) and for fields not yet migrated. Also overrides
-  // locality/stage/nucleusType/devotionals with cluster-notebook's own values rather
-  // than the (now possibly stale) sheet columns — avoids reintroducing the staleness
+  // locality/stage/nucleusType/activities (all four rollups: cc/jyg/sc/devotionals,
+  // 2026-09-14) with cluster-notebook's own values rather than the (now possibly
+  // stale) sheet columns — avoids reintroducing the staleness
   // this migration is removing field-by-field. grouping/cluster in the summary below
   // are NOT yet migrated (still `r[COL.GROUPING]`/`r[COL.CLUSTER]`) — out of scope for
   // this pass; revisit if the picker's own grouping/cluster display needs the same
@@ -54,7 +55,7 @@ export const GET = auth(async (req) => {
     .map(cn => {
       const r = authorizedByName.get(norm(cn.name))!;
       const parsed = parseRow(r);
-      parsed.activities.devotionals = devotionalsFromClusterNotebook(cn.devotionalGathering);
+      parsed.activities = activitiesFromClusterNotebook(cn);
       const acts = Object.values(parsed.activities);
       return {
         nucleus:       cn.name,

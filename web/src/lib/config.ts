@@ -29,6 +29,9 @@ export const COL = {
   IND_PCT:             16,
   HH_NUM:              17,
   HH_PCT:              18,
+  // CC/JYG/SC/DEV_* (19-33): dead. All four activity rollups (childrensClasses/
+  // juniorYouthGroups/studyCircles/devotionalGathering) now come from
+  // cluster-notebook's ActivitySummary via updateActivitySummary, 2026-09-14.
   CC_ACT:              19,
   CC_PART:             20,
   CC_FOF:              21,
@@ -64,12 +67,17 @@ export const COL = {
   NARRATIVE:           51,
 } as const;
 
+// NAME is still used (srpNames in /api/initial-data). DEV_ACT/PART/FOF are dead —
+// devotionalGathering now comes from cluster-notebook, 2026-09-14.
 export const DEV_COL = {
   NAME: 0, LATIN_NAME: 1, LOCALITY: 2, ELECTORAL_UNIT: 3, CLUSTER: 4,
   GROUP_OF_CLUSTERS: 5, SUBREGION: 6, REGION: 7, GROUP_OF_REGIONS: 8,
   NATIONAL_COMMUNITY: 9, DEV_ACT: 10, DEV_PART: 11, DEV_FOF: 12, COMMENTS: 13,
 } as const;
 
+// FACILITATORS is still used (cluster-notebook doesn't expose it yet). CC/JYG/SC_*
+// are dead — childrensClasses/juniorYouthGroups/studyCircles now come from
+// cluster-notebook, 2026-09-14.
 export const EDU_COL = {
   NAME: 0,
   CC_ACT: 1,  CC_PART: 2,  CC_FOF: 3,

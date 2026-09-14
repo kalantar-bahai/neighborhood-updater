@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { NucleusDetail, NucleusRow, Activity, SrpData } from '@/types';
+import { NucleusDetail, NucleusRow, Activity } from '@/types';
 import type { Role, Worker } from '@/types';
 import WorkerListModal from './WorkerListModal';
 import AccessPanel from './AccessPanel';
@@ -106,34 +106,26 @@ function PairField({ label, numVal, pctVal, onNumChange, pctReadonly, numInteger
   );
 }
 
-function ActRow({ label, userVals, srpVals, onChange, onReset, fromSheet }: {
+// Highlighting is driven entirely by cluster-notebook's ActivitySummary.isOverridden
+// now (2026-09-14) -- one flag for the whole {act, part, fof} triple, not a per-field
+// diff against a separately-fetched SRP value. So the row is either fully amber or not.
+function ActRow({ label, userVals, onChange }: {
   label: string;
   userVals: Activity;
-  srpVals: Activity | null;
   onChange: (field: keyof Activity, v: string) => void;
-  onReset: () => void;
-  fromSheet?: boolean;
 }) {
-  const actDiffers  = srpVals !== null && (userVals.act  || '') !== (srpVals.act  || '');
-  const partDiffers = srpVals !== null && (userVals.part || '') !== (srpVals.part || '');
-  const fofDiffers  = srpVals !== null && (userVals.fof  || '') !== (srpVals.fof  || '');
-  const anyDiffers  = actDiffers || partDiffers || fofDiffers;
-  const srpText = srpVals ? `${srpVals.act} / ${srpVals.part} / ${srpVals.fof}` : 'not in SRP';
+  const highlighted = !!userVals.isOverridden;
 
-  function cls(differs: boolean, val: string) {
-    return [differs ? 'overridden' : '', !isValidInt(val) ? 'error' : ''].filter(Boolean).join(' ') || undefined;
+  function cls(val: string) {
+    return [highlighted ? 'overridden' : '', !isValidInt(val) ? 'error' : ''].filter(Boolean).join(' ') || undefined;
   }
 
   return (
-    <tr className={fromSheet ? 'from-sheet' : undefined}>
+    <tr>
       <td className="row-label" style={{ textAlign: 'right', paddingLeft: 4, paddingRight: 10 }}>{label}</td>
-      <td><input type="text" value={userVals.act || ''} className={cls(actDiffers, userVals.act)} onChange={e => onChange('act', e.target.value)} /></td>
-      <td><input type="text" value={userVals.part || ''} className={cls(partDiffers, userVals.part)} onChange={e => onChange('part', e.target.value)} /></td>
-      <td><input type="text" value={userVals.fof || ''} className={cls(fofDiffers, userVals.fof)} onChange={e => onChange('fof', e.target.value)} /></td>
-      <td className={`srp-cell${anyDiffers ? ' differs' : ''}`}>
-        {srpText}
-        {anyDiffers && <button className="reset-btn" onClick={onReset}>reset</button>}
-      </td>
+      <td><input type="text" value={userVals.act || ''} className={cls(userVals.act)} onChange={e => onChange('act', e.target.value)} /></td>
+      <td><input type="text" value={userVals.part || ''} className={cls(userVals.part)} onChange={e => onChange('part', e.target.value)} /></td>
+      <td><input type="text" value={userVals.fof || ''} className={cls(userVals.fof)} onChange={e => onChange('fof', e.target.value)} /></td>
     </tr>
   );
 }
@@ -145,7 +137,6 @@ function TotalRow({ label, totals }: { label: string; totals: { act: number; par
       <td><input className="plain" type="text" value={totals.act} readOnly /></td>
       <td><input className="plain" type="text" value={totals.part} readOnly /></td>
       <td><input className="plain" type="text" value={totals.fof} readOnly /></td>
-      <td className="srp-cell">—</td>
     </tr>
   );
 }
@@ -414,14 +405,6 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
     setIsDirty(true);
   }, []);
 
-  const resetToSrp = useCallback((actKey: keyof SrpData) => {
-    if (!srp || !srp[actKey as keyof SrpData]) return;
-    const srpAct = srp[actKey as keyof SrpData] as Activity;
-    if (actKey === 'facilitators') return;
-    setForm(f => ({ ...f, activities: { ...f.activities, [actKey]: { ...srpAct } } }));
-    setIsDirty(true);
-  }, [srp]);
-
   async function handleSave() {
     setSaving(true);
     setSaveStatus({ msg: 'Saving...', type: 'idle' });
@@ -675,11 +658,10 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
         <div className="card">
           <div className="card-header">
             Educational Activities &amp; Devotionals
-            <span className="srp-badge">{srp ? 'SRP synced' : 'No SRP data'}</span>
           </div>
           <div className="card-body">
             <div className="sync-note">
-              Numbers pre-filled from SRP where available. Edit any value to override — overridden values are highlighted amber.
+              Numbers come from cluster-notebook. Amber rows are manually overridden rather than SRP-derived.
             </div>
             <div className="act-table-wrap">
               <table className="act-table">
@@ -687,19 +669,18 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
                   <tr>
                     <th className="left">Activity</th>
                     <th>Number</th><th>Participants</th><th>Friends of the Faith</th>
-                    <th className="srp-col">SRP</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <ActRow label="Children's Classes" userVals={form.activities.ccs} srpVals={srp?.ccs ?? null}
-                    onChange={(f, v) => setAct('ccs', f, v)} onReset={() => resetToSrp('ccs')} fromSheet />
-                  <ActRow label="Junior Youth Groups" userVals={form.activities.jygs} srpVals={srp?.jygs ?? null}
-                    onChange={(f, v) => setAct('jygs', f, v)} onReset={() => resetToSrp('jygs')} fromSheet />
-                  <ActRow label="Study Circles" userVals={form.activities.scs} srpVals={srp?.scs ?? null}
-                    onChange={(f, v) => setAct('scs', f, v)} onReset={() => resetToSrp('scs')} fromSheet />
+                  <ActRow label="Children's Classes" userVals={form.activities.ccs}
+                    onChange={(f, v) => setAct('ccs', f, v)} />
+                  <ActRow label="Junior Youth Groups" userVals={form.activities.jygs}
+                    onChange={(f, v) => setAct('jygs', f, v)} />
+                  <ActRow label="Study Circles" userVals={form.activities.scs}
+                    onChange={(f, v) => setAct('scs', f, v)} />
                   <TotalRow label="Total Educational Activities" totals={edTotal} />
-                  <ActRow label="Devotional Gatherings" userVals={form.activities.devotionals} srpVals={srp?.devotionals ?? null}
-                    onChange={(f, v) => setAct('devotionals', f, v)} onReset={() => resetToSrp('devotionals')} />
+                  <ActRow label="Devotional Gatherings" userVals={form.activities.devotionals}
+                    onChange={(f, v) => setAct('devotionals', f, v)} />
                   <TotalRow label="Total Activities" totals={allTotal} />
                 </tbody>
               </table>

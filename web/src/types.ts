@@ -11,6 +11,10 @@ export interface Activity {
   act: string;
   part: string;
   fof: string;
+  // Single flag for the whole {act, part, fof} triple, mirroring cluster-notebook's
+  // ActivitySummary.isOverridden — true means a human entered these values rather
+  // than SRP deriving them. Not present for SRP-sourced or totals-only Activity uses.
+  isOverridden?: boolean;
 }
 
 export interface NucleusSummary {
@@ -67,12 +71,11 @@ export interface NucleusRow {
   narrative: string;
 }
 
+// cc/jyg/sc/devotionals numbers all now come from cluster-notebook (see NucleusRow.activities);
+// the SRP sheet cache is only still consulted for facilitators, which cluster-notebook
+// doesn't expose yet.
 export interface SrpData {
   facilitators: string;
-  ccs: Activity | null;
-  jygs: Activity | null;
-  scs: Activity | null;
-  devotionals: Activity | null;
 }
 
 // A worker-list entry -- backed by a real cluster-notebook Individual record now,

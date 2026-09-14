@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import {
-  getDevotionalGathering, updateDevotionalGathering, getAllNuclei, getNucleusFields, updateNucleus,
+  getActivitySummaries, updateActivitySummary, getAllNuclei, getNucleusFields, updateNucleus,
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
 } from './clusterNotebook';
 import type { Individual } from './clusterNotebook';
@@ -22,24 +22,34 @@ function jsonResponse(body: unknown, ok = true, status = 200) {
 }
 
 describe('getAllNuclei', () => {
-  test('returns the full nucleus list with fields, nucleusType, and devotionalGathering', async () => {
+  test('returns the full nucleus list with fields, nucleusType, and all four activity rollups', async () => {
+    const alphaActivities = { number: 4, participants: 30, participantsFof: 10, isOverridden: true };
     mockFetch.mockResolvedValue(jsonResponse({
       data: {
         nuclei: [
-          { name: 'Alpha', stage: 'Initial/2', locality: 'Durham', populationMakeup: 'Mixed', nucleusType: 'Neighborhood', devotionalGathering: { number: 4, participants: 30, participantsFof: 10 } },
-          { name: 'Beta', stage: null, locality: null, populationMakeup: null, nucleusType: null, devotionalGathering: null },
+          {
+            name: 'Alpha', stage: 'Initial/2', locality: 'Durham', populationMakeup: 'Mixed', nucleusType: 'Neighborhood',
+            devotionalGathering: alphaActivities, childrensClasses: alphaActivities, juniorYouthGroups: alphaActivities, studyCircles: alphaActivities,
+          },
+          {
+            name: 'Beta', stage: null, locality: null, populationMakeup: null, nucleusType: null,
+            devotionalGathering: null, childrensClasses: null, juniorYouthGroups: null, studyCircles: null,
+          },
         ],
       },
     }));
 
     const result = await getAllNuclei();
 
-    expect(result).toEqual([
-      { name: 'Alpha', stage: 'Initial/2', locality: 'Durham', populationMakeup: 'Mixed', nucleusType: 'Neighborhood', devotionalGathering: { number: 4, participants: 30, participantsFof: 10 } },
-      { name: 'Beta', stage: null, locality: null, populationMakeup: null, nucleusType: null, devotionalGathering: null },
-    ]);
+    expect(result[0].childrensClasses).toEqual(alphaActivities);
+    expect(result[0].juniorYouthGroups).toEqual(alphaActivities);
+    expect(result[0].studyCircles).toEqual(alphaActivities);
+    expect(result[1].childrensClasses).toBeNull();
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.query).toContain('nucleusType');
+    expect(body.query).toContain('childrensClasses');
+    expect(body.query).toContain('juniorYouthGroups');
+    expect(body.query).toContain('studyCircles');
   });
 
   test('returns an empty array when there are no nuclei', async () => {
@@ -248,34 +258,31 @@ describe('updateNucleus', () => {
   });
 });
 
-describe('getDevotionalGathering', () => {
-  test('sends a query for the nucleus and returns its devotionalGathering', async () => {
+describe('getActivitySummaries', () => {
+  test('sends a query for the nucleus and returns all four activity rollups', async () => {
+    const summary = { number: 4, participants: 30, participantsFof: 10, isOverridden: false };
     mockFetch.mockResolvedValue(jsonResponse({
-      data: { nucleus: { devotionalGathering: { number: 4, participants: 30, participantsFof: 10 } } },
+      data: { nucleus: { devotionalGathering: summary, childrensClasses: summary, juniorYouthGroups: summary, studyCircles: summary } },
     }));
 
-    const result = await getDevotionalGathering('Alpha');
+    const result = await getActivitySummaries('Alpha');
 
-    expect(result).toEqual({ number: 4, participants: 30, participantsFof: 10 });
+    expect(result).toEqual({ devotionalGathering: summary, childrensClasses: summary, juniorYouthGroups: summary, studyCircles: summary });
     const [url, init] = mockFetch.mock.calls[0];
     expect(url).toBe('http://localhost:8000');
     const body = JSON.parse(init.body as string);
     expect(body.variables).toEqual({ name: 'Alpha' });
     expect(body.query).toContain('devotionalGathering');
+    expect(body.query).toContain('childrensClasses');
+    expect(body.query).toContain('juniorYouthGroups');
+    expect(body.query).toContain('studyCircles');
+    expect(body.query).toContain('isOverridden');
   });
 
   test('returns null when the nucleus is not found', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: null } }));
 
-    const result = await getDevotionalGathering('Nonexistent');
-
-    expect(result).toBeNull();
-  });
-
-  test('returns null when devotionalGathering itself is null', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { devotionalGathering: null } } }));
-
-    const result = await getDevotionalGathering('Alpha');
+    const result = await getActivitySummaries('Nonexistent');
 
     expect(result).toBeNull();
   });
@@ -283,48 +290,61 @@ describe('getDevotionalGathering', () => {
   test('throws when the HTTP response is not ok', async () => {
     mockFetch.mockResolvedValue(jsonResponse({}, false, 500));
 
-    await expect(getDevotionalGathering('Alpha')).rejects.toThrow('cluster-notebook request failed: 500');
+    await expect(getActivitySummaries('Alpha')).rejects.toThrow('cluster-notebook request failed: 500');
   });
 
   test('throws when the response contains GraphQL errors', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ errors: [{ message: 'nucleus name is required' }] }));
 
-    await expect(getDevotionalGathering('Alpha')).rejects.toThrow('nucleus name is required');
+    await expect(getActivitySummaries('Alpha')).rejects.toThrow('nucleus name is required');
   });
 });
 
-describe('updateDevotionalGathering', () => {
-  test('sends the shared updateActivitySummary mutation with the given fields and returns the updated value', async () => {
+describe('updateActivitySummary', () => {
+  test('sends the mutation with the activity type and fields, and returns all four rollups', async () => {
+    const updated = { number: 5, participants: 40, participantsFof: 12, isOverridden: true };
     mockFetch.mockResolvedValue(jsonResponse({
-      data: { updateActivitySummary: { devotionalGathering: { number: 5, participants: 40, participantsFof: 12 } } },
+      data: { updateActivitySummary: { devotionalGathering: updated, childrensClasses: null, juniorYouthGroups: null, studyCircles: null } },
     }));
 
-    const result = await updateDevotionalGathering('Alpha', { number: 5, participants: 40, participantsFof: 12 });
+    const result = await updateActivitySummary('Alpha', 'DEVOTIONAL_GATHERING', { number: 5, participants: 40, participantsFof: 12 });
 
-    expect(result).toEqual({ number: 5, participants: 40, participantsFof: 12 });
+    expect(result?.devotionalGathering).toEqual(updated);
     const [, init] = mockFetch.mock.calls[0];
     const body = JSON.parse(init.body as string);
-    expect(body.variables).toEqual({ nucleusName: 'Alpha', number: 5, participants: 40, participantsFof: 12 });
+    expect(body.variables).toEqual({ nucleusName: 'Alpha', activityType: 'DEVOTIONAL_GATHERING', number: 5, participants: 40, participantsFof: 12 });
     expect(body.query).toContain('updateActivitySummary');
-    expect(body.query).toContain('DEVOTIONAL_GATHERING');
+  });
+
+  test('sends the singular ActivityType enum value for each activity type', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: { updateActivitySummary: { devotionalGathering: null, childrensClasses: null, juniorYouthGroups: null, studyCircles: null } },
+    }));
+
+    await updateActivitySummary('Alpha', 'CHILDRENS_CLASS', { number: 2 });
+    await updateActivitySummary('Alpha', 'JUNIOR_YOUTH_GROUP', { number: 3 });
+    await updateActivitySummary('Alpha', 'STUDY_CIRCLE', { number: 1 });
+
+    const activityTypes = mockFetch.mock.calls.map(call => JSON.parse(call[1].body as string).variables.activityType);
+    expect(activityTypes).toEqual(['CHILDRENS_CLASS', 'JUNIOR_YOUTH_GROUP', 'STUDY_CIRCLE']);
   });
 
   test('defaults omitted fields to null', async () => {
     mockFetch.mockResolvedValue(jsonResponse({
-      data: { updateActivitySummary: { devotionalGathering: { number: null, participants: null, participantsFof: null } } },
+      data: { updateActivitySummary: { devotionalGathering: null, childrensClasses: null, juniorYouthGroups: null, studyCircles: null } },
     }));
 
-    await updateDevotionalGathering('Alpha', {});
+    await updateActivitySummary('Alpha', 'DEVOTIONAL_GATHERING', {});
 
     const [, init] = mockFetch.mock.calls[0];
     const body = JSON.parse(init.body as string);
-    expect(body.variables).toEqual({ nucleusName: 'Alpha', number: null, participants: null, participantsFof: null });
+    expect(body.variables).toEqual({ nucleusName: 'Alpha', activityType: 'DEVOTIONAL_GATHERING', number: null, participants: null, participantsFof: null });
   });
 
   test('throws when the mutation returns null (no matching nucleus)', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { updateActivitySummary: null } }));
 
-    await expect(updateDevotionalGathering('Nonexistent', { number: 5 })).rejects.toThrow('cluster-notebook has no nucleus named "Nonexistent"');
+    await expect(updateActivitySummary('Nonexistent', 'DEVOTIONAL_GATHERING', { number: 5 })).rejects.toThrow('cluster-notebook has no nucleus named "Nonexistent"');
   });
 });
 

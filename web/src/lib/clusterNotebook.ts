@@ -1,10 +1,21 @@
 const CLUSTER_NOTEBOOK_URL = process.env.CLUSTER_NOTEBOOK_URL || 'http://localhost:8000';
 
-export interface DevotionalGathering {
+// Shared shape for all four activity rollups (devotionalGathering/childrensClasses/
+// juniorYouthGroups/studyCircles). `isOverridden` is per-object, not per-field: true
+// when any of number/participants/participantsFof is a human-entered override rather
+// than the SRP-derived value (2026-09-14, cluster-notebook).
+export interface ActivitySummary {
   number: number | null;
   participants: number | null;
   participantsFof: number | null;
+  isOverridden: boolean;
 }
+
+// ActivityType enum values are singular (CHILDRENS_CLASS, not CHILDRENS_CLASSES),
+// confirmed against cluster-notebook's schema 2026-09-14.
+export type ActivityType = 'DEVOTIONAL_GATHERING' | 'CHILDRENS_CLASS' | 'JUNIOR_YOUTH_GROUP' | 'STUDY_CIRCLE';
+
+const ACTIVITY_SUMMARY_SELECTION = 'number participants participantsFof isOverridden';
 
 interface GraphQLResponse<T> {
   data?: T;
@@ -74,7 +85,10 @@ export interface NucleusSummary {
   locality: string | null;
   populationMakeup: string | null;
   nucleusType: string | null;
-  devotionalGathering: DevotionalGathering | null;
+  devotionalGathering: ActivitySummary | null;
+  childrensClasses: ActivitySummary | null;
+  juniorYouthGroups: ActivitySummary | null;
+  studyCircles: ActivitySummary | null;
 }
 
 export async function getAllNuclei(): Promise<NucleusSummary[]> {
@@ -82,7 +96,10 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
     query GetAllNuclei {
       nuclei {
         name stage locality populationMakeup nucleusType
-        devotionalGathering { number participants participantsFof }
+        devotionalGathering { ${ACTIVITY_SUMMARY_SELECTION} }
+        childrensClasses { ${ACTIVITY_SUMMARY_SELECTION} }
+        juniorYouthGroups { ${ACTIVITY_SUMMARY_SELECTION} }
+        studyCircles { ${ACTIVITY_SUMMARY_SELECTION} }
       }
     }
   `;
@@ -135,50 +152,60 @@ export async function updateNucleus(
   return data.updateNucleus;
 }
 
-export async function getDevotionalGathering(nucleusName: string): Promise<DevotionalGathering | null> {
-  const query = `
-    query GetNucleusDevotionalGathering($name: String!) {
-      nucleus(name: $name) {
-        devotionalGathering { number participants participantsFof }
-      }
-    }
-  `;
-  const data = await request<{ nucleus: { devotionalGathering: DevotionalGathering | null } | null }>(
-    query,
-    { name: nucleusName }
-  );
-  return data.nucleus?.devotionalGathering ?? null;
+export interface ActivitySummaries {
+  devotionalGathering: ActivitySummary | null;
+  childrensClasses: ActivitySummary | null;
+  juniorYouthGroups: ActivitySummary | null;
+  studyCircles: ActivitySummary | null;
 }
 
-export async function updateDevotionalGathering(
-  nucleusName: string,
-  fields: { number?: number | null; participants?: number | null; participantsFof?: number | null }
-): Promise<DevotionalGathering | null> {
-  // updateDevotionalGathering was removed 2026-09-13 in favor of one shared
-  // mutation across all four activity types — see cluster-notebook/schema.graphql.
-  const mutation = `
-    mutation UpdateDevotionalGathering($nucleusName: String!, $number: Int, $participants: Int, $participantsFof: Int) {
-      updateActivitySummary(
-        nucleusName: $nucleusName, activityType: DEVOTIONAL_GATHERING,
-        number: $number, participants: $participants, participantsFof: $participantsFof
-      ) {
-        devotionalGathering { number participants participantsFof }
+export async function getActivitySummaries(nucleusName: string): Promise<ActivitySummaries | null> {
+  const query = `
+    query GetActivitySummaries($name: String!) {
+      nucleus(name: $name) {
+        devotionalGathering { ${ACTIVITY_SUMMARY_SELECTION} }
+        childrensClasses { ${ACTIVITY_SUMMARY_SELECTION} }
+        juniorYouthGroups { ${ACTIVITY_SUMMARY_SELECTION} }
+        studyCircles { ${ACTIVITY_SUMMARY_SELECTION} }
       }
     }
   `;
-  const data = await request<{ updateActivitySummary: { devotionalGathering: DevotionalGathering | null } | null }>(
+  const data = await request<{ nucleus: ActivitySummaries | null }>(query, { name: nucleusName });
+  return data.nucleus;
+}
+
+export async function updateActivitySummary(
+  nucleusName: string,
+  activityType: ActivityType,
+  fields: { number?: number | null; participants?: number | null; participantsFof?: number | null }
+): Promise<ActivitySummaries | null> {
+  const mutation = `
+    mutation UpdateActivitySummary($nucleusName: String!, $activityType: ActivityType!, $number: Int, $participants: Int, $participantsFof: Int) {
+      updateActivitySummary(
+        nucleusName: $nucleusName, activityType: $activityType,
+        number: $number, participants: $participants, participantsFof: $participantsFof
+      ) {
+        devotionalGathering { ${ACTIVITY_SUMMARY_SELECTION} }
+        childrensClasses { ${ACTIVITY_SUMMARY_SELECTION} }
+        juniorYouthGroups { ${ACTIVITY_SUMMARY_SELECTION} }
+        studyCircles { ${ACTIVITY_SUMMARY_SELECTION} }
+      }
+    }
+  `;
+  const data = await request<{ updateActivitySummary: ActivitySummaries | null }>(
     mutation,
     {
       nucleusName,
+      activityType,
       number: fields.number ?? null,
       participants: fields.participants ?? null,
       participantsFof: fields.participantsFof ?? null,
     }
   );
   if (data.updateActivitySummary === null) {
-    throw new Error(`cluster-notebook has no nucleus named "${nucleusName}" — devotional gathering not saved`);
+    throw new Error(`cluster-notebook has no nucleus named "${nucleusName}" — activity summary not saved`);
   }
-  return data.updateActivitySummary.devotionalGathering ?? null;
+  return data.updateActivitySummary;
 }
 
 export interface Individual {
