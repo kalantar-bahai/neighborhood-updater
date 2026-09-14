@@ -627,9 +627,9 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           </div>}
         </div>
 
-        {/* Workers & Prevalence */}
+        {/* Overview (formerly "Workers & Prevalence") */}
         <div className="card from-sheet">
-          <div className="card-header">Workers &amp; Prevalence</div>
+          <div className="card-header">Overview</div>
           <div className="card-body">
             <div className="field-grid-2">
               <Field
