@@ -475,11 +475,6 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
     setSaveStatus({ msg: '', type: 'idle' });
   }
 
-  const accompaniersMismatch = accompanierNames.length > 0 &&
-    accompanierNames.length !== parseInt(form.accompaniers || '0', 10);
-  const protagonistsMismatch = protagonistNames.length > 0 &&
-    protagonistNames.length !== parseInt(form.protagonists || '0', 10);
-
   const edTotal  = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs]);
   const allTotal = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs, form.activities.devotionals]);
 
@@ -487,34 +482,40 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
   const actVals = actKeys.flatMap(k => [form.activities[k].act, form.activities[k].part, form.activities[k].fof]);
   const hasIntErrors = [
     form.totalPop, form.totalHH, form.indNum, form.hhNum,
-    form.protagonists, form.accompaniers,
     ...actVals,
   ].some(v => !isValidInt(v));
   const cannotSave = hasIntErrors || (!!isNew && !form.nucleus.trim());
 
   const hasAnyActPart = actKeys.some(k => form.activities[k].part !== '');
+  // "Helping" here (relabeled from "Sustaining") is still the protagonist role --
+  // this simpler 5-ring diagram has no slot for Promoting (the newer promoter role)
+  // or Facilitating, unlike the aligned diagram below.
   const diagramData = [
     { label: 'Residing',      value: form.totalPop },
     { label: 'Connected',     value: form.indNum },
     { label: 'Participating', value: hasAnyActPart ? String(allTotal.part) : '' },
-    { label: 'Sustaining',    value: form.protagonists, onClick: () => setShowProtagonistsModal(true) },
-    { label: 'Accompanying',  value: form.accompaniers, onClick: () => setShowAccompaniersModal(true) },
+    { label: 'Helping',       value: String(protagonistNames.length), onClick: () => setShowProtagonistsModal(true) },
+    { label: 'Accompanying',  value: String(accompanierNames.length), onClick: () => setShowAccompaniersModal(true) },
   ];
 
   const alignedResiding = { label: 'Residing', value: form.totalPop };
+  // Redefined 2026-09-14 to match the Overview card: Promoting is the promoter role
+  // (was mistakenly the protagonist role), Helping is the protagonist role (was
+  // empty), Facilitating is the summed facilitators count (was empty), In core
+  // activity is the educational-activities participant total (was empty).
   const alignedRings: AlignedRingContent[] = [
     { single: { label: 'In conversation', value: form.indNum } },
     {
-      right: { label: 'In core activity', value: '' },
+      right: { label: 'In core activity', value: String(edTotal.part) },
       left:  { label: 'Participating',    value: hasAnyActPart ? String(allTotal.part) : '' },
     },
     {
-      right: { label: 'Facilitating', value: '' },
-      left:  { label: 'Promoting',    value: form.protagonists, onClick: () => setShowProtagonistsModal(true) },
+      right: { label: 'Facilitating', value: form.facilitatorsCount },
+      left:  { label: 'Promoting',    value: String(promoterNames.length), onClick: () => setShowPromotersModal(true) },
     },
     {
-      right: { label: 'Accompanying', value: form.accompaniers, onClick: () => setShowAccompaniersModal(true) },
-      left:  { label: 'Helping',      value: '' },
+      right: { label: 'Accompanying', value: String(accompanierNames.length), onClick: () => setShowAccompaniersModal(true) },
+      left:  { label: 'Helping',      value: String(protagonistNames.length), onClick: () => setShowProtagonistsModal(true) },
     },
   ];
 
@@ -631,11 +632,12 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
 
         {/* Overview (formerly "Workers & Prevalence"). Mixed-source now: Helpers/
             Accompanying are still Sheet-sourced free-text counts, Facilitating Core
-            Activity is cluster-notebook-sourced, Participants/In Core Activity are
-            computed totals from the Activities card -- so the fromSheet marker moved
-            to field level instead of the whole card, per the established per-field
-            convention. Promoters is a new role (2026-09-14), backed by cluster-notebook
-            like Contact/ABm Assistant, no free-text count of its own. */}
+            Activity is cluster-notebook-sourced, Participating/In Core Activity are
+            computed totals from the Activities card. All three of Promoting/Helping/
+            Accompanying are cluster-notebook role lists now (2026-09-14) -- no more
+            hand-typed counts, no more Sheet writes for any field in this card, so the
+            fromSheet marker is gone entirely (was already gone from the card wrapper;
+            now gone from the two remaining fields that still had it, too). */}
         <div className="card">
           <div className="card-header">Overview</div>
           <div className="card-body">
@@ -651,13 +653,9 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               />
               <Field
                 label="Helping"
-                value={form.protagonists}
-                onChange={v => set('protagonists', v)}
-                integer
-                highlighted={protagonistsMismatch}
+                value={protagonistNames.map(w => w.name).join(', ')}
+                readonly
                 onLabelClick={() => setShowProtagonistsModal(true)}
-                onSync={() => set('protagonists', String(protagonistNames.length))}
-                fromSheet
               />
             </div>
             <div className="field-grid-3">
@@ -665,13 +663,9 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               <Field label="Facilitating Core Activity" value={form.facilitators} readonly />
               <Field
                 label="Accompanying"
-                value={form.accompaniers}
-                onChange={v => set('accompaniers', v)}
-                integer
-                highlighted={accompaniersMismatch}
+                value={accompanierNames.map(w => w.name).join(', ')}
+                readonly
                 onLabelClick={() => setShowAccompaniersModal(true)}
-                onSync={() => set('accompaniers', String(accompanierNames.length))}
-                fromSheet
               />
             </div>
           </div>
@@ -883,31 +877,23 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
 
       {showAccompaniersModal && (
         <WorkerListModal
-          title="Accompaniers in Nucleus"
+          title="Accompanying"
           role="accompanier"
           nucleus={row.nucleus}
           workers={accompanierNames}
-          onChange={workers => {
-            const wasInSync = accompanierNames.length === parseInt(form.accompaniers || '0', 10);
-            setAccompanierNames(workers);
-            if (wasInSync) set('accompaniers', String(workers.length));
-          }}
+          onChange={workers => setAccompanierNames(workers)}
           onClose={() => setShowAccompaniersModal(false)}
         />
       )}
 
       {showProtagonistsModal && (
         <WorkerListModal
-          title="Protagonists / Workers"
+          title="Helping"
           role="protagonist"
           nucleus={row.nucleus}
           workers={protagonistNames}
           importWorkers={accompanierNames}
-          onChange={workers => {
-            const wasInSync = protagonistNames.length === parseInt(form.protagonists || '0', 10);
-            setProtagonistNames(workers);
-            if (wasInSync) set('protagonists', String(workers.length));
-          }}
+          onChange={workers => setProtagonistNames(workers)}
           onClose={() => setShowProtagonistsModal(false)}
         />
       )}

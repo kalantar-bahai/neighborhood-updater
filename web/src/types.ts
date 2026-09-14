@@ -54,8 +54,6 @@ export interface NucleusRow {
     scs: Activity;
     devotionals: Activity;
   };
-  protagonists: string;
-  accompaniers: string;
   level: string;
   notesPrevalence: string;
   supported: string;
@@ -74,6 +72,9 @@ export interface NucleusRow {
   // here (no per-activity granularity in our UI). Replaces the old Education-sheet
   // read entirely; no more SRP sheet cache consulted anywhere in this app.
   facilitators: string;
+  // Numeric sibling of the above (summed across the same four rollups) -- used only
+  // by the concentric diagram's "Facilitating" ring, which needs a count.
+  facilitatorsCount: string;
 }
 
 // A worker-list entry -- backed by a real cluster-notebook Individual record now,

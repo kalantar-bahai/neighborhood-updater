@@ -7,7 +7,7 @@ vi.mock('./sheets', () => ({
 }));
 
 import { sheetsGet, sheetsClear, sheetsBatchUpdate } from './sheets';
-import { parseRow, findSrpRow, facilitatorsFromClusterNotebook } from './data';
+import { parseRow, findSrpRow, facilitatorsFromClusterNotebook, facilitatorsCountFromClusterNotebook } from './data';
 import { getAccessEntries, saveAccessEntries } from './data';
 import { COL, DEV_COL, ACCESS_COL } from './config';
 import type { AccessEntry } from '@/types';
@@ -730,6 +730,31 @@ describe('facilitatorsFromClusterNotebook', () => {
 
   test('returns empty string when no activity type has facilitatorNames', () => {
     const result = facilitatorsFromClusterNotebook({
+      childrensClasses: blank, juniorYouthGroups: null, studyCircles: null, devotionalGathering: null,
+    });
+    expect(result).toBe('');
+  });
+});
+
+describe('facilitatorsCountFromClusterNotebook', () => {
+  const blank: ActivitySummary = { number: null, participants: null, participantsFof: null, isOverridden: false, facilitators: null, facilitatorNames: null };
+
+  test('returns empty string when summaries is null', () => {
+    expect(facilitatorsCountFromClusterNotebook(null)).toBe('');
+  });
+
+  test('sums facilitators across all four activity types', () => {
+    const result = facilitatorsCountFromClusterNotebook({
+      childrensClasses: { ...blank, facilitators: 2 },
+      juniorYouthGroups: { ...blank, facilitators: 1 },
+      studyCircles: { ...blank, facilitators: null },
+      devotionalGathering: { ...blank, facilitators: 3 },
+    });
+    expect(result).toBe('6');
+  });
+
+  test('returns empty string when no activity type has a facilitators count', () => {
+    const result = facilitatorsCountFromClusterNotebook({
       childrensClasses: blank, juniorYouthGroups: null, studyCircles: null, devotionalGathering: null,
     });
     expect(result).toBe('');

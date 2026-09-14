@@ -51,6 +51,9 @@ export const COL = {
   TOTAL_ACT:           34,
   TOTAL_PART:          35,
   TOTAL_FOF:           36,
+  // dead: the hand-typed counts are retired -- Helping/Accompanying now show the
+  // persisted 'protagonist'/'accompanier' role lists directly (protagonistNames.length/
+  // accompanierNames.length), 2026-09-14, matching Promoting's read-only-list pattern.
   PROTAGONISTS:        37,
   ACCOMPANIERS:        38,
   LEVEL:               39,

@@ -54,6 +54,18 @@ export function facilitatorsFromClusterNotebook(summaries: ActivitySummaries | n
   return Array.from(new Set(names)).join('; ');
 }
 
+// Summed count across all four rollups' `facilitators` -- the numeric sibling of
+// facilitatorNames above, used for the concentric diagram's "Facilitating" ring
+// (which needs a number, not a name string).
+export function facilitatorsCountFromClusterNotebook(summaries: ActivitySummaries | null): string {
+  if (!summaries) return '';
+  const counts = [summaries.childrensClasses, summaries.juniorYouthGroups, summaries.studyCircles, summaries.devotionalGathering]
+    .map(s => s?.facilitators)
+    .filter((n): n is number => n != null);
+  if (counts.length === 0) return '';
+  return String(counts.reduce((a, b) => a + b, 0));
+}
+
 function toIntOrNull(value: unknown): number | null {
   const cleaned = stripCommas(String(value ?? ''));
   const n = parseInt(cleaned, 10);
@@ -180,8 +192,6 @@ export function parseRow(row: string[]) {
       scs:         { act: stripCommas(row[COL.SC_ACT]),   part: stripCommas(row[COL.SC_PART]),   fof: stripCommas(row[COL.SC_FOF]) },
       devotionals: { act: stripCommas(row[COL.DEV_ACT]),  part: stripCommas(row[COL.DEV_PART]),  fof: stripCommas(row[COL.DEV_FOF]) },
     },
-    protagonists:    stripCommas(row[COL.PROTAGONISTS]),
-    accompaniers:    stripCommas(row[COL.ACCOMPANIERS]),
     level:           row[COL.LEVEL],
     notesPrevalence: row[COL.NOTES_PREVALENCE],
     supported:       row[COL.SUPPORTED],
@@ -196,8 +206,9 @@ export function parseRow(row: string[]) {
     notesGatherings:  row[COL.NOTES_GATHERINGS],
     narrative:        row[COL.NARRATIVE],
     // No sheet column -- always overwritten from cluster-notebook right after
-    // parseRow runs (see facilitatorsFromClusterNotebook in getRowData).
+    // parseRow runs (see facilitatorsFromClusterNotebook/facilitatorsCountFromClusterNotebook in getRowData).
     facilitators:     '',
+    facilitatorsCount: '',
   };
 }
 
@@ -243,6 +254,7 @@ export async function getRowData(nucleusName: string) {
   row.nucleus = nucleusName;
   row.activities = activitiesFromClusterNotebook(activitySummaries);
   row.facilitators = facilitatorsFromClusterNotebook(activitySummaries);
+  row.facilitatorsCount = facilitatorsCountFromClusterNotebook(activitySummaries);
   Object.assign(row, nucleusFieldsFromClusterNotebook(nucleusFields));
 
   return {
@@ -306,8 +318,6 @@ export async function createRowData(formData: Record<string, unknown>, userEmail
   newRow[COL.DEV_ACT]        = d.activities?.devotionals?.act  || '';
   newRow[COL.DEV_PART]       = d.activities?.devotionals?.part || '';
   newRow[COL.DEV_FOF]        = d.activities?.devotionals?.fof  || '';
-  newRow[COL.PROTAGONISTS]   = d.protagonists             || '';
-  newRow[COL.ACCOMPANIERS]   = d.accompaniers             || '';
   newRow[COL.LEVEL]          = d.level                    || '';
   newRow[COL.NOTES_PREVALENCE] = d.notesPrevalence        || '';
   newRow[COL.SUPPORTED]      = d.supported                || '';
@@ -359,7 +369,6 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
 
   const updates = [
     ...identityPairs,
-    [COL.PROTAGONISTS, d.protagonists], [COL.ACCOMPANIERS, d.accompaniers],
     [COL.LEVEL, d.level], [COL.NOTES_PREVALENCE, d.notesPrevalence],
     [COL.SUPPORTED, d.supported], [COL.NOTES_SUPPORTED, d.notesSupported],
     [COL.INVOLVED, d.involved], [COL.NOTES_INVOLVED, d.notesInvolved],
