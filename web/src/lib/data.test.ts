@@ -7,10 +7,11 @@ vi.mock('./sheets', () => ({
 }));
 
 import { sheetsGet, sheetsClear, sheetsBatchUpdate } from './sheets';
-import { parseRow, findSrpRow, parseSrpData } from './data';
+import { parseRow, findSrpRow, facilitatorsFromClusterNotebook } from './data';
 import { getAccessEntries, saveAccessEntries } from './data';
-import { COL, DEV_COL, EDU_COL, ACCESS_COL } from './config';
+import { COL, DEV_COL, ACCESS_COL } from './config';
 import type { AccessEntry } from '@/types';
+import type { ActivitySummary } from './clusterNotebook';
 
 vi.mock('./clusterNotebook', () => ({
   getActivitySummaries: vi.fn(),
@@ -115,10 +116,10 @@ describe('getRowData', () => {
       return [];
     });
     mockGetActivitySummaries.mockResolvedValue({
-      devotionalGathering: { number: 4, participants: 30, participantsFof: 10, isOverridden: false },
-      childrensClasses: { number: 1, participants: 10, participantsFof: 2, isOverridden: true },
-      juniorYouthGroups: { number: 2, participants: 20, participantsFof: 3, isOverridden: false },
-      studyCircles: { number: 3, participants: 30, participantsFof: 4, isOverridden: false },
+      devotionalGathering: { number: 4, participants: 30, participantsFof: 10, isOverridden: false, facilitators: null, facilitatorNames: 'Dave' },
+      childrensClasses: { number: 1, participants: 10, participantsFof: 2, isOverridden: true, facilitators: null, facilitatorNames: 'Alice' },
+      juniorYouthGroups: { number: 2, participants: 20, participantsFof: 3, isOverridden: false, facilitators: null, facilitatorNames: null },
+      studyCircles: { number: 3, participants: 30, participantsFof: 4, isOverridden: false, facilitators: null, facilitatorNames: '' },
     });
 
     const result = await getRowData('Alpha');
@@ -128,6 +129,7 @@ describe('getRowData', () => {
     expect(result?.row.activities.ccs).toEqual({ act: '1', part: '10', fof: '2', isOverridden: true });
     expect(result?.row.activities.jygs).toEqual({ act: '2', part: '20', fof: '3', isOverridden: false });
     expect(result?.row.activities.scs).toEqual({ act: '3', part: '30', fof: '4', isOverridden: false });
+    expect(result?.row.facilitators).toBe('Alice; Dave');
   });
 
   test('renders a null cluster-notebook value as empty strings, not overridden', async () => {
@@ -696,21 +698,38 @@ describe('findSrpRow', () => {
   });
 });
 
-describe('parseSrpData', () => {
-  function makeEduRow(overrides: Record<number, string> = {}): string[] {
-    const row = new Array(11).fill('');
-    Object.entries(overrides).forEach(([k, v]) => { row[Number(k)] = v; });
-    return row;
-  }
+describe('facilitatorsFromClusterNotebook', () => {
+  const blank: ActivitySummary = { number: null, participants: null, participantsFof: null, isOverridden: false, facilitators: null, facilitatorNames: null };
 
-  test('returns null when there is no edu row', () => {
-    expect(parseSrpData(null)).toBeNull();
+  test('returns empty string when summaries is null', () => {
+    expect(facilitatorsFromClusterNotebook(null)).toBe('');
   });
 
-  test('parses facilitators from the edu row', () => {
-    const eduRow = makeEduRow({ [EDU_COL.FACILITATORS]: 'Alice, Bob' });
-    const result = parseSrpData(eduRow);
-    expect(result?.facilitators).toBe('Alice, Bob');
+  test('combines distinct non-empty facilitatorNames across all four activity types', () => {
+    const result = facilitatorsFromClusterNotebook({
+      childrensClasses: { ...blank, facilitatorNames: 'Alice' },
+      juniorYouthGroups: { ...blank, facilitatorNames: 'Bob' },
+      studyCircles: { ...blank, facilitatorNames: null },
+      devotionalGathering: { ...blank, facilitatorNames: '' },
+    });
+    expect(result).toBe('Alice; Bob');
+  });
+
+  test('dedupes identical facilitatorNames across activity types', () => {
+    const result = facilitatorsFromClusterNotebook({
+      childrensClasses: { ...blank, facilitatorNames: 'Alice, Bob' },
+      juniorYouthGroups: { ...blank, facilitatorNames: 'Alice, Bob' },
+      studyCircles: null,
+      devotionalGathering: null,
+    });
+    expect(result).toBe('Alice, Bob');
+  });
+
+  test('returns empty string when no activity type has facilitatorNames', () => {
+    const result = facilitatorsFromClusterNotebook({
+      childrensClasses: blank, juniorYouthGroups: null, studyCircles: null, devotionalGathering: null,
+    });
+    expect(result).toBe('');
   });
 });
 

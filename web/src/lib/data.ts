@@ -1,9 +1,9 @@
 import { sheetsGet, sheetsBatchUpdate, sheetsClear, sheetsDeleteRow } from './sheets';
 import {
   MASTER_SHEET_ID, SRP_SHEET_ID,
-  MASTER_TAB, ACCESS_TAB, DEV_TAB, EDU_TAB,
+  MASTER_TAB, ACCESS_TAB, DEV_TAB,
   MASTER_DATA_ROW, SRP_DATA_ROW,
-  COL, EDU_COL,
+  COL,
   ACCESS_COL,
 } from './config';
 import {
@@ -42,6 +42,16 @@ export function activitiesFromClusterNotebook(summaries: ActivitySummaries | nul
     scs: activityFromSummary(summaries?.studyCircles ?? null),
     devotionals: activityFromSummary(summaries?.devotionalGathering ?? null),
   };
+}
+
+// Our UI shows one combined facilitators line per nucleus, not per activity type --
+// collect the distinct non-empty facilitatorNames across all four rollups.
+export function facilitatorsFromClusterNotebook(summaries: ActivitySummaries | null): string {
+  if (!summaries) return '';
+  const names = [summaries.childrensClasses, summaries.juniorYouthGroups, summaries.studyCircles, summaries.devotionalGathering]
+    .map(s => s?.facilitatorNames?.trim())
+    .filter((s): s is string => !!s);
+  return Array.from(new Set(names)).join('; ');
 }
 
 function toIntOrNull(value: unknown): number | null {
@@ -145,11 +155,6 @@ export async function getAllDevRows() {
   return rows.map(r => normalize(r, 14));
 }
 
-export async function getAllEduRows() {
-  const rows = await sheetsGet(SRP_SHEET_ID, `${EDU_TAB}!A${SRP_DATA_ROW}:K`);
-  return rows.map(r => normalize(r, 11));
-}
-
 export function parseRow(row: string[]) {
   return {
     grouping:            row[COL.GROUPING],
@@ -190,6 +195,9 @@ export function parseRow(row: string[]) {
     gatherings:       row[COL.GATHERINGS],
     notesGatherings:  row[COL.NOTES_GATHERINGS],
     narrative:        row[COL.NARRATIVE],
+    // No sheet column -- always overwritten from cluster-notebook right after
+    // parseRow runs (see facilitatorsFromClusterNotebook in getRowData).
+    facilitators:     '',
   };
 }
 
@@ -198,20 +206,13 @@ export function findSrpRow(name: string, rows: string[][], nameCol: number) {
   return rows.find(r => norm(r[nameCol]) === needle) ?? null;
 }
 
-// cc/jyg/sc/devotionals numbers no longer come from here (see activitiesFromClusterNotebook) —
-// this now only carries facilitators, which cluster-notebook doesn't expose yet.
-export function parseSrpData(eduRow: string[] | null) {
-  if (!eduRow) return null;
-  return { facilitators: eduRow[EDU_COL.FACILITATORS] };
-}
-
 function toWorkers(individuals: Individual[]): Worker[] {
   return individuals.map(ind => ({ id: ind.id, name: individualDisplayName(ind), email: ind.email }));
 }
 
 export async function getRowData(nucleusName: string) {
-  const [masterRows, eduRows, accompanierWorkers, protagonistWorkers, abmAssistantWorkers, contactWorkers, activitySummaries, nucleusFields] = await Promise.all([
-    getAllMasterRows(), getAllEduRows(),
+  const [masterRows, accompanierWorkers, protagonistWorkers, abmAssistantWorkers, contactWorkers, activitySummaries, nucleusFields] = await Promise.all([
+    getAllMasterRows(),
     getNucleusWorkers(nucleusName, 'accompanier'),
     getNucleusWorkers(nucleusName, 'protagonist'),
     getNucleusWorkers(nucleusName, 'abm-assistant'),
@@ -223,33 +224,28 @@ export async function getRowData(nucleusName: string) {
   const masterRow = masterRows.find(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
   if (!masterRow) return null;
 
-  // Devotionals no longer needs the Dev sheet at all (getAllDevRows is still used
-  // separately, for /api/initial-data's srpNames) -- only facilitators still comes
-  // from the Edu sheet.
-  let eduRow = findSrpRow(nucleusName, eduRows, EDU_COL.NAME);
-  if (!eduRow && masterRow[COL.PARENT_NUCLEUS]) {
-    eduRow = findSrpRow(`${masterRow[COL.PARENT_NUCLEUS]} - ${nucleusName}`, eduRows, EDU_COL.NAME);
-  }
-
   const row = parseRow(masterRow);
-  // parseRow's nucleus/activities/stage/locality/makeup/totalPop/totalHH/indNum/hhNum/presence/
-  // notesPresence/gatherings/notesGatherings/narrative/grouping/cluster/pg/clusterCode/
-  // nucleusType/auxBoard reads (from the corresponding COL.* sheet columns) are all overwritten below —
-  // none of these sheet columns are read by anything else anymore either (/api/initial-data's
-  // picker summary sources the same fields from cluster-notebook now too), so they're fully
-  // dead. grouping/cluster/pg are read-only from cluster-notebook (no mutation exists for them
-  // there); clusterCode is derived client-side from cluster.name, not read from anywhere.
+  // parseRow's nucleus/activities/facilitators/stage/locality/makeup/totalPop/totalHH/indNum/
+  // hhNum/presence/notesPresence/gatherings/notesGatherings/narrative/grouping/cluster/pg/
+  // clusterCode/nucleusType/auxBoard reads (from the corresponding COL.* sheet columns, where
+  // any even exist) are all overwritten below — none of these sheet columns are read by
+  // anything else anymore either (/api/initial-data's picker summary sources the same fields
+  // from cluster-notebook now too), so they're fully dead. grouping/cluster/pg are read-only
+  // from cluster-notebook (no mutation exists for them there); clusterCode is derived
+  // client-side from cluster.name, not read from anywhere. facilitators has no sheet column at
+  // all anymore — the old Education-sheet read (getAllEduRows/EDU_TAB/EDU_COL) is fully retired,
+  // 2026-09-14.
   // nucleus itself: the list of valid nuclei comes from cluster-notebook, not the Sheet
   // (2026-09-13, the user directly) — `nucleusName` (this function's own parameter) already IS
   // that canonical value once it flows from the picker, so it's authoritative here too, not the
   // Sheet's own (possibly stale, or just differently-cased) copy of the same name.
   row.nucleus = nucleusName;
   row.activities = activitiesFromClusterNotebook(activitySummaries);
+  row.facilitators = facilitatorsFromClusterNotebook(activitySummaries);
   Object.assign(row, nucleusFieldsFromClusterNotebook(nucleusFields));
 
   return {
     row,
-    srp: parseSrpData(eduRow),
     accompanierNames: toWorkers(accompanierWorkers),
     protagonistNames: toWorkers(protagonistWorkers),
     abmAssistantNames: toWorkers(abmAssistantWorkers),

@@ -9,13 +9,18 @@ export interface ActivitySummary {
   participants: number | null;
   participantsFof: number | null;
   isOverridden: boolean;
+  // Added 2026-09-14. Both human-entered only -- no SRP source exists for either
+  // (srp-client has no per-activity roster data yet), so these never get
+  // SRP-derived when unset, unlike number/participants/participantsFof.
+  facilitators: number | null;
+  facilitatorNames: string | null;
 }
 
 // ActivityType enum values are singular (CHILDRENS_CLASS, not CHILDRENS_CLASSES),
 // confirmed against cluster-notebook's schema 2026-09-14.
 export type ActivityType = 'DEVOTIONAL_GATHERING' | 'CHILDRENS_CLASS' | 'JUNIOR_YOUTH_GROUP' | 'STUDY_CIRCLE';
 
-const ACTIVITY_SUMMARY_SELECTION = 'number participants participantsFof isOverridden';
+const ACTIVITY_SUMMARY_SELECTION = 'number participants participantsFof isOverridden facilitators facilitatorNames';
 
 interface GraphQLResponse<T> {
   data?: T;

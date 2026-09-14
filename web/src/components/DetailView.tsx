@@ -366,7 +366,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 }
 
 export default function DetailView({ detail, role, roleMap, email, showBack, spreadsheetUrl, onBack, onSaved, isNew, onCreated }: Props) {
-  const { row, srp } = detail;
+  const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -651,8 +651,8 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
                 onSync={() => set('accompaniers', String(accompanierNames.length))}
               />
             </div>
-            {srp?.facilitators && (
-              <div className="srp-ref">SRP Facilitators: <strong>{srp.facilitators}</strong></div>
+            {form.facilitators && (
+              <div className="srp-ref">SRP Facilitators: <strong>{form.facilitators}</strong></div>
             )}
           </div>
         </div>

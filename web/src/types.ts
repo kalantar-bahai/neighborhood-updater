@@ -69,12 +69,10 @@ export interface NucleusRow {
   gatherings: string;
   notesGatherings: string;
   narrative: string;
-}
-
-// cc/jyg/sc/devotionals numbers all now come from cluster-notebook (see NucleusRow.activities);
-// the SRP sheet cache is only still consulted for facilitators, which cluster-notebook
-// doesn't expose yet.
-export interface SrpData {
+  // Combined, deduped facilitatorNames across all four cluster-notebook activity
+  // rollups (2026-09-14) -- human-entered on their side, no SRP source, read-only
+  // here (no per-activity granularity in our UI). Replaces the old Education-sheet
+  // read entirely; no more SRP sheet cache consulted anywhere in this app.
   facilitators: string;
 }
 
@@ -91,7 +89,6 @@ export interface Worker {
 
 export interface NucleusDetail {
   row: NucleusRow;
-  srp: SrpData | null;
   accompanierNames: Worker[];
   protagonistNames: Worker[];
   abmAssistantNames: Worker[];
