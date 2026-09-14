@@ -5,6 +5,7 @@ import { InitialData, NucleusDetail, Role } from '@/types';
 import Picker from './Picker';
 import DetailView from './DetailView';
 import AccessPanel from './AccessPanel';
+import CreateNucleusModal from './CreateNucleusModal';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
@@ -66,48 +67,6 @@ export default function AppClient() {
 
   if (!initialData || loadingDetail) {
     return <div className="loading-state">Loading...</div>;
-  }
-
-  if (creatingNew) {
-    const emptyDetail: NucleusDetail = {
-      row: {
-        // grouping/pg/clusterCode/locality are always blank at this point regardless of
-        // which cluster gets picked -- they're derived from cluster-notebook once the
-        // nucleus is created and round-trips through the normal getRowData load, 2026-09-14.
-        nucleus: '', parentNucleus: '', nucleusType: '', grouping: '', cluster: '',
-        pg: '', clusterCode: '', locality: '', stage: '',
-        auxBoard: '', makeup: '', totalPop: '', totalHH: '', indNum: '', indPct: '',
-        hhNum: '', hhPct: '',
-        activities: {
-          ccs:         { act: '', part: '', fof: '' },
-          jygs:        { act: '', part: '', fof: '' },
-          scs:         { act: '', part: '', fof: '' },
-          devotionals: { act: '', part: '', fof: '' },
-        },
-        presence: '', notesPresence: '',
-        gatherings: '', notesGatherings: '', narrative: '', facilitators: '', facilitatorsCount: '',
-      },
-      accompanierNames: [],
-      protagonistNames: [],
-      abmAssistantNames: [],
-      contactNames: [],
-      promoterNames: [],
-    };
-    return (
-      <DetailView
-        detail={emptyDetail}
-        role="admin"
-        roleMap={initialData.access.roleMap}
-        email={initialData.email}
-        showBack={false}
-        spreadsheetUrl={initialData.spreadsheetUrl}
-        onBack={() => setCreatingNew(false)}
-        onSaved={() => {}}
-        isNew
-        onCreated={(name) => { setCreatingNew(false); loadNucleus(name); }}
-        clusterNames={initialData.clusterNames}
-      />
-    );
   }
 
   if (detail && selectedNucleus) {
@@ -198,6 +157,14 @@ const typeSummaries = (['neighborhood', 'network', 'population'] as const)
             )}
           </div>
         </div>
+      )}
+
+      {creatingNew && (
+        <CreateNucleusModal
+          clusterNames={initialData.clusterNames}
+          onClose={() => setCreatingNew(false)}
+          onCreated={(name) => { setCreatingNew(false); loadNucleus(name); }}
+        />
       )}
     </>
   );

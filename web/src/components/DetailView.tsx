@@ -15,11 +15,6 @@ interface Props {
   spreadsheetUrl: string;
   onBack: () => void;
   onSaved: (savedBy: string, savedAt: string) => void;
-  isNew?: boolean;
-  onCreated?: (name: string) => void;
-  // Existing clusters only, for the "+Add" cluster picker (2026-09-14) -- always
-  // passed, but only ever rendered when isNew.
-  clusterNames?: string[];
 }
 
 type FormState = NucleusRow;
@@ -80,14 +75,13 @@ function Field({ label, value, onChange, readonly, type, integer, onLabelClick, 
   );
 }
 
-function SelectField({ label, value, options, onChange, fromSheet, placeholder }: {
-  label: string; value: string; options: string[]; onChange: (v: string) => void; fromSheet?: boolean; placeholder?: string;
+function SelectField({ label, value, options, onChange, fromSheet }: {
+  label: string; value: string; options: string[]; onChange: (v: string) => void; fromSheet?: boolean;
 }) {
   return (
     <div className={`field${fromSheet ? ' from-sheet' : ''}`}>
       <label>{label}</label>
       <select value={value || ''} onChange={e => onChange(e.target.value)}>
-        {placeholder && <option value="">{placeholder}</option>}
         {options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
       </select>
     </div>
@@ -369,7 +363,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
   );
 }
 
-export default function DetailView({ detail, role, roleMap, email, showBack, spreadsheetUrl, onBack, onSaved, isNew, onCreated, clusterNames }: Props) {
+export default function DetailView({ detail, role, roleMap, email, showBack, spreadsheetUrl, onBack, onSaved }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   const [isDirty, setIsDirty] = useState(false);
@@ -389,7 +383,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
   const [showContactModal, setShowContactModal] = useState(false);
   const [promoterNames, setPromoterNames] = useState<Worker[]>(() => detail.promoterNames);
   const [showPromotersModal, setShowPromotersModal] = useState(false);
-  const [identityOpen, setIdentityOpen] = useState(!!isNew);
+  const [identityOpen, setIdentityOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
   const [dangerOpen, setDangerOpen] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
@@ -416,7 +410,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
     setSaveStatus({ msg: 'Saving...', type: 'idle' });
     try {
       const payload: Record<string, unknown> = { ...form };
-      if (isAdmin || isNew) {
+      if (isAdmin) {
         payload.identity = {
           nucleus:        form.nucleus,
           parentNucleus:  form.parentNucleus,
@@ -428,33 +422,20 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
         };
       }
 
-      let res: Response;
-      if (isNew) {
-        res = await fetch('/api/nucleus', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ formData: payload }),
-        });
-      } else {
-        res = await fetch('/api/nucleus', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: row.nucleus, formData: payload }),
-        });
-      }
+      const res = await fetch('/api/nucleus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: row.nucleus, formData: payload }),
+      });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Save failed');
 
-      if (isNew) {
-        onCreated?.(form.nucleus);
-      } else {
-        setSaveStatus({ msg: 'Saved successfully', type: 'success' });
-        setIsDirty(false);
-        setLastUpdatedBy(data.savedBy || email);
-        setLastUpdatedAt(data.savedAt || new Date().toISOString());
-        onSaved(data.savedBy || email, data.savedAt || new Date().toISOString());
-      }
+      setSaveStatus({ msg: 'Saved successfully', type: 'success' });
+      setIsDirty(false);
+      setLastUpdatedBy(data.savedBy || email);
+      setLastUpdatedAt(data.savedAt || new Date().toISOString());
+      onSaved(data.savedBy || email, data.savedAt || new Date().toISOString());
     } catch (e: unknown) {
       setSaveStatus({ msg: `Save failed: ${e instanceof Error ? e.message : String(e)}`, type: 'error' });
     } finally {
@@ -488,7 +469,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
     form.totalPop, form.totalHH, form.indNum, form.hhNum,
     ...actVals,
   ].some(v => !isValidInt(v));
-  const cannotSave = hasIntErrors || (!!isNew && (!form.nucleus.trim() || !form.cluster.trim()));
+  const cannotSave = hasIntErrors;
 
   const hasAnyActPart = actKeys.some(k => form.activities[k].part !== '');
   // "Helping" here (relabeled from "Sustaining") is still the protagonist role --
@@ -531,35 +512,29 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
     <>
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0 }}>
-          {(showBack || isNew) && <button className="back-btn" onClick={handleBack}>← {isNew ? 'Cancel' : 'Back'}</button>}
+          {showBack && <button className="back-btn" onClick={handleBack}>← Back</button>}
           <div style={{ minWidth: 0 }}>
-            <h1>{isNew ? 'New Nucleus' : row.nucleus}</h1>
-            {!isNew && <div className="meta">{row.clusterCode} · {row.cluster} · {row.locality}</div>}
-            {!isNew && updatedLine && <div className="last-updated">{updatedLine}</div>}
+            <h1>{row.nucleus}</h1>
+            <div className="meta">{row.clusterCode} · {row.cluster} · {row.locality}</div>
+            {updatedLine && <div className="last-updated">{updatedLine}</div>}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-          {!isNew && (
-            <button onClick={() => setShowDiagram(true)} title="Concentric Circles" aria-label="Concentric Circles" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
-              <IcoDiagram />
-            </button>
-          )}
-          {!isNew && (
-            <button onClick={() => setShowDiagram2(true)} title="Concentric Circles (Aligned)" aria-label="Concentric Circles (Aligned)" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
-              <IcoDiagram2 />
-            </button>
-          )}
-          {!isNew && (
-            <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" title="Open spreadsheet" aria-label="Open spreadsheet" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', textDecoration: 'none' }}>
-              <IcoExternalLink />
-            </a>
-          )}
+          <button onClick={() => setShowDiagram(true)} title="Concentric Circles" aria-label="Concentric Circles" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
+            <IcoDiagram />
+          </button>
+          <button onClick={() => setShowDiagram2(true)} title="Concentric Circles (Aligned)" aria-label="Concentric Circles (Aligned)" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
+            <IcoDiagram2 />
+          </button>
+          <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" title="Open spreadsheet" aria-label="Open spreadsheet" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', textDecoration: 'none' }}>
+            <IcoExternalLink />
+          </a>
           <button onClick={handleSignOut} title="Sign out" aria-label="Sign out" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
             <IcoLogOut />
           </button>
           {!isReadOnly && (
             <button className="save-btn" disabled={saving || cannotSave} onClick={handleSave} title="Save to spreadsheet" aria-label="Save to spreadsheet" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 12px' }}>
-              <IcoSave /><span className="save-btn-label">{isNew ? 'Create' : 'Save'}</span>
+              <IcoSave /><span className="save-btn-label">Save</span>
             </button>
           )}
         </div>
@@ -578,21 +553,17 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           </div>
           {identityOpen && <div className="card-body">
             <div className="field-grid-4">
-              {/* Grouping/PG/Cluster Code are all read-only: Grouping/PG because
-                  cluster-notebook derives them from Cluster.groupOfClusters/growthMilestone
-                  with no mutation for either (2026-09-13); Cluster Code because it's not a
-                  stored field at all, just the first token of cluster.name, computed in
-                  nucleusFieldsFromClusterNotebook (data.ts). Cluster itself is read-only for
-                  an EXISTING nucleus (same no-mutation reasoning), but editable while
-                  creating a brand-new one (isNew): createNucleus needs a clusterName to
-                  establish the nucleus's identity, 2026-09-14. Picker only -- no inline
-                  cluster creation, clusters are real SRP-sourced geographic entities. */}
+              {/* Grouping/Cluster/PG/Cluster Code are all read-only: Grouping/Cluster/PG
+                  because cluster-notebook derives them from Cluster.groupOfClusters/name/
+                  growthMilestone with no mutation for any of the three (2026-09-13); Cluster
+                  Code because it's not a stored field at all, just the first token of
+                  cluster.name, computed in nucleusFieldsFromClusterNotebook (data.ts).
+                  Cluster is chosen once, at creation time, via CreateNucleusModal
+                  (createNucleus needs a clusterName) -- not editable here afterward,
+                  2026-09-14. */}
               <Field label="Grouping"     value={form.grouping}    readonly />
               <Field label="Cluster Code" value={form.clusterCode} readonly />
-              {isNew
-                ? <SelectField label="Cluster" value={form.cluster} options={clusterNames ?? []} onChange={v => set('cluster', v)} placeholder="Select a cluster…" />
-                : <Field label="Cluster" value={form.cluster} readonly />
-              }
+              <Field label="Cluster"      value={form.cluster}     readonly />
               <Field label="PG"           value={form.pg}          readonly />
             </div>
             <div className="field-grid-4">
@@ -600,14 +571,12 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
                   Nucleus.location's own containment chain, and has no write path for
                   it (removed from NucleusPatch 2026-09-13) — not an admin-permission
                   distinction like the other Identity fields. Nucleus (the name itself)
-                  is read-only for an EXISTING nucleus: cluster-notebook's own name is now
-                  the canonical identifier (2026-09-13, the user directly) and cluster-notebook
-                  has no rename mutation — an edit here would silently revert on next load.
-                  Still editable while creating a brand-new nucleus (isNew): it doesn't exist
-                  in cluster-notebook yet, so there's no canonical name to protect, and
-                  createRowData still needs a typed name to create the Sheet row at all. */}
+                  is read-only: cluster-notebook's own name is now the canonical identifier
+                  (2026-09-13, the user directly) and cluster-notebook has no rename
+                  mutation — an edit here would silently revert on next load. Set once, at
+                  creation time, via CreateNucleusModal, 2026-09-14. */}
               <Field label="Locality" value={form.locality} readonly />
-              <Field label="Nucleus" value={form.nucleus} onChange={isNew ? v => set('nucleus', v) : undefined} readonly={!isNew} />
+              <Field label="Nucleus" value={form.nucleus} readonly />
               {isAdmin
                 ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => set('nucleusType', v)} />
                 : <Field label="Type" value={form.nucleusType} readonly />
@@ -776,7 +745,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
         </div>
 
         {/* Manage Access — collaborator and admin */}
-        {canManageAccess && !isNew && (
+        {canManageAccess && (
           <div className="card">
             <div
               className="card-header"
@@ -793,8 +762,8 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           </div>
         )}
 
-        {/* Danger Zone — admin only, existing nuclei */}
-        {isAdmin && !isNew && (
+        {/* Danger Zone — admin only */}
+        {isAdmin && (
           <div className="card" style={{ borderColor: '#fed7d7' }}>
             <div
               className="card-header"
@@ -953,12 +922,9 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
         </span>
         {!isReadOnly && (
           <>
-            {isNew
-              ? <button className="btn-cancel" onClick={handleBack}>Cancel</button>
-              : <button className="btn-cancel" onClick={handleDiscard}>Discard changes</button>
-            }
+            <button className="btn-cancel" onClick={handleDiscard}>Discard changes</button>
             <button className="btn-save" disabled={saving || cannotSave} onClick={handleSave}>
-              {isNew ? 'Create nucleus' : 'Save to spreadsheet'}
+              Save to spreadsheet
             </button>
           </>
         )}
