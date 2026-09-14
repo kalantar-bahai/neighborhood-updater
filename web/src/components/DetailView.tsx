@@ -627,6 +627,36 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           </div>}
         </div>
 
+        {/* Workers & Prevalence */}
+        <div className="card from-sheet">
+          <div className="card-header">Workers &amp; Prevalence</div>
+          <div className="card-body">
+            <div className="field-grid-2">
+              <Field
+                label="Protagonists / Workers"
+                value={form.protagonists}
+                onChange={v => set('protagonists', v)}
+                integer
+                highlighted={protagonistsMismatch}
+                onLabelClick={() => setShowProtagonistsModal(true)}
+                onSync={() => set('protagonists', String(protagonistNames.length))}
+              />
+              <Field
+                label="Accompaniers in Nucleus"
+                value={form.accompaniers}
+                onChange={v => set('accompaniers', v)}
+                integer
+                highlighted={accompaniersMismatch}
+                onLabelClick={() => setShowAccompaniersModal(true)}
+                onSync={() => set('accompaniers', String(accompanierNames.length))}
+              />
+            </div>
+            {srp?.facilitators && (
+              <div className="srp-ref">SRP Facilitators: <strong>{srp.facilitators}</strong></div>
+            )}
+          </div>
+        </div>
+
         {/* Population */}
         <div className="card">
           <div className="card-header">Population</div>
@@ -684,41 +714,6 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
                   <TotalRow label="Total Activities" totals={allTotal} />
                 </tbody>
               </table>
-            </div>
-          </div>
-        </div>
-
-        {/* Workers & Prevalence */}
-        <div className="card from-sheet">
-          <div className="card-header">Workers &amp; Prevalence</div>
-          <div className="card-body">
-            <div className="field-grid-2">
-              <Field
-                label="Protagonists / Workers"
-                value={form.protagonists}
-                onChange={v => set('protagonists', v)}
-                integer
-                highlighted={protagonistsMismatch}
-                onLabelClick={() => setShowProtagonistsModal(true)}
-                onSync={() => set('protagonists', String(protagonistNames.length))}
-              />
-              <Field
-                label="Accompaniers in Nucleus"
-                value={form.accompaniers}
-                onChange={v => set('accompaniers', v)}
-                integer
-                highlighted={accompaniersMismatch}
-                onLabelClick={() => setShowAccompaniersModal(true)}
-                onSync={() => set('accompaniers', String(accompanierNames.length))}
-              />
-            </div>
-            {srp?.facilitators && (
-              <div className="srp-ref">SRP Facilitators: <strong>{srp.facilitators}</strong></div>
-            )}
-            <div className="divider" />
-            <div className="field">
-              <label>Notes</label>
-              <textarea value={form.notesPrevalence || ''} onChange={e => set('notesPrevalence', e.target.value)} />
             </div>
           </div>
         </div>
