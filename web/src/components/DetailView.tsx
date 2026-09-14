@@ -645,15 +645,19 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               {/* Copied from the Activities card's totals, not independently entered --
                   same non-editable treatment as Facilitating Core Activity below. */}
               <Field label="Participating" value={String(allTotal.part)} readonly />
+              {/* Promoting/Helping/Accompanying show a count, not the name list --
+                  these can be large; unlike Contact (a singleton, shows the name
+                  directly), a name list here wouldn't scale. Click the label to see
+                  or edit the actual names in the modal. */}
               <Field
                 label="Promoting"
-                value={promoterNames.map(w => w.name).join(', ')}
+                value={String(promoterNames.length)}
                 readonly
                 onLabelClick={() => setShowPromotersModal(true)}
               />
               <Field
                 label="Helping"
-                value={protagonistNames.map(w => w.name).join(', ')}
+                value={String(protagonistNames.length)}
                 readonly
                 onLabelClick={() => setShowProtagonistsModal(true)}
               />
@@ -663,7 +667,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               <Field label="Facilitating Core Activity" value={form.facilitators} readonly />
               <Field
                 label="Accompanying"
-                value={accompanierNames.map(w => w.name).join(', ')}
+                value={String(accompanierNames.length)}
                 readonly
                 onLabelClick={() => setShowAccompaniersModal(true)}
               />
