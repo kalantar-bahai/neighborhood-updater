@@ -36,13 +36,15 @@ export const GET = auth(async (req) => {
   // `nucleus` value returned below is cluster-notebook's own name, not the Sheet's
   // copy of it. The Sheet is consulted only for per-user authorization (does this
   // user have a row for this name?) and for fields not yet migrated. Also overrides
-  // locality/stage/nucleusType/activities (all four rollups: cc/jyg/sc/devotionals,
-  // 2026-09-14) with cluster-notebook's own values rather than the (now possibly
-  // stale) sheet columns — avoids reintroducing the staleness
-  // this migration is removing field-by-field. grouping/cluster in the summary below
-  // are NOT yet migrated (still `r[COL.GROUPING]`/`r[COL.CLUSTER]`) — out of scope for
-  // this pass; revisit if the picker's own grouping/cluster display needs the same
-  // treatment later.
+  // locality/stage/nucleusType/activities/grouping/cluster with cluster-notebook's
+  // own values rather than the (now possibly stale, or for a newly-created nucleus,
+  // simply never-populated) sheet columns. grouping/cluster used to read
+  // r[COL.GROUPING]/r[COL.CLUSTER] here -- fine while every nucleus's Sheet row was
+  // fully seeded on creation, but broke once nucleus creation stopped seeding those
+  // columns at all (2026-09-14): a brand-new nucleus showed up in the picker under
+  // "Unspecified"/"Unspecified" despite being correctly assigned in cluster-notebook
+  // and displaying correctly once opened. Fixed by sourcing both from
+  // cn.cluster.name/cn.cluster.groupOfClusters instead, 2026-09-14.
   const [clusterNotebookNuclei, clusters] = await Promise.all([getAllNuclei(), getClusters()]);
   const authorizedByName = new Map(
     access.rows
@@ -60,8 +62,8 @@ export const GET = auth(async (req) => {
       return {
         nucleus:       cn.name,
         parentNucleus: r[COL.PARENT_NUCLEUS],
-        grouping:      r[COL.GROUPING],
-        cluster:       r[COL.CLUSTER],
+        grouping:      cn.cluster.groupOfClusters ?? '',
+        cluster:       cn.cluster.name,
         locality:      cn.locality ?? '',
         nucleusType:   cn.nucleusType ?? '',
         stage:         cn.stage ?? '',

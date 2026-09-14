@@ -23,7 +23,7 @@ function jsonResponse(body: unknown, ok = true, status = 200) {
 }
 
 describe('getAllNuclei', () => {
-  test('returns the full nucleus list with fields, nucleusType, and all four activity rollups', async () => {
+  test('returns the full nucleus list with fields, nucleusType, cluster, and all four activity rollups', async () => {
     const alphaActivities = { number: 4, participants: 30, participantsFof: 10, isOverridden: true };
     mockFetch.mockResolvedValue(jsonResponse({
       data: {
@@ -31,10 +31,12 @@ describe('getAllNuclei', () => {
           {
             name: 'Alpha', stage: 'Initial/2', locality: 'Durham', populationMakeup: 'Mixed', nucleusType: 'Neighborhood',
             devotionalGathering: alphaActivities, childrensClasses: alphaActivities, juniorYouthGroups: alphaActivities, studyCircles: alphaActivities,
+            cluster: { name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers', auxiliaryBoardMembers: null },
           },
           {
             name: 'Beta', stage: null, locality: null, populationMakeup: null, nucleusType: null,
             devotionalGathering: null, childrensClasses: null, juniorYouthGroups: null, studyCircles: null,
+            cluster: { name: 'NC-330 Foothills', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
           },
         ],
       },
@@ -45,12 +47,15 @@ describe('getAllNuclei', () => {
     expect(result[0].childrensClasses).toEqual(alphaActivities);
     expect(result[0].juniorYouthGroups).toEqual(alphaActivities);
     expect(result[0].studyCircles).toEqual(alphaActivities);
+    expect(result[0].cluster).toEqual({ name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers', auxiliaryBoardMembers: null });
     expect(result[1].childrensClasses).toBeNull();
+    expect(result[1].cluster.groupOfClusters).toBeNull();
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.query).toContain('nucleusType');
     expect(body.query).toContain('childrensClasses');
     expect(body.query).toContain('juniorYouthGroups');
     expect(body.query).toContain('studyCircles');
+    expect(body.query).toContain('cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers }');
   });
 
   test('returns an empty array when there are no nuclei', async () => {

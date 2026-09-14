@@ -94,6 +94,10 @@ export interface NucleusSummary {
   childrensClasses: ActivitySummary | null;
   juniorYouthGroups: ActivitySummary | null;
   studyCircles: ActivitySummary | null;
+  // Added 2026-09-14 so the picker's own grouping/cluster display can source
+  // from cluster-notebook instead of the (now often blank, for newly-created
+  // nuclei) Sheet columns r[COL.GROUPING]/r[COL.CLUSTER].
+  cluster: ClusterFields;
 }
 
 // No top-level clusters query existed until 2026-09-14 (Cluster was only reachable
@@ -138,6 +142,7 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
         childrensClasses { ${ACTIVITY_SUMMARY_SELECTION} }
         juniorYouthGroups { ${ACTIVITY_SUMMARY_SELECTION} }
         studyCircles { ${ACTIVITY_SUMMARY_SELECTION} }
+        cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers }
       }
     }
   `;
