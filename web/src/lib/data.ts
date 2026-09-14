@@ -88,10 +88,11 @@ function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
     gatherings: boolToYesNo(fields?.hasCommunityGatherings),
     notesGatherings: fields?.communityGatheringDescription ?? '',
     narrative: fields?.narrative ?? '',
-    // Read-only on cluster-notebook's side — no mutation exists for any of these three.
+    // Read-only on cluster-notebook's side — no mutation exists for any of these four.
     cluster: fields?.cluster.name ?? '',
     grouping: fields?.cluster.groupOfClusters ?? '',
     pg: pgFromGrowthMilestone(fields?.cluster.growthMilestone),
+    auxBoard: fields?.cluster.auxiliaryBoardMembers ?? '',
     // Derived client-side (not a cluster-notebook field at all) from cluster.name.
     clusterCode: clusterCodeFromClusterName(fields?.cluster.name),
     // Writable, but only truly settable when the nucleus has no location — see
@@ -224,7 +225,7 @@ export async function getRowData(nucleusName: string) {
   const row = parseRow(masterRow);
   // parseRow's nucleus/devotionals/stage/locality/makeup/totalPop/totalHH/indNum/hhNum/presence/
   // notesPresence/gatherings/notesGatherings/narrative/grouping/cluster/pg/clusterCode/
-  // nucleusType reads (from the corresponding COL.* sheet columns) are all overwritten below —
+  // nucleusType/auxBoard reads (from the corresponding COL.* sheet columns) are all overwritten below —
   // none of these sheet columns are read by anything else anymore either (/api/initial-data's
   // picker summary sources the same fields from cluster-notebook now too), so they're fully
   // dead. grouping/cluster/pg are read-only from cluster-notebook (no mutation exists for them
@@ -351,7 +352,6 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
 
   const updates = [
     ...identityPairs,
-    [COL.AUX_BOARD, d.auxBoard],
     [COL.CC_ACT, d.activities.ccs.act], [COL.CC_PART, d.activities.ccs.part], [COL.CC_FOF, d.activities.ccs.fof],
     [COL.JYG_ACT, d.activities.jygs.act], [COL.JYG_PART, d.activities.jygs.part], [COL.JYG_FOF, d.activities.jygs.fof],
     [COL.SC_ACT, d.activities.scs.act], [COL.SC_PART, d.activities.scs.part], [COL.SC_FOF, d.activities.scs.fof],

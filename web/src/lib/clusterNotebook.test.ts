@@ -83,16 +83,22 @@ describe('getNucleusFields', () => {
       data: {
         nucleus: {
           stage: null, locality: null, populationMakeup: null,
-          cluster: { name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers' },
+          cluster: {
+            name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers',
+            auxiliaryBoardMembers: 'Pat Doe (Propagation), Sam Roe (Protection)',
+          },
         },
       },
     }));
 
     const result = await getNucleusFields('Alpha');
 
-    expect(result?.cluster).toEqual({ name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers' });
+    expect(result?.cluster).toEqual({
+      name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers',
+      auxiliaryBoardMembers: 'Pat Doe (Propagation), Sam Roe (Protection)',
+    });
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
-    expect(body.query).toContain('cluster { name groupOfClusters growthMilestone }');
+    expect(body.query).toContain('cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers }');
   });
 
   test('returns population/households/connected* fields', async () => {

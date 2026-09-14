@@ -172,6 +172,7 @@ describe('getRowData', () => {
     const masterRow = makeRow({
       [COL.NUCLEUS]: 'Alpha',
       [COL.STAGE]: 'stale-stage', [COL.LOCALITY]: 'stale-locality', [COL.MAKEUP]: 'stale-makeup',
+      [COL.AUX_BOARD]: 'stale-auxboard',
     });
     mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
       if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
@@ -184,7 +185,10 @@ describe('getRowData', () => {
       hasSocialAction: true, socialActionDescription: 'Cleanup drive', hasCommunityGatherings: false, communityGatheringDescription: null,
       narrative: 'A growing community of practice.',
       nucleusType: 'Neighborhood',
-      cluster: { name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers' },
+      cluster: {
+        name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers',
+        auxiliaryBoardMembers: 'Pat Doe (Propagation), Sam Roe (Protection)',
+      },
     });
 
     const result = await getRowData('Alpha');
@@ -207,6 +211,7 @@ describe('getRowData', () => {
     expect(result?.row.pg).toBe('M3');
     expect(result?.row.clusterCode).toBe('NC-215');
     expect(result?.row.nucleusType).toBe('Neighborhood');
+    expect(result?.row.auxBoard).toBe('Pat Doe (Propagation), Sam Roe (Protection)');
   });
 
   test('derives clusterCode as the first token of cluster.name', async () => {
@@ -222,7 +227,7 @@ describe('getRowData', () => {
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
-      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
     });
 
     const result = await getRowData('Alpha');
@@ -243,7 +248,7 @@ describe('getRowData', () => {
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
-      cluster: { name: '', groupOfClusters: null, growthMilestone: null },
+      cluster: { name: '', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
     });
 
     const result = await getRowData('Alpha');
@@ -271,7 +276,7 @@ describe('getRowData', () => {
         hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
         narrative: null,
         nucleusType: 'Neighborhood',
-        cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone },
+        cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone, auxiliaryBoardMembers: null },
       });
       const result = await getRowData('Alpha');
       expect(result?.row.pg).toBe(expectedPg);
@@ -291,7 +296,7 @@ describe('getRowData', () => {
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
-      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
     });
 
     const result = await getRowData('Alpha');
@@ -317,6 +322,7 @@ describe('getRowData', () => {
     expect(result?.row.presence).toBe('');
     expect(result?.row.gatherings).toBe('');
     expect(result?.row.narrative).toBe('');
+    expect(result?.row.auxBoard).toBe('');
   });
 
   test('fetches accompanier/protagonist/abm-assistant/contact workers from cluster-notebook, mapped to {id, name, email}', async () => {
@@ -425,7 +431,7 @@ describe('saveRowData', () => {
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
-      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
     });
 
     const formData = { ...baseFormData, stage: 'Advanced/5', locality: 'Durham', makeup: 'Students' };
@@ -453,7 +459,7 @@ describe('saveRowData', () => {
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
-      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
     });
 
     const formData = { ...baseFormData, totalPop: '500', totalHH: '120', indNum: '80', hhNum: '30' };
@@ -481,7 +487,7 @@ describe('saveRowData', () => {
       hasSocialAction: true, socialActionDescription: 'Cleanup drive', hasCommunityGatherings: false, communityGatheringDescription: '',
       narrative: null,
       nucleusType: null,
-      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
     });
 
     const formData = {
@@ -511,7 +517,7 @@ describe('saveRowData', () => {
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: 'A growing community of practice.',
       nucleusType: null,
-      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
     });
 
     const formData = { ...baseFormData, narrative: 'A growing community of practice.' };
@@ -564,7 +570,7 @@ describe('saveRowData', () => {
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: 'Network',
-      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
     });
 
     const formData = {
@@ -587,7 +593,7 @@ describe('saveRowData', () => {
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
-      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
     });
 
     // identity present (admin save), but nucleusType specifically omitted from it.
@@ -611,7 +617,7 @@ describe('saveRowData', () => {
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
-      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
     });
 
     const formData = { ...baseFormData, presence: '', gatherings: '' };
@@ -632,7 +638,7 @@ describe('saveRowData', () => {
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
-      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null },
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
     });
 
     const formData: Record<string, unknown> = { ...baseFormData, stage: 'Advanced/5' };

@@ -36,6 +36,10 @@ export interface ClusterFields {
   name: string;
   groupOfClusters: string | null;
   growthMilestone: string | null;
+  // Plain text, comma-separated "<Name> (<Portfolio>)" entries, sourced from SRP.
+  // Read-only, no mutation -- same precedent as groupOfClusters/growthMilestone.
+  // Per-person Individual/RoleInNE linkage is explicitly deferred on cluster-notebook's side.
+  auxiliaryBoardMembers: string | null;
 }
 
 export interface NucleusFields {
@@ -88,7 +92,7 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
 
 const NUCLEUS_FIELDS_SELECTION = 'stage locality populationMakeup population households connectedPopulation connectedHouseholds '
   + 'hasSocialAction socialActionDescription hasCommunityGatherings communityGatheringDescription narrative nucleusType '
-  + 'cluster { name groupOfClusters growthMilestone }';
+  + 'cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers }';
 
 export async function getNucleusFields(nucleusName: string): Promise<NucleusFields | null> {
   const query = `

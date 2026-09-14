@@ -630,7 +630,10 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               {/* Derived from the Contact Individual's own email field -- no separate
                   stored value, so there's nothing to edit here directly. */}
               <Field label="Contact Email" value={contactNames[0]?.email ?? ''} readonly />
-              <Field label="Auxiliary Board Member(s)" value={form.auxBoard} onChange={isAdmin ? v => set('auxBoard', v) : undefined} readonly={!isAdmin} fromSheet />
+              {/* Read-only everywhere: sourced from cluster-notebook's Cluster.auxiliaryBoardMembers
+                  (plain text, comma-separated "<Name> (<Portfolio>)" entries, no mutation) -- same
+                  treatment as Grouping/Cluster/PG above. */}
+              <Field label="Auxiliary Board Member(s)" value={form.auxBoard} readonly />
               <Field
                 label="ABm Assistant"
                 value={abmAssistantNames.map(w => w.name).join(', ')}
