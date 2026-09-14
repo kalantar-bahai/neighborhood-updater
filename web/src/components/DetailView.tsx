@@ -642,15 +642,15 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
             <div className="field-grid-3">
               {/* Copied from the Activities card's totals, not independently entered --
                   same non-editable treatment as Facilitating Core Activity below. */}
-              <Field label="Participants" value={String(allTotal.part)} readonly />
+              <Field label="Participating" value={String(allTotal.part)} readonly />
               <Field
-                label="Promoters"
+                label="Promoting"
                 value={promoterNames.map(w => w.name).join(', ')}
                 readonly
                 onLabelClick={() => setShowPromotersModal(true)}
               />
               <Field
-                label="Helpers"
+                label="Helping"
                 value={form.protagonists}
                 onChange={v => set('protagonists', v)}
                 integer
