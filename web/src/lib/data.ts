@@ -1,8 +1,8 @@
 import { sheetsGet, sheetsBatchUpdate, sheetsClear, sheetsDeleteRow } from './sheets';
 import {
-  MASTER_SHEET_ID, SRP_SHEET_ID,
-  MASTER_TAB, ACCESS_TAB, DEV_TAB,
-  MASTER_DATA_ROW, SRP_DATA_ROW,
+  MASTER_SHEET_ID,
+  MASTER_TAB, ACCESS_TAB,
+  MASTER_DATA_ROW,
   COL,
   ACCESS_COL,
 } from './config';
@@ -162,11 +162,6 @@ export async function getAllMasterRows() {
   return rows.map(r => normalize(r, 52));
 }
 
-export async function getAllDevRows() {
-  const rows = await sheetsGet(SRP_SHEET_ID, `${DEV_TAB}!A${SRP_DATA_ROW}:N`);
-  return rows.map(r => normalize(r, 14));
-}
-
 export function parseRow(row: string[]) {
   return {
     grouping:            row[COL.GROUPING],
@@ -202,11 +197,6 @@ export function parseRow(row: string[]) {
     facilitators:     '',
     facilitatorsCount: '',
   };
-}
-
-export function findSrpRow(name: string, rows: string[][], nameCol: number) {
-  const needle = norm(name);
-  return rows.find(r => norm(r[nameCol]) === needle) ?? null;
 }
 
 function toWorkers(individuals: Individual[]): Worker[] {

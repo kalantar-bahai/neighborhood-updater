@@ -7,9 +7,9 @@ vi.mock('./sheets', () => ({
 }));
 
 import { sheetsGet, sheetsClear, sheetsBatchUpdate } from './sheets';
-import { parseRow, findSrpRow, facilitatorsFromClusterNotebook, facilitatorsCountFromClusterNotebook } from './data';
+import { parseRow, facilitatorsFromClusterNotebook, facilitatorsCountFromClusterNotebook } from './data';
 import { getAccessEntries, saveAccessEntries } from './data';
-import { COL, DEV_COL, ACCESS_COL } from './config';
+import { COL, ACCESS_COL } from './config';
 import type { AccessEntry } from '@/types';
 import type { ActivitySummary } from './clusterNotebook';
 
@@ -661,32 +661,6 @@ describe('saveRowData', () => {
     await saveRowData('Alpha', baseFormData, 'me@x.com');
 
     expect(mockUpdateNucleus).not.toHaveBeenCalled();
-  });
-});
-
-describe('findSrpRow', () => {
-  const rows = [
-    makeRow({ [DEV_COL.NAME]: 'Alabama' }),
-    makeRow({ [DEV_COL.NAME]: 'Albemarle Corridor' }),
-  ];
-
-  test('finds row by exact name', () => {
-    const result = findSrpRow('Albemarle Corridor', rows, DEV_COL.NAME);
-    expect(result?.[DEV_COL.NAME]).toBe('Albemarle Corridor');
-  });
-
-  test('is case-insensitive', () => {
-    const result = findSrpRow('albemarle corridor', rows, DEV_COL.NAME);
-    expect(result?.[DEV_COL.NAME]).toBe('Albemarle Corridor');
-  });
-
-  test('returns null when not found', () => {
-    expect(findSrpRow('Unknown Place', rows, DEV_COL.NAME)).toBeNull();
-  });
-
-  test('trims whitespace', () => {
-    const result = findSrpRow('  Alabama  ', rows, DEV_COL.NAME);
-    expect(result?.[DEV_COL.NAME]).toBe('Alabama');
   });
 });
 

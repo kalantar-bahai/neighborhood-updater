@@ -150,7 +150,6 @@ const typeSummaries = (['neighborhood', 'network', 'population'] as const)
       <Picker
         rows={initialData.rows}
         email={initialData.email}
-        srpNames={initialData.srpNames}
         onSelect={loadNucleus}
         onSignOut={() => window.location.href = '/signout'}
         onAdd={isGlobalAdmin ? () => setCreatingNew(true) : undefined}

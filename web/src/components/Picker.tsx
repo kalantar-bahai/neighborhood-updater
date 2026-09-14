@@ -6,7 +6,6 @@ import { NucleusSummary } from '@/types';
 interface Props {
   rows: NucleusSummary[];
   email: string;
-  srpNames: string[];
   onSelect: (name: string) => void;
   onSignOut: () => void;
   onAdd?: () => void;
@@ -20,19 +19,9 @@ function typeBadgeStyle(nucleusType: string): React.CSSProperties {
   return {};
 }
 
-export default function Picker({ rows, email, srpNames, onSelect, onSignOut, onAdd }: Props) {
+export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Props) {
   const [openClusters, setOpenClusters] = useState<Set<string>>(new Set());
   const [openPockets, setOpenPockets] = useState<Set<string>>(new Set());
-
-  function inSrp(r: NucleusSummary) {
-    const name = (r.nucleus || '').toLowerCase().trim();
-    if (srpNames.includes(name)) return true;
-    if (r.parentNucleus) {
-      const combined = (r.parentNucleus + ' - ' + r.nucleus).toLowerCase().trim();
-      if (srpNames.includes(combined)) return true;
-    }
-    return false;
-  }
 
   function toggleCluster(key: string) {
     setOpenClusters(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
@@ -50,7 +39,6 @@ export default function Picker({ rows, email, srpNames, onSelect, onSignOut, onA
           <div className="sub">{r.locality}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {!inSrp(r) && <span className="no-srp-badge">SRP</span>}
           {r.stage && <span className="stage-badge" style={typeBadgeStyle(r.nucleusType)}>{r.stage}</span>}
         </div>
       </div>

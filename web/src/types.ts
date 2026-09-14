@@ -94,7 +94,6 @@ export interface InitialData {
   access: { roleMap: Record<string, Role> };
   rows: NucleusSummary[];
   email: string;
-  srpNames: string[];
   spreadsheetUrl: string;
 }
 

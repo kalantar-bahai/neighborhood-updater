@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getAccess } from '@/lib/access';
-import { getAllDevRows, parseRow, activitiesFromClusterNotebook } from '@/lib/data';
+import { parseRow, activitiesFromClusterNotebook } from '@/lib/data';
 import { getAllNuclei } from '@/lib/clusterNotebook';
-import { COL, DEV_COL } from '@/lib/config';
+import { COL } from '@/lib/config';
 
 function n(v: string) { return parseInt(v || '0', 10) || 0; }
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
@@ -43,7 +43,7 @@ export const GET = auth(async (req) => {
   // are NOT yet migrated (still `r[COL.GROUPING]`/`r[COL.CLUSTER]`) — out of scope for
   // this pass; revisit if the picker's own grouping/cluster display needs the same
   // treatment later.
-  const [clusterNotebookNuclei, devRows] = await Promise.all([getAllNuclei(), getAllDevRows()]);
+  const clusterNotebookNuclei = await getAllNuclei();
   const authorizedByName = new Map(
     access.rows
       .filter(r => (r[COL.NUCLEUS] || '').trim() !== '')
@@ -70,14 +70,12 @@ export const GET = auth(async (req) => {
         totalFof:  acts.reduce((s, a) => s + n(a.fof),  0),
       };
     });
-  const srpNames = devRows.map(r => (r[DEV_COL.NAME] || '').toLowerCase().trim());
   const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${process.env.MASTER_SHEET_ID}`;
 
   return NextResponse.json({
     access: { roleMap: access.roleMap },
     rows: authorizedRows,
     email,
-    srpNames,
     spreadsheetUrl,
   });
 });

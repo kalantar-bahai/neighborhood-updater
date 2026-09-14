@@ -1,14 +1,13 @@
 export const MASTER_SHEET_ID = process.env.MASTER_SHEET_ID!;
-export const SRP_SHEET_ID    = process.env.SRP_SHEET_ID!;
 
 export const MASTER_TAB  = 'Nuclei';
 export const ACCESS_TAB  = 'Access';
-export const DEV_TAB     = 'Devotionals';
-// The Education tab is no longer read at all -- facilitators (its last live field)
-// now comes from cluster-notebook's ActivitySummary.facilitatorNames, 2026-09-14.
+// The SRP cache spreadsheet (Devotionals + Education tabs) is no longer read at
+// all, 2026-09-14 -- Education's last live field (facilitators) moved to
+// cluster-notebook's ActivitySummary.facilitatorNames, and Devotionals' last use
+// (the Picker's "not in SRP" badge) was retired outright.
 
 export const MASTER_DATA_ROW = 4;
-export const SRP_DATA_ROW    = 2;
 
 export const COL = {
   GROUPING:            0,
@@ -80,14 +79,6 @@ export const COL = {
   GATHERINGS:          49,
   NOTES_GATHERINGS:    50,
   NARRATIVE:           51,
-} as const;
-
-// NAME is still used (srpNames in /api/initial-data). DEV_ACT/PART/FOF are dead —
-// devotionalGathering now comes from cluster-notebook, 2026-09-14.
-export const DEV_COL = {
-  NAME: 0, LATIN_NAME: 1, LOCALITY: 2, ELECTORAL_UNIT: 3, CLUSTER: 4,
-  GROUP_OF_CLUSTERS: 5, SUBREGION: 6, REGION: 7, GROUP_OF_REGIONS: 8,
-  NATIONAL_COMMUNITY: 9, DEV_ACT: 10, DEV_PART: 11, DEV_FOF: 12, COMMENTS: 13,
 } as const;
 
 // Worker/role lists (accompanier/protagonist/abm-assistant/contact/promoter) now live
