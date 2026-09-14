@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getAccess } from '@/lib/access';
-import { parseRow, activitiesFromClusterNotebook } from '@/lib/data';
+import { activitiesFromClusterNotebook } from '@/lib/data';
 import { getAllNuclei, getClusters } from '@/lib/clusterNotebook';
-import { COL } from '@/lib/config';
 
 function n(v: string) { return parseInt(v || '0', 10) || 0; }
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
@@ -32,36 +31,21 @@ export const GET = auth(async (req) => {
   // isn't the priority).
   //
   // The list of valid nuclei is cluster-notebook's, not the Sheet's (2026-09-13,
-  // the user directly) -- this loop is driven by clusterNotebookNuclei, and the
-  // `nucleus` value returned below is cluster-notebook's own name, not the Sheet's
-  // copy of it. The Sheet is consulted only for per-user authorization (does this
-  // user have a row for this name?) and for fields not yet migrated. Also overrides
-  // locality/stage/nucleusType/activities/grouping/cluster with cluster-notebook's
-  // own values rather than the (now possibly stale, or for a newly-created nucleus,
-  // simply never-populated) sheet columns. grouping/cluster used to read
-  // r[COL.GROUPING]/r[COL.CLUSTER] here -- fine while every nucleus's Sheet row was
-  // fully seeded on creation, but broke once nucleus creation stopped seeding those
-  // columns at all (2026-09-14): a brand-new nucleus showed up in the picker under
-  // "Unspecified"/"Unspecified" despite being correctly assigned in cluster-notebook
-  // and displaying correctly once opened. Fixed by sourcing both from
-  // cn.cluster.name/cn.cluster.groupOfClusters instead, 2026-09-14.
+  // the user directly) -- this loop is driven by clusterNotebookNuclei, and every
+  // field returned below is cluster-notebook's own value. Authorization no longer
+  // cross-references the Sheet either (2026-09-14) -- roleMap's own keys (a
+  // wildcard '*', or the exact nucleus names an entry names) are the complete
+  // authorization answer; see access.ts.
   const [clusterNotebookNuclei, clusters] = await Promise.all([getAllNuclei(), getClusters()]);
-  const authorizedByName = new Map(
-    access.rows
-      .filter(r => (r[COL.NUCLEUS] || '').trim() !== '')
-      .map(r => [norm(r[COL.NUCLEUS]), r] as const)
-  );
+  const hasWildcard = '*' in access.roleMap;
 
   const authorizedRows = clusterNotebookNuclei
-    .filter(cn => authorizedByName.has(norm(cn.name)))
+    .filter(cn => hasWildcard || norm(cn.name) in access.roleMap)
     .map(cn => {
-      const r = authorizedByName.get(norm(cn.name))!;
-      const parsed = parseRow(r);
-      parsed.activities = activitiesFromClusterNotebook(cn);
-      const acts = Object.values(parsed.activities);
+      const acts = Object.values(activitiesFromClusterNotebook(cn));
       return {
         nucleus:       cn.name,
-        parentNucleus: r[COL.PARENT_NUCLEUS],
+        parentNucleus: cn.parentNucleus?.name ?? '',
         grouping:      cn.cluster.groupOfClusters ?? '',
         cluster:       cn.cluster.name,
         locality:      cn.locality ?? '',

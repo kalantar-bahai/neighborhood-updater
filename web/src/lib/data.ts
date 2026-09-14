@@ -131,6 +131,10 @@ function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
     gatherings: boolToYesNo(fields?.hasCommunityGatherings),
     notesGatherings: fields?.communityGatheringDescription ?? '',
     narrative: fields?.narrative ?? '',
+    // "Pocket" grouping (2026-09-14) -- one nucleus nested under another in the
+    // picker, unrelated to the cluster/grouping hierarchy. Now cluster-notebook's
+    // own field (parentNucleus { name }), not a Sheet column.
+    parentNucleus: fields?.parentNucleus?.name ?? '',
     // Read-only on cluster-notebook's side — no mutation exists for any of these four.
     cluster: fields?.cluster.name ?? '',
     grouping: fields?.cluster.groupOfClusters ?? '',
@@ -223,10 +227,16 @@ export async function getRowData(nucleusName: string) {
     getNucleusFields(nucleusName),
   ]);
 
+  // Existence is cluster-notebook's call now, not the Sheet's (2026-09-14) -- a
+  // nucleus created after this point may have no Sheet row at all (see the access
+  // rewrite in access.ts/initial-data/route.ts, which no longer requires one
+  // either). nucleusFields is the authoritative "does this exist" check; a missing
+  // Sheet row just means parentNucleus (the one field left with nowhere else to
+  // live) defaults to blank.
+  if (nucleusFields === null) return null;
   const masterRow = masterRows.find(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
-  if (!masterRow) return null;
 
-  const row = parseRow(masterRow);
+  const row = parseRow(masterRow ?? normalize([], 52));
   // parseRow's nucleus/activities/facilitators/stage/locality/makeup/totalPop/totalHH/indNum/
   // hhNum/presence/notesPresence/gatherings/notesGatherings/narrative/grouping/cluster/pg/
   // clusterCode/nucleusType/auxBoard reads (from the corresponding COL.* sheet columns, where
@@ -260,7 +270,10 @@ export async function getRowData(nucleusName: string) {
 export async function deleteRowData(nucleusName: string): Promise<void> {
   const allRows = await getAllMasterRows();
   const rowIndex = allRows.findIndex(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
-  if (rowIndex === -1) throw new Error(`Row not found: ${nucleusName}`);
+  // No Sheet row is a valid state now (2026-09-14) -- nothing to delete there.
+  // Deleting the nucleus in cluster-notebook itself isn't something we do (no
+  // delete mutation requested from them at this time, per docs §4).
+  if (rowIndex === -1) return;
   const sheetRowIndex = MASTER_DATA_ROW + rowIndex - 1; // 0-based index for deleteDimension
   await sheetsDeleteRow(MASTER_SHEET_ID, MASTER_TAB, sheetRowIndex);
 }
@@ -276,7 +289,7 @@ interface FormDataInput {
   presence?: string; notesPresence?: string;
   gatherings?: string; notesGatherings?: string;
   narrative?: string;
-  identity?: { nucleusType?: string };
+  identity?: { nucleusType?: string; parentNucleus?: string };
 }
 
 // Shared between createRowData and saveRowData -- each of the four activity
@@ -316,6 +329,7 @@ function nucleusPatchFromFormData(d: FormDataInput) {
     hasCommunityGatherings?: boolean | null; communityGatheringDescription?: string;
     narrative?: string;
     nucleusType?: string;
+    parentNucleusName?: string | null;
   } = {};
   if (d.stage !== undefined) nucleusPatch.stage = d.stage;
   if (d.makeup !== undefined) nucleusPatch.populationMakeup = d.makeup;
@@ -330,16 +344,18 @@ function nucleusPatchFromFormData(d: FormDataInput) {
   if (d.narrative !== undefined) nucleusPatch.narrative = d.narrative;
   // nucleusType is nested under identity (admin/create-only), unlike the other patch fields above.
   if (d.identity && d.identity.nucleusType !== undefined) nucleusPatch.nucleusType = d.identity.nucleusType;
+  // parentNucleus likewise -- '' (cleared in the UI) means "no parent", so it maps to
+  // null, not an empty-string patch value.
+  if (d.identity && d.identity.parentNucleus !== undefined) nucleusPatch.parentNucleusName = d.identity.parentNucleus || null;
   return nucleusPatch;
 }
 
 // Identity (name + cluster) is established via cluster-notebook's createNucleus,
-// 2026-09-14 -- everything else (stage, population, activities, narrative, etc.)
-// goes through the exact same update calls saveRowData uses for editing, not a
-// separate seed-write. We still write a minimal Sheet stub row (just the name and
-// parent), because our own access-control matching (getAccess, still Sheet-based
-// per docs §6) requires a Sheet row to exist for a nucleus to be visible in the
-// picker at all -- independent of whether it exists in cluster-notebook.
+// 2026-09-14 -- everything else (stage, population, activities, narrative,
+// parentNucleus, etc.) goes through the exact same update calls saveRowData uses
+// for editing, not a separate seed-write. No Sheet row is written at all anymore --
+// access control no longer requires one (see access.ts) and parentNucleus, the
+// last field that needed one, is now cluster-notebook's own field.
 export async function createRowData(formData: Record<string, unknown>, userEmail: string) {
   const d = formData as any;
   const newNucleus = ((d.identity?.nucleus) || '').trim();
@@ -348,17 +364,13 @@ export async function createRowData(formData: Record<string, unknown>, userEmail
   if (!newNucleus) throw new Error('Nucleus name is required');
   if (!clusterName) throw new Error('Cluster is required');
 
-  const allRows = await getAllMasterRows();
-  if (allRows.some(r => norm(r[COL.NUCLEUS]) === norm(newNucleus))) {
-    throw new CodedError(`A nucleus named "${newNucleus}" already exists`, 'CONFLICT');
-  }
-
   let created;
   try {
     created = await createNucleus(newNucleus, clusterName);
   } catch (e) {
-    // Global uniqueness is enforced at cluster-notebook's DB level too (2026-09-14) --
-    // treat their duplicate-name error the same as our own pre-check above.
+    // Global uniqueness is enforced at cluster-notebook's DB level (2026-09-14) --
+    // this is now our only duplicate-name check (the Sheet-based pre-check that used
+    // to run here was dropped along with the Sheet stub-row write it existed to guard).
     if (e instanceof Error && /already exists/i.test(e.message)) {
       throw new CodedError(`A nucleus named "${newNucleus}" already exists`, 'CONFLICT');
     }
@@ -368,15 +380,7 @@ export async function createRowData(formData: Record<string, unknown>, userEmail
     throw new CodedError(`cluster-notebook has no cluster named "${clusterName}" — nucleus not created`, 'BAD_CLUSTER');
   }
 
-  const sheetRow = MASTER_DATA_ROW + allRows.length;
-  const newRow = new Array(52).fill('');
-  newRow[COL.NUCLEUS]        = newNucleus;
-  newRow[COL.PARENT_NUCLEUS] = d.identity?.parentNucleus || '';
-
-  const writes: Promise<unknown>[] = [
-    sheetsBatchUpdate(MASTER_SHEET_ID, [{ range: `${MASTER_TAB}!A${sheetRow}`, values: [newRow] }]),
-    ...activityUpdateWrites(newNucleus, d),
-  ];
+  const writes: Promise<unknown>[] = [...activityUpdateWrites(newNucleus, d)];
   const nucleusPatch = nucleusPatchFromFormData(d);
   if (Object.keys(nucleusPatch).length > 0) {
     writes.push(updateNucleus(newNucleus, nucleusPatch));
@@ -386,48 +390,21 @@ export async function createRowData(formData: Record<string, unknown>, userEmail
   return { success: true, savedBy: userEmail, savedAt: new Date().toISOString() };
 }
 
+// nucleus/grouping/cluster/pg/clusterCode are deliberately absent from nucleusPatch below —
+// nucleus (the name itself) is no longer editable at all: cluster-notebook's own name is
+// the canonical identifier now (2026-09-13, the user directly), and cluster-notebook has no
+// rename mutation. grouping/cluster/pg are read-only from cluster-notebook
+// (Cluster.groupOfClusters/name/growthMilestone, no mutation exists); clusterCode is derived
+// client-side from cluster.name, not a stored field at all. Every field this function writes,
+// including parentNucleus now, routes entirely through cluster-notebook -- no Sheet write at
+// all anymore, 2026-09-14.
 export async function saveRowData(nucleusName: string, formData: Record<string, unknown>, userEmail: string) {
-  const allRows = await getAllMasterRows();
-  const rowIndex = allRows.findIndex(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
-  if (rowIndex === -1) throw new Error(`Row not found: ${nucleusName}`);
-
-  const sheetRow = MASTER_DATA_ROW + rowIndex;
   const d = formData as any;
-  const colLetter = (i: number) => {
-    let letter = '', idx = i + 1;
-    while (idx > 0) { const rem = (idx - 1) % 26; letter = String.fromCharCode(65 + rem) + letter; idx = Math.floor((idx - 1) / 26); }
-    return letter;
-  };
-
-  // nucleus/grouping/cluster/pg/clusterCode/nucleusType are deliberately absent here —
-  // nucleus (the name itself) is no longer editable at all: cluster-notebook's own name is
-  // the canonical identifier now (2026-09-13, the user directly), and cluster-notebook has no
-  // rename mutation, so writing a new name to the sheet would just silently revert on next
-  // load (the picker/detail view would keep showing cluster-notebook's unchanged name).
-  // grouping/cluster/pg are read-only from cluster-notebook now
-  // (Cluster.groupOfClusters/name/growthMilestone, no mutation exists); clusterCode is derived
-  // client-side from cluster.name, not a stored field at all; nucleusType moved to
-  // cluster-notebook's own Nucleus.nucleusType (see nucleusPatch below). Writing any of them to
-  // the sheet would be silently discarded on next load anyway.
-  const identityPairs: [number, unknown][] = d.identity ? [
-    [COL.PARENT_NUCLEUS, d.identity.parentNucleus],
-  ] : [];
-
-  const updates = [
-    ...identityPairs,
-  ].filter(([, value]) => value !== undefined)
-    .map(([col, value]) => ({
-      range: `${MASTER_TAB}!${colLetter(col as number)}${sheetRow}`,
-      values: [[(value ?? '') as string]],
-    }));
 
   // cc/jyg/sc/devotionals are no longer Sheet columns at all (see COL.CC_ACT etc.'s
   // "dead" comments) -- each now writes straight to cluster-notebook's shared
   // updateActivitySummary mutation, one call per activity type.
-  const writes: Promise<unknown>[] = [
-    sheetsBatchUpdate(MASTER_SHEET_ID, updates),
-    ...activityUpdateWrites(nucleusName, d),
-  ];
+  const writes: Promise<unknown>[] = [...activityUpdateWrites(nucleusName, d)];
   const nucleusPatch = nucleusPatchFromFormData(d);
   if (Object.keys(nucleusPatch).length > 0) {
     writes.push(updateNucleus(nucleusName, nucleusPatch));

@@ -1,5 +1,4 @@
-import { getAllMasterRows, getAccessEntries } from './data';
-import { COL } from './config';
+import { getAccessEntries } from './data';
 import type { Role, AccessEntry } from '@/types';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
@@ -14,14 +13,22 @@ export interface UserAccess {
   role: Role;
   entries: AccessEntry[];
   roleMap: Record<string, Role>;
-  rows: string[][];
 }
 
-export async function getAccess(email: string): Promise<UserAccess | { role: 'none'; rows: [] }> {
-  const [allRows, allEntries] = await Promise.all([getAllMasterRows(), getAccessEntries()]);
+// No longer reads the Sheet's Nuclei tab (2026-09-14) -- roleMap's own keys (a
+// wildcard '*', or the exact nucleus names an entry names) are already the
+// complete authorization answer. The old `rows` field cross-referenced those
+// names against Sheet rows purely as a "does this nucleus exist" check, which
+// (a) was redundant for named entries (the name was already known) and
+// (b) capped a wildcard admin's "everything" at "everything with a Sheet row" --
+// exactly the trap a nucleus created without one fell into. Callers that need
+// "which cluster-notebook nuclei is this user authorized for" now check
+// roleMap directly (see /api/initial-data/route.ts).
+export async function getAccess(email: string): Promise<UserAccess | { role: 'none' }> {
+  const allEntries = await getAccessEntries();
 
   const userEntries = allEntries.filter(e => norm(e.email) === norm(email));
-  if (userEntries.length === 0) return { role: 'none', rows: [] };
+  if (userEntries.length === 0) return { role: 'none' };
 
   const roleMap: Record<string, Role> = {};
   for (const entry of userEntries) {
@@ -29,15 +36,9 @@ export async function getAccess(email: string): Promise<UserAccess | { role: 'no
     roleMap[key] = key in roleMap ? higher(roleMap[key], entry.role) : entry.role;
   }
 
-  const hasWildcard = '*' in roleMap;
-  const nucleusSet = new Set(Object.keys(roleMap).map(norm));
-  const rows = hasWildcard
-    ? allRows
-    : allRows.filter(r => nucleusSet.has(norm(r[COL.NUCLEUS])));
-
   // Determine top-level role (highest across all entries — used only for
   // quick 'access denied' vs 'has some access' checks at the route level)
   const topRole = Object.values(roleMap).reduce(higher);
 
-  return { role: topRole, entries: userEntries, roleMap, rows };
+  return { role: topRole, entries: userEntries, roleMap };
 }

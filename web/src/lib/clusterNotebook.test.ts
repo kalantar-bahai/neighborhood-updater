@@ -32,11 +32,13 @@ describe('getAllNuclei', () => {
             name: 'Alpha', stage: 'Initial/2', locality: 'Durham', populationMakeup: 'Mixed', nucleusType: 'Neighborhood',
             devotionalGathering: alphaActivities, childrensClasses: alphaActivities, juniorYouthGroups: alphaActivities, studyCircles: alphaActivities,
             cluster: { name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers', auxiliaryBoardMembers: null },
+            parentNucleus: { name: 'Chapelboro' },
           },
           {
             name: 'Beta', stage: null, locality: null, populationMakeup: null, nucleusType: null,
             devotionalGathering: null, childrensClasses: null, juniorYouthGroups: null, studyCircles: null,
             cluster: { name: 'NC-330 Foothills', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+            parentNucleus: null,
           },
         ],
       },
@@ -48,14 +50,17 @@ describe('getAllNuclei', () => {
     expect(result[0].juniorYouthGroups).toEqual(alphaActivities);
     expect(result[0].studyCircles).toEqual(alphaActivities);
     expect(result[0].cluster).toEqual({ name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers', auxiliaryBoardMembers: null });
+    expect(result[0].parentNucleus).toEqual({ name: 'Chapelboro' });
     expect(result[1].childrensClasses).toBeNull();
     expect(result[1].cluster.groupOfClusters).toBeNull();
+    expect(result[1].parentNucleus).toBeNull();
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.query).toContain('nucleusType');
     expect(body.query).toContain('childrensClasses');
     expect(body.query).toContain('juniorYouthGroups');
     expect(body.query).toContain('studyCircles');
     expect(body.query).toContain('cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers }');
+    expect(body.query).toContain('parentNucleus { name }');
   });
 
   test('returns an empty array when there are no nuclei', async () => {
@@ -203,6 +208,23 @@ describe('getNucleusFields', () => {
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
     });
   });
+
+  test('requests and returns the parentNucleus field (pocket grouping, null when unset)', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: {
+        nucleus: {
+          stage: null, locality: null, populationMakeup: null,
+          parentNucleus: { name: 'Chapelboro' },
+        },
+      },
+    }));
+
+    const result = await getNucleusFields('Alpha');
+
+    expect(result?.parentNucleus).toEqual({ name: 'Chapelboro' });
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('parentNucleus { name }');
+  });
 });
 
 describe('updateNucleus', () => {
@@ -330,6 +352,24 @@ describe('updateNucleus', () => {
     expect(result?.nucleusType).toBe('Network');
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables.patch).toEqual({ nucleusType: 'Network' });
+  });
+
+  test('sends the parentNucleusName field, including explicit null to clear it', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: {
+        updateNucleus: {
+          stage: null, locality: null, populationMakeup: null,
+          population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+          hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+          narrative: null, nucleusType: null, parentNucleus: null,
+        },
+      },
+    }));
+
+    await updateNucleus('Alpha', { parentNucleusName: null });
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables.patch).toEqual({ parentNucleusName: null });
   });
 });
 

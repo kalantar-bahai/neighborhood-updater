@@ -79,6 +79,13 @@ export interface NucleusFields {
   // or written (cluster-notebook 2026-09-13). By design, not a bug -- Network/
   // Population nuclei aren't location-bound, so they naturally take the settable path.
   nucleusType: string | null;
+  // Added 2026-09-14 -- backed by the same generic containment primitive (parentId)
+  // used for the Setting->Locality->Cluster geographic chain, now also applied to
+  // Nucleus->Nucleus for our "pocket" grouping (e.g. distinct population-specific
+  // nuclei nested under a shared parent neighborhood). One-hop lookup, null if
+  // unset. Write side is updateNucleus's `parentNucleusName` patch field (a plain
+  // string, not nested) -- no cycle-guard on their side, human-entered data.
+  parentNucleus: { name: string } | null;
 }
 
 // Deliberately not `extends NucleusFields` — the picker (getAllNuclei's caller)
@@ -98,6 +105,8 @@ export interface NucleusSummary {
   // from cluster-notebook instead of the (now often blank, for newly-created
   // nuclei) Sheet columns r[COL.GROUPING]/r[COL.CLUSTER].
   cluster: ClusterFields;
+  // Added 2026-09-14 for the same reason -- see NucleusFields.parentNucleus.
+  parentNucleus: { name: string } | null;
 }
 
 // No top-level clusters query existed until 2026-09-14 (Cluster was only reachable
@@ -143,6 +152,7 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
         juniorYouthGroups { ${ACTIVITY_SUMMARY_SELECTION} }
         studyCircles { ${ACTIVITY_SUMMARY_SELECTION} }
         cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers }
+        parentNucleus { name }
       }
     }
   `;
@@ -152,7 +162,7 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
 
 const NUCLEUS_FIELDS_SELECTION = 'stage locality populationMakeup population households connectedPopulation connectedHouseholds '
   + 'hasSocialAction socialActionDescription hasCommunityGatherings communityGatheringDescription narrative nucleusType '
-  + 'cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers }';
+  + 'cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers } parentNucleus { name }';
 
 export async function getNucleusFields(nucleusName: string): Promise<NucleusFields | null> {
   const query = `
@@ -179,6 +189,10 @@ export async function updateNucleus(
     hasCommunityGatherings?: boolean | null; communityGatheringDescription?: string;
     narrative?: string;
     nucleusType?: string;
+    // Added 2026-09-14 -- a plain string (unlike the `parentNucleus { name }` query
+    // field), not nested. null clears the parent; an unknown name throws a real
+    // error rather than silently no-opping.
+    parentNucleusName?: string | null;
   }
 ): Promise<NucleusFields | null> {
   const mutation = `
