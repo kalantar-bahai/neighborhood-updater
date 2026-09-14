@@ -196,9 +196,6 @@
 .act-table td input.error { border-color: #e53e3e; background: #fff5f5; }
 .act-table td input.plain { border: none; background: transparent; color: #4a5568; text-align: center; width: 100%; font-size: 12px; }
 
-/* ── SRP reference ────────────────────────────────────────────────────────── */
-.srp-ref { font-size: 11px; color: #a0aec0; background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 10px; }
-.srp-ref strong { color: #718096; }
 .sync-note { font-size: 11px; color: #718096; background: #f7fafc; border-radius: 6px; padding: 7px 12px; border: 1px solid #e2e8f0; }
 .divider { height: 1px; background: #e2e8f0; margin: 2px 0; }
 

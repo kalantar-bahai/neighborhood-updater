@@ -627,11 +627,14 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           </div>}
         </div>
 
-        {/* Overview (formerly "Workers & Prevalence") */}
-        <div className="card from-sheet">
+        {/* Overview (formerly "Workers & Prevalence"). Mixed-source now: protagonists/
+            accompaniers are still Sheet-sourced free-text counts, facilitators is
+            cluster-notebook-sourced -- so the fromSheet marker moved to field level
+            instead of the whole card, per the established per-field convention. */}
+        <div className="card">
           <div className="card-header">Overview</div>
           <div className="card-body">
-            <div className="field-grid-2">
+            <div className="field-grid-3">
               <Field
                 label="Protagonists / Workers"
                 value={form.protagonists}
@@ -640,6 +643,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
                 highlighted={protagonistsMismatch}
                 onLabelClick={() => setShowProtagonistsModal(true)}
                 onSync={() => set('protagonists', String(protagonistNames.length))}
+                fromSheet
               />
               <Field
                 label="Accompaniers in Nucleus"
@@ -649,11 +653,10 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
                 highlighted={accompaniersMismatch}
                 onLabelClick={() => setShowAccompaniersModal(true)}
                 onSync={() => set('accompaniers', String(accompanierNames.length))}
+                fromSheet
               />
+              <Field label="Facilitators" value={form.facilitators} readonly />
             </div>
-            {form.facilitators && (
-              <div className="srp-ref">SRP Facilitators: <strong>{form.facilitators}</strong></div>
-            )}
           </div>
         </div>
 
