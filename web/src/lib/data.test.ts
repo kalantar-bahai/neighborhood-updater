@@ -78,17 +78,6 @@ describe('parseRow', () => {
     expect(result.activities.scs).toEqual({ act: '3', part: '30', fof: '11' });
   });
 
-  test('maps assessment fields', () => {
-    const row = makeRow({
-      [COL.SUPPORTED]: 'Yes', [COL.NOTES_SUPPORTED]: 'Great support',
-      [COL.INVOLVED]: 'No',   [COL.NOTES_INVOLVED]: '',
-    });
-    const result = parseRow(row);
-    expect(result.supported).toBe('Yes');
-    expect(result.notesSupported).toBe('Great support');
-    expect(result.involved).toBe('No');
-  });
-
   test('empty row returns empty strings throughout', () => {
     const result = parseRow(new Array(51).fill(''));
     expect(result.nucleus).toBe('');

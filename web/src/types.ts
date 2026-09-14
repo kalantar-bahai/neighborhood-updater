@@ -54,16 +54,8 @@ export interface NucleusRow {
     scs: Activity;
     devotionals: Activity;
   };
-  level: string;
-  notesPrevalence: string;
-  supported: string;
-  notesSupported: string;
   presence: string;
   notesPresence: string;
-  involved: string;
-  notesInvolved: string;
-  efforts: string;
-  notesEfforts: string;
   gatherings: string;
   notesGatherings: string;
   narrative: string;

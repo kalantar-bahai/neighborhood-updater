@@ -192,16 +192,8 @@ export function parseRow(row: string[]) {
       scs:         { act: stripCommas(row[COL.SC_ACT]),   part: stripCommas(row[COL.SC_PART]),   fof: stripCommas(row[COL.SC_FOF]) },
       devotionals: { act: stripCommas(row[COL.DEV_ACT]),  part: stripCommas(row[COL.DEV_PART]),  fof: stripCommas(row[COL.DEV_FOF]) },
     },
-    level:           row[COL.LEVEL],
-    notesPrevalence: row[COL.NOTES_PREVALENCE],
-    supported:       row[COL.SUPPORTED],
-    notesSupported:  row[COL.NOTES_SUPPORTED],
     presence:        row[COL.PRESENCE],
     notesPresence:   row[COL.NOTES_PRESENCE],
-    involved:        row[COL.INVOLVED],
-    notesInvolved:   row[COL.NOTES_INVOLVED],
-    efforts:          row[COL.EFFORTS],
-    notesEfforts:     row[COL.NOTES_EFFORTS],
     gatherings:       row[COL.GATHERINGS],
     notesGatherings:  row[COL.NOTES_GATHERINGS],
     narrative:        row[COL.NARRATIVE],
@@ -318,16 +310,8 @@ export async function createRowData(formData: Record<string, unknown>, userEmail
   newRow[COL.DEV_ACT]        = d.activities?.devotionals?.act  || '';
   newRow[COL.DEV_PART]       = d.activities?.devotionals?.part || '';
   newRow[COL.DEV_FOF]        = d.activities?.devotionals?.fof  || '';
-  newRow[COL.LEVEL]          = d.level                    || '';
-  newRow[COL.NOTES_PREVALENCE] = d.notesPrevalence        || '';
-  newRow[COL.SUPPORTED]      = d.supported                || '';
-  newRow[COL.NOTES_SUPPORTED]= d.notesSupported           || '';
   newRow[COL.PRESENCE]       = d.presence                 || '';
   newRow[COL.NOTES_PRESENCE] = d.notesPresence            || '';
-  newRow[COL.INVOLVED]       = d.involved                 || '';
-  newRow[COL.NOTES_INVOLVED] = d.notesInvolved            || '';
-  newRow[COL.EFFORTS]        = d.efforts                  || '';
-  newRow[COL.NOTES_EFFORTS]  = d.notesEfforts             || '';
   newRow[COL.GATHERINGS]     = d.gatherings               || '';
   newRow[COL.NOTES_GATHERINGS] = d.notesGatherings        || '';
   newRow[COL.NARRATIVE]      = d.narrative                || '';
@@ -369,10 +353,6 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
 
   const updates = [
     ...identityPairs,
-    [COL.LEVEL, d.level], [COL.NOTES_PREVALENCE, d.notesPrevalence],
-    [COL.SUPPORTED, d.supported], [COL.NOTES_SUPPORTED, d.notesSupported],
-    [COL.INVOLVED, d.involved], [COL.NOTES_INVOLVED, d.notesInvolved],
-    [COL.EFFORTS, d.efforts], [COL.NOTES_EFFORTS, d.notesEfforts],
   ].filter(([, value]) => value !== undefined)
     .map(([col, value]) => ({
       range: `${MASTER_TAB}!${colLetter(col as number)}${sheetRow}`,

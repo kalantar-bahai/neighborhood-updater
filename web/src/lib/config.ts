@@ -56,12 +56,23 @@ export const COL = {
   // accompanierNames.length), 2026-09-14, matching Promoting's read-only-list pattern.
   PROTAGONISTS:        37,
   ACCOMPANIERS:        38,
+  // LEVEL/NOTES_PREVALENCE/SUPPORTED/NOTES_SUPPORTED (39-42): dead. No UI has ever
+  // read or written these ("Level"/"Notes" under "Prevalence", "Supported?"/"Notes"
+  // under "Assembly Support" in the sheet's own header rows) -- removed entirely,
+  // 2026-09-14, rather than left readonly, because round-tripping form.level etc. on
+  // every save was silently overwriting any value entered directly in the sheet with
+  // a stale copy from page load. Column positions kept in case someone still
+  // maintains these columns by hand in the spreadsheet.
   LEVEL:               39,
   NOTES_PREVALENCE:    40,
   SUPPORTED:           41,
   NOTES_SUPPORTED:     42,
   PRESENCE:            43,
   NOTES_PRESENCE:      44,
+  // INVOLVED/NOTES_INVOLVED/EFFORTS/NOTES_EFFORTS (45-48): dead, same reasoning as
+  // LEVEL/SUPPORTED above ("Involved?"/"Notes" under "Local Leaders Involved in
+  // Bahá'í Community Life", "Efforts Made?"/"Notes" under "Specific Efforts Made to
+  // Foster Spiritual Health of Neighborhood").
   INVOLVED:            45,
   NOTES_INVOLVED:      46,
   EFFORTS:             47,
