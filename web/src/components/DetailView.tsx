@@ -167,6 +167,7 @@ function InfoTip({ text }: { text: string }) {
       {open && pos && createPortal(
         <div
           ref={popoverRef}
+          onClick={e => e.stopPropagation()}
           style={{
             position: 'fixed', left: pos.left, width: pos.width,
             ...(pos.top !== undefined ? { top: pos.top } : { bottom: pos.bottom }),
