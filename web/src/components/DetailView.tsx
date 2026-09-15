@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { NucleusDetail, NucleusRow, Activity } from '@/types';
 import type { Role, Worker } from '@/types';
 import WorkerListModal from './WorkerListModal';
@@ -33,6 +33,10 @@ function computedPct(connected: string, total: string): string {
 
 function isValidInt(v: string) { return !v || /^\d+$/.test(v.trim()); }
 
+// The three actually-editable Activity fields -- excludes isOverridden, which is
+// server-computed display state, never something a blur/change event commits.
+type ActivityNumericField = 'act' | 'part' | 'fof';
+
 function actTotal(acts: (Activity | undefined)[]) {
   return acts.reduce((acc, a) => ({
     act:  acc.act  + parseInt((a?.act  || '0'), 10),
@@ -41,8 +45,8 @@ function actTotal(acts: (Activity | undefined)[]) {
   }), { act: 0, part: 0, fof: 0 });
 }
 
-function Field({ label, value, onChange, readonly, type, integer, onLabelClick, highlighted, onSync, fromSheet }: {
-  label: string; value: string; onChange?: (v: string) => void; readonly?: boolean; type?: string; integer?: boolean;
+function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabelClick, highlighted, onSync, fromSheet }: {
+  label: string; value: string; onChange?: (v: string) => void; onBlur?: () => void; readonly?: boolean; type?: string; integer?: boolean;
   onLabelClick?: () => void; highlighted?: boolean; onSync?: () => void; fromSheet?: boolean;
 }) {
   const hasError = integer && !readonly && !isValidInt(value);
@@ -64,6 +68,8 @@ function Field({ label, value, onChange, readonly, type, integer, onLabelClick, 
             ...(highlighted ? { borderColor: '#f6ad55', background: '#fffaf0' } : {}),
           }}
           onChange={e => onChange?.(e.target.value)}
+          onBlur={onBlur}
+          onKeyDown={onBlur ? (e => { if (e.key === 'Enter') e.currentTarget.blur(); }) : undefined}
         />
         {highlighted && onSync && (
           <button onClick={onSync} title="Sync to list count" style={{ position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#d97706', display: 'flex', alignItems: 'center' }}>
@@ -88,16 +94,22 @@ function SelectField({ label, value, options, onChange, fromSheet }: {
   );
 }
 
-function PairField({ label, numVal, pctVal, onNumChange, pctReadonly, numInteger, fromSheet }: {
+function PairField({ label, numVal, pctVal, onNumChange, onNumBlur, readonly, pctReadonly, numInteger, fromSheet }: {
   label: string; numVal: string; pctVal: string;
-  onNumChange: (v: string) => void; pctReadonly?: boolean; numInteger?: boolean; fromSheet?: boolean;
+  onNumChange: (v: string) => void; onNumBlur?: () => void; readonly?: boolean; pctReadonly?: boolean; numInteger?: boolean; fromSheet?: boolean;
 }) {
-  const hasError = numInteger && !isValidInt(numVal);
+  const hasError = numInteger && !readonly && !isValidInt(numVal);
   return (
     <div className={`pair-field${fromSheet ? ' from-sheet' : ''}`}>
       <label>{label}</label>
       <div className="pair-inputs">
-        <input type="text" value={numVal || ''} placeholder="#" className={hasError ? 'error' : undefined} onChange={e => onNumChange(e.target.value)} />
+        <input
+          type="text" value={numVal || ''} placeholder="#" readOnly={readonly}
+          className={[readonly ? 'ro' : '', hasError ? 'error' : ''].filter(Boolean).join(' ') || undefined}
+          onChange={e => onNumChange(e.target.value)}
+          onBlur={onNumBlur}
+          onKeyDown={onNumBlur ? (e => { if (e.key === 'Enter') e.currentTarget.blur(); }) : undefined}
+        />
         <input type="text" value={pctVal || ''} placeholder="%" className={`pct${pctReadonly ? ' ro' : ''}`} readOnly={pctReadonly} />
       </div>
     </div>
@@ -107,23 +119,36 @@ function PairField({ label, numVal, pctVal, onNumChange, pctReadonly, numInteger
 // Highlighting is driven entirely by cluster-notebook's ActivitySummary.isOverridden
 // now (2026-09-14) -- one flag for the whole {act, part, fof} triple, not a per-field
 // diff against a separately-fetched SRP value. So the row is either fully amber or not.
-function ActRow({ label, userVals, onChange }: {
+function ActRow({ label, userVals, onChange, onBlur, readonly }: {
   label: string;
   userVals: Activity;
-  onChange: (field: keyof Activity, v: string) => void;
+  onChange: (field: ActivityNumericField, v: string) => void;
+  onBlur: (field: ActivityNumericField) => void;
+  readonly?: boolean;
 }) {
   const highlighted = !!userVals.isOverridden;
 
   function cls(val: string) {
-    return [highlighted ? 'overridden' : '', !isValidInt(val) ? 'error' : ''].filter(Boolean).join(' ') || undefined;
+    return [readonly ? 'ro' : '', highlighted ? 'overridden' : '', !readonly && !isValidInt(val) ? 'error' : ''].filter(Boolean).join(' ') || undefined;
+  }
+
+  function field(key: ActivityNumericField) {
+    return (
+      <input
+        type="text" value={userVals[key] || ''} className={cls(String(userVals[key]))} readOnly={readonly}
+        onChange={e => onChange(key, e.target.value)}
+        onBlur={() => onBlur(key)}
+        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      />
+    );
   }
 
   return (
     <tr>
       <td className="row-label" style={{ textAlign: 'right', paddingLeft: 4, paddingRight: 10 }}>{label}</td>
-      <td><input type="text" value={userVals.act || ''} className={cls(userVals.act)} onChange={e => onChange('act', e.target.value)} /></td>
-      <td><input type="text" value={userVals.part || ''} className={cls(userVals.part)} onChange={e => onChange('part', e.target.value)} /></td>
-      <td><input type="text" value={userVals.fof || ''} className={cls(userVals.fof)} onChange={e => onChange('fof', e.target.value)} /></td>
+      <td>{field('act')}</td>
+      <td>{field('part')}</td>
+      <td>{field('fof')}</td>
     </tr>
   );
 }
@@ -139,9 +164,9 @@ function TotalRow({ label, totals }: { label: string; totals: { act: number; par
   );
 }
 
-function ToggleItem({ label, value, notes, onToggle, onNotes }: {
+function ToggleItem({ label, value, notes, onToggle, onNotes, onNotesBlur, readonly }: {
   label: string; value: string; notes: string;
-  onToggle: (v: string) => void; onNotes: (v: string) => void;
+  onToggle: (v: string) => void; onNotes: (v: string) => void; onNotesBlur?: () => void; readonly?: boolean;
 }) {
   const isYes = (value || '').toLowerCase() === 'yes';
   const isNo  = !isYes;
@@ -149,10 +174,10 @@ function ToggleItem({ label, value, notes, onToggle, onNotes }: {
     <div className="detail-item">
       <div className="q">{label}</div>
       <div className="toggle-row">
-        <button className={`tb${isYes ? ' yes' : ''}`} onClick={() => onToggle('Yes')}>Yes</button>
-        <button className={`tb${isNo ? ' no' : ''}`} onClick={() => onToggle('No')}>No</button>
+        <button className={`tb${isYes ? ' yes' : ''}`} onClick={() => onToggle('Yes')} disabled={readonly}>Yes</button>
+        <button className={`tb${isNo ? ' no' : ''}`} onClick={() => onToggle('No')} disabled={readonly}>No</button>
       </div>
-      <textarea value={notes || ''} onChange={e => onNotes(e.target.value)} />
+      <textarea value={notes || ''} onChange={e => onNotes(e.target.value)} onBlur={onNotesBlur} readOnly={readonly} />
     </div>
   );
 }
@@ -170,11 +195,6 @@ const IcoExternalLink = () => (
 const IcoLogOut = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-  </svg>
-);
-const IcoSave = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
   </svg>
 );
 const IcoList = () => (
@@ -366,16 +386,15 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 export default function DetailView({ detail, role, roleMap, email, showBack, spreadsheetUrl, onBack, onSaved }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
-  const [isDirty, setIsDirty] = useState(false);
-  // Which activity types the user actually touched this session -- a save only
-  // resends the types in here, not the whole `activities` object. Otherwise every
-  // save (even an unrelated field like stage) would resend all four types' current
-  // displayed numbers as explicit values to cluster-notebook's updateActivitySummary,
-  // needlessly writing untouched, already-matching numbers on every save (2026-09-14,
-  // cluster-notebook).
-  const [dirtyActs, setDirtyActs] = useState<Set<keyof FormState['activities']>>(new Set());
+  // Baseline to diff a blur-triggered field's current value against, so clicking into
+  // a field and back out without editing it sends nothing. Advanced only on a
+  // successful save of that specific field -- see saveField/commitField/setAndSave.
+  const committedRef = useRef<FormState>(rowToForm(row));
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ msg: string; type: 'idle' | 'success' | 'error' }>({ msg: '', type: 'idle' });
+  // The most recent failed field save, so the status bar can offer a one-click Retry
+  // instead of requiring the user to re-edit the field to re-trigger a blur.
+  const [retry, setRetry] = useState<{ label: string; run: () => void } | null>(null);
   const [lastUpdatedBy, setLastUpdatedBy] = useState('');
   const [lastUpdatedAt, setLastUpdatedAt] = useState('');
   const [showDiagram, setShowDiagram] = useState(false);
@@ -400,99 +419,137 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
   const canWrite       = role === 'read-write' || role === 'collaborator' || role === 'admin';
   const isAdmin        = role === 'admin';
   const canManageAccess = role === 'admin' || role === 'collaborator';
-  const isReadOnly     = role === 'read';
 
+  // Local-only: updates what's displayed as the user types/selects. Never talks to the
+  // network by itself -- see commitField/setAndSave/commitActField below for that.
   const set = useCallback(<K extends keyof FormState>(key: K, val: FormState[K]) => {
     setForm(f => ({ ...f, [key]: val }));
-    setIsDirty(true);
   }, []);
 
-  const setAct = useCallback((actKey: keyof FormState['activities'], field: keyof Activity, val: string) => {
+  const setAct = useCallback((actKey: keyof FormState['activities'], field: ActivityNumericField, val: string) => {
     setForm(f => ({ ...f, activities: { ...f.activities, [actKey]: { ...f.activities[actKey], [field]: val } } }));
-    setDirtyActs(prev => new Set(prev).add(actKey));
-    setIsDirty(true);
   }, []);
 
-  async function handleSave() {
+  // Sends one small formData fragment to the same /api/nucleus POST saveRowData always
+  // used -- every field this app writes is already a partial update on cluster-notebook's
+  // side (undefined = leave alone), so autosave needed no new or smaller APIs, just
+  // smaller/more frequent calls to the ones that already existed (2026-09-15, see
+  // docs/superpowers/specs/2026-09-15-detailview-autosave-design.md).
+  async function saveField(fragment: Record<string, unknown>, label: string) {
     setSaving(true);
-    setSaveStatus({ msg: 'Saving...', type: 'idle' });
+    setSaveStatus({ msg: 'Saving…', type: 'idle' });
     try {
-      const payload: Record<string, unknown> = { ...form };
-      // Only the activity types the user actually edited -- see dirtyActs' own comment.
-      if (dirtyActs.size > 0) {
-        payload.activities = Object.fromEntries(
-          Object.entries(form.activities).filter(([key]) => dirtyActs.has(key as keyof FormState['activities']))
-        );
-      } else {
-        delete payload.activities;
-      }
-      if (isAdmin) {
-        payload.identity = {
-          nucleus:        form.nucleus,
-          parentNucleus:  form.parentNucleus,
-          grouping:       form.grouping,
-          cluster:        form.cluster,
-          pg:             form.pg,
-          clusterCode:    form.clusterCode,
-          nucleusType:    form.nucleusType,
-        };
-      }
-
       const res = await fetch('/api/nucleus', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: row.nucleus, formData: payload }),
+        body: JSON.stringify({ name: row.nucleus, formData: fragment }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Save failed');
 
-      setSaveStatus({ msg: 'Saved successfully', type: 'success' });
-      setIsDirty(false);
-      setDirtyActs(new Set());
+      setSaveStatus({ msg: 'Saved', type: 'success' });
+      setRetry(null);
       // Server-recomputed isOverridden (and current act/part/fof) for whichever activity
-      // types were saved -- without this the amber highlight wouldn't appear until reload.
+      // types this fragment touched -- without this the amber highlight wouldn't appear
+      // until reload. Only present when the fragment included `activities`.
       if (data.activities) {
         setForm(f => ({ ...f, activities: data.activities }));
       }
       setLastUpdatedBy(data.savedBy || email);
       setLastUpdatedAt(data.savedAt || new Date().toISOString());
       onSaved(data.savedBy || email, data.savedAt || new Date().toISOString());
+      return { ok: true as const, activities: data.activities as FormState['activities'] | undefined };
     } catch (e: unknown) {
-      setSaveStatus({ msg: `Save failed: ${e instanceof Error ? e.message : String(e)}`, type: 'error' });
+      const message = e instanceof Error ? e.message : String(e);
+      setSaveStatus({ msg: `Failed to save ${label}: ${message}`, type: 'error' });
+      return { ok: false as const };
     } finally {
       setSaving(false);
     }
   }
 
+  // Blur/Enter-triggered fields: totalPop, totalHH, indNum, hhNum, makeup,
+  // notesPresence, notesGatherings, narrative. Skips the request entirely if the value
+  // hasn't changed since the last successful save, or (for integer fields) is invalid --
+  // an invalid number is never sent, and doesn't block saving any other field.
+  type TextFieldKey = 'totalPop' | 'totalHH' | 'indNum' | 'hhNum' | 'makeup' | 'notesPresence' | 'notesGatherings' | 'narrative';
+  function commitField(key: TextFieldKey, label: string, integer?: boolean) {
+    const value = form[key];
+    if (value === committedRef.current[key]) return;
+    if (integer && !isValidInt(value)) {
+      setSaveStatus({ msg: `${label} must be a number`, type: 'error' });
+      return;
+    }
+    const attempt = async () => {
+      const result = await saveField({ [key]: value }, label);
+      if (result.ok) {
+        committedRef.current = { ...committedRef.current, [key]: value };
+      } else {
+        setRetry({ label, run: () => void attempt() });
+      }
+    };
+    void attempt();
+  }
+
+  // Immediate-trigger fields: stage, nucleusType (admin dropdowns), presence, gatherings
+  // (toggles) -- the change event itself is the complete, discrete action, no blur needed.
+  function setAndSave<K extends keyof FormState>(key: K, value: FormState[K], fragment: Record<string, unknown>, label: string) {
+    setForm(f => ({ ...f, [key]: value }));
+    const attempt = async () => {
+      const result = await saveField(fragment, label);
+      if (result.ok) {
+        committedRef.current = { ...committedRef.current, [key]: value };
+      } else {
+        setRetry({ label, run: () => void attempt() });
+      }
+    };
+    void attempt();
+  }
+
+  // Activities: blur/Enter-triggered, per sub-field (act/part/fof independently) --
+  // updateActivitySummary's fields are each independently optional, so a blur on just
+  // "Number" sends only {number}, never resending untouched participants/fof.
+  const ACT_FIELD_LABEL: Record<ActivityNumericField, string> = { act: 'Number', part: 'Participants', fof: 'Friends of the Faith' };
+  function commitActField(actKey: keyof FormState['activities'], field: ActivityNumericField, rowLabel: string) {
+    const value = form.activities[actKey][field];
+    const committedVal = committedRef.current.activities[actKey][field];
+    if (value === committedVal) return;
+    const label = `${rowLabel} ${ACT_FIELD_LABEL[field]}`;
+    if (!isValidInt(String(value ?? ''))) {
+      setSaveStatus({ msg: `${label} must be a number`, type: 'error' });
+      return;
+    }
+    const attempt = async () => {
+      const result = await saveField({ activities: { [actKey]: { [field]: value } } }, label);
+      if (result.ok) {
+        committedRef.current = {
+          ...committedRef.current,
+          activities: result.activities ?? {
+            ...committedRef.current.activities,
+            [actKey]: { ...committedRef.current.activities[actKey], [field]: value },
+          },
+        };
+      } else {
+        setRetry({ label, run: () => void attempt() });
+      }
+    };
+    void attempt();
+  }
+
   function handleBack() {
-    if (isDirty && !confirm('Discard all unsaved changes?')) return;
+    if (saving && !confirm('A save is still in progress. Leave anyway?')) return;
     onBack();
   }
 
   function handleSignOut() {
-    if (isDirty && !confirm('Discard all unsaved changes?')) return;
+    if (saving && !confirm('A save is still in progress. Leave anyway?')) return;
     window.location.href = '/signout';
-  }
-
-  function handleDiscard() {
-    if (isDirty && !confirm('Discard all unsaved changes?')) return;
-    setForm(rowToForm(row));
-    setIsDirty(false);
-    setSaveStatus({ msg: '', type: 'idle' });
   }
 
   const edTotal  = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs]);
   const allTotal = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs, form.activities.devotionals]);
 
   const actKeys = ['ccs', 'jygs', 'scs', 'devotionals'] as const;
-  const actVals = actKeys.flatMap(k => [form.activities[k].act, form.activities[k].part, form.activities[k].fof]);
-  const hasIntErrors = [
-    form.totalPop, form.totalHH, form.indNum, form.hhNum,
-    ...actVals,
-  ].some(v => !isValidInt(v));
-  const cannotSave = hasIntErrors;
-
   const hasAnyActPart = actKeys.some(k => form.activities[k].part !== '');
   // "Helping" here (relabeled from "Sustaining") is still the protagonist role --
   // this simpler 5-ring diagram has no slot for Promoting (the newer promoter role)
@@ -554,11 +611,6 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           <button onClick={handleSignOut} title="Sign out" aria-label="Sign out" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
             <IcoLogOut />
           </button>
-          {!isReadOnly && (
-            <button className="save-btn" disabled={saving || cannotSave} onClick={handleSave} title="Save to spreadsheet" aria-label="Save to spreadsheet" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 12px' }}>
-              <IcoSave /><span className="save-btn-label">Save</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -600,11 +652,11 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               <Field label="Locality" value={form.locality} readonly />
               <Field label="Nucleus" value={form.nucleus} readonly />
               {isAdmin
-                ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => set('nucleusType', v)} />
+                ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => setAndSave('nucleusType', v, { identity: { nucleusType: v } }, 'Type')} />
                 : <Field label="Type" value={form.nucleusType} readonly />
               }
               {isAdmin
-                ? <SelectField label="Stage" value={form.stage} options={STAGE_OPTIONS} onChange={v => set('stage', v)} />
+                ? <SelectField label="Stage" value={form.stage} options={STAGE_OPTIONS} onChange={v => setAndSave('stage', v, { stage: v }, 'Stage')} />
                 : <Field label="Stage" value={form.stage} readonly />
               }
             </div>
@@ -682,24 +734,24 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           <div className="card-header">Population</div>
           <div className="card-body">
             <div className="field-grid-2">
-              <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} integer />
-              <Field label="Total Households" value={form.totalHH}  onChange={v => set('totalHH', v)} integer />
+              <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} onBlur={() => commitField('totalPop', 'Total Population', true)} readonly={!canWrite} integer />
+              <Field label="Total Households" value={form.totalHH}  onChange={v => set('totalHH', v)} onBlur={() => commitField('totalHH', 'Total Households', true)} readonly={!canWrite} integer />
             </div>
             <div className="field-grid-2">
               <PairField
                 label="Individuals Connected"
                 numVal={form.indNum} pctVal={computedPct(form.indNum, form.totalPop)}
-                onNumChange={v => set('indNum', v)} pctReadonly numInteger
+                onNumChange={v => set('indNum', v)} onNumBlur={() => commitField('indNum', 'Individuals Connected', true)} readonly={!canWrite} pctReadonly numInteger
               />
               <PairField
                 label="Households Connected"
                 numVal={form.hhNum} pctVal={computedPct(form.hhNum, form.totalHH)}
-                onNumChange={v => set('hhNum', v)} pctReadonly numInteger
+                onNumChange={v => set('hhNum', v)} onNumBlur={() => commitField('hhNum', 'Households Connected', true)} readonly={!canWrite} pctReadonly numInteger
               />
             </div>
             <div className="field">
               <label>Makeup of Population</label>
-              <textarea value={form.makeup || ''} onChange={e => set('makeup', e.target.value)} />
+              <textarea value={form.makeup || ''} onChange={e => set('makeup', e.target.value)} onBlur={() => commitField('makeup', 'Makeup of Population')} readOnly={!canWrite} />
             </div>
           </div>
         </div>
@@ -722,15 +774,15 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
                   </tr>
                 </thead>
                 <tbody>
-                  <ActRow label="Children's Classes" userVals={form.activities.ccs}
-                    onChange={(f, v) => setAct('ccs', f, v)} />
-                  <ActRow label="Junior Youth Groups" userVals={form.activities.jygs}
-                    onChange={(f, v) => setAct('jygs', f, v)} />
-                  <ActRow label="Study Circles" userVals={form.activities.scs}
-                    onChange={(f, v) => setAct('scs', f, v)} />
+                  <ActRow label="Children's Classes" userVals={form.activities.ccs} readonly={!canWrite}
+                    onChange={(f, v) => setAct('ccs', f, v)} onBlur={f => commitActField('ccs', f, "Children's Classes")} />
+                  <ActRow label="Junior Youth Groups" userVals={form.activities.jygs} readonly={!canWrite}
+                    onChange={(f, v) => setAct('jygs', f, v)} onBlur={f => commitActField('jygs', f, 'Junior Youth Groups')} />
+                  <ActRow label="Study Circles" userVals={form.activities.scs} readonly={!canWrite}
+                    onChange={(f, v) => setAct('scs', f, v)} onBlur={f => commitActField('scs', f, 'Study Circles')} />
                   <TotalRow label="Total Educational Activities" totals={edTotal} />
-                  <ActRow label="Devotional Gatherings" userVals={form.activities.devotionals}
-                    onChange={(f, v) => setAct('devotionals', f, v)} />
+                  <ActRow label="Devotional Gatherings" userVals={form.activities.devotionals} readonly={!canWrite}
+                    onChange={(f, v) => setAct('devotionals', f, v)} onBlur={f => commitActField('devotionals', f, 'Devotional Gatherings')} />
                   <TotalRow label="Total Activities" totals={allTotal} />
                 </tbody>
               </table>
@@ -743,10 +795,12 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           <div className="card-header">Additional Details</div>
           <div className="card-body">
             <div className="detail-grid">
-              <ToggleItem label="Social Action" value={form.presence} notes={form.notesPresence}
-                onToggle={v => set('presence', v)} onNotes={v => set('notesPresence', v)} />
-              <ToggleItem label="Regular Gatherings / Festivals" value={form.gatherings} notes={form.notesGatherings}
-                onToggle={v => set('gatherings', v)} onNotes={v => set('notesGatherings', v)} />
+              <ToggleItem label="Social Action" value={form.presence} notes={form.notesPresence} readonly={!canWrite}
+                onToggle={v => setAndSave('presence', v, { presence: v }, 'Social Action')}
+                onNotes={v => set('notesPresence', v)} onNotesBlur={() => commitField('notesPresence', 'Social Action notes')} />
+              <ToggleItem label="Regular Gatherings / Festivals" value={form.gatherings} notes={form.notesGatherings} readonly={!canWrite}
+                onToggle={v => setAndSave('gatherings', v, { gatherings: v }, 'Regular Gatherings / Festivals')}
+                onNotes={v => set('notesGatherings', v)} onNotesBlur={() => commitField('notesGatherings', 'Regular Gatherings / Festivals notes')} />
             </div>
           </div>
         </div>
@@ -759,6 +813,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
               <textarea
                 value={form.narrative || ''}
                 onChange={canWrite ? e => set('narrative', e.target.value) : undefined}
+                onBlur={canWrite ? () => commitField('narrative', 'Narrative') : undefined}
                 readOnly={!canWrite}
                 rows={6}
               />
@@ -942,14 +997,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
         <span className={`save-status${saveStatus.type !== 'idle' ? ` ${saveStatus.type}` : ''}`}>
           {saveStatus.msg}
         </span>
-        {!isReadOnly && (
-          <>
-            <button className="btn-cancel" onClick={handleDiscard}>Discard changes</button>
-            <button className="save-btn" disabled={saving || cannotSave} onClick={handleSave} aria-label="Save" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 12px' }}>
-              <IcoSave /><span className="save-btn-label">Save</span>
-            </button>
-          </>
-        )}
+        {retry && <button className="btn-cancel" onClick={() => retry.run()}>Retry</button>}
       </div>
     </>
   );
