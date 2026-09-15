@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { NucleusDetail, NucleusRow, Activity } from '@/types';
 import type { Role, Worker } from '@/types';
 import WorkerListModal from './WorkerListModal';
@@ -97,39 +98,78 @@ function SelectField({ label, value, options, onChange, fromSheet }: {
 // costs no space until touched -- works on mobile (no hover needed), and the text can
 // run long without disturbing the surrounding layout. Trying this out on one field
 // (Households Connected) before considering it for others, 2026-09-15.
+interface InfoTipPos { top?: number; bottom?: number; left: number; width: number }
+
 function InfoTip({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<InfoTipPos | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const open = pos !== null;
+
+  // Closing on scroll/resize instead of tracking a live position -- these are short-lived
+  // lookups, not something worth repositioning on every scroll tick.
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setPos(null);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+
+  function toggle(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (open) { setPos(null); return; }
+    const rect = btnRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const width = Math.min(240, window.innerWidth - 16);
+    const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
+    const spaceBelow = window.innerHeight - rect.bottom;
+    // Flip above the icon when there's not enough room below -- a rough threshold
+    // (long text wraps to several lines within this width), not an exact measurement.
+    if (spaceBelow < 160) {
+      setPos({ bottom: window.innerHeight - rect.top + 4, left, width });
+    } else {
+      setPos({ top: rect.bottom + 4, left, width });
+    }
+  }
+
   return (
-    <span style={{ position: 'relative', display: 'inline-flex' }}>
+    <span style={{ display: 'inline-flex' }}>
       <button
+        ref={btnRef}
         type="button"
-        onClick={e => { e.stopPropagation(); setOpen(o => !o); }}
+        onClick={toggle}
         aria-label="Field description"
         aria-expanded={open}
         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: '#a0aec0', display: 'inline-flex', alignItems: 'center' }}
       >
         <IcoInfo />
       </button>
-      {open && (
+      {/* Rendered into document.body, not in place -- a card's `overflow: hidden` (needed
+          to clip the header's rounded corners) would otherwise cut this off whenever it'd
+          extend past the card's edge, which the long definitions here often do. */}
+      {open && pos && createPortal(
         <>
-          {/* Full-screen click-away catcher -- simplest way to dismiss on outside tap
-              without a ref + document listener. */}
-          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
+          <div onClick={() => setPos(null)} style={{ position: 'fixed', inset: 0, zIndex: 199 }} />
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              position: 'absolute', top: '100%', left: 0, marginTop: 4,
+              position: 'fixed', left: pos.left, width: pos.width,
+              ...(pos.top !== undefined ? { top: pos.top } : { bottom: pos.bottom }),
               background: '#2d3748', color: 'white', fontSize: 12, lineHeight: 1.4,
-              // Reset the label's uppercase/bold/letter-spacing styling -- this sits
-              // nested inside a <label> and would otherwise inherit it.
+              // Reset the label's uppercase/bold/letter-spacing styling -- this would
+              // otherwise inherit it from the <label> it's triggered from.
               fontWeight: 400, textTransform: 'none', letterSpacing: 'normal',
-              padding: '8px 10px', borderRadius: 6, width: 220, maxWidth: '80vw',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.25)', zIndex: 20,
+              padding: '8px 10px', borderRadius: 6,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.25)', zIndex: 200,
             }}
           >
             {text}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </span>
   );
