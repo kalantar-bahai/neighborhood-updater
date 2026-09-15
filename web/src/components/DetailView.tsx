@@ -538,6 +538,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
   const [promoterNames, setPromoterNames] = useState<Worker[]>(() => detail.promoterNames);
   const [showPromotersModal, setShowPromotersModal] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(false);
+  const [diagramCardOpen, setDiagramCardOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
   const [dangerOpen, setDangerOpen] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
@@ -898,6 +899,22 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
               <textarea value={form.makeup || ''} onChange={e => set('makeup', e.target.value)} onBlur={() => commitField('makeup', 'Makeup of Population')} readOnly={!canWrite} />
             </div>
           </div>
+        </div>
+
+        {/* Concentric Circles (Aligned) */}
+        <div className="card">
+          <div
+            className="card-header"
+            onClick={() => setDiagramCardOpen(o => !o)}
+            style={{ cursor: 'pointer', userSelect: 'none' }}
+          >
+            <span><span style={{ fontSize: 11, marginRight: 6 }}>{diagramCardOpen ? '▼' : '▶'}</span>Concentric Circles (Aligned)</span>
+          </div>
+          {diagramCardOpen && (
+            <div className="card-body">
+              <AlignedConcentricDiagram rings={alignedRings} residing={alignedResiding} />
+            </div>
+          )}
         </div>
 
         {/* Activities */}
