@@ -907,7 +907,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
           </div>
           <div className="card-body">
             <div className="sync-note">
-              Numbers come from cluster-notebook. Amber rows are manually overridden rather than SRP-derived.
+              Numbers come from cluster-notebook. Amber rows are manually overridden.
             </div>
             <div className="act-table-wrap">
               <table className="act-table">
