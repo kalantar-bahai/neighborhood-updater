@@ -69,7 +69,8 @@ export const DELETE = auth(async (req) => {
   const name = req.nextUrl.searchParams.get('name');
   if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400 });
 
-  await deleteRowData(name);
+  const deleted = await deleteRowData(name);
+  if (!deleted) return NextResponse.json({ error: `Not found: ${name}` }, { status: 404 });
   return NextResponse.json({ success: true });
 });
 

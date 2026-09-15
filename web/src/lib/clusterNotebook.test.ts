@@ -2,7 +2,7 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import {
   getActivitySummaries, updateActivitySummary, getAllNuclei, getNucleusFields, updateNucleus,
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
-  getClusters, createNucleus,
+  getClusters, createNucleus, deleteNucleus,
 } from './clusterNotebook';
 import type { Individual } from './clusterNotebook';
 
@@ -144,6 +144,33 @@ describe('createNucleus', () => {
     }));
 
     await expect(createNucleus('Airport Gardens', 'NC-215 Triangle')).rejects.toThrow('already exists');
+  });
+});
+
+describe('deleteNucleus', () => {
+  test('sends the name and returns true on success', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { deleteNucleus: true } }));
+
+    const result = await deleteNucleus('Riverside');
+
+    expect(result).toBe(true);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ name: 'Riverside' });
+    expect(body.query).toContain('deleteNucleus(name: $name)');
+  });
+
+  test('returns false for a name with no active nucleus (never existed or already deleted)', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { deleteNucleus: false } }));
+
+    const result = await deleteNucleus('Nonexistent');
+
+    expect(result).toBe(false);
+  });
+
+  test('throws when the request fails', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({}, false, 500));
+
+    await expect(deleteNucleus('Riverside')).rejects.toThrow('cluster-notebook request failed: 500');
   });
 });
 

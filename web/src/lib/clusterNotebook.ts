@@ -142,6 +142,23 @@ export async function createNucleus(name: string, clusterName: string): Promise<
   return data.createNucleus;
 }
 
+// Soft delete on cluster-notebook's side (2026-09-14) -- the Nucleus row persists
+// (archivedAt set) but disappears from nuclei/nucleus(name)/parentNucleus immediately.
+// ActivitySummaryOverride rows are hard-deleted; real Activity rows are reassigned
+// (never deleted) to parentNucleus, else resolved Locality, else resolved Cluster;
+// current RoleInNE role-holders are ended. Children pointing here via parentNucleus
+// are nulled out, not cascade-deleted. Returns false for "never existed" and
+// "already deleted" alike -- the same idempotent-delete convention used elsewhere.
+export async function deleteNucleus(name: string): Promise<boolean> {
+  const mutation = `
+    mutation DeleteNucleus($name: String!) {
+      deleteNucleus(name: $name)
+    }
+  `;
+  const data = await request<{ deleteNucleus: boolean }>(mutation, { name });
+  return data.deleteNucleus;
+}
+
 export async function getAllNuclei(): Promise<NucleusSummary[]> {
   const query = `
     query GetAllNuclei {

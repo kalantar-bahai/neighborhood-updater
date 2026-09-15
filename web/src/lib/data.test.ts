@@ -20,13 +20,14 @@ vi.mock('./clusterNotebook', () => ({
   updateNucleus: vi.fn(),
   getNucleusWorkers: vi.fn(),
   createNucleus: vi.fn(),
+  deleteNucleus: vi.fn(),
   individualDisplayName: vi.fn((ind: { firstName?: string | null }) => ind.firstName ?? ''),
 }));
 
 import {
-  getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus, getNucleusWorkers, createNucleus,
+  getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus, getNucleusWorkers, createNucleus, deleteNucleus,
 } from './clusterNotebook';
-import { getRowData, saveRowData, createRowData } from './data';
+import { getRowData, saveRowData, createRowData, deleteRowData } from './data';
 import { MASTER_TAB } from './config';
 
 const mockGetActivitySummaries = vi.mocked(getActivitySummaries);
@@ -35,6 +36,7 @@ const mockGetNucleusFields = vi.mocked(getNucleusFields);
 const mockUpdateNucleus = vi.mocked(updateNucleus);
 const mockGetNucleusWorkers = vi.mocked(getNucleusWorkers);
 const mockCreateNucleus = vi.mocked(createNucleus);
+const mockDeleteNucleus = vi.mocked(deleteNucleus);
 
 const mockSheetsGet = vi.mocked(sheetsGet);
 const mockSheetsClear = vi.mocked(sheetsClear);
@@ -806,6 +808,29 @@ describe('createRowData', () => {
     await createRowData(formData, 'me@x.com');
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Riverside', { parentNucleusName: 'Chapelboro' });
+  });
+});
+
+describe('deleteRowData', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  test('delegates entirely to cluster-notebook, no Sheet interaction', async () => {
+    mockDeleteNucleus.mockResolvedValue(true);
+
+    const result = await deleteRowData('Alpha');
+
+    expect(mockDeleteNucleus).toHaveBeenCalledWith('Alpha');
+    expect(result).toBe(true);
+    expect(mockSheetsBatchUpdate).not.toHaveBeenCalled();
+    expect(mockSheetsClear).not.toHaveBeenCalled();
+  });
+
+  test('returns false for a name that no longer has an active nucleus (idempotent delete)', async () => {
+    mockDeleteNucleus.mockResolvedValue(false);
+
+    const result = await deleteRowData('Nonexistent');
+
+    expect(result).toBe(false);
   });
 });
 

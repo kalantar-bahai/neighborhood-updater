@@ -1,4 +1,4 @@
-import { sheetsGet, sheetsBatchUpdate, sheetsClear, sheetsDeleteRow } from './sheets';
+import { sheetsGet, sheetsBatchUpdate, sheetsClear } from './sheets';
 import {
   MASTER_SHEET_ID,
   MASTER_TAB, ACCESS_TAB,
@@ -8,7 +8,7 @@ import {
 } from './config';
 import {
   getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus,
-  getNucleusWorkers, individualDisplayName, createNucleus,
+  getNucleusWorkers, individualDisplayName, createNucleus, deleteNucleus,
 } from './clusterNotebook';
 import type { ActivitySummary, ActivitySummaries, ActivityType, NucleusFields, Individual } from './clusterNotebook';
 import type { AccessEntry, Activity, Worker } from '@/types';
@@ -267,15 +267,15 @@ export async function getRowData(nucleusName: string) {
   };
 }
 
-export async function deleteRowData(nucleusName: string): Promise<void> {
-  const allRows = await getAllMasterRows();
-  const rowIndex = allRows.findIndex(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
-  // No Sheet row is a valid state now (2026-09-14) -- nothing to delete there.
-  // Deleting the nucleus in cluster-notebook itself isn't something we do (no
-  // delete mutation requested from them at this time, per docs §4).
-  if (rowIndex === -1) return;
-  const sheetRowIndex = MASTER_DATA_ROW + rowIndex - 1; // 0-based index for deleteDimension
-  await sheetsDeleteRow(MASTER_SHEET_ID, MASTER_TAB, sheetRowIndex);
+// Fully cluster-notebook's call now, 2026-09-14 -- no Sheet interaction at all (matching
+// createRowData/saveRowData). Their deleteNucleus is a soft delete: the row persists but
+// disappears from nuclei/nucleus(name) immediately, ActivitySummaryOverride rows are
+// hard-deleted, real Activity rows are reassigned (never deleted) up the parentNucleus/
+// locality/cluster chain, and role-holders are ended. Returns false for "never existed" and
+// "already deleted" alike -- we surface that to the caller so the route can 404 on it,
+// same as getRowData's existence check.
+export async function deleteRowData(nucleusName: string): Promise<boolean> {
+  return deleteNucleus(nucleusName);
 }
 
 // Shape of the bits of submitted form data activityUpdateWrites/
