@@ -44,17 +44,17 @@ function actTotal(acts: (Activity | undefined)[]) {
   }), { act: 0, part: 0, fof: 0 });
 }
 
-function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabelClick, highlighted, onSync, fromSheet }: {
+function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabelClick, highlighted, onSync, fromSheet, info }: {
   label: string; value: string; onChange?: (v: string) => void; onBlur?: () => void; readonly?: boolean; type?: string; integer?: boolean;
-  onLabelClick?: () => void; highlighted?: boolean; onSync?: () => void; fromSheet?: boolean;
+  onLabelClick?: () => void; highlighted?: boolean; onSync?: () => void; fromSheet?: boolean; info?: string;
 }) {
   const hasError = integer && !readonly && !isValidInt(value);
   const cls = [readonly ? 'ro' : '', hasError ? 'error' : '', highlighted ? 'overridden' : ''].filter(Boolean).join(' ');
   return (
     <div className={`field${fromSheet ? ' from-sheet' : ''}`}>
       {onLabelClick
-        ? <label onClick={onLabelClick} style={{ cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>{label} <IcoList /></label>
-        : <label>{label}</label>
+        ? <label onClick={onLabelClick} style={{ cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>{label} <IcoList />{info && <InfoTip text={info} />}</label>
+        : <label style={{ display: 'inline-flex', alignItems: 'center' }}>{label}{info && <InfoTip text={info} />}</label>
       }
       <div style={{ position: 'relative' }}>
         <input
@@ -93,14 +93,56 @@ function SelectField({ label, value, options, onChange, fromSheet }: {
   );
 }
 
-function PairField({ label, numVal, pctVal, onNumChange, onNumBlur, readonly, pctReadonly, numInteger, fromSheet }: {
+// A short "what does this field mean" note, tucked behind a tappable (i) icon so it
+// costs no space until touched -- works on mobile (no hover needed), and the text can
+// run long without disturbing the surrounding layout. Trying this out on one field
+// (Households Connected) before considering it for others, 2026-09-15.
+function InfoTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex' }}>
+      <button
+        type="button"
+        onClick={e => { e.stopPropagation(); setOpen(o => !o); }}
+        aria-label="Field description"
+        aria-expanded={open}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: '#a0aec0', display: 'inline-flex', alignItems: 'center' }}
+      >
+        <IcoInfo />
+      </button>
+      {open && (
+        <>
+          {/* Full-screen click-away catcher -- simplest way to dismiss on outside tap
+              without a ref + document listener. */}
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: 'absolute', top: '100%', left: 0, marginTop: 4,
+              background: '#2d3748', color: 'white', fontSize: 12, lineHeight: 1.4,
+              // Reset the label's uppercase/bold/letter-spacing styling -- this sits
+              // nested inside a <label> and would otherwise inherit it.
+              fontWeight: 400, textTransform: 'none', letterSpacing: 'normal',
+              padding: '8px 10px', borderRadius: 6, width: 220, maxWidth: '80vw',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.25)', zIndex: 20,
+            }}
+          >
+            {text}
+          </div>
+        </>
+      )}
+    </span>
+  );
+}
+
+function PairField({ label, numVal, pctVal, onNumChange, onNumBlur, readonly, pctReadonly, numInteger, fromSheet, info }: {
   label: string; numVal: string; pctVal: string;
-  onNumChange: (v: string) => void; onNumBlur?: () => void; readonly?: boolean; pctReadonly?: boolean; numInteger?: boolean; fromSheet?: boolean;
+  onNumChange: (v: string) => void; onNumBlur?: () => void; readonly?: boolean; pctReadonly?: boolean; numInteger?: boolean; fromSheet?: boolean; info?: string;
 }) {
   const hasError = numInteger && !readonly && !isValidInt(numVal);
   return (
     <div className={`pair-field${fromSheet ? ' from-sheet' : ''}`}>
-      <label>{label}</label>
+      <label>{label}{info && <InfoTip text={info} />}</label>
       <div className="pair-inputs">
         <input
           type="text" value={numVal || ''} placeholder="#" readOnly={readonly}
@@ -189,6 +231,11 @@ const IcoDiagram = () => (
 const IcoLogOut = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+  </svg>
+);
+const IcoInfo = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16.5"/><line x1="12" y1="7.5" x2="12.01" y2="7.5"/>
   </svg>
 );
 const IcoList = () => (
@@ -689,7 +736,12 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
             <div className="field-grid-3">
               {/* Copied from the Activities card's totals, not independently entered --
                   same non-editable treatment as Facilitating Core Activity below. */}
-              <Field label="Participating" value={String(allTotal.part)} readonly />
+              <Field
+                label="Participating"
+                value={String(allTotal.part)}
+                readonly
+                info="Estimated number of individuals who participate with some regularity in collective spaces in the neighborhood, such as family groups, neighborhood gatherings, festivals, community gatherings, Bahá’í holy days, or neighborhood Feasts."
+              />
               {/* Promoting/Helping/Accompanying show a count, not the name list --
                   these can be large; unlike Contact (a singleton, shows the name
                   directly), a name list here wouldn't scale. Click the label to see
@@ -699,22 +751,35 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
                 value={String(promoterNames.length)}
                 readonly
                 onLabelClick={() => setShowPromotersModal(true)}
+                info="Estimated number of individuals promoting various aspects of community life such as parents encouraging participation, junior youth bringing friends, or youth inviting peers. It also includes promoting collective spaces such as festivals, Summer of Service, family gatherings, and various logistical assistance such as providing food, giving rides…"
               />
               <Field
                 label="Helping"
                 value={String(protagonistNames.length)}
                 readonly
                 onLabelClick={() => setShowProtagonistsModal(true)}
+                info="Estimated number of individuals who assist others in taking simple acts of service or initial steps in the educational process, without yet providing sustained accompaniment. For example, someone might help another person share a prayer, learn a quotation, introduce the institute’s programs, or undertake a simple act of service."
               />
             </div>
             <div className="field-grid-3">
-              <Field label="In Core Activity" value={String(edTotal.part)} readonly />
-              <Field label="Facilitating Core Activity" value={form.facilitators} readonly />
+              <Field
+                label="In Core Activity"
+                value={String(edTotal.part)}
+                readonly
+                info="Estimated number of individuals who participate in one or more core activities: children’s classes, junior youth groups, devotional gatherings, or study circles. This is a subset of those participating more broadly in community building activities."
+              />
+              <Field
+                label="Facilitating Core Activity"
+                value={form.facilitators}
+                readonly
+                info="Estimated number of individuals who directly facilitate the educational process, particularly as teachers of children’s classes, animators of junior youth groups, tutors of study circles, or others serving in a comparable facilitating role."
+              />
               <Field
                 label="Accompanying"
                 value={String(accompanierNames.length)}
                 readonly
                 onLabelClick={() => setShowAccompaniersModal(true)}
+                info="Estimated number of individuals with sufficient experience and capacity to provide sustained accompaniment to others as they advance in service—helping them develop capacity."
               />
             </div>
           </div>
@@ -736,6 +801,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
               />
               <PairField
                 label="Households Connected"
+                info="Number of households where at least one person is engaged in a conversation about the Faith, participating, serving, and/or accompanying others."
                 numVal={form.hhNum} pctVal={computedPct(form.hhNum, form.totalHH)}
                 onNumChange={v => set('hhNum', v)} onNumBlur={() => commitField('hhNum', 'Households Connected', true)} readonly={!canWrite} pctReadonly numInteger
               />
