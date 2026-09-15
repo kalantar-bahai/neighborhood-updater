@@ -54,7 +54,7 @@ function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabe
   return (
     <div className={`field${fromSheet ? ' from-sheet' : ''}`}>
       {onLabelClick
-        ? <label onClick={onLabelClick} style={{ cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>{label}{info && <InfoTip text={info} />} <IcoList /></label>
+        ? <label onClick={onLabelClick} style={{ cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', alignSelf: 'flex-start', gap: 4 }}>{label}{info && <InfoTip text={info} />} <IcoList /></label>
         : <label style={{ display: 'inline-flex', alignItems: 'center' }}>{label}{info && <InfoTip text={info} />}</label>
       }
       <div style={{ position: 'relative' }}>
