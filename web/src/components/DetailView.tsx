@@ -54,7 +54,7 @@ function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabe
   return (
     <div className={`field${fromSheet ? ' from-sheet' : ''}`}>
       {onLabelClick
-        ? <label onClick={onLabelClick} style={{ cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>{label} <IcoList />{info && <InfoTip text={info} />}</label>
+        ? <label onClick={onLabelClick} style={{ cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>{label}{info && <InfoTip text={info} />} <IcoList /></label>
         : <label style={{ display: 'inline-flex', alignItems: 'center' }}>{label}{info && <InfoTip text={info} />}</label>
       }
       <div style={{ position: 'relative' }}>
@@ -103,16 +103,30 @@ interface InfoTipPos { top?: number; bottom?: number; left: number; width: numbe
 function InfoTip({ text }: { text: string }) {
   const [pos, setPos] = useState<InfoTipPos | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const open = pos !== null;
 
-  // Closing on scroll/resize instead of tracking a live position -- these are short-lived
-  // lookups, not something worth repositioning on every scroll tick.
+  // Dismiss on outside pointerdown (not a full-screen overlay <div>'s onClick) --
+  // a covering overlay that removes itself in its own click handler causes a real bug
+  // on touch devices: the tap that closes it can "click through" to whatever element is
+  // newly exposed underneath once the overlay's gone (reported by the user: tapping the
+  // info icon again to close it was also opening the names-list modal beneath it, since
+  // the overlay had been covering that same spot). A pointerdown listener on the
+  // document, fired before any click is dispatched, has nothing to click through.
   useEffect(() => {
     if (!open) return;
+    function handlePointerDown(e: PointerEvent) {
+      const target = e.target as Node;
+      if (btnRef.current?.contains(target)) return; // the button's own onClick handles this tap
+      if (popoverRef.current?.contains(target)) return; // tapping the popover itself shouldn't close it
+      setPos(null);
+    }
+    document.addEventListener('pointerdown', handlePointerDown, true);
     const close = () => setPos(null);
     window.addEventListener('scroll', close, true);
     window.addEventListener('resize', close);
     return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
       window.removeEventListener('scroll', close, true);
       window.removeEventListener('resize', close);
     };
@@ -151,24 +165,21 @@ function InfoTip({ text }: { text: string }) {
           to clip the header's rounded corners) would otherwise cut this off whenever it'd
           extend past the card's edge, which the long definitions here often do. */}
       {open && pos && createPortal(
-        <>
-          <div onClick={() => setPos(null)} style={{ position: 'fixed', inset: 0, zIndex: 199 }} />
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              position: 'fixed', left: pos.left, width: pos.width,
-              ...(pos.top !== undefined ? { top: pos.top } : { bottom: pos.bottom }),
-              background: '#2d3748', color: 'white', fontSize: 12, lineHeight: 1.4,
-              // Reset the label's uppercase/bold/letter-spacing styling -- this would
-              // otherwise inherit it from the <label> it's triggered from.
-              fontWeight: 400, textTransform: 'none', letterSpacing: 'normal',
-              padding: '8px 10px', borderRadius: 6,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.25)', zIndex: 200,
-            }}
-          >
-            {text}
-          </div>
-        </>,
+        <div
+          ref={popoverRef}
+          style={{
+            position: 'fixed', left: pos.left, width: pos.width,
+            ...(pos.top !== undefined ? { top: pos.top } : { bottom: pos.bottom }),
+            background: '#2d3748', color: 'white', fontSize: 12, lineHeight: 1.4,
+            // Reset the label's uppercase/bold/letter-spacing styling -- this would
+            // otherwise inherit it from the <label> it's triggered from.
+            fontWeight: 400, textTransform: 'none', letterSpacing: 'normal',
+            padding: '8px 10px', borderRadius: 6,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.25)', zIndex: 200,
+          }}
+        >
+          {text}
+        </div>,
         document.body
       )}
     </span>
