@@ -163,14 +163,21 @@ function InfoTip({ text }: { text: string }) {
   }
 
   return (
-    <span style={{ display: 'inline-flex' }}>
+    <>
       <button
         ref={btnRef}
         type="button"
         onClick={toggle}
         aria-label="Field description"
         aria-expanded={open}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: '#a0aec0', display: 'inline-flex', alignItems: 'center' }}
+        // Explicit, fixed box (not left to default flex sizing) -- pins the clickable
+        // area to exactly the icon + its padding, so it can't end up wider than it
+        // looks the way the label itself once did (see the align-self: flex-start fix).
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer', color: '#a0aec0',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: 16, height: 16, padding: 0, marginLeft: 4, flex: '0 0 auto',
+        }}
       >
         <IcoInfo />
       </button>
@@ -196,7 +203,7 @@ function InfoTip({ text }: { text: string }) {
         </div>,
         document.body
       )}
-    </span>
+    </>
   );
 }
 
