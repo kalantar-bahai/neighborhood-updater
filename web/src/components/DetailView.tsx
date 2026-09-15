@@ -205,15 +205,15 @@ function TotalRow({ label, totals }: { label: string; totals: { act: number; par
   );
 }
 
-function ToggleItem({ label, value, notes, onToggle, onNotes, onNotesBlur, readonly }: {
+function ToggleItem({ label, value, notes, onToggle, onNotes, onNotesBlur, readonly, info }: {
   label: string; value: string; notes: string;
-  onToggle: (v: string) => void; onNotes: (v: string) => void; onNotesBlur?: () => void; readonly?: boolean;
+  onToggle: (v: string) => void; onNotes: (v: string) => void; onNotesBlur?: () => void; readonly?: boolean; info?: string;
 }) {
   const isYes = (value || '').toLowerCase() === 'yes';
   const isNo  = !isYes;
   return (
     <div className="detail-item">
-      <div className="q">{label}</div>
+      <div className="q">{label}{info && <InfoTip text={info} />}</div>
       <div className="toggle-row">
         <button className={`tb${isYes ? ' yes' : ''}`} onClick={() => onToggle('Yes')} disabled={readonly}>Yes</button>
         <button className={`tb${isNo ? ' no' : ''}`} onClick={() => onToggle('No')} disabled={readonly}>No</button>
@@ -854,10 +854,12 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
             <div className="detail-grid">
               <ToggleItem label="Social Action" value={form.presence} notes={form.notesPresence} readonly={!canWrite}
                 onToggle={v => setAndSave('presence', v, { presence: v }, 'Social Action')}
-                onNotes={v => set('notesPresence', v)} onNotesBlur={() => commitField('notesPresence', 'Social Action notes')} />
+                onNotes={v => set('notesPresence', v)} onNotesBlur={() => commitField('notesPresence', 'Social Action notes')}
+                info="Efforts aimed at improving an aspect of the social or economic life of the population, however modest or informal." />
               <ToggleItem label="Regular Gatherings / Festivals" value={form.gatherings} notes={form.notesGatherings} readonly={!canWrite}
                 onToggle={v => setAndSave('gatherings', v, { gatherings: v }, 'Regular Gatherings / Festivals')}
-                onNotes={v => set('notesGatherings', v)} onNotesBlur={() => commitField('notesGatherings', 'Regular Gatherings / Festivals notes')} />
+                onNotes={v => set('notesGatherings', v)} onNotesBlur={() => commitField('notesGatherings', 'Regular Gatherings / Festivals notes')}
+                info="Well-prepared community gatherings, camps, festivals, service projects, arts endeavours, and collective teaching initiatives that occur regularly, each according to its own rhythm, and with increasing frequency." />
             </div>
           </div>
         </div>
