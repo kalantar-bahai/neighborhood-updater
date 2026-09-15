@@ -56,13 +56,11 @@ export const GET = auth(async (req) => {
         totalFof:  acts.reduce((s, a) => s + n(a.fof),  0),
       };
     });
-  const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${process.env.MASTER_SHEET_ID}`;
 
   return NextResponse.json({
     access: { roleMap: access.roleMap },
     rows: authorizedRows,
     email,
-    spreadsheetUrl,
     clusterNames: clusters.map(c => c.name),
   });
 });

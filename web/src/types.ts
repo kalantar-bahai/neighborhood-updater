@@ -94,7 +94,6 @@ export interface InitialData {
   access: { roleMap: Record<string, Role> };
   rows: NucleusSummary[];
   email: string;
-  spreadsheetUrl: string;
   // For the "+Add" cluster picker (2026-09-14) -- existing clusters only, no
   // inline creation (clusters are real, SRP-sourced geographic entities).
   clusterNames: string[];

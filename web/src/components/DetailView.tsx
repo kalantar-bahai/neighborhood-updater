@@ -12,7 +12,6 @@ interface Props {
   roleMap: Record<string, Role>;
   email: string;
   showBack: boolean;
-  spreadsheetUrl: string;
   onBack: () => void;
   onSaved: (savedBy: string, savedAt: string) => void;
 }
@@ -185,11 +184,6 @@ function ToggleItem({ label, value, notes, onToggle, onNotes, onNotesBlur, reado
 const IcoDiagram = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <ellipse cx="12" cy="12" rx="10" ry="7"/><ellipse cx="12" cy="12" rx="5" ry="3.5"/>
-  </svg>
-);
-const IcoExternalLink = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
   </svg>
 );
 const IcoLogOut = () => (
@@ -383,7 +377,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
   );
 }
 
-export default function DetailView({ detail, role, roleMap, email, showBack, spreadsheetUrl, onBack, onSaved }: Props) {
+export default function DetailView({ detail, role, roleMap, email, showBack, onBack, onSaved }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   // Baseline to diff a blur-triggered field's current value against, so clicking into
@@ -605,9 +599,6 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
           <button onClick={() => setShowDiagram2(true)} title="Concentric Circles (Aligned)" aria-label="Concentric Circles (Aligned)" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
             <IcoDiagram2 />
           </button>
-          <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" title="Open spreadsheet" aria-label="Open spreadsheet" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', textDecoration: 'none' }}>
-            <IcoExternalLink />
-          </a>
           <button onClick={handleSignOut} title="Sign out" aria-label="Sign out" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
             <IcoLogOut />
           </button>
@@ -852,7 +843,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
             {dangerOpen && (
               <div className="card-body">
                 <p style={{ fontSize: 13, color: '#744210', background: '#fffbeb', border: '1px solid #f6e05e', borderRadius: 6, padding: '8px 12px', margin: 0 }}>
-                  Deleting a nucleus permanently removes it from the spreadsheet. This cannot be undone.
+                  Deleting a nucleus removes it immediately. This can&rsquo;t be undone here.
                 </p>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 4 }}>
                   <div className="field" style={{ flex: 1, margin: 0 }}>

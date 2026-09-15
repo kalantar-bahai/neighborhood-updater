@@ -79,7 +79,6 @@ export default function AppClient() {
         roleMap={initialData.access.roleMap}
         email={initialData.email}
         showBack={initialData.rows.length > 1}
-        spreadsheetUrl={initialData.spreadsheetUrl}
         onBack={handleBack}
         onSaved={() => {}}
       />
