@@ -367,6 +367,13 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   const [isDirty, setIsDirty] = useState(false);
+  // Which activity types the user actually touched this session -- a save only
+  // resends the types in here, not the whole `activities` object. Otherwise every
+  // save (even an unrelated field like stage) would resend all four types' current
+  // displayed numbers as explicit values to cluster-notebook's updateActivitySummary,
+  // needlessly writing untouched, already-matching numbers on every save (2026-09-14,
+  // cluster-notebook).
+  const [dirtyActs, setDirtyActs] = useState<Set<keyof FormState['activities']>>(new Set());
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ msg: string; type: 'idle' | 'success' | 'error' }>({ msg: '', type: 'idle' });
   const [lastUpdatedBy, setLastUpdatedBy] = useState('');
@@ -402,6 +409,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
 
   const setAct = useCallback((actKey: keyof FormState['activities'], field: keyof Activity, val: string) => {
     setForm(f => ({ ...f, activities: { ...f.activities, [actKey]: { ...f.activities[actKey], [field]: val } } }));
+    setDirtyActs(prev => new Set(prev).add(actKey));
     setIsDirty(true);
   }, []);
 
@@ -410,6 +418,14 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
     setSaveStatus({ msg: 'Saving...', type: 'idle' });
     try {
       const payload: Record<string, unknown> = { ...form };
+      // Only the activity types the user actually edited -- see dirtyActs' own comment.
+      if (dirtyActs.size > 0) {
+        payload.activities = Object.fromEntries(
+          Object.entries(form.activities).filter(([key]) => dirtyActs.has(key as keyof FormState['activities']))
+        );
+      } else {
+        delete payload.activities;
+      }
       if (isAdmin) {
         payload.identity = {
           nucleus:        form.nucleus,
@@ -433,6 +449,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
 
       setSaveStatus({ msg: 'Saved successfully', type: 'success' });
       setIsDirty(false);
+      setDirtyActs(new Set());
       setLastUpdatedBy(data.savedBy || email);
       setLastUpdatedAt(data.savedAt || new Date().toISOString());
       onSaved(data.savedBy || email, data.savedAt || new Date().toISOString());
