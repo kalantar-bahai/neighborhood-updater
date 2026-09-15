@@ -54,7 +54,20 @@ function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabe
   return (
     <div className={`field${fromSheet ? ' from-sheet' : ''}`}>
       {onLabelClick
-        ? <label onClick={onLabelClick} style={{ cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', alignSelf: 'flex-start', gap: 4 }}>{label}{info && <InfoTip text={info} />} <IcoList /></label>
+        ? (
+          // info sits OUTSIDE both clickable spans entirely (a true sibling of each,
+          // never a descendant) -- not just stopPropagation-guarded. Nesting it inside
+          // an element with its own onClick was still the wrong structure even with a
+          // correctly-sized hit area: the user could reproducibly open both the info
+          // popover and the names-list modal from a single tap on the list icon. Split
+          // into two independently-clickable spans (name, then icon) so info can sit
+          // between them -- left of the list icon, still right next to the name.
+          <label style={{ display: 'inline-flex', alignItems: 'center', alignSelf: 'flex-start', gap: 4 }}>
+            <span onClick={onLabelClick} style={{ cursor: 'pointer', textDecoration: 'underline' }}>{label}</span>
+            {info && <InfoTip text={info} />}
+            <span onClick={onLabelClick} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}><IcoList /></span>
+          </label>
+        )
         : <label style={{ display: 'inline-flex', alignItems: 'center' }}>{label}{info && <InfoTip text={info} />}</label>
       }
       <div style={{ position: 'relative' }}>
