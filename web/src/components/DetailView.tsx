@@ -450,6 +450,11 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
       setSaveStatus({ msg: 'Saved successfully', type: 'success' });
       setIsDirty(false);
       setDirtyActs(new Set());
+      // Server-recomputed isOverridden (and current act/part/fof) for whichever activity
+      // types were saved -- without this the amber highlight wouldn't appear until reload.
+      if (data.activities) {
+        setForm(f => ({ ...f, activities: data.activities }));
+      }
       setLastUpdatedBy(data.savedBy || email);
       setLastUpdatedAt(data.savedAt || new Date().toISOString());
       onSaved(data.savedBy || email, data.savedAt || new Date().toISOString());

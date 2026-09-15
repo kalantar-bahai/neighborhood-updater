@@ -411,5 +411,14 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
   }
   await Promise.all(writes);
 
-  return { success: true, savedBy: userEmail, savedAt: new Date().toISOString() };
+  // If activities were part of this save, hand back the fresh post-write state (in
+  // particular isOverridden) so the caller can update its display without a reload --
+  // cluster-notebook recomputes isOverridden server-side (value comparison against its
+  // own SRP-derived numbers), so there's no way for the client to know the new value
+  // from what it sent.
+  const activities = d.activities
+    ? activitiesFromClusterNotebook(await getActivitySummaries(nucleusName))
+    : undefined;
+
+  return { success: true, savedBy: userEmail, savedAt: new Date().toISOString(), activities };
 }

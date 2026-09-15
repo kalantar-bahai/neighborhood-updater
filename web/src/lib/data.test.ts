@@ -697,6 +697,37 @@ describe('saveRowData', () => {
 
     expect(mockUpdateNucleus).not.toHaveBeenCalled();
   });
+
+  test('returns fresh activities (including server-recomputed isOverridden) when activities were part of the save', async () => {
+    mockUpdateActivitySummary.mockResolvedValue(null);
+    mockGetActivitySummaries.mockResolvedValue({
+      childrensClasses: { number: 3, participants: null, participantsFof: null, isOverridden: true, facilitators: null, facilitatorNames: null },
+      juniorYouthGroups: null, studyCircles: null, devotionalGathering: null,
+    });
+
+    const result = await saveRowData('Alpha', baseFormData, 'me@x.com');
+
+    // Fetched AFTER the writes settle, not derived from what we sent -- cluster-notebook
+    // recomputes isOverridden server-side, so the client can't know the new value otherwise.
+    expect(mockGetActivitySummaries).toHaveBeenCalledWith('Alpha');
+    expect(result.activities?.ccs).toEqual({ act: '3', part: '', fof: '', isOverridden: true });
+  });
+
+  test('omits activities from the result when the save did not touch any activity type', async () => {
+    mockUpdateNucleus.mockResolvedValue({
+      stage: 'Advanced/5', locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+    });
+
+    const result = await saveRowData('Alpha', { stage: 'Advanced/5' }, 'me@x.com');
+
+    expect(mockGetActivitySummaries).not.toHaveBeenCalled();
+    expect(result.activities).toBeUndefined();
+  });
 });
 
 describe('createRowData', () => {
