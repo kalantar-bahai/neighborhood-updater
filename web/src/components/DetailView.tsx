@@ -63,9 +63,9 @@ function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabe
           // into two independently-clickable spans (name, then icon) so info can sit
           // between them -- left of the list icon, still right next to the name.
           <label style={{ display: 'inline-flex', alignItems: 'center', alignSelf: 'flex-start', gap: 4 }}>
-            <span onClick={onLabelClick} style={{ cursor: 'pointer', textDecoration: 'underline' }}>{label}</span>
+            <span onClick={e => { lastLabelClickTime = e.timeStamp; onLabelClick(); }} style={{ cursor: 'pointer', textDecoration: 'underline' }}>{label}</span>
             {info && <InfoTip text={info} />}
-            <span onClick={onLabelClick} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}><IcoList /></span>
+            <span onClick={e => { lastLabelClickTime = e.timeStamp; onLabelClick(); }} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}><IcoList /></span>
           </label>
         )
         : <label style={{ display: 'inline-flex', alignItems: 'center' }}>{label}{info && <InfoTip text={info} />}</label>
@@ -113,6 +113,17 @@ function SelectField({ label, value, options, onChange, fromSheet }: {
 // (Households Connected) before considering it for others, 2026-09-15.
 interface InfoTipPos { top?: number; bottom?: number; left: number; width: number }
 
+// Guards against a confirmed spurious replay: clicking a field's clickable label (the
+// name text or its list icon, opening a worker-list modal) is sometimes followed, ~30-40ms
+// later, by a SECOND synthetic click event whose target is a nearby InfoTip button and
+// whose clientX/clientY are copied verbatim from the ORIGINAL click -- even though those
+// coordinates don't fall within the button's own actual bounding box. Diagnosed live with
+// the user (2026-09-15): confirmed via getBoundingClientRect() logging that the two events
+// share identical coordinates while the button's real rect doesn't contain them, ruling out
+// a genuine second tap or a real hit-test. Root mechanism (React event replay vs. a
+// touch/browser ghost-click) unconfirmed; this timestamp guard sidesteps it regardless.
+let lastLabelClickTime = 0;
+
 function InfoTip({ text }: { text: string }) {
   const [pos, setPos] = useState<InfoTipPos | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -147,6 +158,10 @@ function InfoTip({ text }: { text: string }) {
 
   function toggle(e: React.MouseEvent) {
     e.stopPropagation();
+    // See lastLabelClickTime's own comment -- a confirmed spurious replay click follows
+    // a real label click by ~30-40ms with copied coordinates. Anything this close is
+    // almost certainly that, not a genuine tap on this button.
+    if (e.timeStamp - lastLabelClickTime < 200) return;
     if (open) { setPos(null); return; }
     const rect = btnRef.current?.getBoundingClientRect();
     if (!rect) return;
