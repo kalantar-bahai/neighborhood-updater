@@ -945,8 +945,8 @@ export default function DetailView({ detail, role, roleMap, email, showBack, spr
         {!isReadOnly && (
           <>
             <button className="btn-cancel" onClick={handleDiscard}>Discard changes</button>
-            <button className="btn-save" disabled={saving || cannotSave} onClick={handleSave}>
-              Save to spreadsheet
+            <button className="save-btn" disabled={saving || cannotSave} onClick={handleSave} aria-label="Save" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 12px' }}>
+              <IcoSave /><span className="save-btn-label">Save</span>
             </button>
           </>
         )}

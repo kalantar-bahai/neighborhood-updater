@@ -286,8 +286,6 @@
   flex-wrap: wrap;
 }
 .btn-cancel { padding: 7px 14px; border-radius: 6px; border: 1px solid #cbd5e0; background: white; font-size: 13px; cursor: pointer; color: #4a5568; }
-.btn-save { padding: 7px 20px; border-radius: 6px; border: none; background: #3182ce; color: white; font-size: 13px; font-weight: 600; cursor: pointer; }
-.btn-save:disabled { background: #a0aec0; cursor: default; }
 .save-status { font-size: 12px; color: #718096; margin-right: auto; }
 .save-status.error { color: #e53e3e; }
 .save-status.success { color: #38a169; }
