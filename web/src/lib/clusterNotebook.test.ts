@@ -1,4 +1,9 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('@clerk/nextjs/server', () => ({
+  auth: vi.fn(async () => ({ getToken: vi.fn(async () => 'test-token') })),
+}));
+
 import {
   getActivitySummaries, updateActivitySummary, getAllNuclei, getNucleusFields, updateNucleus,
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
@@ -585,5 +590,14 @@ describe('updateNucleusWorkers', () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { updateNucleusWorkers: null } }));
 
     await expect(updateNucleusWorkers('Nonexistent', 'accompanier', [])).rejects.toThrow('cluster-notebook has no nucleus named "Nonexistent"');
+  });
+});
+
+describe('request (token forwarding)', () => {
+  test('forwards the Clerk session token as a bearer Authorization header', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { clusters: [] } }));
+    await getClusters();
+    const [, init] = mockFetch.mock.calls[0];
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-token');
   });
 });

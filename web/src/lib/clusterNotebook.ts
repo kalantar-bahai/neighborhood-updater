@@ -1,3 +1,5 @@
+import { auth } from '@clerk/nextjs/server';
+
 const CLUSTER_NOTEBOOK_URL = process.env.CLUSTER_NOTEBOOK_URL || 'http://localhost:8000';
 
 // Shared shape for all four activity rollups (devotionalGathering/childrensClasses/
@@ -28,9 +30,15 @@ interface GraphQLResponse<T> {
 }
 
 async function request<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+  const { getToken } = await auth();
+  const token = await getToken();
+
   const res = await fetch(CLUSTER_NOTEBOOK_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ query, variables }),
   });
 
