@@ -1,22 +1,25 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { NextResponse, type NextRequest } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { getAccess } from '@/lib/access';
+import { getCurrentUserEmail } from '@/lib/clerkUser';
 import { getRowData, saveRowData, createRowData, deleteRowData, CodedError } from '@/lib/data';
+
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
 function effectiveRole(roleMap: Record<string, string>, nucleus: string) {
   return roleMap[norm(nucleus)] ?? roleMap['*'] ?? null;
 }
 
-export const GET = auth(async (req) => {
-  if (!req.auth?.user?.email) {
+export async function GET(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
   const name = req.nextUrl.searchParams.get('name');
   if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400 });
 
-  const access = await getAccess(req.auth.user.email);
+  const access = await getAccess(userId);
   if (access.role === 'none') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
   const role = effectiveRole(access.roleMap, name);
@@ -26,18 +29,18 @@ export const GET = auth(async (req) => {
   if (!data) return NextResponse.json({ error: `Not found: ${name}` }, { status: 404 });
 
   return NextResponse.json(data);
-});
+}
 
-export const POST = auth(async (req) => {
-  if (!req.auth?.user?.email) {
+export async function POST(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
   const { name, formData } = await req.json();
   if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400 });
 
-  const email = req.auth.user.email;
-  const access = await getAccess(email);
+  const access = await getAccess(userId);
   if (access.role === 'none') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
   const role = effectiveRole(access.roleMap, name);
@@ -51,17 +54,18 @@ export const POST = auth(async (req) => {
     delete formData.auxBoard;
   }
 
+  const email = await getCurrentUserEmail();
   const result = await saveRowData(name, formData, email);
   return NextResponse.json(result);
-});
+}
 
-export const DELETE = auth(async (req) => {
-  if (!req.auth?.user?.email) {
+export async function DELETE(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const email = req.auth.user.email;
-  const access = await getAccess(email);
+  const access = await getAccess(userId);
   if (access.role === 'none' || access.roleMap['*'] !== 'admin') {
     return NextResponse.json({ error: 'Access denied — global admin required' }, { status: 403 });
   }
@@ -72,21 +76,21 @@ export const DELETE = auth(async (req) => {
   const deleted = await deleteRowData(name);
   if (!deleted) return NextResponse.json({ error: `Not found: ${name}` }, { status: 404 });
   return NextResponse.json({ success: true });
-});
+}
 
-export const PUT = auth(async (req) => {
-  if (!req.auth?.user?.email) {
+export async function PUT(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const email = req.auth.user.email;
-  const access = await getAccess(email);
-
+  const access = await getAccess(userId);
   if (access.role === 'none' || access.roleMap['*'] !== 'admin') {
     return NextResponse.json({ error: 'Access denied — global admin required' }, { status: 403 });
   }
 
   const { formData } = await req.json();
+  const email = await getCurrentUserEmail();
 
   try {
     const result = await createRowData(formData, email);
@@ -100,4 +104,4 @@ export const PUT = auth(async (req) => {
     }
     throw e;
   }
-});
+}
