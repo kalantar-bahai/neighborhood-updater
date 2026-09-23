@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { NextResponse, type NextRequest } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { getAccess } from '@/lib/access';
 import { searchIndividuals, createIndividual, individualDisplayName } from '@/lib/clusterNotebook';
 
@@ -11,8 +11,9 @@ function effectiveRole(roleMap: Record<string, string>, nucleus: string) {
 
 // Both routes require read-write minimum, matching /api/workers -- searching/creating
 // individuals only ever happens as part of editing a worker list, never a pure read view.
-export const GET = auth(async (req) => {
-  if (!req.auth?.user?.email) {
+export async function GET(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
@@ -20,7 +21,7 @@ export const GET = auth(async (req) => {
   const search = req.nextUrl.searchParams.get('search') || undefined;
   if (!nucleus) return NextResponse.json({ error: 'Missing nucleus' }, { status: 400 });
 
-  const access = await getAccess(req.auth.user.email);
+  const access = await getAccess(userId);
   if (access.role === 'none') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   const role = effectiveRole(access.roleMap, nucleus);
   if (!role || role === 'read') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
@@ -29,10 +30,11 @@ export const GET = auth(async (req) => {
   return NextResponse.json({
     individuals: individuals.map(ind => ({ id: ind.id, name: individualDisplayName(ind) })),
   });
-});
+}
 
-export const POST = auth(async (req) => {
-  if (!req.auth?.user?.email) {
+export async function POST(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
@@ -40,11 +42,11 @@ export const POST = auth(async (req) => {
   if (!nucleus) return NextResponse.json({ error: 'Missing nucleus' }, { status: 400 });
   if (!name || !String(name).trim()) return NextResponse.json({ error: 'Missing name' }, { status: 400 });
 
-  const access = await getAccess(req.auth.user.email);
+  const access = await getAccess(userId);
   if (access.role === 'none') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   const role = effectiveRole(access.roleMap, nucleus);
   if (!role || role === 'read') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
   const individual = await createIndividual(String(name).trim(), nucleus);
   return NextResponse.json({ id: individual.id, name: individualDisplayName(individual) });
-});
+}
