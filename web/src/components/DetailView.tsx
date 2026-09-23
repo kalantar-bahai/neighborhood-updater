@@ -346,6 +346,12 @@ const IcoDiagram2 = () => (
   </svg>
 );
 
+const IcoDiagram3 = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6.5" strokeDasharray="2 2"/><circle cx="12" cy="12" r="3"/>
+  </svg>
+);
+
 const TYPE_OPTIONS  = ['', 'Neighborhood', 'Network', 'Population'];
 const STAGE_OPTIONS = ['', 'Potential/1', 'Initial/2', 'Emerging/3', 'Expanding/4', 'Advanced/5', 'Advanced+/6'];
 
@@ -511,6 +517,57 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
   );
 }
 
+// Staggered diagram: 8 concentric circles sharing one center, ordered inner -> outer to
+// match the labels passed in. Each label is left-aligned and anchored in the middle of its
+// own ring's band along a 45deg ray running up and to the right of the center, so the
+// labels step diagonally and the longer ones spill past the circles' edges. The halo
+// (paint-order: stroke) keeps a label readable wherever it crosses a different fill.
+const SCX = 230, SCY = 240, SSTEP = 26;
+const SRINGS = [
+  { fill: '#1e3a8a', dashed: true  }, // 1 Accompanying (innermost)
+  { fill: '#1e40af', dashed: false, bold: true }, // 2 Helping Others
+  { fill: '#2563eb', dashed: true  }, // 3 Facilitating Ed. Act.
+  { fill: '#3b82f6', dashed: false, bold: true }, // 4 Participating in Ed. Act.
+  { fill: '#60a5fa', dashed: true  }, // 5 Promoting
+  { fill: '#93c5fd', dashed: false, bold: true }, // 6 Participating
+  { fill: '#bfdbfe', dashed: false }, // 7 In Conversation
+  { fill: '#dbeafe', dashed: false }, // 8 Population/Residing (outermost)
+];
+
+function StaggeredConcentricDiagram({ labels }: { labels: AlignedLabel[] }) {
+  const cos45 = Math.SQRT1_2;
+  return (
+    <svg viewBox="0 0 580 480" style={{ width: '100%', display: 'block' }}>
+      {/* Painted outer -> inner so each smaller circle sits on top of the larger one. */}
+      {SRINGS.map((ring, i) => ({ ring, r: (i + 1) * SSTEP })).reverse().map(({ ring, r }) => (
+        <circle
+          key={r} cx={SCX} cy={SCY} r={r}
+          fill={ring.fill} stroke="white" strokeWidth={ring.bold ? 3.5 : 1.5}
+          strokeDasharray={ring.dashed ? '6 5' : undefined}
+        />
+      ))}
+      {labels.map((l, i) => {
+        const mid = (i + 0.5) * SSTEP;
+        const dark = i < 4;
+        const x = SCX + mid * cos45, y = SCY - mid * cos45;
+        const content = <><tspan fontWeight={700}>{formatNum(l.value)}</tspan> {l.label}</>;
+        return (
+          <g key={i} onClick={l.onClick} style={l.onClick ? { cursor: 'pointer' } : undefined}>
+            <text x={x} y={y} dominantBaseline="middle" fontSize={11} fontWeight={400}
+              fill={dark ? '#1e3a8a' : '#ffffff'} stroke={dark ? '#1e3a8a' : '#ffffff'} strokeWidth={3} strokeLinejoin="round">
+              {content}
+            </text>
+            <text x={x} y={y} dominantBaseline="middle" fontSize={11} fontWeight={400}
+              fill={dark ? '#ffffff' : '#1e3a8a'} textDecoration={l.onClick ? 'underline' : undefined}>
+              {content}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 export default function DetailView({ detail, role, roleMap, email, showBack, onBack, onSaved }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
@@ -527,6 +584,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
   const [lastUpdatedAt, setLastUpdatedAt] = useState('');
   const [showDiagram, setShowDiagram] = useState(false);
   const [showDiagram2, setShowDiagram2] = useState(false);
+  const [showDiagram3, setShowDiagram3] = useState(false);
   const [accompanierNames, setAccompanierNames] = useState<Worker[]>(() => detail.accompanierNames);
   const [showAccompaniersModal, setShowAccompaniersModal] = useState(false);
   const [protagonistNames, setProtagonistNames] = useState<Worker[]>(() => detail.protagonistNames);
@@ -712,6 +770,18 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
     },
   ];
 
+  // Innermost -> outermost, same values as the Aligned diagram's rings.
+  const staggeredLabels: AlignedLabel[] = [
+    { label: 'Accompanying',              value: String(accompanierNames.length), onClick: () => setShowAccompaniersModal(true) },
+    { label: 'Helping Others',            value: String(protagonistNames.length), onClick: () => setShowProtagonistsModal(true) },
+    { label: 'Facilitating Ed. Act.',     value: form.facilitatorsCount },
+    { label: 'Participating in Ed. Act.', value: String(edTotal.part) },
+    { label: 'Promoting',                 value: String(promoterNames.length), onClick: () => setShowPromotersModal(true) },
+    { label: 'Participating',             value: hasAnyActPart ? String(allTotal.part) : '' },
+    { label: 'In Conversation',           value: form.indNum },
+    { label: 'Population/Residing',       value: form.totalPop },
+  ];
+
   const updatedLine = lastUpdatedAt
     ? `Last saved by ${lastUpdatedBy} on ${new Date(lastUpdatedAt).toLocaleString()}`
     : '';
@@ -733,6 +803,9 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
           </button>
           <button onClick={() => setShowDiagram2(true)} title="Concentric Circles (Aligned)" aria-label="Concentric Circles (Aligned)" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
             <IcoDiagram2 />
+          </button>
+          <button onClick={() => setShowDiagram3(true)} title="Concentric Circles (Staggered)" aria-label="Concentric Circles (Staggered)" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
+            <IcoDiagram3 />
           </button>
           <button onClick={handleSignOut} title="Sign out" aria-label="Sign out" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
             <IcoLogOut />
@@ -901,18 +974,18 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
           </div>
         </div>
 
-        {/* Concentric Circles (Aligned) */}
+        {/* Concentric Circles (Staggered) */}
         <div className="card">
           <div
             className="card-header"
             onClick={() => setDiagramCardOpen(o => !o)}
             style={{ cursor: 'pointer', userSelect: 'none' }}
           >
-            <span><span style={{ fontSize: 11, marginRight: 6 }}>{diagramCardOpen ? '▼' : '▶'}</span>Concentric Circles (Aligned)</span>
+            <span><span style={{ fontSize: 11, marginRight: 6 }}>{diagramCardOpen ? '▼' : '▶'}</span>Concentric Circles (Staggered)</span>
           </div>
           {diagramCardOpen && (
             <div className="card-body">
-              <AlignedConcentricDiagram rings={alignedRings} residing={alignedResiding} />
+              <StaggeredConcentricDiagram labels={staggeredLabels} />
             </div>
           )}
         </div>
@@ -1095,6 +1168,24 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
               <button onClick={() => setShowDiagram2(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#718096', lineHeight: 1, padding: 0 }}>×</button>
             </div>
             <AlignedConcentricDiagram rings={alignedRings} residing={alignedResiding} />
+          </div>
+        </div>
+      )}
+
+      {showDiagram3 && (
+        <div
+          onClick={() => setShowDiagram3(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: 12, padding: '20px 24px', maxWidth: 560, width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: '#2d3748' }}>{row.nucleus}</div>
+                <div style={{ fontSize: 11, color: '#718096', marginTop: 2 }}>{row.clusterCode} · {row.cluster} · {row.locality}</div>
+              </div>
+              <button onClick={() => setShowDiagram3(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#718096', lineHeight: 1, padding: 0 }}>×</button>
+            </div>
+            <StaggeredConcentricDiagram labels={staggeredLabels} />
           </div>
         </div>
       )}

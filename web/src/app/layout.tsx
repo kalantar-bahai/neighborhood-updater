@@ -12,7 +12,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: some browsers (e.g. Chrome on iOS adds __gcrremoteframetoken)
+    // inject attributes onto <html> before React hydrates. It only silences attribute
+    // mismatches on this one element, not on its children.
+    <html lang="en" suppressHydrationWarning>
       <body>{children}</body>
     </html>
   );
