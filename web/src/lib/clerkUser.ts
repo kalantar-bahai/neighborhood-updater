@@ -5,5 +5,5 @@ import { currentUser } from '@clerk/nextjs/server';
 // Clerk user id instead (see access.ts), because email is mutable.
 export async function getCurrentUserEmail(): Promise<string> {
   const user = await currentUser();
-  return user?.primaryEmailAddress?.emailAddress ?? '';
+  return user?.primaryEmailAddress?.emailAddress ?? 'unknown';
 }

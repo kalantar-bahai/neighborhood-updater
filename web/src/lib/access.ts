@@ -13,6 +13,8 @@ export interface UserAccess {
 // the seam that swap lands in: callers (the 5 API routes) keep reading `roleMap`
 // exactly as before, so only this function's body needs to change later, not its
 // callers. Do not inline this stub into callers or "simplify" it away.
+// `entries` is likewise kept in the return shape for type-compatibility with
+// UserAccess, but is always `[]` under this stopgap -- nothing currently reads it.
 // Tracked: https://github.com/kalantar-bahai/neighborhood-updater/issues/37
 export async function getAccess(userId: string): Promise<UserAccess | { role: 'none' }> {
   void userId;

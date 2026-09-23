@@ -32,6 +32,9 @@ interface GraphQLResponse<T> {
 async function request<T>(query: string, variables: Record<string, unknown>): Promise<T> {
   const { getToken } = await auth();
   const token = await getToken();
+  if (!token) {
+    console.warn('cluster-notebook request: no Clerk session token available, sending unauthenticated');
+  }
 
   const res = await fetch(CLUSTER_NOTEBOOK_URL, {
     method: 'POST',

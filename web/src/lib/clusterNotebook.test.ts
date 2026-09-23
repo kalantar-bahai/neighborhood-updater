@@ -10,6 +10,7 @@ import {
   getClusters, createNucleus, deleteNucleus,
 } from './clusterNotebook';
 import type { Individual } from './clusterNotebook';
+import { auth } from '@clerk/nextjs/server';
 
 const mockFetch = vi.fn();
 
@@ -599,5 +600,18 @@ describe('request (token forwarding)', () => {
     await getClusters();
     const [, init] = mockFetch.mock.calls[0];
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-token');
+  });
+
+  test('sends the request unauthenticated and warns when no Clerk session token is available', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(auth).mockResolvedValueOnce({ getToken: vi.fn(async () => null) } as never);
+    mockFetch.mockResolvedValue(jsonResponse({ data: { clusters: [] } }));
+
+    await expect(getClusters()).resolves.toEqual([]);
+
+    const [, init] = mockFetch.mock.calls[0];
+    expect('Authorization' in (init.headers as Record<string, string>)).toBe(false);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
   });
 });

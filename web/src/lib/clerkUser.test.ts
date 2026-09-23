@@ -21,13 +21,13 @@ describe('getCurrentUserEmail', () => {
     expect(await getCurrentUserEmail()).toBe('alice@x.com');
   });
 
-  test('returns empty string when there is no signed-in user', async () => {
+  test('returns "unknown" when there is no signed-in user', async () => {
     mockCurrentUser.mockResolvedValue(null);
-    expect(await getCurrentUserEmail()).toBe('');
+    expect(await getCurrentUserEmail()).toBe('unknown');
   });
 
-  test('returns empty string when the user has no primary email', async () => {
+  test('returns "unknown" when the user has no primary email', async () => {
     mockCurrentUser.mockResolvedValue({ primaryEmailAddress: null } as never);
-    expect(await getCurrentUserEmail()).toBe('');
+    expect(await getCurrentUserEmail()).toBe('unknown');
   });
 });
