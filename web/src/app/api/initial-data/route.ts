@@ -1,19 +1,22 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { auth } from '@clerk/nextjs/server';
 import { getAccess } from '@/lib/access';
+import { getCurrentUserEmail } from '@/lib/clerkUser';
 import { activitiesFromClusterNotebook } from '@/lib/data';
 import { getAllNuclei, getClusters } from '@/lib/clusterNotebook';
 
 function n(v: string) { return parseInt(v || '0', 10) || 0; }
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
-export const GET = auth(async (req) => {
-  if (!req.auth?.user?.email) {
+// No arguments -- this route never reads anything from the request itself.
+export async function GET() {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const email = req.auth.user.email;
-  const access = await getAccess(email);
+  const email = await getCurrentUserEmail();
+  const access = await getAccess(userId);
 
   if (access.role === 'none') {
     return NextResponse.json(
@@ -63,4 +66,4 @@ export const GET = auth(async (req) => {
     email,
     clusterNames: clusters.map(c => c.name),
   });
-});
+}
