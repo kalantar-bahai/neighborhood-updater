@@ -72,11 +72,23 @@ matcher per Clerk's own setup notes).
   and copy. Its button is wrapped in Clerk's unstyled `<SignInButton>`
   (renders nothing of its own; just triggers Clerk's flow on the existing
   button) instead of calling NextAuth's `signIn('google')`. Google is
-  configured as Clerk's social connection so the sign-in flow looks the same
-  to users.
-- The sign-out page (`web/src/app/signout/page.tsx`) and the header's sign-out
-  icon (`DetailView.tsx`) keep their markup, wrapped in Clerk's unstyled
-  `<SignOutButton>` instead of calling NextAuth's `signOut`.
+  configured as Clerk's social connection so the sign-in *card* looks the
+  same to users. Correction (post-implementation, from the final review):
+  the *flow* is not identical — `<SignInButton>`'s default `mode="redirect"`
+  sends the user through Clerk's own Account Portal interstitial before
+  Google, where NextAuth's `signIn('google')` went straight to Google's
+  consent screen. `mode="modal"` is the closer analogue if that extra hop
+  is unwanted; not changed here, since the plan/implementation didn't treat
+  it as a defect, but this spec's original "looks the same to users" framing
+  overstated it.
+- The sign-out page (`web/src/app/signout/page.tsx`) keeps its markup,
+  wrapped in Clerk's unstyled `<SignOutButton>` instead of calling
+  NextAuth's `signOut`. Correction (post-implementation): the header's
+  sign-out icon (`DetailView.tsx`) does *not* need this wrapping and isn't
+  wrapped — its `handleSignOut()` only navigates to `/signout`
+  (`window.location.href = '/signout'`); it never called NextAuth directly,
+  so there was nothing there to migrate. This spec originally listed it
+  alongside the sign-out page in error.
 - Decided for now, still open to revisiting: `UserButton` (Clerk's
   avatar-plus-dropdown component) was considered and set aside in favor of
   keeping the existing UI unchanged.
