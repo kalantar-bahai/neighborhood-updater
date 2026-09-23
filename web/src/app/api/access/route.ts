@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { NextResponse, type NextRequest } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { getAccess } from '@/lib/access';
 import { getAccessEntries, saveAccessEntries } from '@/lib/data';
 import type { AccessEntry, Role } from '@/types';
@@ -17,12 +17,13 @@ function callerCanManage(roleMap: Record<string, Role>, nucleus: string): boolea
   return canManage(roleMap[key]) || canManage(roleMap['*']);
 }
 
-export const GET = auth(async (req) => {
-  if (!req.auth?.user?.email) {
+export async function GET(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const access = await getAccess(req.auth.user.email);
+  const access = await getAccess(userId);
   if (access.role === 'none') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
   const adminNuclei = new Set(
@@ -46,10 +47,11 @@ export const GET = auth(async (req) => {
     : visible;
 
   return NextResponse.json({ entries: result });
-});
+}
 
-export const POST = auth(async (req) => {
-  if (!req.auth?.user?.email) {
+export async function POST(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
@@ -67,7 +69,7 @@ export const POST = auth(async (req) => {
     return NextResponse.json({ error: `Invalid role: ${role}` }, { status: 400 });
   }
 
-  const callerAccess = await getAccess(req.auth.user.email);
+  const callerAccess = await getAccess(userId);
   if (callerAccess.role === 'none' || !callerCanManage(callerAccess.roleMap, nucleus)) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
@@ -75,10 +77,11 @@ export const POST = auth(async (req) => {
   const existing = await getAccessEntries();
   await saveAccessEntries([...existing, { name, email, role, nucleus }]);
   return NextResponse.json({ success: true });
-});
+}
 
-export const DELETE = auth(async (req) => {
-  if (!req.auth?.user?.email) {
+export async function DELETE(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
@@ -93,7 +96,7 @@ export const DELETE = auth(async (req) => {
     return NextResponse.json({ error: 'Missing required fields: email, nucleus' }, { status: 400 });
   }
 
-  const callerAccess = await getAccess(req.auth.user.email);
+  const callerAccess = await getAccess(userId);
   if (callerAccess.role === 'none' || !callerCanManage(callerAccess.roleMap, nucleus)) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
@@ -104,4 +107,4 @@ export const DELETE = auth(async (req) => {
   );
   await saveAccessEntries(updated);
   return NextResponse.json({ success: true });
-});
+}
