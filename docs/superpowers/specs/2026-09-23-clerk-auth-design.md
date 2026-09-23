@@ -37,7 +37,8 @@ work is tracked in
   working unchanged; only `getAccess`'s *source* changes.
 - Preserve the existing custom sign-in/sign-out UI rather than swapping in
   Clerk's default styled components.
-- Preserve the human-readable "last saved by" audit line.
+- Preserve today's "last saved by" display behavior as-is (see Audit trail
+  below — it's ephemeral today, and stays that way here).
 
 ## Non-goals
 
@@ -50,6 +51,12 @@ work is tracked in
   not blocking this work.
 - Coordinating tutor-tracker's or any other app's onboarding onto the shared
   Clerk org. Out of scope for this branch.
+- Persisting a durable save-audit trail (who/when last saved a nucleus).
+  Today's "last saved by" is ephemeral client state, not stored anywhere;
+  it stays that way here. Tracked in issue #38.
+- Deciding the fate of `/api/access` and the `Access` Sheet tab now that
+  nothing enforces what it grants (once `getAccess` is stubbed). Left as-is;
+  worth resolving alongside #37, not here.
 
 ## Identity
 
@@ -62,11 +69,17 @@ matcher per Clerk's own setup notes).
 - `web/src/app/api/auth/[...nextauth]/route.ts` is removed; Clerk's own
   routes replace it.
 - The sign-in page (`web/src/app/page.tsx`) keeps its current card markup
-  and copy, but calls Clerk's sign-in instead of NextAuth's `signIn('google')`.
-  Google is configured as Clerk's social connection so the sign-in flow looks
-  the same to users.
-- The sign-out page (`web/src/app/signout/page.tsx`) keeps its markup, calls
-  Clerk's sign-out instead of NextAuth's `signOut`.
+  and copy. Its button is wrapped in Clerk's unstyled `<SignInButton>`
+  (renders nothing of its own; just triggers Clerk's flow on the existing
+  button) instead of calling NextAuth's `signIn('google')`. Google is
+  configured as Clerk's social connection so the sign-in flow looks the same
+  to users.
+- The sign-out page (`web/src/app/signout/page.tsx`) and the header's sign-out
+  icon (`DetailView.tsx`) keep their markup, wrapped in Clerk's unstyled
+  `<SignOutButton>` instead of calling NextAuth's `signOut`.
+- Decided for now, still open to revisiting: `UserButton` (Clerk's
+  avatar-plus-dropdown component) was considered and set aside in favor of
+  keeping the existing UI unchanged.
 - Every route handler's `req.auth?.user?.email` check is replaced with
   Clerk's server-side `auth()` (for the user id) — see Authorization below
   for what each route actually needs.
@@ -110,12 +123,20 @@ rebuild.
 
 ## Audit trail ("last saved by")
 
-Save paths that write `email` into the row (`saveRowData(name, formData,
-email)` in `api/nucleus/route.ts`, and equivalents) keep writing a
-human-readable identity, not the Clerk user id. That value comes from
-Clerk's `currentUser()` (email address), fetched alongside the user id in
-the same request — independent of the authorization key used for `getAccess`
-and cluster-notebook calls.
+Contrary to an earlier assumption in this design, "last saved by" is not
+persisted today: `saveRowData(name, formData, email)` in
+`api/nucleus/route.ts` (and equivalents) only echoes `email` back in the
+save response; `DetailView`'s `lastUpdatedBy`/`lastUpdatedAt` are plain
+client-side React state set from that response, gone on reload. There is no
+row or column anywhere storing it, in the Sheet or otherwise.
+
+This design preserves that behavior as-is: the echoed value becomes a
+human-readable identity from Clerk's `currentUser()` (email address),
+fetched alongside the user id in the same request, rather than the raw
+Clerk user id — but it's still ephemeral, still not persisted. Making it
+durable, in cluster-notebook, is tracked separately in
+[neighborhood-updater#38](https://github.com/kalantar-bahai/neighborhood-updater/issues/38)
+and is not part of this change.
 
 ## Environment / setup
 
@@ -143,9 +164,10 @@ and cluster-notebook calls.
   no behavioral assertions about role gating should need to change, since
   the shape is preserved.
 - Manual verification: sign in via the tunnel and via localhost (per the
-  existing dual-origin dev setup), confirm the sign-in/out UI still matches
-  the current look, confirm a save still records a human-readable "last
-  saved by".
+  existing dual-origin dev setup), confirm the sign-in/out UI is pixel-for-
+  pixel the same as today (unstyled `SignInButton`/`SignOutButton` render
+  nothing of their own), confirm a save still shows a human-readable
+  "last saved by" for the current session.
 
 ## Rollout
 
