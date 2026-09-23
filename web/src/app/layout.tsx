@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -16,7 +17,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // inject attributes onto <html> before React hydrates. It only silences attribute
     // mismatches on this one element, not on its children.
     <html lang="en" suppressHydrationWarning>
-      <body>{children}</body>
+      <body>
+        <ClerkProvider>{children}</ClerkProvider>
+      </body>
     </html>
   );
 }
