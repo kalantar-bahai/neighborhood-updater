@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getNucleusPermissions } from '@/lib/access';
 import { getNucleusWorkers, updateNucleusWorkers, individualDisplayName } from '@/lib/clusterNotebook';
 import type { Individual } from '@/lib/clusterNotebook';
-import { RECOGNIZED_WORKER_TYPES } from '@/lib/config';
+import { INFORMAL_WORKER_TYPES } from '@/lib/config';
 import type { Worker } from '@/types';
 import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
 
@@ -47,8 +47,8 @@ export async function POST(req: NextRequest) {
   const permissions = await getNucleusPermissions(nucleus);
   if (!permissions.canAssignRoles) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
-  const isRecognized = (RECOGNIZED_WORKER_TYPES as readonly string[]).includes(type);
-  if (isRecognized && !permissions.assignableRoles.includes(type)) {
+  const isInformal = (INFORMAL_WORKER_TYPES as readonly string[]).includes(type);
+  if (!isInformal && !permissions.assignableRoles.includes(type)) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
 

@@ -34,6 +34,9 @@ export async function POST(req: NextRequest) {
 
   const { name, formData } = await req.json();
   if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400 });
+  if (!formData || typeof formData !== 'object') {
+    return NextResponse.json({ error: 'Missing formData' }, { status: 400 });
+  }
 
   const permissions = await getNucleusPermissions(name);
   if (!permissions.canWrite) return NextResponse.json({ error: 'Access denied' }, { status: 403 });

@@ -11,11 +11,11 @@ interface Props {
 
 // Real, human descriptions built from a role's actual PermissionSet, not just
 // its bare name -- e.g. "ATC-Collaborator" alone tells a viewer nothing, but
-// "can edit everything including this nucleus's name/location" does.
+// "can edit this nucleus's Type and Stage" does.
 function describePermissions(p: RoleGrant['permissions']): string {
   const bits: string[] = [];
-  if (p.canChangeIdentity) bits.push("can edit everything including this nucleus's name/location");
-  else if (p.canWrite) bits.push('can edit day-to-day info, not identity');
+  if (p.canChangeIdentity) bits.push("can edit this nucleus's Type and Stage");
+  else if (p.canWrite) bits.push('can edit day-to-day info, not Type/Stage');
   else bits.push('read-only');
   if (p.canDelete) bits.push('can delete this nucleus');
   if (p.canAssignRoles) bits.push('can assign roles to others');
@@ -96,6 +96,7 @@ export default function ManageAccessCard({ nucleus }: Props) {
           role={openRole}
           nucleus={nucleus}
           workers={openRoleWorkers}
+          single={openRole === 'contact'}
           onChange={setOpenRoleWorkers}
           onClose={() => setOpenRole(null)}
         />

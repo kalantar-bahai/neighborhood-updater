@@ -48,11 +48,11 @@ This is additive to what your own `docs/data-model.md` ("Nucleus Assistant" sect
 
 **Write**: update any subset of the above fields for one nucleus, by name. Today this is one `saveRowData(name, formData)` call that writes whichever fields are present in `formData` (partial update semantics — omitted fields are left alone). A single broad "patch nucleus" mutation (rather than one mutation per field) would match this pattern most directly, though per-field mutations (as already done for devotionals) also work if patch semantics are preserved per field.
 
-**Field sensitivity**: two-tier within one role — "identity fields" (nucleus, parentNucleus, grouping, cluster, pg, clusterCode, nucleusType) require `admin`; "standard fields" (locality, stage, makeup, activities, protagonist/accompanier worker lists) only require `read-write`. Contact and ABm Assistant are the exception within worker lists — both require `admin`, matching their pre-migration admin-only edit gate. `auxBoard` is now read-only everywhere (no write path at all, see below), so the admin/read-write distinction no longer applies to it. Since access control stays on our side for now (§7), this just needs the mutation to accept identity and standard fields as it does today — enforcement happens in nucleus-assistant's API route before the call reaches you.
+**Field sensitivity — updated, 2026-09-24.** Two tiers now come from your own `PermissionSet`, not a role name on our side: `canWrite` gates the standard fields (locality — already read-only regardless, see above — stage, makeup, activities, and the protagonist/promoter worker lists); `canChangeIdentity` additionally gates just `nucleusType` and `stage`'s write path specifically (not the read-only identity fields like nucleus/parentNucleus/grouping/cluster/pg/clusterCode, which stay read-only for everyone regardless of any permission). Contact, ABm Assistant, and Accompanying are no longer admin-gated at all — they're your *recognized* roles now, gated by whether the caller's `assignableRoles` includes that specific role name. Enforcement is no longer solely on our side: we still strip disallowed fields client-side as defense-in-depth, but you reject unauthorized mutations independently now too (`extensions.code: "FORBIDDEN"`, which we detect and surface as a real error).
 
 ## 4. Nucleus create / delete
 
-**Write**: create a new nucleus (name + all fields from §2, conflict error if name already exists) and delete a nucleus by name. Both currently `admin`-only, global-scope (`roleMap['*'] === 'admin'`).
+**Write**: create a new nucleus (name + all fields from §2, conflict error if name already exists) and delete a nucleus by name. **Write — updated, 2026-09-24.** No longer global-admin-gated. Create checks `createableEntityTypes.includes('nucleus')` via `myPermissions(entityName: <the target Cluster's name>)` — anchored on the Cluster the new nucleus would belong to. Delete checks `canDelete` via `myPermissions(entityName: <that nucleus's name>)` — anchored on the nucleus itself, not its parent Cluster. Both per-entity now, matching your model.
 
 **Create — done, 2026-09-14.** Wired to `createNucleus(name: String!, clusterName: String!): Nucleus` + the new top-level `clusters: [Cluster!]!` query (for our picker). Identity-only at creation, as we settled on together: name + cluster is all `createNucleus` takes, everything else (stage, population, activities, narrative, social action/gatherings, parentNucleus) is set immediately after via the exact same `updateNucleus`/`updateActivitySummary` calls we already use for editing — no separate full-field create payload needed on your side. `createNucleus` returning `null` (unknown cluster) vs. throwing a real GraphQL error (duplicate name, enforced at your DB level) let us map both to distinct client-facing errors (400 vs. 409) cleanly.
 
@@ -85,11 +85,17 @@ Wired into nucleus-assistant: `getRowData`/`getNucleusWorkers`, `/api/workers` (
 
 **Cross-check signal**: the `protagonists`/`accompaniers` free-text count fields in §2 are compared against these lists' lengths client-side to flag a "mismatch" (not auto-reconciled). No API implication beyond exposing both.
 
-## 6. Access control — deferred, not requested now
+## 6. Access control — done, 2026-09-24
 
-Per our decision, per-nucleus role access (read / read-write / collaborator / admin, with `*` wildcard) stays on our Sheet-based `Access` tab until cluster-notebook has a real permissions model. **Not asking you to build this yet** — flagging it here only so it's visible as a known future ask, consistent with your own requirements doc's open question on the permissions model shape.
+No longer deferred — this is now our sole authorization source, replacing the Sheet-based `Access` tab entirely (that tab and its code are removed from our side; the underlying Google Sheet itself is untouched, just no longer read).
 
-**Simplified, 2026-09-14:** the `Access` tab's role entries are now the sole authorization answer — we no longer cross-reference those entries against your `nuclei` list to check "does this nucleus exist" (redundant for named entries, and silently broken for wildcard admins — see §2's note above). This doesn't change the shape of a future permissions model on your side, just removes a Sheet-side inefficiency on ours.
+We read your `PermissionSet` (`canRead`, `canWrite`, `canChangeIdentity`, `canDelete`, `canAssignRoles`, `assignableRoles: [String!]!`, `createableEntityTypes: [String!]!`) via `Nucleus.myPermissions` (batched onto our existing nuclei-list query — no extra round trip), `Query.myPermissions(entityName)` (ad hoc, per-route checks), and `Query.assignableRoleDetails(entityName)` (role name + its real `PermissionSet` together, backing a "manage access" picker with real descriptions instead of bare role names). `Query.isAdministrator` is the one global concept we use, for our own "create a new nucleus" entry point's visibility.
+
+Recognized roles (gated by `assignableRoles` membership when assigning): `accompanier`, `contact`, `abm-assistant`, plus whatever else your `assignableRoleDetails` returns (ATC/ATC-Collaborator/CIC/CIC-Collaborator/CSO, per our design consult). Informal roles (`protagonist`, `promoter` — your own open question, #14 on your side): freely assignable to anyone with `canAssignRoles` true, no `assignableRoles` check.
+
+Role assignment (both kinds) goes through the same `updateNucleusWorkers`/`workers(role)` you already exposed for §5's worker lists — no separate mutation needed. Permission denials carry `extensions.code: "FORBIDDEN"` on the GraphQL error, which we detect specifically and surface as a real "you don't have permission" message rather than a generic failure.
+
+Full design: `docs/superpowers/specs/2026-09-24-real-authorization-design.md`.
 
 ## 7. SRP-sourced comparison data — fully retired, 2026-09-14
 
