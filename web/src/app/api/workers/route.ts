@@ -5,6 +5,7 @@ import { getNucleusWorkers, updateNucleusWorkers, individualDisplayName } from '
 import type { Individual } from '@/lib/clusterNotebook';
 import { WORKER_TYPES } from '@/lib/config';
 import type { Worker } from '@/types';
+import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
@@ -34,8 +35,12 @@ export async function GET(req: NextRequest) {
   if (access.role === 'none') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   if (!effectiveRole(access.roleMap, name)) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
-  const workers = await getNucleusWorkers(name, type);
-  return NextResponse.json({ workers: toWorkers(workers) });
+  try {
+    const workers = await getNucleusWorkers(name, type);
+    return NextResponse.json({ workers: toWorkers(workers) });
+  } catch (e: unknown) {
+    return clusterNotebookErrorResponse(e);
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -61,6 +66,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
 
-  const workers = await updateNucleusWorkers(nucleus, type, personIds);
-  return NextResponse.json({ workers: toWorkers(workers) });
+  try {
+    const workers = await updateNucleusWorkers(nucleus, type, personIds);
+    return NextResponse.json({ workers: toWorkers(workers) });
+  } catch (e: unknown) {
+    return clusterNotebookErrorResponse(e);
+  }
 }

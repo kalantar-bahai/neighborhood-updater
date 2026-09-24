@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getAccess } from '@/lib/access';
 import { getCurrentUserEmail } from '@/lib/clerkUser';
 import { getRowData, saveRowData, createRowData, deleteRowData, CodedError } from '@/lib/data';
+import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
@@ -25,10 +26,13 @@ export async function GET(req: NextRequest) {
   const role = effectiveRole(access.roleMap, name);
   if (!role) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
-  const data = await getRowData(name);
-  if (!data) return NextResponse.json({ error: `Not found: ${name}` }, { status: 404 });
-
-  return NextResponse.json(data);
+  try {
+    const data = await getRowData(name);
+    if (!data) return NextResponse.json({ error: `Not found: ${name}` }, { status: 404 });
+    return NextResponse.json(data);
+  } catch (e: unknown) {
+    return clusterNotebookErrorResponse(e);
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -55,8 +59,12 @@ export async function POST(req: NextRequest) {
   }
 
   const email = await getCurrentUserEmail();
-  const result = await saveRowData(name, formData, email);
-  return NextResponse.json(result);
+  try {
+    const result = await saveRowData(name, formData, email);
+    return NextResponse.json(result);
+  } catch (e: unknown) {
+    return clusterNotebookErrorResponse(e);
+  }
 }
 
 export async function DELETE(req: NextRequest) {
@@ -73,9 +81,13 @@ export async function DELETE(req: NextRequest) {
   const name = req.nextUrl.searchParams.get('name');
   if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400 });
 
-  const deleted = await deleteRowData(name);
-  if (!deleted) return NextResponse.json({ error: `Not found: ${name}` }, { status: 404 });
-  return NextResponse.json({ success: true });
+  try {
+    const deleted = await deleteRowData(name);
+    if (!deleted) return NextResponse.json({ error: `Not found: ${name}` }, { status: 404 });
+    return NextResponse.json({ success: true });
+  } catch (e: unknown) {
+    return clusterNotebookErrorResponse(e);
+  }
 }
 
 export async function PUT(req: NextRequest) {
@@ -102,6 +114,6 @@ export async function PUT(req: NextRequest) {
     if (e instanceof CodedError && e.code === 'BAD_CLUSTER') {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }
-    throw e;
+    return clusterNotebookErrorResponse(e);
   }
 }
