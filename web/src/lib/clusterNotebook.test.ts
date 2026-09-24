@@ -8,6 +8,7 @@ import {
   getActivitySummaries, updateActivitySummary, getAllNuclei, getNucleusFields, updateNucleus,
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError,
+  getMyPermissions, getAssignableRoleDetails, getIsAdministrator,
 } from './clusterNotebook';
 import type { Individual } from './clusterNotebook';
 import { auth } from '@clerk/nextjs/server';
@@ -39,12 +40,14 @@ describe('getAllNuclei', () => {
             devotionalGathering: alphaActivities, childrensClasses: alphaActivities, juniorYouthGroups: alphaActivities, studyCircles: alphaActivities,
             cluster: { name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers', auxiliaryBoardMembers: null },
             parentNucleus: { name: 'Chapelboro' },
+            myPermissions: { canRead: true, canWrite: true, canChangeIdentity: false, canDelete: false, canAssignRoles: true, assignableRoles: ['accompanier'], createableEntityTypes: [] },
           },
           {
             name: 'Beta', stage: null, locality: null, populationMakeup: null, nucleusType: null,
             devotionalGathering: null, childrensClasses: null, juniorYouthGroups: null, studyCircles: null,
             cluster: { name: 'NC-330 Foothills', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
             parentNucleus: null,
+            myPermissions: { canRead: true, canWrite: false, canChangeIdentity: false, canDelete: false, canAssignRoles: false, assignableRoles: [], createableEntityTypes: [] },
           },
         ],
       },
@@ -60,6 +63,8 @@ describe('getAllNuclei', () => {
     expect(result[1].childrensClasses).toBeNull();
     expect(result[1].cluster.groupOfClusters).toBeNull();
     expect(result[1].parentNucleus).toBeNull();
+    expect(result[0].myPermissions).toEqual({ canRead: true, canWrite: true, canChangeIdentity: false, canDelete: false, canAssignRoles: true, assignableRoles: ['accompanier'], createableEntityTypes: [] });
+    expect(result[1].myPermissions.canWrite).toBe(false);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.query).toContain('nucleusType');
     expect(body.query).toContain('childrensClasses');
@@ -67,6 +72,7 @@ describe('getAllNuclei', () => {
     expect(body.query).toContain('studyCircles');
     expect(body.query).toContain('cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers }');
     expect(body.query).toContain('parentNucleus { name }');
+    expect(body.query).toContain('myPermissions');
   });
 
   test('returns an empty array when there are no nuclei', async () => {
@@ -634,5 +640,61 @@ describe('request (permission errors)', () => {
     expect(err).toBeInstanceOf(Error);
     expect(err).not.toBeInstanceOf(ClusterNotebookForbiddenError);
     expect(err.message).toContain('nucleus name is required');
+  });
+});
+
+describe('getMyPermissions', () => {
+  test('returns the PermissionSet for a known entity', async () => {
+    const permissions = { canRead: true, canWrite: true, canChangeIdentity: true, canDelete: false, canAssignRoles: true, assignableRoles: ['ATC-Collaborator'], createableEntityTypes: ['individual', 'nucleus', 'setting'] };
+    mockFetch.mockResolvedValue(jsonResponse({ data: { myPermissions: permissions } }));
+
+    const result = await getMyPermissions('NC-215 Triangle');
+
+    expect(result).toEqual(permissions);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ entityName: 'NC-215 Triangle' });
+    expect(body.query).toContain('myPermissions');
+  });
+
+  test('returns null for an entity name cluster-notebook does not recognize', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { myPermissions: null } }));
+
+    const result = await getMyPermissions('Nonexistent');
+
+    expect(result).toBeNull();
+  });
+});
+
+describe('getAssignableRoleDetails', () => {
+  test('returns the list of role/permissions pairs', async () => {
+    const roles = [
+      { role: 'ATC-Collaborator', permissions: { canRead: true, canWrite: true, canChangeIdentity: true, canDelete: false, canAssignRoles: true, assignableRoles: [], createableEntityTypes: [] } },
+      { role: 'accompanier', permissions: { canRead: true, canWrite: true, canChangeIdentity: false, canDelete: false, canAssignRoles: true, assignableRoles: [], createableEntityTypes: [] } },
+    ];
+    mockFetch.mockResolvedValue(jsonResponse({ data: { assignableRoleDetails: roles } }));
+
+    const result = await getAssignableRoleDetails('NC-215 Triangle');
+
+    expect(result).toEqual(roles);
+  });
+
+  test('returns an empty array when cluster-notebook returns null', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { assignableRoleDetails: null } }));
+
+    const result = await getAssignableRoleDetails('Nonexistent');
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe('getIsAdministrator', () => {
+  test('returns true for an administrator', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { isAdministrator: true } }));
+    expect(await getIsAdministrator()).toBe(true);
+  });
+
+  test('returns false for a non-administrator', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { isAdministrator: false } }));
+    expect(await getIsAdministrator()).toBe(false);
   });
 });

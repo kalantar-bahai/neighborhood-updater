@@ -22,7 +22,24 @@ export interface ActivitySummary {
 // confirmed against cluster-notebook's schema 2026-09-14.
 export type ActivityType = 'DEVOTIONAL_GATHERING' | 'CHILDRENS_CLASS' | 'JUNIOR_YOUTH_GROUP' | 'STUDY_CIRCLE';
 
+// Confirmed live with cluster-notebook 2026-09-24. canChangeIdentity gates a
+// Nucleus's Type/Stage (and any future rename/relocate) specifically -- a
+// stricter tier than plain canWrite. assignableRoles lists which RECOGNIZED
+// roles this caller may grant here; informal roles (protagonist/promoter) are
+// always assignable whenever canAssignRoles is true, regardless of this list.
+export interface PermissionSet {
+  canRead: boolean;
+  canWrite: boolean;
+  canChangeIdentity: boolean;
+  canDelete: boolean;
+  canAssignRoles: boolean;
+  assignableRoles: string[];
+  createableEntityTypes: string[];
+}
+
 const ACTIVITY_SUMMARY_SELECTION = 'number participants participantsFof isOverridden facilitators facilitatorNames';
+
+const PERMISSION_SET_SELECTION = 'canRead canWrite canChangeIdentity canDelete canAssignRoles assignableRoles createableEntityTypes';
 
 interface GraphQLResponse<T> {
   data?: T;
@@ -128,6 +145,10 @@ export interface NucleusSummary {
   cluster: ClusterFields;
   // Added 2026-09-14 for the same reason -- see NucleusFields.parentNucleus.
   parentNucleus: { name: string } | null;
+  // Added 2026-09-24 for real per-nucleus authorization -- fetched in the same
+  // request as the rest of the list (cluster-notebook designed this as a field
+  // specifically so a list of nuclei costs one request, not one per nucleus).
+  myPermissions: PermissionSet;
 }
 
 // No top-level clusters query existed until 2026-09-14 (Cluster was only reachable
@@ -191,6 +212,7 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
         studyCircles { ${ACTIVITY_SUMMARY_SELECTION} }
         cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers }
         parentNucleus { name }
+        myPermissions { ${PERMISSION_SET_SELECTION} }
       }
     }
   `;
@@ -382,4 +404,49 @@ export async function updateNucleusWorkers(nucleusName: string, role: string, pe
     throw new Error(`cluster-notebook has no nucleus named "${nucleusName}" — workers not saved`);
   }
   return data.updateNucleusWorkers.workers;
+}
+
+// Ad hoc, single-entity permission check -- works on Nucleus, Cluster, Locality,
+// or Setting names (confirmed live). Null means cluster-notebook doesn't
+// recognize entityName; callers normalize that themselves (see access.ts's
+// getNucleusPermissions) rather than this function guessing at a default.
+export async function getMyPermissions(entityName: string): Promise<PermissionSet | null> {
+  const query = `
+    query GetMyPermissions($entityName: String!) {
+      myPermissions(entityName: $entityName) { ${PERMISSION_SET_SELECTION} }
+    }
+  `;
+  const data = await request<{ myPermissions: PermissionSet | null }>(query, { entityName });
+  return data.myPermissions;
+}
+
+// role + its real PermissionSet together, so a picker can describe what a role
+// actually does ("can edit this nucleus's name/location") instead of showing a
+// bare role name.
+export interface RoleGrant {
+  role: string;
+  permissions: PermissionSet;
+}
+
+export async function getAssignableRoleDetails(entityName: string): Promise<RoleGrant[]> {
+  const query = `
+    query GetAssignableRoleDetails($entityName: String!) {
+      assignableRoleDetails(entityName: $entityName) { role permissions { ${PERMISSION_SET_SELECTION} } }
+    }
+  `;
+  const data = await request<{ assignableRoleDetails: RoleGrant[] | null }>(query, { entityName });
+  return data.assignableRoleDetails ?? [];
+}
+
+// The one true global/org-wide concept (the Administrator role, no entity
+// attached) -- confirmed live 2026-09-24. Not the same as having elevated
+// PermissionSet values everywhere; this is a direct, explicit check.
+export async function getIsAdministrator(): Promise<boolean> {
+  const query = `
+    query GetIsAdministrator {
+      isAdministrator
+    }
+  `;
+  const data = await request<{ isAdministrator: boolean }>(query, {});
+  return data.isAdministrator;
 }
