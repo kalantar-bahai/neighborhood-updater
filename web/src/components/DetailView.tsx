@@ -3,14 +3,14 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NucleusDetail, NucleusRow, Activity } from '@/types';
-import type { Role, Worker } from '@/types';
+import type { Worker } from '@/types';
+import type { PermissionSet } from '@/lib/access';
 import WorkerListModal from './WorkerListModal';
-import AccessPanel from './AccessPanel';
+import ManageAccessCard from './ManageAccessCard';
 
 interface Props {
   detail: NucleusDetail;
-  role: Role;
-  roleMap: Record<string, Role>;
+  permissions: PermissionSet;
   email: string;
   showBack: boolean;
   onBack: () => void;
@@ -568,7 +568,7 @@ function StaggeredConcentricDiagram({ labels }: { labels: AlignedLabel[] }) {
   );
 }
 
-export default function DetailView({ detail, role, roleMap, email, showBack, onBack, onSaved }: Props) {
+export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   // Baseline to diff a blur-triggered field's current value against, so clicking into
@@ -603,9 +603,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const canWrite       = role === 'read-write' || role === 'collaborator' || role === 'admin';
-  const isAdmin        = role === 'admin';
-  const canManageAccess = role === 'admin' || role === 'collaborator';
+  const canWrite = permissions.canWrite;
 
   // Local-only: updates what's displayed as the user types/selects. Never talks to the
   // network by itself -- see commitField/setAndSave/commitActField below for that.
@@ -850,11 +848,11 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
                   creation time, via CreateNucleusModal, 2026-09-14. */}
               <Field label="Locality" value={form.locality} readonly />
               <Field label="Nucleus" value={form.nucleus} readonly />
-              {isAdmin
+              {permissions.canChangeIdentity
                 ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => setAndSave('nucleusType', v, { identity: { nucleusType: v } }, 'Type')} />
                 : <Field label="Type" value={form.nucleusType} readonly />
               }
-              {isAdmin
+              {permissions.canChangeIdentity
                 ? <SelectField label="Stage" value={form.stage} options={STAGE_OPTIONS} onChange={v => setAndSave('stage', v, { stage: v }, 'Stage')} />
                 : <Field label="Stage" value={form.stage} readonly />
               }
@@ -864,7 +862,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
                 label="Contact"
                 value={contactNames[0]?.name ?? ''}
                 readonly
-                onLabelClick={isAdmin ? () => setShowContactModal(true) : undefined}
+                onLabelClick={permissions.canAssignRoles && permissions.assignableRoles.includes('contact') ? () => setShowContactModal(true) : undefined}
               />
               {/* Derived from the Contact Individual's own email field -- no separate
                   stored value, so there's nothing to edit here directly. */}
@@ -877,7 +875,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
                 label="ABm Assistant"
                 value={abmAssistantNames.map(w => w.name).join(', ')}
                 readonly
-                onLabelClick={isAdmin ? () => setShowAbmAssistantModal(true) : undefined}
+                onLabelClick={permissions.canAssignRoles && permissions.assignableRoles.includes('abm-assistant') ? () => setShowAbmAssistantModal(true) : undefined}
               />
             </div>
           </div>}
@@ -911,14 +909,14 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
                 label="Promoting"
                 value={String(promoterNames.length)}
                 readonly
-                onLabelClick={() => setShowPromotersModal(true)}
+                onLabelClick={permissions.canAssignRoles ? () => setShowPromotersModal(true) : undefined}
                 info="Estimated number of individuals promoting various aspects of community life such as parents encouraging participation, junior youth bringing friends, or youth inviting peers. It also includes promoting collective spaces such as festivals, Summer of Service, family gatherings, and various logistical assistance such as providing food, giving rides…"
               />
               <Field
                 label="Helping"
                 value={String(protagonistNames.length)}
                 readonly
-                onLabelClick={() => setShowProtagonistsModal(true)}
+                onLabelClick={permissions.canAssignRoles ? () => setShowProtagonistsModal(true) : undefined}
                 info="Estimated number of individuals who assist others in taking simple acts of service or initial steps in the educational process, without yet providing sustained accompaniment. For example, someone might help another person share a prayer, learn a quotation, introduce the institute’s programs, or undertake a simple act of service."
               />
             </div>
@@ -939,7 +937,7 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
                 label="Accompanying"
                 value={String(accompanierNames.length)}
                 readonly
-                onLabelClick={() => setShowAccompaniersModal(true)}
+                onLabelClick={permissions.canAssignRoles && permissions.assignableRoles.includes('accompanier') ? () => setShowAccompaniersModal(true) : undefined}
                 info="Estimated number of individuals with sufficient experience and capacity to provide sustained accompaniment to others as they advance in service—helping them develop capacity."
               />
             </div>
@@ -1057,8 +1055,8 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
           </div>
         </div>
 
-        {/* Manage Access — collaborator and admin */}
-        {canManageAccess && (
+        {/* Manage Access — anyone cluster-notebook lets assign roles here */}
+        {permissions.canAssignRoles && (
           <div className="card">
             <div
               className="card-header"
@@ -1069,14 +1067,14 @@ export default function DetailView({ detail, role, roleMap, email, showBack, onB
             </div>
             {accessOpen && (
               <div className="card-body">
-                <AccessPanel nucleus={row.nucleus} roleMap={roleMap} />
+                <ManageAccessCard nucleus={row.nucleus} />
               </div>
             )}
           </div>
         )}
 
-        {/* Danger Zone — admin only */}
-        {isAdmin && (
+        {/* Danger Zone — requires delete permission on this specific nucleus */}
+        {permissions.canDelete && (
           <div className="card" style={{ borderColor: '#fed7d7' }}>
             <div
               className="card-header"
