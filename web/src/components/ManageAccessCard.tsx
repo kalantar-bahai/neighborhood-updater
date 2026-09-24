@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { RoleGrant } from '@/lib/clusterNotebook';
 import type { Worker } from '@/types';
 
@@ -56,6 +57,13 @@ export default function ManageAccessCard({ nucleus }: Props) {
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchSeq = useRef(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Suggestions render through a portal into document.body, positioned from
+  // the input's own bounding rect -- DetailView's `.card` sets `overflow:
+  // hidden` (to clip the header's rounded corners), which would otherwise
+  // clip an absolutely-positioned dropdown nested inside it. Same fix as
+  // InfoTip's popover elsewhere in this app, same reason.
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   useEffect(() => {
     fetch(`/api/roles?nucleus=${encodeURIComponent(nucleus)}`)
@@ -80,6 +88,17 @@ export default function ManageAccessCard({ nucleus }: Props) {
       .catch((e: unknown) => setLoadError(e instanceof Error ? e.message : 'Failed to load access roles.'));
   }, [nucleus]);
 
+  // Positions the portal-rendered dropdown from the input's current rect --
+  // called directly at each point suggestions/searching changes (matching
+  // WorkerListModal's own convention: "a useEffect body should react to
+  // committed state, not synchronously set more state on every render"),
+  // not derived via a separate effect.
+  function positionDropdown() {
+    const rect = inputRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  }
+
   useEffect(() => {
     const query = input.trim();
     if (!query) return;
@@ -87,6 +106,7 @@ export default function ManageAccessCard({ nucleus }: Props) {
     debounceRef.current = setTimeout(async () => {
       if (seq !== searchSeq.current) return;
       setSearching(true);
+      positionDropdown();
       try {
         const res = await fetch(`/api/individuals?nucleus=${encodeURIComponent(nucleus)}&search=${encodeURIComponent(query)}`);
         const data = await res.json();
@@ -106,8 +126,19 @@ export default function ManageAccessCard({ nucleus }: Props) {
   function handleInputChange(value: string) {
     setInput(value);
     setSuggestions([]);
-    if (!value.trim()) setSearching(false);
+    if (!value.trim()) { setSearching(false); setDropdownPos(null); }
   }
+
+  useEffect(() => {
+    if (!dropdownPos) return;
+    const close = () => setDropdownPos(null);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [dropdownPos]);
 
   function idsForRole(role: string): string[] {
     return (entries ?? []).filter(e => e.role === role).map(e => e.id);
@@ -136,6 +167,7 @@ export default function ManageAccessCard({ nucleus }: Props) {
   function addPerson(worker: Worker) {
     setInput('');
     setSuggestions([]);
+    setDropdownPos(null);
     void saveRole(newRole, [...idsForRole(newRole), worker.id]);
   }
 
@@ -152,6 +184,7 @@ export default function ManageAccessCard({ nucleus }: Props) {
       if (!res.ok) throw new Error(data.error || 'Create failed');
       setInput('');
       setSuggestions([]);
+      setDropdownPos(null);
       setSaving(false);
       await saveRole(newRole, [...idsForRole(newRole), data.id]);
     } catch (e: unknown) {
@@ -223,9 +256,10 @@ export default function ManageAccessCard({ nucleus }: Props) {
       )}
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end', position: 'relative' }}>
-        <div className="field" style={{ flex: '1 1 180px', margin: 0, position: 'relative' }}>
+        <div className="field" style={{ flex: '1 1 180px', margin: 0 }}>
           <label style={{ fontSize: 12 }}>Name</label>
           <input
+            ref={inputRef}
             type="text"
             value={input}
             onChange={e => handleInputChange(e.target.value)}
@@ -234,8 +268,8 @@ export default function ManageAccessCard({ nucleus }: Props) {
             disabled={saving}
             style={{ fontSize: 13 }}
           />
-          {(suggestions.length > 0 || searching) && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', border: '1px solid #e2e8f0', borderRadius: 6, marginTop: 4, maxHeight: 180, overflowY: 'auto', zIndex: 1, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+          {dropdownPos && createPortal(
+            <div style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, background: 'white', border: '1px solid #e2e8f0', borderRadius: 6, maxHeight: 180, overflowY: 'auto', zIndex: 200, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
               {searching && suggestions.length === 0 && (
                 <div style={{ padding: '8px 10px', fontSize: 13, color: '#a0aec0' }}>Searching...</div>
               )}
@@ -249,7 +283,8 @@ export default function ManageAccessCard({ nucleus }: Props) {
                   {s.name}
                 </div>
               ))}
-            </div>
+            </div>,
+            document.body
           )}
         </div>
         <div className="field" style={{ flex: '0 1 160px', margin: 0 }}>
