@@ -1,7 +1,6 @@
 export const MASTER_SHEET_ID = process.env.MASTER_SHEET_ID!;
 
 export const MASTER_TAB  = 'Nuclei';
-export const ACCESS_TAB  = 'Access';
 // The SRP cache spreadsheet (Devotionals + Education tabs) is no longer read at
 // all, 2026-09-14 -- Education's last live field (facilitators) moved to
 // cluster-notebook's ActivitySummary.facilitatorNames, and Devotionals' last use
@@ -98,10 +97,3 @@ export type WorkerType = typeof WORKER_TYPES[number];
 // is true) -- cluster-notebook's own open question (their issue #14), not
 // something this app decides.
 export const RECOGNIZED_WORKER_TYPES = ['accompanier', 'contact', 'abm-assistant'] as const;
-
-export const ACCESS_COL = {
-  NAME:    0,
-  EMAIL:   1,
-  ROLE:    2,
-  NUCLEUS: 3,
-} as const;

@@ -1,14 +1,5 @@
 import type { PermissionSet } from './lib/access';
 
-export type Role = 'read' | 'read-write' | 'collaborator' | 'admin';
-
-export interface AccessEntry {
-  name: string;
-  email: string;
-  role: Role;
-  nucleus: string; // specific nucleus name or '*' for all
-}
-
 export interface Activity {
   act: string;
   part: string;

@@ -1,17 +1,16 @@
-import { sheetsGet, sheetsBatchUpdate, sheetsClear } from './sheets';
+import { sheetsGet } from './sheets';
 import {
   MASTER_SHEET_ID,
-  MASTER_TAB, ACCESS_TAB,
+  MASTER_TAB,
   MASTER_DATA_ROW,
   COL,
-  ACCESS_COL,
 } from './config';
 import {
   getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus,
   getNucleusWorkers, individualDisplayName, createNucleus, deleteNucleus,
 } from './clusterNotebook';
 import type { ActivitySummary, ActivitySummaries, ActivityType, NucleusFields, Individual } from './clusterNotebook';
-import type { AccessEntry, Activity, Worker } from '@/types';
+import type { Activity, Worker } from '@/types';
 
 // Lets callers (route handlers) distinguish error cases (e.g. 409 vs 400)
 // without an `as any` cast on `.code`.
@@ -146,27 +145,6 @@ function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
     // NucleusFields.nucleusType's own comment in clusterNotebook.ts.
     nucleusType: fields?.nucleusType ?? '',
   };
-}
-
-export async function getAccessEntries(): Promise<AccessEntry[]> {
-  const rows = await sheetsGet(MASTER_SHEET_ID, `${ACCESS_TAB}!A2:D`);
-  return rows
-    .filter(r => (r[ACCESS_COL.EMAIL] || '').trim() !== '')
-    .map(r => ({
-      name:    r[ACCESS_COL.NAME]    || '',
-      email:   r[ACCESS_COL.EMAIL]   || '',
-      role:    (r[ACCESS_COL.ROLE]   || 'read') as AccessEntry['role'],
-      nucleus: r[ACCESS_COL.NUCLEUS] || '*',
-    }));
-}
-
-export async function saveAccessEntries(entries: AccessEntry[]): Promise<void> {
-  await sheetsClear(MASTER_SHEET_ID, `${ACCESS_TAB}!A2:D`);
-  if (entries.length === 0) return;
-  await sheetsBatchUpdate(MASTER_SHEET_ID, [{
-    range: `${ACCESS_TAB}!A2`,
-    values: entries.map(e => [e.name, e.email, e.role, e.nucleus]),
-  }]);
 }
 
 export async function getAllMasterRows() {
