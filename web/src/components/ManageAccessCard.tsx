@@ -24,7 +24,13 @@ function describePermissions(p: RoleGrant['permissions']): string {
 
 export default function ManageAccessCard({ nucleus }: Props) {
   const [roles, setRoles] = useState<RoleGrant[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // loadError: the initial roles-list fetch has nothing else to show if it
+  // fails, so it legitimately replaces the whole card. actionError: a failed
+  // per-role "Manage" click must NOT hide the roles list (and its Manage
+  // buttons) -- that would be the only way to retry, so it renders as an
+  // inline message alongside the still-visible list instead.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [openRole, setOpenRole] = useState<string | null>(null);
   const [openRoleWorkers, setOpenRoleWorkers] = useState<Worker[]>([]);
   const [loadingRole, setLoadingRole] = useState(false);
@@ -33,10 +39,10 @@ export default function ManageAccessCard({ nucleus }: Props) {
     fetch(`/api/roles?nucleus=${encodeURIComponent(nucleus)}`)
       .then(r => r.json())
       .then(data => {
-        if (data.error) { setError(data.error); return; }
+        if (data.error) { setLoadError(data.error); return; }
         setRoles(data.roles);
       })
-      .catch(() => setError('Failed to load assignable roles.'));
+      .catch(() => setLoadError('Failed to load assignable roles.'));
   }, [nucleus]);
 
   // WorkerListModal takes its initial `workers` list as a prop -- it doesn't fetch
@@ -46,7 +52,7 @@ export default function ManageAccessCard({ nucleus }: Props) {
   // everywhere else, then opens the modal with that as its starting state.
   async function openRoleModal(role: string) {
     setLoadingRole(true);
-    setError(null);
+    setActionError(null);
     try {
       const res = await fetch(`/api/workers?nucleus=${encodeURIComponent(nucleus)}&type=${encodeURIComponent(role)}`);
       const data = await res.json();
@@ -54,13 +60,13 @@ export default function ManageAccessCard({ nucleus }: Props) {
       setOpenRoleWorkers(data.workers);
       setOpenRole(role);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to load current holders');
+      setActionError(e instanceof Error ? e.message : 'Failed to load current holders');
     } finally {
       setLoadingRole(false);
     }
   }
 
-  if (error) return <div style={{ fontSize: 13, color: '#e53e3e', padding: '8px 0' }}>{error}</div>;
+  if (loadError) return <div style={{ fontSize: 13, color: '#e53e3e', padding: '8px 0' }}>{loadError}</div>;
   if (!roles) return <div style={{ fontSize: 13, color: '#718096', padding: '8px 0' }}>Loading roles...</div>;
   if (roles.length === 0) return <div style={{ fontSize: 13, color: '#718096', padding: '8px 0' }}>No roles available to assign here.</div>;
 
@@ -81,6 +87,8 @@ export default function ManageAccessCard({ nucleus }: Props) {
           </button>
         </div>
       ))}
+
+      {actionError && <div style={{ fontSize: 13, color: '#e53e3e', padding: '8px 0' }}>{actionError}</div>}
 
       {openRole && (
         <WorkerListModal
