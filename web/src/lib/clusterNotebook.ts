@@ -26,8 +26,15 @@ const ACTIVITY_SUMMARY_SELECTION = 'number participants participantsFof isOverri
 
 interface GraphQLResponse<T> {
   data?: T;
-  errors?: { message: string }[];
+  errors?: { message: string; extensions?: { code?: string } }[];
 }
+
+// Thrown instead of a plain Error when cluster-notebook rejects a call for
+// permission reasons (confirmed with cluster-notebook 2026-09-24:
+// extensions.code === 'FORBIDDEN' is the contract; the message text is not --
+// it's still "Not authenticated." even for a real permission denial, so callers
+// should never rely on it, only on this error type).
+export class ClusterNotebookForbiddenError extends Error {}
 
 async function request<T>(query: string, variables: Record<string, unknown>): Promise<T> {
   const { getToken } = await auth();
@@ -51,6 +58,9 @@ async function request<T>(query: string, variables: Record<string, unknown>): Pr
 
   const json = (await res.json()) as GraphQLResponse<T>;
   if (json.errors?.length) {
+    if (json.errors.some(e => e.extensions?.code === 'FORBIDDEN')) {
+      throw new ClusterNotebookForbiddenError('cluster-notebook denied this request (FORBIDDEN)');
+    }
     throw new Error(`cluster-notebook GraphQL error: ${json.errors.map(e => e.message).join('; ')}`);
   }
   if (json.data === undefined) {

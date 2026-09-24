@@ -7,7 +7,7 @@ vi.mock('@clerk/nextjs/server', () => ({
 import {
   getActivitySummaries, updateActivitySummary, getAllNuclei, getNucleusFields, updateNucleus,
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
-  getClusters, createNucleus, deleteNucleus,
+  getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError,
 } from './clusterNotebook';
 import type { Individual } from './clusterNotebook';
 import { auth } from '@clerk/nextjs/server';
@@ -613,5 +613,26 @@ describe('request (token forwarding)', () => {
     expect('Authorization' in (init.headers as Record<string, string>)).toBe(false);
     expect(warnSpy).toHaveBeenCalledTimes(1);
     warnSpy.mockRestore();
+  });
+});
+
+describe('request (permission errors)', () => {
+  test('throws ClusterNotebookForbiddenError when a GraphQL error carries extensions.code FORBIDDEN', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      errors: [{ message: 'Not authenticated.', extensions: { code: 'FORBIDDEN' } }],
+    }));
+
+    await expect(getClusters()).rejects.toBeInstanceOf(ClusterNotebookForbiddenError);
+  });
+
+  test('throws a plain Error, not ClusterNotebookForbiddenError, for a GraphQL error without that code', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      errors: [{ message: 'nucleus name is required' }],
+    }));
+
+    const err = await getClusters().catch(e => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(ClusterNotebookForbiddenError);
+    expect(err.message).toContain('nucleus name is required');
   });
 });
