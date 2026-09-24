@@ -38,9 +38,7 @@ export interface NucleusRow {
   totalPop: string;
   totalHH: string;
   indNum: string;
-  indPct: string;
   hhNum: string;
-  hhPct: string;
   activities: {
     ccs: Activity;
     jygs: Activity;

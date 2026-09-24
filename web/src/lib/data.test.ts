@@ -1,14 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('./sheets', () => ({
-  sheetsGet: vi.fn(),
-  sheetsClear: vi.fn(),
-  sheetsBatchUpdate: vi.fn(),
-}));
-
-import { sheetsGet, sheetsClear, sheetsBatchUpdate } from './sheets';
-import { parseRow, facilitatorsFromClusterNotebook, facilitatorsCountFromClusterNotebook } from './data';
-import { COL } from './config';
+import { facilitatorsFromClusterNotebook, facilitatorsCountFromClusterNotebook } from './data';
 import type { ActivitySummary } from './clusterNotebook';
 
 vi.mock('./clusterNotebook', () => ({
@@ -26,7 +18,6 @@ import {
   getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus, getNucleusWorkers, createNucleus, deleteNucleus,
 } from './clusterNotebook';
 import { getRowData, saveRowData, createRowData, deleteRowData } from './data';
-import { MASTER_TAB } from './config';
 
 const mockGetActivitySummaries = vi.mocked(getActivitySummaries);
 const mockUpdateActivitySummary = vi.mocked(updateActivitySummary);
@@ -35,58 +26,6 @@ const mockUpdateNucleus = vi.mocked(updateNucleus);
 const mockGetNucleusWorkers = vi.mocked(getNucleusWorkers);
 const mockCreateNucleus = vi.mocked(createNucleus);
 const mockDeleteNucleus = vi.mocked(deleteNucleus);
-
-const mockSheetsGet = vi.mocked(sheetsGet);
-const mockSheetsClear = vi.mocked(sheetsClear);
-const mockSheetsBatchUpdate = vi.mocked(sheetsBatchUpdate);
-
-function makeRow(overrides: Record<number, string> = {}): string[] {
-  const row = new Array(51).fill('');
-  Object.entries(overrides).forEach(([k, v]) => { row[Number(k)] = v; });
-  return row;
-}
-
-describe('parseRow', () => {
-  test('maps identity fields correctly', () => {
-    const row = makeRow({
-      [COL.GROUPING]: 'NC Piedmont',
-      [COL.CLUSTER]: 'Charlotte Area',
-      [COL.NUCLEUS]: 'Albemarle Corridor',
-    });
-    const result = parseRow(row);
-    expect(result.grouping).toBe('NC Piedmont');
-    expect(result.cluster).toBe('Charlotte Area');
-    expect(result.nucleus).toBe('Albemarle Corridor');
-  });
-
-  test('maps activity fields into nested object', () => {
-    const row = makeRow({
-      [COL.CC_ACT]: '3', [COL.CC_PART]: '28', [COL.CC_FOF]: '24',
-      [COL.DEV_ACT]: '5', [COL.DEV_PART]: '40', [COL.DEV_FOF]: '12',
-    });
-    const result = parseRow(row);
-    expect(result.activities.ccs).toEqual({ act: '3', part: '28', fof: '24' });
-    expect(result.activities.devotionals).toEqual({ act: '5', part: '40', fof: '12' });
-  });
-
-  test('maps all three educational activity types', () => {
-    const row = makeRow({
-      [COL.CC_ACT]: '1',  [COL.CC_PART]: '10',  [COL.CC_FOF]: '5',
-      [COL.JYG_ACT]: '2', [COL.JYG_PART]: '20', [COL.JYG_FOF]: '8',
-      [COL.SC_ACT]: '3',  [COL.SC_PART]: '30',  [COL.SC_FOF]: '11',
-    });
-    const result = parseRow(row);
-    expect(result.activities.jygs).toEqual({ act: '2', part: '20', fof: '8' });
-    expect(result.activities.scs).toEqual({ act: '3', part: '30', fof: '11' });
-  });
-
-  test('empty row returns empty strings throughout', () => {
-    const result = parseRow(new Array(51).fill(''));
-    expect(result.nucleus).toBe('');
-    expect(result.nucleusType).toBe('');
-    expect(result.activities.ccs).toEqual({ act: '', part: '', fof: '' });
-  });
-});
 
 describe('getRowData', () => {
   beforeEach(() => {
@@ -97,15 +36,7 @@ describe('getRowData', () => {
     mockGetActivitySummaries.mockResolvedValue(null);
   });
 
-  test('maps all four activity rollups from cluster-notebook, ignoring the sheet columns', async () => {
-    const masterRow = makeRow({
-      [COL.NUCLEUS]: 'Alpha',
-      [COL.DEV_ACT]: '999', [COL.DEV_PART]: '999', [COL.DEV_FOF]: '999',
-    });
-    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
-      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
-      return [];
-    });
+  test('maps all four activity rollups from cluster-notebook', async () => {
     mockGetActivitySummaries.mockResolvedValue({
       devotionalGathering: { number: 4, participants: 30, participantsFof: 10, isOverridden: false, facilitators: null, facilitatorNames: 'Dave' },
       childrensClasses: { number: 1, participants: 10, participantsFof: 2, isOverridden: true, facilitators: null, facilitatorNames: 'Alice' },
@@ -124,12 +55,6 @@ describe('getRowData', () => {
   });
 
   test('renders a null cluster-notebook value as empty strings, not overridden', async () => {
-    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
-    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
-      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
-      return [];
-    });
-
     const result = await getRowData('Alpha');
 
     expect(result?.row.activities.devotionals).toEqual({ act: '', part: '', fof: '', isOverridden: false });
@@ -137,7 +62,6 @@ describe('getRowData', () => {
   });
 
   test('returns null when the nucleus is not found in cluster-notebook', async () => {
-    mockSheetsGet.mockResolvedValue([]);
     mockGetNucleusFields.mockResolvedValue(null);
 
     const result = await getRowData('Nonexistent');
@@ -145,8 +69,7 @@ describe('getRowData', () => {
     expect(result).toBeNull();
   });
 
-  test('finds the nucleus in cluster-notebook even with no matching sheet row', async () => {
-    mockSheetsGet.mockResolvedValue([]);
+  test('returns the nucleus name and fields directly from cluster-notebook', async () => {
     mockGetActivitySummaries.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue({
       stage: 'Advanced/5', locality: null, populationMakeup: null,
@@ -165,14 +88,7 @@ describe('getRowData', () => {
     expect(result?.row.stage).toBe('Advanced/5');
   });
 
-  test('uses the caller-supplied nucleusName as the canonical name, not the sheet\'s own copy', async () => {
-    // The sheet's own COL.NUCLEUS value differs in case/whitespace from the name the
-    // caller (ultimately cluster-notebook, via the picker) looked this row up by.
-    const masterRow = makeRow({ [COL.NUCLEUS]: '  alpha  ' });
-    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
-      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
-      return [];
-    });
+  test('uses the caller-supplied nucleusName as the canonical name', async () => {
     mockGetActivitySummaries.mockResolvedValue(null);
 
     const result = await getRowData('Alpha');
@@ -181,26 +97,12 @@ describe('getRowData', () => {
   });
 
   test('propagates a cluster-notebook read failure', async () => {
-    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
-    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
-      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
-      return [];
-    });
     mockGetActivitySummaries.mockRejectedValue(new Error('cluster-notebook request failed: 500 Internal Server Error'));
 
     await expect(getRowData('Alpha')).rejects.toThrow('cluster-notebook request failed');
   });
 
-  test('overrides stage/locality/makeup with cluster-notebook data, ignoring the sheet columns', async () => {
-    const masterRow = makeRow({
-      [COL.NUCLEUS]: 'Alpha',
-      [COL.STAGE]: 'stale-stage', [COL.LOCALITY]: 'stale-locality', [COL.MAKEUP]: 'stale-makeup',
-      [COL.AUX_BOARD]: 'stale-auxboard',
-    });
-    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
-      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
-      return [];
-    });
+  test('maps nucleusFields onto the row', async () => {
     mockGetActivitySummaries.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue({
       stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students',
@@ -239,11 +141,6 @@ describe('getRowData', () => {
   });
 
   test('derives clusterCode as the first token of cluster.name', async () => {
-    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
-    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
-      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
-      return [];
-    });
     mockGetActivitySummaries.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
@@ -261,11 +158,6 @@ describe('getRowData', () => {
   });
 
   test('derives an empty clusterCode when the cluster name is empty', async () => {
-    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
-    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
-      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
-      return [];
-    });
     mockGetActivitySummaries.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
@@ -283,11 +175,6 @@ describe('getRowData', () => {
   });
 
   test('translates all three known growthMilestone values to M1/M2/M3', async () => {
-    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
-    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
-      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
-      return [];
-    });
     mockGetActivitySummaries.mockResolvedValue(null);
 
     const cases: [string, string][] = [
@@ -311,11 +198,6 @@ describe('getRowData', () => {
   });
 
   test('renders a null growthMilestone as an empty pg, not a mismatched code', async () => {
-    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
-    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
-      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
-      return [];
-    });
     mockGetActivitySummaries.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
@@ -334,11 +216,6 @@ describe('getRowData', () => {
   });
 
   test('renders a null cluster-notebook nucleus-fields value as empty strings', async () => {
-    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
-    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
-      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
-      return [];
-    });
     mockGetActivitySummaries.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
@@ -362,11 +239,6 @@ describe('getRowData', () => {
   });
 
   test('fetches accompanier/protagonist/abm-assistant/contact/promoter workers from cluster-notebook, mapped to {id, name, email}', async () => {
-    const masterRow = makeRow({ [COL.NUCLEUS]: 'Alpha' });
-    mockSheetsGet.mockImplementation(async (_id: string, range: string) => {
-      if (range.startsWith(`${MASTER_TAB}!`)) return [masterRow];
-      return [];
-    });
     mockGetActivitySummaries.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
@@ -415,7 +287,7 @@ describe('saveRowData', () => {
     },
   };
 
-  test('writes all four activity rollups via cluster-notebook instead of the sheet', async () => {
+  test('writes all four activity rollups via cluster-notebook', async () => {
     mockUpdateActivitySummary.mockResolvedValue(null);
 
     await saveRowData('Alpha', baseFormData, 'me@x.com');
@@ -424,8 +296,6 @@ describe('saveRowData', () => {
     expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'JUNIOR_YOUTH_GROUP', { number: null, participants: null, participantsFof: null });
     expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'STUDY_CIRCLE', { number: null, participants: null, participantsFof: null });
     expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'DEVOTIONAL_GATHERING', { number: 5, participants: 40, participantsFof: 12 });
-    // No Sheet write at all anymore -- everything routes through cluster-notebook, 2026-09-14.
-    expect(mockSheetsBatchUpdate).not.toHaveBeenCalled();
   });
 
   test('sends null fields to cluster-notebook when devotionals values are blank', async () => {
@@ -456,7 +326,7 @@ describe('saveRowData', () => {
     await expect(saveRowData('Alpha', baseFormData, 'me@x.com')).rejects.toThrow('cluster-notebook has no nucleus named "Alpha"');
   });
 
-  test('writes stage/locality/makeup via cluster-notebook instead of the sheet', async () => {
+  test('writes stage/locality/makeup via cluster-notebook', async () => {
     mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue({
       stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students',
@@ -478,7 +348,7 @@ describe('saveRowData', () => {
     });
   });
 
-  test('writes population/households/connected* via cluster-notebook instead of the sheet', async () => {
+  test('writes population/households/connected* via cluster-notebook', async () => {
     mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
@@ -498,7 +368,7 @@ describe('saveRowData', () => {
     });
   });
 
-  test('writes presence/gatherings as tri-state booleans via cluster-notebook instead of the sheet', async () => {
+  test('writes presence/gatherings as tri-state booleans via cluster-notebook', async () => {
     mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
@@ -523,7 +393,7 @@ describe('saveRowData', () => {
     });
   });
 
-  test('writes narrative via cluster-notebook instead of the sheet', async () => {
+  test('writes narrative via cluster-notebook', async () => {
     mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
@@ -569,7 +439,7 @@ describe('saveRowData', () => {
     expect(patch).toEqual({ nucleusType: 'Neighborhood', parentNucleusName: 'Chapelboro' });
   });
 
-  test('writes nucleusType via cluster-notebook instead of the sheet', async () => {
+  test('writes nucleusType via cluster-notebook', async () => {
     mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
@@ -741,7 +611,7 @@ describe('createRowData', () => {
     },
   };
 
-  test('creates via cluster-notebook, writing no sheet row at all', async () => {
+  test('creates via cluster-notebook', async () => {
     mockCreateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
@@ -754,9 +624,6 @@ describe('createRowData', () => {
     await createRowData(baseCreateFormData, 'me@x.com');
 
     expect(mockCreateNucleus).toHaveBeenCalledWith('Riverside', 'NC-215 Triangle');
-    // No Sheet write at all anymore -- access control and existence no longer need one,
-    // and parentNucleus (the last field that did) is now cluster-notebook's own, 2026-09-14.
-    expect(mockSheetsBatchUpdate).not.toHaveBeenCalled();
   });
 
   test('throws when nucleus name is missing', async () => {
@@ -796,7 +663,6 @@ describe('createRowData', () => {
     }
     expect(caught).toBeInstanceOf(Error);
     expect((caught as { code?: string }).code).toBe('BAD_CLUSTER');
-    expect(mockSheetsBatchUpdate).not.toHaveBeenCalled();
   });
 
   test('pushes activity and nucleus-patch writes through cluster-notebook, same as saveRowData', async () => {
@@ -843,15 +709,13 @@ describe('createRowData', () => {
 describe('deleteRowData', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  test('delegates entirely to cluster-notebook, no Sheet interaction', async () => {
+  test('delegates entirely to cluster-notebook', async () => {
     mockDeleteNucleus.mockResolvedValue(true);
 
     const result = await deleteRowData('Alpha');
 
     expect(mockDeleteNucleus).toHaveBeenCalledWith('Alpha');
     expect(result).toBe(true);
-    expect(mockSheetsBatchUpdate).not.toHaveBeenCalled();
-    expect(mockSheetsClear).not.toHaveBeenCalled();
   });
 
   test('returns false for a name that no longer has an active nucleus (idempotent delete)', async () => {

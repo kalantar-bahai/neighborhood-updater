@@ -1,10 +1,3 @@
-import { sheetsGet } from './sheets';
-import {
-  MASTER_SHEET_ID,
-  MASTER_TAB,
-  MASTER_DATA_ROW,
-  COL,
-} from './config';
 import {
   getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus,
   getNucleusWorkers, individualDisplayName, createNucleus, deleteNucleus,
@@ -19,14 +12,6 @@ export class CodedError extends Error {
     super(message);
   }
 }
-
-function normalize(row: string[], numCols: number): string[] {
-  const r = row ? [...row] : [];
-  while (r.length < numCols) r.push('');
-  return r;
-}
-
-function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
 function stripCommas(s: string) { return s ? s.replace(/,/g, '') : s; }
 
@@ -147,55 +132,12 @@ function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
   };
 }
 
-export async function getAllMasterRows() {
-  const rows = await sheetsGet(MASTER_SHEET_ID, `${MASTER_TAB}!A${MASTER_DATA_ROW}:AZ`);
-  return rows.map(r => normalize(r, 52));
-}
-
-export function parseRow(row: string[]) {
-  return {
-    grouping:            row[COL.GROUPING],
-    cluster:             row[COL.CLUSTER],
-    pg:                  row[COL.PG],
-    clusterCode:         row[COL.CLUSTER_CODE],
-    locality:            row[COL.LOCALITY],
-    nucleus:             row[COL.NUCLEUS],
-    parentNucleus:       row[COL.PARENT_NUCLEUS],
-    nucleusType:         row[COL.TYPE],
-    stage:               row[COL.STAGE],
-    auxBoard:            row[COL.AUX_BOARD],
-    makeup:              row[COL.MAKEUP],
-    totalPop:            stripCommas(row[COL.TOTAL_POP]),
-    totalHH:             stripCommas(row[COL.TOTAL_HH]),
-    indNum:              stripCommas(row[COL.IND_NUM]),
-    indPct:              row[COL.IND_PCT],
-    hhNum:               stripCommas(row[COL.HH_NUM]),
-    hhPct:               row[COL.HH_PCT],
-    activities: {
-      ccs:         { act: stripCommas(row[COL.CC_ACT]),   part: stripCommas(row[COL.CC_PART]),   fof: stripCommas(row[COL.CC_FOF]) },
-      jygs:        { act: stripCommas(row[COL.JYG_ACT]),  part: stripCommas(row[COL.JYG_PART]),  fof: stripCommas(row[COL.JYG_FOF]) },
-      scs:         { act: stripCommas(row[COL.SC_ACT]),   part: stripCommas(row[COL.SC_PART]),   fof: stripCommas(row[COL.SC_FOF]) },
-      devotionals: { act: stripCommas(row[COL.DEV_ACT]),  part: stripCommas(row[COL.DEV_PART]),  fof: stripCommas(row[COL.DEV_FOF]) },
-    },
-    presence:        row[COL.PRESENCE],
-    notesPresence:   row[COL.NOTES_PRESENCE],
-    gatherings:       row[COL.GATHERINGS],
-    notesGatherings:  row[COL.NOTES_GATHERINGS],
-    narrative:        row[COL.NARRATIVE],
-    // No sheet column -- always overwritten from cluster-notebook right after
-    // parseRow runs (see facilitatorsFromClusterNotebook/facilitatorsCountFromClusterNotebook in getRowData).
-    facilitators:     '',
-    facilitatorsCount: '',
-  };
-}
-
 function toWorkers(individuals: Individual[]): Worker[] {
   return individuals.map(ind => ({ id: ind.id, name: individualDisplayName(ind), email: ind.email }));
 }
 
 export async function getRowData(nucleusName: string) {
-  const [masterRows, accompanierWorkers, protagonistWorkers, abmAssistantWorkers, contactWorkers, promoterWorkers, activitySummaries, nucleusFields] = await Promise.all([
-    getAllMasterRows(),
+  const [accompanierWorkers, protagonistWorkers, abmAssistantWorkers, contactWorkers, promoterWorkers, activitySummaries, nucleusFields] = await Promise.all([
     getNucleusWorkers(nucleusName, 'accompanier'),
     getNucleusWorkers(nucleusName, 'protagonist'),
     getNucleusWorkers(nucleusName, 'abm-assistant'),
@@ -205,35 +147,21 @@ export async function getRowData(nucleusName: string) {
     getNucleusFields(nucleusName),
   ]);
 
-  // Existence is cluster-notebook's call now, not the Sheet's (2026-09-14) -- a
-  // nucleus created after this point may have no Sheet row at all (see the access
-  // rewrite in access.ts/initial-data/route.ts, which no longer requires one
-  // either). nucleusFields is the authoritative "does this exist" check; a missing
-  // Sheet row just means parentNucleus (the one field left with nowhere else to
-  // live) defaults to blank.
+  // cluster-notebook is the sole source of truth now -- nucleusFields is the
+  // authoritative "does this exist" check.
   if (nucleusFields === null) return null;
-  const masterRow = masterRows.find(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
 
-  const row = parseRow(masterRow ?? normalize([], 52));
-  // parseRow's nucleus/activities/facilitators/stage/locality/makeup/totalPop/totalHH/indNum/
-  // hhNum/presence/notesPresence/gatherings/notesGatherings/narrative/grouping/cluster/pg/
-  // clusterCode/nucleusType/auxBoard reads (from the corresponding COL.* sheet columns, where
-  // any even exist) are all overwritten below — none of these sheet columns are read by
-  // anything else anymore either (/api/initial-data's picker summary sources the same fields
-  // from cluster-notebook now too), so they're fully dead. grouping/cluster/pg are read-only
-  // from cluster-notebook (no mutation exists for them there); clusterCode is derived
-  // client-side from cluster.name, not read from anywhere. facilitators has no sheet column at
-  // all anymore — the old Education-sheet read (getAllEduRows/EDU_TAB/EDU_COL) is fully retired,
-  // 2026-09-14.
-  // nucleus itself: the list of valid nuclei comes from cluster-notebook, not the Sheet
-  // (2026-09-13, the user directly) — `nucleusName` (this function's own parameter) already IS
-  // that canonical value once it flows from the picker, so it's authoritative here too, not the
-  // Sheet's own (possibly stale, or just differently-cased) copy of the same name.
-  row.nucleus = nucleusName;
-  row.activities = activitiesFromClusterNotebook(activitySummaries);
-  row.facilitators = facilitatorsFromClusterNotebook(activitySummaries);
-  row.facilitatorsCount = facilitatorsCountFromClusterNotebook(activitySummaries);
-  Object.assign(row, nucleusFieldsFromClusterNotebook(nucleusFields));
+  const row = {
+    // The list of valid nuclei comes from cluster-notebook, not any hand-typed
+    // copy (2026-09-13, the user directly) -- `nucleusName` (this function's own
+    // parameter) already IS that canonical value once it flows from the picker,
+    // so it's authoritative here.
+    nucleus: nucleusName,
+    activities: activitiesFromClusterNotebook(activitySummaries),
+    facilitators: facilitatorsFromClusterNotebook(activitySummaries),
+    facilitatorsCount: facilitatorsCountFromClusterNotebook(activitySummaries),
+    ...nucleusFieldsFromClusterNotebook(nucleusFields),
+  };
 
   return {
     row,
