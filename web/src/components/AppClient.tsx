@@ -1,13 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { InitialData, NucleusDetail, Role } from '@/types';
+import { InitialData, NucleusDetail } from '@/types';
+import type { PermissionSet } from '@/lib/access';
 import Picker from './Picker';
 import DetailView from './DetailView';
-import AccessPanel from './AccessPanel';
 import CreateNucleusModal from './CreateNucleusModal';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
+
+const NO_ACCESS: PermissionSet = {
+  canRead: false, canWrite: false, canChangeIdentity: false, canDelete: false,
+  canAssignRoles: false, assignableRoles: [], createableEntityTypes: [],
+};
 
 export default function AppClient() {
   const [initialData, setInitialData] = useState<InitialData | null>(null);
@@ -16,7 +21,6 @@ export default function AppClient() {
   const [selectedNucleus, setSelectedNucleus] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [creatingNew, setCreatingNew] = useState(false);
-  const [accessOpen, setAccessOpen] = useState(false);
 
   function loadInitialData() {
     fetch('/api/initial-data')
@@ -70,13 +74,11 @@ export default function AppClient() {
   }
 
   if (detail && selectedNucleus) {
-    const roleMap = initialData.access.roleMap;
-    const role: Role = (roleMap[norm(selectedNucleus)] ?? roleMap['*'] ?? 'read') as Role;
+    const permissions = initialData.access.permissions[norm(selectedNucleus)] ?? NO_ACCESS;
     return (
       <DetailView
         detail={detail}
-        role={role}
-        roleMap={initialData.access.roleMap}
+        permissions={permissions}
         email={initialData.email}
         showBack={initialData.rows.length > 1}
         onBack={handleBack}
@@ -85,8 +87,7 @@ export default function AppClient() {
     );
   }
 
-  const roleMap = initialData.access.roleMap;
-  const isGlobalAdmin = roleMap['*'] === 'admin' || roleMap['*'] === 'collaborator';
+  const isAdministrator = initialData.access.isAdministrator;
 
   const TYPE_META: Record<string, { label: string; bg: string; color: string; border: string }> = {
     neighborhood: { label: 'Neighborhood', bg: '#bee3f8', color: '#2c5282', border: '#90cdf4' },
@@ -114,7 +115,7 @@ const typeSummaries = (['neighborhood', 'network', 'population'] as const)
         email={initialData.email}
         onSelect={loadNucleus}
         onSignOut={() => window.location.href = '/signout'}
-        onAdd={isGlobalAdmin ? () => setCreatingNew(true) : undefined}
+        onAdd={isAdministrator ? () => setCreatingNew(true) : undefined}
       />
       {typeSummaries.length > 0 && (
         <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 16px 24px', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -136,25 +137,6 @@ const typeSummaries = (['neighborhood', 'network', 'population'] as const)
               </div>
             );
           })}
-        </div>
-      )}
-
-      {isGlobalAdmin && (
-        <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 16px 32px' }}>
-          <div className="card">
-            <div
-              className="card-header"
-              onClick={() => setAccessOpen(o => !o)}
-              style={{ cursor: 'pointer', userSelect: 'none' }}
-            >
-              <span><span style={{ fontSize: 11, marginRight: 6 }}>{accessOpen ? '▼' : '▶'}</span>Manage Access</span>
-            </div>
-            {accessOpen && (
-              <div className="card-body">
-                <AccessPanel roleMap={roleMap} />
-              </div>
-            )}
-          </div>
         </div>
       )}
 
