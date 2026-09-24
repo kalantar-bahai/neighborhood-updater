@@ -90,6 +90,15 @@ export const COL = {
 export const WORKER_TYPES = ['accompanier', 'protagonist', 'abm-assistant', 'contact', 'promoter'] as const;
 export type WorkerType = typeof WORKER_TYPES[number];
 
+// Confirmed with cluster-notebook 2026-09-24: accompanier/contact/abm-assistant
+// are REAL recognized roles now (real permission grants, e.g. accompanier is
+// read+write) -- assigning someone into one requires that role name to appear
+// in the assigner's PermissionSet.assignableRoles, same as ATC/CIC/CSO/etc.
+// protagonist/promoter stay informal (freely assignable whenever canAssignRoles
+// is true) -- cluster-notebook's own open question (their issue #14), not
+// something this app decides.
+export const RECOGNIZED_WORKER_TYPES = ['accompanier', 'contact', 'abm-assistant'] as const;
+
 export const ACCESS_COL = {
   NAME:    0,
   EMAIL:   1,
