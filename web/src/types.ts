@@ -1,3 +1,5 @@
+import type { PermissionSet } from './lib/access';
+
 export type Role = 'read' | 'read-write' | 'collaborator' | 'admin';
 
 export interface AccessEntry {
@@ -91,7 +93,7 @@ export interface NucleusDetail {
 }
 
 export interface InitialData {
-  access: { roleMap: Record<string, Role> };
+  access: { isAdministrator: boolean; permissions: Record<string, PermissionSet> };
   rows: NucleusSummary[];
   email: string;
   // For the "+Add" cluster picker (2026-09-14) -- existing clusters only, no
