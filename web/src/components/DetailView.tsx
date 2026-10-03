@@ -691,21 +691,30 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     void attempt();
   }
 
-  // Activities: blur/Enter-triggered, per sub-field (act/part/fof independently) --
-  // updateActivitySummary's fields are each independently optional, so a blur on just
-  // "Number" sends only {number}, never resending untouched participants/fof.
+  // Activities: blur/Enter-triggered, per sub-field (act/part/fof independently edited
+  // in the UI). But cluster-notebook's updateActivitySummary mutation writes all three
+  // (number/participants/participantsFof) together every call -- there's no way to tell
+  // it "leave this one alone". activityUpdateWrites (data.ts) reflects that: any field
+  // missing from the submitted activity fragment is coerced to an explicit null, which
+  // cluster-notebook applies as a real clear. So every commit here must resend the
+  // complete, correct triple -- the new value for the field just blurred, and the other
+  // two fields' last-known-good (committedRef) values -- never a partial fragment, or a
+  // single-field edit silently wipes its siblings on cluster-notebook (confirmed bug,
+  // 2026-10-03, reported by the user as a value "disappearing" after an edit).
   const ACT_FIELD_LABEL: Record<ActivityNumericField, string> = { act: 'Number', part: 'Participants', fof: 'Friends of the Faith' };
   function commitActField(actKey: keyof FormState['activities'], field: ActivityNumericField, rowLabel: string) {
     const value = form.activities[actKey][field];
-    const committedVal = committedRef.current.activities[actKey][field];
-    if (value === committedVal) return;
+    const committedTriple = committedRef.current.activities[actKey];
+    if (value === committedTriple[field]) return;
     const label = `${rowLabel} ${ACT_FIELD_LABEL[field]}`;
     if (!isValidInt(String(value ?? ''))) {
       setSaveStatus({ msg: `${label} must be a number`, type: 'error' });
       return;
     }
     const attempt = async () => {
-      const result = await saveField({ activities: { [actKey]: { [field]: value } } }, label);
+      const result = await saveField({
+        activities: { [actKey]: { act: committedTriple.act, part: committedTriple.part, fof: committedTriple.fof, [field]: value } },
+      }, label);
       if (result.ok) {
         committedRef.current = {
           ...committedRef.current,
