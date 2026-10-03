@@ -294,6 +294,15 @@ export async function getActivitySummaries(nucleusName: string): Promise<Activit
 export async function updateActivitySummary(
   nucleusName: string,
   activityType: ActivityType,
+  // Each field is genuinely optional, not just nullable -- confirmed with
+  // cluster-notebook directly, 2026-10-03. Their resolver defaults these three
+  // arguments to strawberry.UNSET and only assigns a field when it's not UNSET,
+  // so a field this function is never TOLD about must be omitted from the GraphQL
+  // variables entirely, not defaulted to null -- null is a real, explicit "clear
+  // this field", indistinguishable server-side from a deliberate clear. request()'s
+  // JSON.stringify drops object keys whose value is undefined, so building
+  // `variables` by only setting the keys actually present in `fields` (never
+  // `?? null`) is what gets this right.
   fields: { number?: number | null; participants?: number | null; participantsFof?: number | null }
 ): Promise<ActivitySummaries | null> {
   const mutation = `
@@ -309,16 +318,11 @@ export async function updateActivitySummary(
       }
     }
   `;
-  const data = await request<{ updateActivitySummary: ActivitySummaries | null }>(
-    mutation,
-    {
-      nucleusName,
-      activityType,
-      number: fields.number ?? null,
-      participants: fields.participants ?? null,
-      participantsFof: fields.participantsFof ?? null,
-    }
-  );
+  const variables: Record<string, unknown> = { nucleusName, activityType };
+  if ('number' in fields) variables.number = fields.number;
+  if ('participants' in fields) variables.participants = fields.participants;
+  if ('participantsFof' in fields) variables.participantsFof = fields.participantsFof;
+  const data = await request<{ updateActivitySummary: ActivitySummaries | null }>(mutation, variables);
   if (data.updateActivitySummary === null) {
     throw new Error(`cluster-notebook has no nucleus named "${nucleusName}" — activity summary not saved`);
   }

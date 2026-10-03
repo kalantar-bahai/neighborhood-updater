@@ -691,30 +691,28 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     void attempt();
   }
 
-  // Activities: blur/Enter-triggered, per sub-field (act/part/fof independently edited
-  // in the UI). But cluster-notebook's updateActivitySummary mutation writes all three
-  // (number/participants/participantsFof) together every call -- there's no way to tell
-  // it "leave this one alone". activityUpdateWrites (data.ts) reflects that: any field
-  // missing from the submitted activity fragment is coerced to an explicit null, which
-  // cluster-notebook applies as a real clear. So every commit here must resend the
-  // complete, correct triple -- the new value for the field just blurred, and the other
-  // two fields' last-known-good (committedRef) values -- never a partial fragment, or a
-  // single-field edit silently wipes its siblings on cluster-notebook (confirmed bug,
-  // 2026-10-03, reported by the user as a value "disappearing" after an edit).
+  // Activities: blur/Enter-triggered, per sub-field (act/part/fof independently) --
+  // updateActivitySummary's fields are each genuinely optional, server-side: cluster-
+  // notebook's resolver defaults them to strawberry.UNSET and only assigns a field
+  // when it's not UNSET, so omitting a field here really does leave it untouched --
+  // it is NOT the same as sending it as null (a real, explicit clear). Confirmed with
+  // cluster-notebook directly, 2026-10-03, after their audit log caught an earlier
+  // version of this function sending a partial {act} fragment that activityUpdateWrites/
+  // updateActivitySummary (at the time) defaulted into clearing nulls for participants/
+  // fof. Both of those now only include a sub-field when the caller actually provided
+  // one, so a blur on just "Number" can safely send only {act: value} again.
   const ACT_FIELD_LABEL: Record<ActivityNumericField, string> = { act: 'Number', part: 'Participants', fof: 'Friends of the Faith' };
   function commitActField(actKey: keyof FormState['activities'], field: ActivityNumericField, rowLabel: string) {
     const value = form.activities[actKey][field];
-    const committedTriple = committedRef.current.activities[actKey];
-    if (value === committedTriple[field]) return;
+    const committedVal = committedRef.current.activities[actKey][field];
+    if (value === committedVal) return;
     const label = `${rowLabel} ${ACT_FIELD_LABEL[field]}`;
     if (!isValidInt(String(value ?? ''))) {
       setSaveStatus({ msg: `${label} must be a number`, type: 'error' });
       return;
     }
     const attempt = async () => {
-      const result = await saveField({
-        activities: { [actKey]: { act: committedTriple.act, part: committedTriple.part, fof: committedTriple.fof, [field]: value } },
-      }, label);
+      const result = await saveField({ activities: { [actKey]: { [field]: value } } }, label);
       if (result.ok) {
         committedRef.current = {
           ...committedRef.current,

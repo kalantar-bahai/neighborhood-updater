@@ -309,21 +309,21 @@ describe('saveRowData', () => {
     });
   });
 
-  test('treats a sub-field omitted from the activity fragment as an explicit clear, not "leave unchanged"', async () => {
-    // activityUpdateWrites has no way to express "only touch this one sub-field" --
-    // updateActivitySummary always writes number/participants/participantsFof together,
-    // so any caller that submits a partial {act} object (without part/fof) silently
-    // wipes the other two on cluster-notebook. DetailView.tsx's commitActField used to
-    // do exactly this (confirmed bug, 2026-10-03) -- it must always resend the complete
-    // triple. This test locks in that contract so a future caller can't reintroduce it.
+  test('omits a sub-field entirely from the cluster-notebook write when the activity fragment does not include it', async () => {
+    // cluster-notebook's updateActivitySummary resolver distinguishes an omitted
+    // field (left alone, via their strawberry.UNSET sentinel) from an explicit null
+    // (a real clear) -- confirmed with cluster-notebook directly, 2026-10-03, after
+    // their audit log caught an earlier version of this code defaulting a missing
+    // sub-field to null and silently wiping it. A caller that submits a partial
+    // {act} object (without part/fof) must leave the other two untouched, not clear
+    // them -- this is what lets DetailView.tsx's per-sub-field blur send just the
+    // one field that actually changed.
     mockUpdateActivitySummary.mockResolvedValue(null);
 
     const formData = { activities: { ...baseFormData.activities, devotionals: { act: '12' } } };
     await saveRowData('Alpha', formData, 'me@x.com');
 
-    expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'DEVOTIONAL_GATHERING', {
-      number: 12, participants: null, participantsFof: null,
-    });
+    expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'DEVOTIONAL_GATHERING', { number: 12 });
   });
 
   test('strips commas before sending devotionals counts to cluster-notebook', async () => {

@@ -483,16 +483,34 @@ describe('updateActivitySummary', () => {
     expect(activityTypes).toEqual(['CHILDRENS_CLASS', 'JUNIOR_YOUTH_GROUP', 'STUDY_CIRCLE']);
   });
 
-  test('defaults omitted fields to null', async () => {
+  test('omits fields not provided from the GraphQL variables entirely, rather than defaulting them to a clearing null', async () => {
+    // cluster-notebook's resolver defaults number/participants/participantsFof to
+    // strawberry.UNSET and only assigns a field when it's not UNSET -- a variable
+    // genuinely absent from the request resolves to UNSET (left alone), while an
+    // explicit `null` is a real clear. Confirmed with cluster-notebook directly,
+    // 2026-10-03, after their audit log caught the previous `?? null` default
+    // silently wiping fields this function was never told to touch.
     mockFetch.mockResolvedValue(jsonResponse({
       data: { updateActivitySummary: { devotionalGathering: null, childrensClasses: null, juniorYouthGroups: null, studyCircles: null } },
     }));
 
-    await updateActivitySummary('Alpha', 'DEVOTIONAL_GATHERING', {});
+    await updateActivitySummary('Alpha', 'DEVOTIONAL_GATHERING', { number: 5 });
 
     const [, init] = mockFetch.mock.calls[0];
     const body = JSON.parse(init.body as string);
-    expect(body.variables).toEqual({ nucleusName: 'Alpha', activityType: 'DEVOTIONAL_GATHERING', number: null, participants: null, participantsFof: null });
+    expect(body.variables).toEqual({ nucleusName: 'Alpha', activityType: 'DEVOTIONAL_GATHERING', number: 5 });
+  });
+
+  test('sends an explicit null for a field the caller deliberately set to null', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: { updateActivitySummary: { devotionalGathering: null, childrensClasses: null, juniorYouthGroups: null, studyCircles: null } },
+    }));
+
+    await updateActivitySummary('Alpha', 'DEVOTIONAL_GATHERING', { number: 5, participants: null });
+
+    const [, init] = mockFetch.mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    expect(body.variables).toEqual({ nucleusName: 'Alpha', activityType: 'DEVOTIONAL_GATHERING', number: 5, participants: null });
   });
 
   test('throws when the mutation returns null (no matching nucleus)', async () => {

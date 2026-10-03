@@ -200,7 +200,14 @@ interface FormDataInput {
 
 // Shared between createRowData and saveRowData -- each of the four activity
 // rollups writes straight to cluster-notebook's updateActivitySummary, one call
-// per activity type present in the submitted form.
+// per activity type present in the submitted form. Each of number/participants/
+// participantsFof is independently optional on an activity object (DetailView.tsx's
+// per-sub-field blur sends just one at a time) -- only include the sub-fields the
+// caller actually submitted (`!== undefined`, matching nucleusPatchFromFormData's
+// own convention below), never defaulting a missing one via toIntOrNull(undefined).
+// Confirmed with cluster-notebook directly, 2026-10-03: their resolver distinguishes
+// an omitted field (left alone) from an explicit null (a real clear) -- sending null
+// for every sub-field we didn't mean to touch was silently wiping real data.
 function activityUpdateWrites(nucleusName: string, d: FormDataInput): Promise<unknown>[] {
   const ACTIVITY_KEYS: [keyof NonNullable<FormDataInput['activities']>, ActivityType][] = [
     ['ccs', 'CHILDRENS_CLASS'],
@@ -212,11 +219,11 @@ function activityUpdateWrites(nucleusName: string, d: FormDataInput): Promise<un
   for (const [key, activityType] of ACTIVITY_KEYS) {
     const act = d.activities?.[key];
     if (act) {
-      writes.push(updateActivitySummary(nucleusName, activityType, {
-        number: toIntOrNull(act.act),
-        participants: toIntOrNull(act.part),
-        participantsFof: toIntOrNull(act.fof),
-      }));
+      const patch: { number?: number | null; participants?: number | null; participantsFof?: number | null } = {};
+      if (act.act !== undefined) patch.number = toIntOrNull(act.act);
+      if (act.part !== undefined) patch.participants = toIntOrNull(act.part);
+      if (act.fof !== undefined) patch.participantsFof = toIntOrNull(act.fof);
+      writes.push(updateActivitySummary(nucleusName, activityType, patch));
     }
   }
   return writes;
