@@ -96,6 +96,20 @@ export interface ClusterFields {
   auxiliaryBoardMembers: string | null;
 }
 
+// Confirmed with cluster-notebook directly, 2026-10-04. `at` is always present
+// whenever `lastUpdated` itself is non-null (see below); `by` is one of: a
+// person's real name; "SRP sync" (the label is reserved, but can't occur yet --
+// the SRP read direction isn't built, only outbox bookkeeping exists so far);
+// "System" for script/seed writes that opened no audit context; or null when the
+// caller's role lacks a separate `can_see_actors` permission (not part of
+// PermissionSet, and not something we pre-check -- the server has already
+// decided by the time `by` comes back null, so we just branch on it, never ask
+// cluster-notebook to re-derive the same answer ourselves).
+export interface LastUpdated {
+  at: string;
+  by: string | null;
+}
+
 export interface NucleusFields {
   stage: string | null;
   locality: string | null;
@@ -124,6 +138,14 @@ export interface NucleusFields {
   // unset. Write side is updateNucleus's `parentNucleusName` patch field (a plain
   // string, not nested) -- no cycle-guard on their side, human-entered data.
   parentNucleus: { name: string } | null;
+  // Aggregated server-side across this Nucleus's own fields AND all four
+  // ActivitySummary rows -- whichever changed most recently (so an activity-only
+  // edit moves this too, by design: both show up on the same detail page).
+  // Non-null only once something has actually been audited -- null for a nucleus
+  // created/last-touched before cluster-notebook's audit logging began,
+  // 2026-09-25 (no row to report, not an unknown actor). See LastUpdated above
+  // for what `by` can be.
+  lastUpdated: LastUpdated | null;
 }
 
 // Deliberately not `extends NucleusFields` — the picker (getAllNuclei's caller)
@@ -222,7 +244,7 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
 
 const NUCLEUS_FIELDS_SELECTION = 'stage locality populationMakeup population households connectedPopulation connectedHouseholds '
   + 'hasSocialAction socialActionDescription hasCommunityGatherings communityGatheringDescription narrative nucleusType '
-  + 'cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers } parentNucleus { name }';
+  + 'cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers } parentNucleus { name } lastUpdated { at by }';
 
 export async function getNucleusFields(nucleusName: string): Promise<NucleusFields | null> {
   const query = `

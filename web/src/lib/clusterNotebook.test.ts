@@ -264,6 +264,23 @@ describe('getNucleusFields', () => {
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.query).toContain('parentNucleus { name }');
   });
+
+  test('requests and returns the lastUpdated field (aggregated across the nucleus and its activity summaries)', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: {
+        nucleus: {
+          stage: null, locality: null, populationMakeup: null,
+          lastUpdated: { at: '2026-10-03T19:18:09-04:00', by: null },
+        },
+      },
+    }));
+
+    const result = await getNucleusFields('Alpha');
+
+    expect(result?.lastUpdated).toEqual({ at: '2026-10-03T19:18:09-04:00', by: null });
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('lastUpdated { at by }');
+  });
 });
 
 describe('updateNucleus', () => {

@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getNucleusPermissions } from '@/lib/access';
-import { getCurrentUserEmail } from '@/lib/clerkUser';
 import { getRowData, saveRowData, createRowData, deleteRowData, CodedError } from '@/lib/data';
 import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
 
@@ -49,9 +48,8 @@ export async function POST(req: NextRequest) {
     delete formData.auxBoard;
   }
 
-  const email = await getCurrentUserEmail();
   try {
-    const result = await saveRowData(name, formData, email);
+    const result = await saveRowData(name, formData);
     return NextResponse.json(result);
   } catch (e: unknown) {
     return clusterNotebookErrorResponse(e);
@@ -97,10 +95,8 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
 
-  const email = await getCurrentUserEmail();
-
   try {
-    const result = await createRowData(formData, email);
+    const result = await createRowData(formData);
     return NextResponse.json(result);
   } catch (e: unknown) {
     if (e instanceof CodedError && e.code === 'CONFLICT') {

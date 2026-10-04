@@ -79,6 +79,7 @@ describe('getRowData', () => {
       nucleusType: null,
       parentNucleus: null,
       cluster: { name: '', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
     const result = await getRowData('Newly Created');
@@ -115,6 +116,7 @@ describe('getRowData', () => {
         name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers',
         auxiliaryBoardMembers: 'Pat Doe (Propagation), Sam Roe (Protection)',
       },
+      lastUpdated: null,
     });
 
     const result = await getRowData('Alpha');
@@ -150,6 +152,7 @@ describe('getRowData', () => {
       nucleusType: null,
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
     const result = await getRowData('Alpha');
@@ -167,6 +170,7 @@ describe('getRowData', () => {
       nucleusType: null,
       parentNucleus: null,
       cluster: { name: '', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
     const result = await getRowData('Alpha');
@@ -191,6 +195,7 @@ describe('getRowData', () => {
         nucleusType: 'Neighborhood',
         parentNucleus: null,
         cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone, auxiliaryBoardMembers: null },
+        lastUpdated: null,
       });
       const result = await getRowData('Alpha');
       expect(result?.row.pg).toBe(expectedPg);
@@ -207,6 +212,7 @@ describe('getRowData', () => {
       nucleusType: null,
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
     const result = await getRowData('Alpha');
@@ -225,6 +231,7 @@ describe('getRowData', () => {
       nucleusType: null,
       parentNucleus: null,
       cluster: { name: '', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
     const result = await getRowData('Alpha');
@@ -248,6 +255,7 @@ describe('getRowData', () => {
       nucleusType: null,
       parentNucleus: null,
       cluster: { name: '', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
     const blank = { familyName: null, middleNames: null, nickname: null, sex: null, phone: null, ageCategory: null };
     mockGetNucleusWorkers.mockImplementation(async (_name: string, role: string) => {
@@ -272,6 +280,24 @@ describe('getRowData', () => {
     expect(result?.contactNames).toEqual([{ id: '4', name: 'Dave', email: 'dave@x.com' }]);
     expect(result?.promoterNames).toEqual([{ id: '5', name: 'Erin', email: null }]);
   });
+
+  test('passes through lastUpdated from cluster-notebook', async () => {
+    mockGetActivitySummaries.mockResolvedValue(null);
+    mockGetNucleusFields.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null,
+      nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: '', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: { at: '2026-10-03T19:18:09-04:00', by: null },
+    });
+
+    const result = await getRowData('Alpha');
+
+    expect(result?.lastUpdated).toEqual({ at: '2026-10-03T19:18:09-04:00', by: null });
+  });
 });
 
 describe('saveRowData', () => {
@@ -290,7 +316,7 @@ describe('saveRowData', () => {
   test('writes all four activity rollups via cluster-notebook', async () => {
     mockUpdateActivitySummary.mockResolvedValue(null);
 
-    await saveRowData('Alpha', baseFormData, 'me@x.com');
+    await saveRowData('Alpha', baseFormData);
 
     expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'CHILDRENS_CLASS', { number: 1, participants: 2, participantsFof: 3 });
     expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'JUNIOR_YOUTH_GROUP', { number: null, participants: null, participantsFof: null });
@@ -302,7 +328,7 @@ describe('saveRowData', () => {
     mockUpdateActivitySummary.mockResolvedValue(null);
 
     const formData = { ...baseFormData, activities: { ...baseFormData.activities, devotionals: { act: '', part: '', fof: '' } } };
-    await saveRowData('Alpha', formData, 'me@x.com');
+    await saveRowData('Alpha', formData);
 
     expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'DEVOTIONAL_GATHERING', {
       number: null, participants: null, participantsFof: null,
@@ -321,7 +347,7 @@ describe('saveRowData', () => {
     mockUpdateActivitySummary.mockResolvedValue(null);
 
     const formData = { activities: { ...baseFormData.activities, devotionals: { act: '12' } } };
-    await saveRowData('Alpha', formData, 'me@x.com');
+    await saveRowData('Alpha', formData);
 
     expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'DEVOTIONAL_GATHERING', { number: 12 });
   });
@@ -330,7 +356,7 @@ describe('saveRowData', () => {
     mockUpdateActivitySummary.mockResolvedValue(null);
 
     const formData = { ...baseFormData, activities: { ...baseFormData.activities, devotionals: { act: '1,200', part: '900', fof: '0' } } };
-    await saveRowData('Alpha', formData, 'me@x.com');
+    await saveRowData('Alpha', formData);
 
     expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Alpha', 'DEVOTIONAL_GATHERING', {
       number: 1200, participants: 900, participantsFof: 0,
@@ -340,7 +366,7 @@ describe('saveRowData', () => {
   test('propagates a cluster-notebook write failure instead of reporting success', async () => {
     mockUpdateActivitySummary.mockRejectedValue(new Error('cluster-notebook has no nucleus named "Alpha" — activity summary not saved'));
 
-    await expect(saveRowData('Alpha', baseFormData, 'me@x.com')).rejects.toThrow('cluster-notebook has no nucleus named "Alpha"');
+    await expect(saveRowData('Alpha', baseFormData)).rejects.toThrow('cluster-notebook has no nucleus named "Alpha"');
   });
 
   test('writes stage/locality/makeup via cluster-notebook', async () => {
@@ -353,10 +379,11 @@ describe('saveRowData', () => {
       nucleusType: null,
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
     const formData = { ...baseFormData, stage: 'Advanced/5', locality: 'Durham', makeup: 'Students' };
-    await saveRowData('Alpha', formData, 'me@x.com');
+    await saveRowData('Alpha', formData);
 
     // locality is intentionally absent here even though formData has it: cluster-notebook
     // removed NucleusPatch.locality 2026-09-13 (now read-only, derived from Nucleus.location).
@@ -375,10 +402,11 @@ describe('saveRowData', () => {
       nucleusType: null,
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
     const formData = { ...baseFormData, totalPop: '500', totalHH: '120', indNum: '80', hhNum: '30' };
-    await saveRowData('Alpha', formData, 'me@x.com');
+    await saveRowData('Alpha', formData);
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
@@ -395,6 +423,7 @@ describe('saveRowData', () => {
       nucleusType: null,
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
     const formData = {
@@ -402,7 +431,7 @@ describe('saveRowData', () => {
       presence: 'Yes', notesPresence: 'Cleanup drive',
       gatherings: 'No', notesGatherings: '',
     };
-    await saveRowData('Alpha', formData, 'me@x.com');
+    await saveRowData('Alpha', formData);
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
       hasSocialAction: true, socialActionDescription: 'Cleanup drive',
@@ -420,10 +449,11 @@ describe('saveRowData', () => {
       nucleusType: null,
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
     const formData = { ...baseFormData, narrative: 'A growing community of practice.' };
-    await saveRowData('Alpha', formData, 'me@x.com');
+    await saveRowData('Alpha', formData);
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
       narrative: 'A growing community of practice.',
@@ -444,7 +474,7 @@ describe('saveRowData', () => {
         cluster: 'NC-215 Triangle', pg: 'M3', clusterCode: 'NC-215', nucleusType: 'Neighborhood',
       },
     };
-    await saveRowData('Alpha', formData, 'me@x.com');
+    await saveRowData('Alpha', formData);
 
     const patch = mockUpdateNucleus.mock.calls[0][1];
     expect(patch).not.toHaveProperty('nucleus');
@@ -465,13 +495,14 @@ describe('saveRowData', () => {
       narrative: null, nucleusType: 'Network',
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
     const formData = {
       ...baseFormData,
       identity: { nucleus: 'Alpha', nucleusType: 'Network' },
     };
-    await saveRowData('Alpha', formData, 'me@x.com');
+    await saveRowData('Alpha', formData);
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
       nucleusType: 'Network',
@@ -487,6 +518,7 @@ describe('saveRowData', () => {
       narrative: null, nucleusType: null,
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
     // identity present (admin save), but nucleusType/parentNucleus specifically omitted from it.
@@ -495,7 +527,7 @@ describe('saveRowData', () => {
       stage: 'Advanced/5',
       identity: { nucleus: 'Alpha' },
     };
-    await saveRowData('Alpha', formData, 'me@x.com');
+    await saveRowData('Alpha', formData);
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { stage: 'Advanced/5' });
   });
@@ -509,10 +541,11 @@ describe('saveRowData', () => {
       narrative: null, nucleusType: null,
       parentNucleus: { name: 'Chapelboro' },
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
     const formData = { ...baseFormData, identity: { nucleus: 'Alpha', parentNucleus: 'Chapelboro' } };
-    await saveRowData('Alpha', formData, 'me@x.com');
+    await saveRowData('Alpha', formData);
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { parentNucleusName: 'Chapelboro' });
   });
@@ -526,10 +559,11 @@ describe('saveRowData', () => {
       narrative: null, nucleusType: null,
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
     const formData = { ...baseFormData, identity: { nucleus: 'Alpha', parentNucleus: '' } };
-    await saveRowData('Alpha', formData, 'me@x.com');
+    await saveRowData('Alpha', formData);
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { parentNucleusName: null });
   });
@@ -544,10 +578,11 @@ describe('saveRowData', () => {
       nucleusType: null,
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
     const formData = { ...baseFormData, presence: '', gatherings: '' };
-    await saveRowData('Alpha', formData, 'me@x.com');
+    await saveRowData('Alpha', formData);
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
       hasSocialAction: null, hasCommunityGatherings: null,
@@ -564,11 +599,12 @@ describe('saveRowData', () => {
       nucleusType: null,
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
     const formData: Record<string, unknown> = { ...baseFormData, stage: 'Advanced/5' };
     delete formData.makeup;
-    await saveRowData('Alpha', formData, 'me@x.com');
+    await saveRowData('Alpha', formData);
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { stage: 'Advanced/5' });
   });
@@ -578,7 +614,7 @@ describe('saveRowData', () => {
 
     // baseFormData's own `locality` is never patchable (read-only, derived on
     // cluster-notebook's side) — plain baseFormData alone shouldn't trigger a call.
-    await saveRowData('Alpha', baseFormData, 'me@x.com');
+    await saveRowData('Alpha', baseFormData);
 
     expect(mockUpdateNucleus).not.toHaveBeenCalled();
   });
@@ -590,7 +626,7 @@ describe('saveRowData', () => {
       juniorYouthGroups: null, studyCircles: null, devotionalGathering: null,
     });
 
-    const result = await saveRowData('Alpha', baseFormData, 'me@x.com');
+    const result = await saveRowData('Alpha', baseFormData);
 
     // Fetched AFTER the writes settle, not derived from what we sent -- cluster-notebook
     // recomputes isOverridden server-side, so the client can't know the new value otherwise.
@@ -606,12 +642,35 @@ describe('saveRowData', () => {
       narrative: null, nucleusType: null,
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
-    const result = await saveRowData('Alpha', { stage: 'Advanced/5' }, 'me@x.com');
+    const result = await saveRowData('Alpha', { stage: 'Advanced/5' });
 
     expect(mockGetActivitySummaries).not.toHaveBeenCalled();
     expect(result.activities).toBeUndefined();
+  });
+
+  test('returns a fresh lastUpdated read from cluster-notebook after the writes settle', async () => {
+    // Real, persisted data from cluster-notebook's audit log (confirmed 2026-10-04),
+    // aggregated across the nucleus and all four activity summaries -- not derivable
+    // from anything we sent, so this always comes from a fresh read, never echoed
+    // back from the write itself.
+    mockUpdateActivitySummary.mockResolvedValue(null);
+    mockGetNucleusFields.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: { at: '2026-10-04T10:00:00-04:00', by: 'Michael Kalantar' },
+    });
+
+    const result = await saveRowData('Alpha', baseFormData);
+
+    expect(mockGetNucleusFields).toHaveBeenCalledWith('Alpha');
+    expect(result.lastUpdated).toEqual({ at: '2026-10-04T10:00:00-04:00', by: 'Michael Kalantar' });
   });
 });
 
@@ -636,21 +695,22 @@ describe('createRowData', () => {
       narrative: null, nucleusType: null,
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
 
-    await createRowData(baseCreateFormData, 'me@x.com');
+    await createRowData(baseCreateFormData);
 
     expect(mockCreateNucleus).toHaveBeenCalledWith('Riverside', 'NC-215 Triangle');
   });
 
   test('throws when nucleus name is missing', async () => {
-    await expect(createRowData({ identity: { cluster: 'NC-215 Triangle' } }, 'me@x.com'))
+    await expect(createRowData({ identity: { cluster: 'NC-215 Triangle' } }))
       .rejects.toThrow('Nucleus name is required');
     expect(mockCreateNucleus).not.toHaveBeenCalled();
   });
 
   test('throws when cluster is missing', async () => {
-    await expect(createRowData({ identity: { nucleus: 'Riverside' } }, 'me@x.com'))
+    await expect(createRowData({ identity: { nucleus: 'Riverside' } }))
       .rejects.toThrow('Cluster is required');
     expect(mockCreateNucleus).not.toHaveBeenCalled();
   });
@@ -660,7 +720,7 @@ describe('createRowData', () => {
 
     let caught: unknown;
     try {
-      await createRowData(baseCreateFormData, 'me@x.com');
+      await createRowData(baseCreateFormData);
     } catch (e) {
       caught = e;
     }
@@ -674,7 +734,7 @@ describe('createRowData', () => {
 
     let caught: unknown;
     try {
-      await createRowData(baseCreateFormData, 'me@x.com');
+      await createRowData(baseCreateFormData);
     } catch (e) {
       caught = e;
     }
@@ -690,6 +750,7 @@ describe('createRowData', () => {
       narrative: null, nucleusType: null,
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
     mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue(null);
@@ -699,7 +760,7 @@ describe('createRowData', () => {
       stage: 'Initial/2',
       activities: { ...baseCreateFormData.activities, ccs: { act: '1', part: '2', fof: '3' } },
     };
-    await createRowData(formData, 'me@x.com');
+    await createRowData(formData);
 
     expect(mockUpdateActivitySummary).toHaveBeenCalledWith('Riverside', 'CHILDRENS_CLASS', { number: 1, participants: 2, participantsFof: 3 });
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Riverside', { stage: 'Initial/2' });
@@ -713,13 +774,44 @@ describe('createRowData', () => {
       narrative: null, nucleusType: null,
       parentNucleus: { name: 'Chapelboro' },
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
     });
     mockUpdateNucleus.mockResolvedValue(null);
 
     const formData = { ...baseCreateFormData, identity: { ...baseCreateFormData.identity, parentNucleus: 'Chapelboro' } };
-    await createRowData(formData, 'me@x.com');
+    await createRowData(formData);
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Riverside', { parentNucleusName: 'Chapelboro' });
+  });
+
+  test('returns a fresh lastUpdated read, not createNucleus\'s own (potentially stale) snapshot', async () => {
+    // createNucleus's own response only reflects the creation moment -- stale
+    // relative to any activity/nucleus-patch writes that ran after it. Its own
+    // lastUpdated is null here deliberately, to prove the result comes from the
+    // later fresh read, not from echoing this one back.
+    mockCreateNucleus.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
+    });
+    mockGetNucleusFields.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: { at: '2026-10-04T10:05:00-04:00', by: 'Michael Kalantar' },
+    });
+
+    const result = await createRowData(baseCreateFormData);
+
+    expect(mockGetNucleusFields).toHaveBeenCalledWith('Riverside');
+    expect(result.lastUpdated).toEqual({ at: '2026-10-04T10:05:00-04:00', by: 'Michael Kalantar' });
   });
 });
 

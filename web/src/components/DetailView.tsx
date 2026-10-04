@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { NucleusDetail, NucleusRow, Activity } from '@/types';
 import type { Worker } from '@/types';
 import type { PermissionSet } from '@/lib/access';
+import type { LastUpdated } from '@/lib/clusterNotebook';
 import WorkerListModal from './WorkerListModal';
 import ManageAccessCard from './ManageAccessCard';
 
@@ -580,8 +581,13 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // The most recent failed field save, so the status bar can offer a one-click Retry
   // instead of requiring the user to re-edit the field to re-trigger a blur.
   const [retry, setRetry] = useState<{ label: string; run: () => void } | null>(null);
-  const [lastUpdatedBy, setLastUpdatedBy] = useState('');
-  const [lastUpdatedAt, setLastUpdatedAt] = useState('');
+  // Real, persisted data from cluster-notebook's audit log (confirmed 2026-10-04) --
+  // not fabricated client-side state. Initialized from the detail we loaded, kept
+  // fresh after each save from that save's own response. Always one of three shapes:
+  // null (no audit row exists at all -- predates audit logging), { at, by: null }
+  // (history exists, actor withheld by role), or { at, by } (full info) -- see
+  // LastUpdated/updatedLine below for how each renders.
+  const [lastUpdated, setLastUpdated] = useState<LastUpdated | null>(() => detail.lastUpdated);
   const [showDiagram, setShowDiagram] = useState(false);
   const [showDiagram2, setShowDiagram2] = useState(false);
   const [showDiagram3, setShowDiagram3] = useState(false);
@@ -640,9 +646,12 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
       if (data.activities) {
         setForm(f => ({ ...f, activities: data.activities }));
       }
-      setLastUpdatedBy(data.savedBy || email);
-      setLastUpdatedAt(data.savedAt || new Date().toISOString());
-      onSaved(data.savedBy || email, data.savedAt || new Date().toISOString());
+      // data.lastUpdated is always present on a successful save (saveRowData reads it
+      // fresh after writing) -- undefined would only mean an old server response
+      // shape, so `!== undefined` (not a truthiness check) is what actually guards
+      // against that, while still accepting a legitimate null.
+      if (data.lastUpdated !== undefined) setLastUpdated(data.lastUpdated as LastUpdated | null);
+      onSaved(data.lastUpdated?.by ?? email, data.lastUpdated?.at ?? new Date().toISOString());
       return { ok: true as const, activities: data.activities as FormState['activities'] | undefined };
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e);
@@ -787,9 +796,16 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     { label: 'Population/Residing',       value: form.totalPop },
   ];
 
-  const updatedLine = lastUpdatedAt
-    ? `Last saved by ${lastUpdatedBy} on ${new Date(lastUpdatedAt).toLocaleString()}`
-    : '';
+  // Three cases, confirmed with cluster-notebook 2026-10-04 -- null means no audit
+  // row exists at all (predates audit logging, 2026-09-25: no date to show, not an
+  // unknown one), `by` null with `at` set means the actor is withheld by role (not
+  // "unknown" either -- the server already decided, so no "unknown person" wording),
+  // both set is the full line.
+  const updatedLine = !lastUpdated
+    ? 'Last updated by System'
+    : lastUpdated.by
+      ? `Last updated by ${lastUpdated.by} on ${new Date(lastUpdated.at).toLocaleString()}`
+      : `Last updated on ${new Date(lastUpdated.at).toLocaleString()}`;
 
   return (
     <>
@@ -799,7 +815,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           <div style={{ minWidth: 0 }}>
             <h1>{row.nucleus}</h1>
             <div className="meta">{row.clusterCode} · {row.cluster} · {row.locality}</div>
-            {updatedLine && <div className="last-updated">{updatedLine}</div>}
+            <div className="last-updated">{updatedLine}</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>

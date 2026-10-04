@@ -1,4 +1,5 @@
 import type { PermissionSet } from './lib/access';
+import type { LastUpdated } from './lib/clusterNotebook';
 
 export interface Activity {
   act: string;
@@ -79,6 +80,12 @@ export interface NucleusDetail {
   // At most one entry -- Contact is a single-person role, unlike the other three.
   contactNames: Worker[];
   promoterNames: Worker[];
+  // Real, persisted "who/when last changed anything on this page" from
+  // cluster-notebook's audit log -- aggregated across the Nucleus's own fields and
+  // all four activity summaries (confirmed 2026-10-04). Null only when no audit row
+  // exists at all (predates audit logging, 2026-09-25); see LastUpdated for what
+  // `by` can be once this is non-null.
+  lastUpdated: LastUpdated | null;
 }
 
 export interface InitialData {

@@ -170,6 +170,7 @@ export async function getRowData(nucleusName: string) {
     abmAssistantNames: toWorkers(abmAssistantWorkers),
     contactNames: toWorkers(contactWorkers),
     promoterNames: toWorkers(promoterWorkers),
+    lastUpdated: nucleusFields?.lastUpdated ?? null,
   };
 }
 
@@ -269,7 +270,7 @@ function nucleusPatchFromFormData(d: FormDataInput) {
 // for editing, not a separate seed-write. No Sheet row is written at all anymore --
 // access control no longer requires one (see access.ts) and parentNucleus, the
 // last field that needed one, is now cluster-notebook's own field.
-export async function createRowData(formData: Record<string, unknown>, userEmail: string) {
+export async function createRowData(formData: Record<string, unknown>) {
   const d = formData as any;
   const newNucleus = ((d.identity?.nucleus) || '').trim();
   const clusterName = ((d.identity?.cluster) || '').trim();
@@ -300,7 +301,11 @@ export async function createRowData(formData: Record<string, unknown>, userEmail
   }
   await Promise.all(writes);
 
-  return { success: true, savedBy: userEmail, savedAt: new Date().toISOString() };
+  // `created`'s own snapshot (from createNucleus's response, above) only reflects
+  // the creation moment -- stale relative to the activity/nucleus-patch writes that
+  // just ran after it -- so read lastUpdated fresh rather than reuse it.
+  const fields = await getNucleusFields(newNucleus);
+  return { success: true, lastUpdated: fields?.lastUpdated ?? null };
 }
 
 // nucleus/grouping/cluster/pg/clusterCode are deliberately absent from nucleusPatch below —
@@ -311,7 +316,7 @@ export async function createRowData(formData: Record<string, unknown>, userEmail
 // client-side from cluster.name, not a stored field at all. Every field this function writes,
 // including parentNucleus now, routes entirely through cluster-notebook -- no Sheet write at
 // all anymore, 2026-09-14.
-export async function saveRowData(nucleusName: string, formData: Record<string, unknown>, userEmail: string) {
+export async function saveRowData(nucleusName: string, formData: Record<string, unknown>) {
   const d = formData as any;
 
   // cc/jyg/sc/devotionals are no longer Sheet columns at all (see COL.CC_ACT etc.'s
@@ -324,14 +329,17 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
   }
   await Promise.all(writes);
 
-  // If activities were part of this save, hand back the fresh post-write state (in
-  // particular isOverridden) so the caller can update its display without a reload --
-  // cluster-notebook recomputes isOverridden server-side (value comparison against its
-  // own SRP-derived numbers), so there's no way for the client to know the new value
-  // from what it sent.
-  const activities = d.activities
-    ? activitiesFromClusterNotebook(await getActivitySummaries(nucleusName))
-    : undefined;
+  // Fresh post-write state for both activities (in particular isOverridden) and
+  // lastUpdated -- neither is derivable from what we sent: cluster-notebook
+  // recomputes isOverridden server-side (comparison against its own SRP-derived
+  // numbers), and lastUpdated is aggregated across the nucleus and all four
+  // activity summaries (confirmed with cluster-notebook 2026-10-04), so a save
+  // that only touched one activity type still needs a fresh read to reflect it.
+  const [activitySummaries, fields] = await Promise.all([
+    d.activities ? getActivitySummaries(nucleusName) : Promise.resolve(null),
+    getNucleusFields(nucleusName),
+  ]);
+  const activities = d.activities ? activitiesFromClusterNotebook(activitySummaries) : undefined;
 
-  return { success: true, savedBy: userEmail, savedAt: new Date().toISOString(), activities };
+  return { success: true, activities, lastUpdated: fields?.lastUpdated ?? null };
 }
