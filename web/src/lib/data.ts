@@ -294,18 +294,25 @@ export async function createRowData(formData: Record<string, unknown>) {
     throw new CodedError(`cluster-notebook has no cluster named "${clusterName}" — nucleus not created`, 'BAD_CLUSTER');
   }
 
-  const writes: Promise<unknown>[] = [...activityUpdateWrites(newNucleus, d)];
   const nucleusPatch = nucleusPatchFromFormData(d);
-  if (Object.keys(nucleusPatch).length > 0) {
-    writes.push(updateNucleus(newNucleus, nucleusPatch));
-  }
-  await Promise.all(writes);
+  const nucleusWrite = Object.keys(nucleusPatch).length > 0 ? updateNucleus(newNucleus, nucleusPatch) : null;
+  await Promise.all([...activityUpdateWrites(newNucleus, d), nucleusWrite]);
+  const updatedFields = nucleusWrite ? await nucleusWrite : null;
 
-  // `created`'s own snapshot (from createNucleus's response, above) only reflects
-  // the creation moment -- stale relative to the activity/nucleus-patch writes that
-  // just ran after it -- so read lastUpdated fresh rather than reuse it.
-  const fields = await getNucleusFields(newNucleus);
-  return { success: true, lastUpdated: fields?.lastUpdated ?? null };
+  // lastUpdated: confirmed with cluster-notebook 2026-10-04 that updateNucleus's own
+  // response already carries an accurate value (its audit row commits in the same
+  // transaction the mutation resolves against) -- reuse it when it's the only write
+  // that ran after creation. updateActivitySummary's response has no lastUpdated at
+  // all (it returns ActivitySummary, not Nucleus), and even alongside a concurrent
+  // nucleus-patch write, that write's own response reflects only ITS OWN transaction,
+  // not an activity write that might settle a moment later -- so activities touched
+  // always means a fresh aggregate read instead. Neither write happening at all (a
+  // bare identity-only create) means createNucleus's own response, above, is already
+  // the freshest thing we have.
+  const lastUpdated = d.activities
+    ? (await getNucleusFields(newNucleus))?.lastUpdated ?? null
+    : (updatedFields ?? created).lastUpdated;
+  return { success: true, lastUpdated };
 }
 
 // nucleus/grouping/cluster/pg/clusterCode are deliberately absent from nucleusPatch below —
@@ -322,24 +329,31 @@ export async function saveRowData(nucleusName: string, formData: Record<string, 
   // cc/jyg/sc/devotionals are no longer Sheet columns at all (see COL.CC_ACT etc.'s
   // "dead" comments) -- each now writes straight to cluster-notebook's shared
   // updateActivitySummary mutation, one call per activity type.
-  const writes: Promise<unknown>[] = [...activityUpdateWrites(nucleusName, d)];
   const nucleusPatch = nucleusPatchFromFormData(d);
-  if (Object.keys(nucleusPatch).length > 0) {
-    writes.push(updateNucleus(nucleusName, nucleusPatch));
-  }
-  await Promise.all(writes);
+  const nucleusWrite = Object.keys(nucleusPatch).length > 0 ? updateNucleus(nucleusName, nucleusPatch) : null;
+  await Promise.all([...activityUpdateWrites(nucleusName, d), nucleusWrite]);
+  const updatedFields = nucleusWrite ? await nucleusWrite : null;
 
-  // Fresh post-write state for both activities (in particular isOverridden) and
-  // lastUpdated -- neither is derivable from what we sent: cluster-notebook
-  // recomputes isOverridden server-side (comparison against its own SRP-derived
-  // numbers), and lastUpdated is aggregated across the nucleus and all four
-  // activity summaries (confirmed with cluster-notebook 2026-10-04), so a save
-  // that only touched one activity type still needs a fresh read to reflect it.
-  const [activitySummaries, fields] = await Promise.all([
-    d.activities ? getActivitySummaries(nucleusName) : Promise.resolve(null),
-    getNucleusFields(nucleusName),
-  ]);
-  const activities = d.activities ? activitiesFromClusterNotebook(activitySummaries) : undefined;
+  // Fresh post-write state for activities (in particular isOverridden) -- not
+  // derivable from what we sent: cluster-notebook recomputes it server-side
+  // (comparison against its own SRP-derived numbers).
+  const activities = d.activities
+    ? activitiesFromClusterNotebook(await getActivitySummaries(nucleusName))
+    : undefined;
 
-  return { success: true, activities, lastUpdated: fields?.lastUpdated ?? null };
+  // lastUpdated: confirmed with cluster-notebook 2026-10-04 that updateNucleus's own
+  // response already carries an accurate value (its audit row commits in the same
+  // transaction the mutation resolves against) -- reuse it when it's the only write
+  // this save made. updateActivitySummary's response has no lastUpdated at all (it
+  // returns ActivitySummary, not Nucleus), and even alongside a concurrent
+  // nucleus-patch write, that write's own response reflects only ITS OWN transaction,
+  // not an activity write that might settle a moment later -- so activities touched
+  // always means a fresh aggregate read instead. Also falls back to a fresh read if
+  // nothing was written at all (defensive -- the UI never calls this without a real
+  // change, so there'd be no write to reuse a value from).
+  const lastUpdated = (d.activities || !updatedFields)
+    ? (await getNucleusFields(nucleusName))?.lastUpdated ?? null
+    : updatedFields.lastUpdated;
+
+  return { success: true, activities, lastUpdated };
 }

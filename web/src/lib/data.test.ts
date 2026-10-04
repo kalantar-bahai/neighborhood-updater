@@ -651,11 +651,33 @@ describe('saveRowData', () => {
     expect(result.activities).toBeUndefined();
   });
 
-  test('returns a fresh lastUpdated read from cluster-notebook after the writes settle', async () => {
+  test('reuses updateNucleus\'s own lastUpdated when the save only touched nucleus fields, skipping a fresh read', async () => {
+    // Confirmed with cluster-notebook 2026-10-04: updateNucleus returns a Nucleus,
+    // and its lastUpdated field resolves AFTER the mutation commits (same
+    // transaction), so this response is already accurate -- no need to spend an
+    // extra round trip re-reading it when it's the only write this save made.
+    mockUpdateNucleus.mockResolvedValue({
+      stage: 'Advanced/5', locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: { at: '2026-10-04T10:36:04-04:00', by: 'Cee Esso' },
+    });
+
+    const result = await saveRowData('Alpha', { stage: 'Advanced/5' });
+
+    expect(mockGetNucleusFields).not.toHaveBeenCalled();
+    expect(result.lastUpdated).toEqual({ at: '2026-10-04T10:36:04-04:00', by: 'Cee Esso' });
+  });
+
+  test('returns a fresh lastUpdated read from cluster-notebook when activities were touched', async () => {
     // Real, persisted data from cluster-notebook's audit log (confirmed 2026-10-04),
     // aggregated across the nucleus and all four activity summaries -- not derivable
-    // from anything we sent, so this always comes from a fresh read, never echoed
-    // back from the write itself.
+    // from anything we sent (updateActivitySummary's own response has no lastUpdated
+    // at all -- it returns ActivitySummary, not Nucleus), so this always comes from
+    // a fresh read.
     mockUpdateActivitySummary.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
@@ -668,6 +690,40 @@ describe('saveRowData', () => {
     });
 
     const result = await saveRowData('Alpha', baseFormData);
+
+    expect(mockGetNucleusFields).toHaveBeenCalledWith('Alpha');
+    expect(result.lastUpdated).toEqual({ at: '2026-10-04T10:00:00-04:00', by: 'Michael Kalantar' });
+  });
+
+  test('still does a fresh lastUpdated read when a nucleus-field write ran alongside an activity write', async () => {
+    // The subtle case: updateNucleus's own response is accurate for ITS OWN
+    // transaction, but a concurrently-running activity write could settle a moment
+    // later -- so its response can't be trusted as "the newest thing" when
+    // something else wrote at the same time. updateNucleus's own lastUpdated here
+    // is deliberately a DIFFERENT (older) value than the fresh read's, so this test
+    // fails if the code ever takes the shortcut in this combined case.
+    mockUpdateActivitySummary.mockResolvedValue(null);
+    mockUpdateNucleus.mockResolvedValue({
+      stage: 'Advanced/5', locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: { at: '2026-10-04T09:00:00-04:00', by: 'Stale Response' },
+    });
+    mockGetNucleusFields.mockResolvedValue({
+      stage: 'Advanced/5', locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: { at: '2026-10-04T10:00:00-04:00', by: 'Michael Kalantar' },
+    });
+
+    const formData = { ...baseFormData, stage: 'Advanced/5' };
+    const result = await saveRowData('Alpha', formData);
 
     expect(mockGetNucleusFields).toHaveBeenCalledWith('Alpha');
     expect(result.lastUpdated).toEqual({ at: '2026-10-04T10:00:00-04:00', by: 'Michael Kalantar' });
@@ -812,6 +868,56 @@ describe('createRowData', () => {
 
     expect(mockGetNucleusFields).toHaveBeenCalledWith('Riverside');
     expect(result.lastUpdated).toEqual({ at: '2026-10-04T10:05:00-04:00', by: 'Michael Kalantar' });
+  });
+
+  test('reuses updateNucleus\'s own lastUpdated when the create only touched nucleus fields besides identity, skipping a fresh read', async () => {
+    // Same reasoning as saveRowData's equivalent test -- updateNucleus's own
+    // response is already accurate (confirmed with cluster-notebook 2026-10-04), so
+    // no need for a separate read when it's the only write that ran after creation.
+    mockCreateNucleus.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
+    });
+    mockUpdateNucleus.mockResolvedValue({
+      stage: 'Initial/2', locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: { at: '2026-10-04T10:36:04-04:00', by: 'Cee Esso' },
+    });
+
+    const formData = { identity: baseCreateFormData.identity, stage: 'Initial/2' };
+    const result = await createRowData(formData);
+
+    expect(mockGetNucleusFields).not.toHaveBeenCalled();
+    expect(result.lastUpdated).toEqual({ at: '2026-10-04T10:36:04-04:00', by: 'Cee Esso' });
+  });
+
+  test('reuses createNucleus\'s own lastUpdated when nothing else was written (bare identity-only create)', async () => {
+    // Nothing ran after createNucleus itself -- its own response, already in hand,
+    // is the freshest thing there is. No second write, and no read, needed.
+    mockCreateNucleus.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: { at: '2026-10-04T10:40:00-04:00', by: 'Michael Kalantar' },
+    });
+
+    const result = await createRowData({ identity: baseCreateFormData.identity });
+
+    expect(mockUpdateNucleus).not.toHaveBeenCalled();
+    expect(mockGetNucleusFields).not.toHaveBeenCalled();
+    expect(result.lastUpdated).toEqual({ at: '2026-10-04T10:40:00-04:00', by: 'Michael Kalantar' });
   });
 });
 
