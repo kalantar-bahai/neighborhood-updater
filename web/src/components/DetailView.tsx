@@ -800,9 +800,13 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // row exists at all (predates audit logging, 2026-09-25: no date to show, not an
   // unknown one), `by` null with `at` set means the actor is withheld by role (not
   // "unknown" either -- the server already decided, so no "unknown person" wording),
-  // both set is the full line.
+  // both set is the full line. Deliberately NOT "System" for the null case (2026-10-04,
+  // reported by the user as confusing) -- "System" is cluster-notebook's own real label
+  // for a script/seed write that DID get audited (a case `lastUpdated.by` can equal,
+  // rendered by the second branch below); reusing that word here, for a nucleus with
+  // no audit row at all, made it look like the same thing when it isn't.
   const updatedLine = !lastUpdated
-    ? 'Last updated by System'
+    ? 'No update history recorded'
     : lastUpdated.by
       ? `Last updated by ${lastUpdated.by} on ${new Date(lastUpdated.at).toLocaleString()}`
       : `Last updated on ${new Date(lastUpdated.at).toLocaleString()}`;
