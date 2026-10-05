@@ -248,14 +248,21 @@ function PairField({ label, numVal, pctVal, onNumChange, onNumBlur, readonly, pc
 // Highlighting is driven entirely by cluster-notebook's ActivitySummary.isOverridden
 // now (2026-09-14) -- one flag for the whole {act, part, fof} triple, not a per-field
 // diff against a separately-fetched SRP value. So the row is either fully amber or not.
-function ActRow({ label, userVals, onChange, onBlur, readonly }: {
+// highlightOverrides defaults on, but is turned off for Devotional Gatherings
+// specifically (2026-10-05): cluster-notebook now has a write-back path that will
+// (eventually) push an overridden DG value to SRP itself, so a manual DG override no
+// longer represents a standing discrepancy worth flagging -- it's not a divergence
+// waiting to be reconciled, just a value on its way there. The other three activity
+// types have no such write-back yet, so they keep the amber cue.
+function ActRow({ label, userVals, onChange, onBlur, readonly, highlightOverrides = true }: {
   label: string;
   userVals: Activity;
   onChange: (field: ActivityNumericField, v: string) => void;
   onBlur: (field: ActivityNumericField) => void;
   readonly?: boolean;
+  highlightOverrides?: boolean;
 }) {
-  const highlighted = !!userVals.isOverridden;
+  const highlighted = highlightOverrides && !!userVals.isOverridden;
 
   function cls(val: string) {
     return [readonly ? 'ro' : '', highlighted ? 'overridden' : '', !readonly && !isValidInt(val) ? 'error' : ''].filter(Boolean).join(' ') || undefined;
@@ -1061,7 +1068,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   <ActRow label="Study Circles" userVals={form.activities.scs} readonly={!canWrite}
                     onChange={(f, v) => setAct('scs', f, v)} onBlur={f => commitActField('scs', f, 'Study Circles')} />
                   <TotalRow label="Total Educational Activities" totals={edTotal} />
-                  <ActRow label="Devotional Gatherings" userVals={form.activities.devotionals} readonly={!canWrite}
+                  <ActRow label="Devotional Gatherings" userVals={form.activities.devotionals} readonly={!canWrite} highlightOverrides={false}
                     onChange={(f, v) => setAct('devotionals', f, v)} onBlur={f => commitActField('devotionals', f, 'Devotional Gatherings')} />
                   <TotalRow label="Total Activities" totals={allTotal} />
                 </tbody>
