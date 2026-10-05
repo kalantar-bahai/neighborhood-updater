@@ -946,7 +946,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 label="Participating"
                 value={String(allTotal.part)}
                 readonly
-                info="Estimated number of individuals who participate with some regularity in collective spaces in the neighborhood, such as family groups, neighborhood gatherings, festivals, community gatherings, Bahá’í holy days, or neighborhood Feasts."
+                info="Estimated number of individuals who participate with some regularity in collective spaces in the neighborhood, such as devotional meetings, family groups, neighborhood gatherings, festivals, community gatherings, Bahá’í holy days, or neighborhood Feasts, and home visits."
               />
               {/* Promoting/Helping/Accompanying show a count, not the name list --
                   these can be large; unlike Contact (a singleton, shows the name
@@ -957,14 +957,14 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 value={String(promoterNames.length)}
                 readonly
                 onLabelClick={permissions.canAssignRoles ? () => setShowPromotersModal(true) : undefined}
-                info="Estimated number of individuals promoting various aspects of community life such as parents encouraging participation, junior youth bringing friends, or youth inviting peers. It also includes promoting collective spaces such as festivals, Summer of Service, family gatherings, and various logistical assistance such as providing food, giving rides…"
+                info="Estimated number of individuals promoting various aspects of community life such as parents encouraging participation, junior youth bringing friends, or youth inviting peers. It also includes promoting collective spaces such as festivals, Summer of Service, family gatherings, and various logistical assistance such as providing food, giving rides, serving others, etc."
               />
               <Field
                 label="Helping"
                 value={String(protagonistNames.length)}
                 readonly
                 onLabelClick={permissions.canAssignRoles ? () => setShowProtagonistsModal(true) : undefined}
-                info="Estimated number of individuals who assist others in taking simple acts of service or initial steps in the educational process, without yet providing sustained accompaniment. For example, someone might help another person share a prayer, learn a quotation, introduce the institute’s programs, or undertake a simple act of service."
+                info="Estimated number of individuals who assist others in taking initial steps in serving others. For example, one may walk with another to do home visits, to share a prayer, to learn a quotation, to introduce the institute’s programs, or other acts of service."
               />
             </div>
             <div className="field-grid-3">
@@ -972,20 +972,20 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 label="In Core Activity"
                 value={String(edTotal.part)}
                 readonly
-                info="Estimated number of individuals who participate in one or more core activities: children’s classes, junior youth groups, devotional gatherings, or study circles. This is a subset of those participating more broadly in community building activities."
+                info="Estimated number of children, junior youth, youth, and adults participating in educational activities in various modalities and forms: children’s classes, junior youth groups, and study circles."
               />
               <Field
                 label="Facilitating Core Activity"
                 value={form.facilitators}
                 readonly
-                info="Estimated number of individuals who directly facilitate the educational process, particularly as teachers of children’s classes, animators of junior youth groups, tutors of study circles, or others serving in a comparable facilitating role."
+                info="Estimated number of individuals who facilitate or share the content of the institute’s educational programs, in various forms, approaches, methods, and modalities, to all ages in the neighborhood."
               />
               <Field
                 label="Accompanying"
                 value={String(accompanierNames.length)}
                 readonly
                 onLabelClick={permissions.canAssignRoles && permissions.assignableRoles.includes('accompanier') ? () => setShowAccompaniersModal(true) : undefined}
-                info="Estimated number of individuals with sufficient experience and capacity to provide sustained accompaniment to others as they advance in service—helping them develop capacity."
+                info="Estimated number of individuals who have gained a measure of experience from the institute’s courses alongside acts of service, whose actions are motivated by a desire to see capacity develop in others and to foster friendships founded on cooperation and reciprocity."
               />
             </div>
           </div>
@@ -1002,6 +1002,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             <div className="field-grid-2">
               <PairField
                 label="Individuals Connected"
+                info="Estimated number of individuals with whom there is some contact or conversation in the neighborhood, but who do not yet participate regularly in activities or collective spaces."
                 numVal={form.indNum} pctVal={computedPct(form.indNum, form.totalPop)}
                 onNumChange={v => set('indNum', v)} onNumBlur={() => commitField('indNum', 'Individuals Connected', true)} readonly={!canWrite} pctReadonly numInteger
               />
