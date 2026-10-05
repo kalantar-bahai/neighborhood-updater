@@ -518,21 +518,36 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
   );
 }
 
-// Staggered diagram: 8 concentric circles sharing one center, ordered inner -> outer to
+// Staggered diagram: 9 concentric circles sharing one center, ordered inner -> outer to
 // match the labels passed in. Each label is left-aligned and anchored in the middle of its
 // own ring's band along a 45deg ray running up and to the right of the center, so the
 // labels step diagonally and the longer ones spill past the circles' edges. The halo
 // (paint-order: stroke) keeps a label readable wherever it crosses a different fill.
-const SCX = 230, SCY = 240, SSTEP = 26;
+//
+// dashed/bold are explicit per ring, not computed from position -- inserting ring 5
+// (2026-10-04) breaks the old alternating pattern on purpose: ring 6 (renamed from
+// "Promoting", unchanged otherwise) keeps the dashed look it always had, landing right
+// next to the new ring's own dashed look, rather than flipping to bold just because its
+// position shifted by one.
+// SCX shifted from 230 (right by 10) when the 9th ring was added, 2026-10-04 -- the
+// outermost ring's radius grew to 9*SSTEP=234, which would otherwise clip slightly
+// past the viewBox's left edge (230-234 < 0).
+const SCX = 240, SCY = 240, SSTEP = 26;
 const SRINGS = [
   { fill: '#1e3a8a', dashed: true  }, // 1 Accompanying (innermost)
   { fill: '#1e40af', dashed: false, bold: true }, // 2 Helping Others
   { fill: '#2563eb', dashed: true  }, // 3 Facilitating Ed. Act.
   { fill: '#3b82f6', dashed: false, bold: true }, // 4 Participating in Ed. Act.
-  { fill: '#60a5fa', dashed: true  }, // 5 Promoting
-  { fill: '#93c5fd', dashed: false, bold: true }, // 6 Participating
-  { fill: '#bfdbfe', dashed: false }, // 7 In Conversation
-  { fill: '#dbeafe', dashed: false }, // 8 Population/Residing (outermost)
+  // New 2026-10-04, no SRP/cluster-notebook mapping yet (blank value) -- #4e94f8 is the
+  // midpoint between ring 4's and ring 6's existing fills, computed rather than reusing
+  // a Tailwind stop: no shade falls between blue-500 and blue-400, and reusing the whole
+  // palette's skipped blue-700 would've meant recoloring rings 3-4 too, which should stay
+  // exactly as they were.
+  { fill: '#4e94f8', dashed: true  }, // 5 Hosting Devotional Meetings/Gatherings
+  { fill: '#60a5fa', dashed: true  }, // 6 Protagonists/Promoting (renamed from "Promoting")
+  { fill: '#93c5fd', dashed: false, bold: true }, // 7 Participating
+  { fill: '#bfdbfe', dashed: false }, // 8 In Conversation
+  { fill: '#dbeafe', dashed: false }, // 9 Population/Residing (outermost)
 ];
 
 function StaggeredConcentricDiagram({ labels }: { labels: AlignedLabel[] }) {
@@ -549,7 +564,10 @@ function StaggeredConcentricDiagram({ labels }: { labels: AlignedLabel[] }) {
       ))}
       {labels.map((l, i) => {
         const mid = (i + 0.5) * SSTEP;
-        const dark = i < 4;
+        // Dark-fill rings (white text) vs light-fill rings (navy text) -- the new ring
+        // 5's fill (#4e94f8) is still closer to the dark side than the light one, so the
+        // threshold shifted from 4 to 5 rather than staying put.
+        const dark = i < 5;
         const x = SCX + mid * cos45, y = SCY - mid * cos45;
         const content = <><tspan fontWeight={700}>{formatNum(l.value)}</tspan> {l.label}</>;
         return (
@@ -784,16 +802,18 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     },
   ];
 
-  // Innermost -> outermost, same values as the Aligned diagram's rings.
+  // Innermost -> outermost, same values as the Aligned diagram's rings (except
+  // "Hosting Devotional Meetings/Gatherings", which has no mapping yet -- always blank).
   const staggeredLabels: AlignedLabel[] = [
-    { label: 'Accompanying',              value: String(accompanierNames.length), onClick: () => setShowAccompaniersModal(true) },
-    { label: 'Helping Others',            value: String(protagonistNames.length), onClick: () => setShowProtagonistsModal(true) },
-    { label: 'Facilitating Ed. Act.',     value: form.facilitatorsCount },
-    { label: 'Participating in Ed. Act.', value: String(edTotal.part) },
-    { label: 'Promoting',                 value: String(promoterNames.length), onClick: () => setShowPromotersModal(true) },
-    { label: 'Participating',             value: hasAnyActPart ? String(allTotal.part) : '' },
-    { label: 'In Conversation',           value: form.indNum },
-    { label: 'Population/Residing',       value: form.totalPop },
+    { label: 'Accompanying',                           value: String(accompanierNames.length), onClick: () => setShowAccompaniersModal(true) },
+    { label: 'Helping Others',                          value: String(protagonistNames.length), onClick: () => setShowProtagonistsModal(true) },
+    { label: 'Facilitating Ed. Act.',                   value: form.facilitatorsCount },
+    { label: 'Participating in Ed. Act.',               value: String(edTotal.part) },
+    { label: 'Hosting Devotional Meetings/Gatherings',  value: '' },
+    { label: 'Protagonists/Promoting',                  value: String(promoterNames.length), onClick: () => setShowPromotersModal(true) },
+    { label: 'Participating',                           value: hasAnyActPart ? String(allTotal.part) : '' },
+    { label: 'In Conversation',                         value: form.indNum },
+    { label: 'Population/Residing',                     value: form.totalPop },
   ];
 
   // Three cases, confirmed with cluster-notebook 2026-10-04 -- null means no audit
