@@ -91,12 +91,14 @@ describe('getAllNuclei', () => {
 });
 
 describe('getClusters', () => {
-  test('returns the full cluster list', async () => {
+  test('returns each cluster\'s name and myPermissions', async () => {
+    const createPermissions = { canRead: true, canWrite: false, canChangeIdentity: false, canDelete: false, canAssignRoles: false, assignableRoles: [], createableEntityTypes: ['nucleus', 'setting', 'individual'] };
+    const readOnlyPermissions = { canRead: true, canWrite: false, canChangeIdentity: false, canDelete: false, canAssignRoles: false, assignableRoles: [], createableEntityTypes: [] };
     mockFetch.mockResolvedValue(jsonResponse({
       data: {
         clusters: [
-          { name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers', auxiliaryBoardMembers: 'Pat Doe (Propagation)' },
-          { name: 'NC-330 Foothills', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+          { name: 'NC-215 Triangle', myPermissions: createPermissions },
+          { name: 'NC-330 Foothills', myPermissions: readOnlyPermissions },
         ],
       },
     }));
@@ -104,11 +106,14 @@ describe('getClusters', () => {
     const result = await getClusters();
 
     expect(result).toEqual([
-      { name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers', auxiliaryBoardMembers: 'Pat Doe (Propagation)' },
-      { name: 'NC-330 Foothills', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      { name: 'NC-215 Triangle', myPermissions: createPermissions },
+      { name: 'NC-330 Foothills', myPermissions: readOnlyPermissions },
     ]);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
-    expect(body.query).toContain('clusters {');
+    // Mirrors Nucleus.myPermissions -- added 2026-10-05 so "+Add nucleus" (and
+    // CreateNucleusModal's cluster dropdown) can be gated on createableEntityTypes
+    // without a separate per-cluster round trip.
+    expect(body.query).toContain('clusters { name myPermissions {');
   });
 
   test('returns an empty array when there are no clusters', async () => {

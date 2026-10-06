@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { isAdministrator } from '@/lib/access';
 import { getCurrentUserEmail } from '@/lib/clerkUser';
 import { activitiesFromClusterNotebook } from '@/lib/data';
 import { getAllNuclei, getClusters } from '@/lib/clusterNotebook';
@@ -19,11 +18,22 @@ export async function GET() {
   const email = await getCurrentUserEmail();
 
   try {
-    const [clusterNotebookNuclei, clusters, admin] = await Promise.all([getAllNuclei(), getClusters(), isAdministrator()]);
+    const [clusterNotebookNuclei, clusters] = await Promise.all([getAllNuclei(), getClusters()]);
 
     const readableNuclei = clusterNotebookNuclei.filter(cn => cn.myPermissions.canRead);
+    // Clusters this user can actually create a nucleus under -- drives both whether
+    // "+Add nucleus" shows at all (AppClient.tsx) and which clusters
+    // CreateNucleusModal's dropdown offers, so the UI and the PUT route's own
+    // enforcement agree by construction. Confirmed with cluster-notebook 2026-10-05:
+    // this is the same computation as their per-entity myPermissions(entityName:)
+    // check (a test on their side pins the two equal), not an approximation of it --
+    // and replaces the old, wrong isAdministrator-based gate, which hid this
+    // capability from anyone who wasn't also a global Administrator.
+    const createableClusterNames = clusters
+      .filter(c => c.myPermissions.createableEntityTypes.includes('nucleus'))
+      .map(c => c.name);
 
-    if (readableNuclei.length === 0 && !admin) {
+    if (readableNuclei.length === 0 && createableClusterNames.length === 0) {
       return NextResponse.json(
         { error: `Access denied. Your account (${email}) is not authorized.` },
         { status: 403 }
@@ -49,10 +59,10 @@ export async function GET() {
     });
 
     return NextResponse.json({
-      access: { isAdministrator: admin, permissions },
+      access: { permissions },
       rows: authorizedRows,
       email,
-      clusterNames: clusters.map(c => c.name),
+      clusterNames: createableClusterNames,
     });
   } catch (e: unknown) {
     return clusterNotebookErrorResponse(e);

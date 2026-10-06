@@ -173,17 +173,35 @@ export interface NucleusSummary {
   myPermissions: PermissionSet;
 }
 
+// Deliberately not `extends ClusterFields` -- same reasoning as NucleusSummary not
+// extending NucleusFields above: this is the create-flow's own purpose-built shape,
+// decoupled from the fuller ClusterFields nested under Nucleus/NucleusSummary, which
+// has no use for myPermissions and never requests it.
+export interface ClusterSummary {
+  name: string;
+  myPermissions: PermissionSet;
+}
+
 // No top-level clusters query existed until 2026-09-14 (Cluster was only reachable
 // nested under Nucleus.cluster) -- added specifically to back our "+Add" cluster
 // picker. Deliberately no inline cluster creation: clusters are real, SRP-sourced
 // geographic entities, not something a user invents ad hoc.
-export async function getClusters(): Promise<ClusterFields[]> {
+//
+// myPermissions added 2026-10-05, mirroring Nucleus.myPermissions (same reason:
+// cluster-notebook designed it as a field so a list of clusters costs one request,
+// not one per cluster) -- determines whether "+Add nucleus" shows at all (true if
+// ANY cluster's createableEntityTypes includes 'nucleus') and which clusters
+// CreateNucleusModal's dropdown should actually offer, so the UI and the PUT route's
+// own enforcement agree by construction rather than by coincidence. Dropped
+// groupOfClusters/growthMilestone/auxiliaryBoardMembers from the query -- confirmed
+// unused by this function's one caller, which only ever read `.name`.
+export async function getClusters(): Promise<ClusterSummary[]> {
   const query = `
     query GetClusters {
-      clusters { name groupOfClusters growthMilestone auxiliaryBoardMembers }
+      clusters { name myPermissions { ${PERMISSION_SET_SELECTION} } }
     }
   `;
-  const data = await request<{ clusters: ClusterFields[] }>(query, {});
+  const data = await request<{ clusters: ClusterSummary[] }>(query, {});
   return data.clusters;
 }
 

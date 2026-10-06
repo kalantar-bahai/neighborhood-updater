@@ -89,11 +89,14 @@ export interface NucleusDetail {
 }
 
 export interface InitialData {
-  access: { isAdministrator: boolean; permissions: Record<string, PermissionSet> };
+  access: { permissions: Record<string, PermissionSet> };
   rows: NucleusSummary[];
   email: string;
-  // For the "+Add" cluster picker (2026-09-14) -- existing clusters only, no
-  // inline creation (clusters are real, SRP-sourced geographic entities).
+  // For the "+Add" cluster picker -- clusters this user can actually create a
+  // nucleus under (2026-10-05; was "existing clusters, unfiltered" before that),
+  // no inline creation (clusters are real, SRP-sourced geographic entities). Also
+  // doubles as the "+Add nucleus" button's own gate: non-empty means yes. See
+  // AppClient.tsx.
   clusterNames: string[];
 }
 

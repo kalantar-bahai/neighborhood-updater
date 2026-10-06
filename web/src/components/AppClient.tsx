@@ -87,7 +87,13 @@ export default function AppClient() {
     );
   }
 
-  const isAdministrator = initialData.access.isAdministrator;
+  // Gates "+Add nucleus" on whether there's any cluster this user can actually
+  // create one under (2026-10-05) -- clusterNames is already filtered to exactly
+  // those clusters (see /api/initial-data/route.ts), so this is the same check the
+  // PUT route itself enforces, not a separate approximation of it. Replaces the
+  // old isAdministrator-based gate, which hid this capability from anyone who
+  // wasn't also a global Administrator -- a different, much rarer role.
+  const canCreateNucleus = initialData.clusterNames.length > 0;
 
   const TYPE_META: Record<string, { label: string; bg: string; color: string; border: string }> = {
     neighborhood: { label: 'Neighborhood', bg: '#bee3f8', color: '#2c5282', border: '#90cdf4' },
@@ -115,7 +121,7 @@ const typeSummaries = (['neighborhood', 'network', 'population'] as const)
         email={initialData.email}
         onSelect={loadNucleus}
         onSignOut={() => window.location.href = '/signout'}
-        onAdd={isAdministrator ? () => setCreatingNew(true) : undefined}
+        onAdd={canCreateNucleus ? () => setCreatingNew(true) : undefined}
       />
       {typeSummaries.length > 0 && (
         <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 16px 24px', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
