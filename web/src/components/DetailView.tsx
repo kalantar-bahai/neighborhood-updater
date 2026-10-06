@@ -777,14 +777,14 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
 
   const actKeys = ['ccs', 'jygs', 'scs', 'devotionals'] as const;
   const hasAnyActPart = actKeys.some(k => form.activities[k].part !== '');
-  // "Helping" here (relabeled from "Sustaining") is still the protagonist role --
+  // "Helping Others" here (relabeled from "Sustaining") is still the protagonist role --
   // this simpler 5-ring diagram has no slot for Promoting (the newer promoter role)
   // or Facilitating, unlike the aligned diagram below.
   const diagramData = [
     { label: 'Residing',      value: form.totalPop },
     { label: 'Connected',     value: form.indNum },
     { label: 'Participating', value: hasAnyActPart ? String(allTotal.part) : '' },
-    { label: 'Helping',       value: String(protagonistNames.length), onClick: () => setShowProtagonistsModal(true) },
+    { label: 'Helping Others', value: String(protagonistNames.length), onClick: () => setShowProtagonistsModal(true) },
     { label: 'Accompanying',  value: String(accompanierNames.length), onClick: () => setShowAccompaniersModal(true) },
   ];
 
@@ -805,7 +805,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     },
     {
       right: { label: 'Accompanying', value: String(accompanierNames.length), onClick: () => setShowAccompaniersModal(true) },
-      left:  { label: 'Helping',      value: String(protagonistNames.length), onClick: () => setShowProtagonistsModal(true) },
+      left:  { label: 'Helping Others', value: String(protagonistNames.length), onClick: () => setShowProtagonistsModal(true) },
     },
   ];
 
@@ -936,10 +936,11 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
         </div>
 
         {/* Overview (formerly "Workers & Prevalence"). Mixed-source now: Helpers/
-            Accompanying are still Sheet-sourced free-text counts, Facilitating Core
-            Activity is cluster-notebook-sourced, Participating/In Core Activity are
-            computed totals from the Activities card. All three of Promoting/Helping/
-            Accompanying are cluster-notebook role lists now (2026-09-14) -- no more
+            Accompanying are still Sheet-sourced free-text counts, Facilitating
+            Educational Activity is cluster-notebook-sourced, Participating/In
+            Educational Activity are computed totals from the Activities card.
+            All three of Promoting/Helping/Accompanying are cluster-notebook role
+            lists now (2026-09-14) -- no more
             hand-typed counts, no more Sheet writes for any field in this card, so the
             fromSheet marker is gone entirely (was already gone from the card wrapper;
             now gone from the two remaining fields that still had it, too). */}
@@ -948,7 +949,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           <div className="card-body">
             <div className="field-grid-3">
               {/* Copied from the Activities card's totals, not independently entered --
-                  same non-editable treatment as Facilitating Core Activity below. */}
+                  same non-editable treatment as Facilitating Educational Activity below. */}
               <Field
                 label="Participating"
                 value={String(allTotal.part)}
@@ -967,7 +968,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 info="Estimated number of individuals promoting various aspects of community life such as parents encouraging participation, junior youth bringing friends, or youth inviting peers. It also includes promoting collective spaces such as festivals, Summer of Service, family gatherings, and various logistical assistance such as providing food, giving rides, serving others, etc."
               />
               <Field
-                label="Helping"
+                label="Helping Others"
                 value={String(protagonistNames.length)}
                 readonly
                 onLabelClick={permissions.canAssignRoles ? () => setShowProtagonistsModal(true) : undefined}
@@ -976,13 +977,13 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             </div>
             <div className="field-grid-3">
               <Field
-                label="In Core Activity"
+                label="In Educational Activity"
                 value={String(edTotal.part)}
                 readonly
                 info="Estimated number of children, junior youth, youth, and adults participating in educational activities in various modalities and forms: children’s classes, junior youth groups, and study circles."
               />
               <Field
-                label="Facilitating Core Activity"
+                label="Facilitating Educational Activity"
                 value={form.facilitators}
                 readonly
                 info="Estimated number of individuals who facilitate or share the content of the institute’s educational programs, in various forms, approaches, methods, and modalities, to all ages in the neighborhood."
@@ -1256,7 +1257,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
 
       {showProtagonistsModal && (
         <WorkerListModal
-          title="Helping"
+          title="Helping Others"
           role="protagonist"
           nucleus={row.nucleus}
           workers={protagonistNames}
