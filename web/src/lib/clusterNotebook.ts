@@ -110,6 +110,9 @@ export interface LastUpdated {
   by: string | null;
 }
 
+// Confirmed with cluster-notebook directly, 2026-10-08.
+export type PlaceType = 'CLUSTER' | 'LOCALITY' | 'SETTING';
+
 export interface NucleusFields {
   stage: string | null;
   locality: string | null;
@@ -158,6 +161,14 @@ export interface NucleusFields {
   // unset. Write side is updateNucleus's `parentNucleusName` patch field (a plain
   // string, not nested) -- no cycle-guard on their side, human-entered data.
   parentNucleus: { name: string } | null;
+  // The raw value `locationName` sets -- distinct from locality/cluster above,
+  // which are both DERIVED by walking up from this. Confirmed with cluster-notebook
+  // directly, 2026-10-08: null means no location at all (legitimate for a
+  // population-/network-based nucleus, and the recommended choice for a "pocket"
+  // nested under a parent -- see parentNucleus above, which it's otherwise easy to
+  // confuse this with). `type` says which tier `name` is at; naming a Nucleus here
+  // is rejected server-side (that's parentNucleusName's job, not this field's).
+  location: { name: string; type: PlaceType } | null;
   // Aggregated server-side across this Nucleus's own fields AND all four
   // ActivitySummary rows -- whichever changed most recently (so an activity-only
   // edit moves this too, by design: both show up on the same detail page).
@@ -225,6 +236,40 @@ export async function getClusters(): Promise<ClusterSummary[]> {
   return data.clusters;
 }
 
+// Backs the Location picker (2026-10-08) -- scoped to one cluster at a time (a
+// nucleus's own cluster is fixed, so there's never a reason to fetch every
+// cluster's tree). `clusters`/`Cluster.localities`/`Locality.settings` all take
+// an optional name to narrow the query like a path; passing it at the top level
+// here is enough to get just this one cluster's localities back. Each level is
+// already scoped to what the caller can read -- a Locality/Setting simply isn't
+// in the tree if it isn't readable, so an empty array here can mean either "this
+// cluster really has none" or "the caller can't see any"; either way there's
+// nothing to offer. `srpLinked`/`nuclei` (confirmed with cluster-notebook
+// directly) are what let the picker warn before summing a nucleus's counts into
+// a Setting that already has others -- `nuclei` lists whoever's already there
+// (filter out this nucleus's own name before displaying it as "shared with").
+export interface SettingOption {
+  name: string;
+  srpLinked: boolean;
+  nuclei: string[];
+}
+export interface LocalityOption {
+  name: string;
+  settings: SettingOption[];
+}
+
+export async function getLocationOptions(clusterName: string): Promise<LocalityOption[]> {
+  const query = `
+    query GetLocationOptions($clusterName: String) {
+      clusters(name: $clusterName) {
+        localities { name settings { name srpLinked nuclei } }
+      }
+    }
+  `;
+  const data = await request<{ clusters: { localities: LocalityOption[] }[] }>(query, { clusterName });
+  return data.clusters[0]?.localities ?? [];
+}
+
 // Identity-only at creation -- everything else (location, nucleusType, stage,
 // population, activities, worker roles) goes through the same update mutations
 // used for editing, not through this call. Returns null for an unknown
@@ -283,7 +328,8 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
 const NUCLEUS_FIELDS_SELECTION = 'stage locality populationMakeup population households connectedPopulation connectedHouseholds '
   + 'inConversation inCommunityActivities protagonists devotionalHosts inEducationalActivities educationalFacilitators helpingOthers accompanying '
   + 'hasSocialAction socialActionDescription hasCommunityGatherings communityGatheringDescription narrative nucleusType '
-  + 'cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers } parentNucleus { name } lastUpdated { at by }';
+  + 'cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers } parentNucleus { name } lastUpdated { at by } '
+  + 'location { name type }';
 
 export async function getNucleusFields(nucleusName: string): Promise<NucleusFields | null> {
   const query = `
@@ -297,11 +343,9 @@ export async function getNucleusFields(nucleusName: string): Promise<NucleusFiel
 
 export async function updateNucleus(
   nucleusName: string,
-  // NOTE: no `locality` here — REMOVED from NucleusPatch 2026-09-13. `locality`
-  // is now a read-only derived value (walked up from Nucleus.location's own
-  // containment chain), not a hand-entered field; cluster-notebook has no
-  // write path for it at all right now (setting `location` isn't wired up
-  // either). It's still readable via NucleusFields/getNucleusFields/getAllNuclei.
+  // NOTE: no `locality` here -- REMOVED from NucleusPatch 2026-09-13, and never
+  // coming back: it's a read-only derived value (walked up from `locationName`
+  // below), not a hand-entered field.
   patch: {
     stage?: string; populationMakeup?: string;
     population?: number | null; households?: number | null;
@@ -320,6 +364,11 @@ export async function updateNucleus(
     // field), not nested. null clears the parent; an unknown name throws a real
     // error rather than silently no-opping.
     parentNucleusName?: string | null;
+    // Added 2026-10-08 -- any Cluster/Locality/Setting name (never a Nucleus --
+    // cluster-notebook rejects that, pointing at parentNucleusName instead, as of
+    // their commit 7142aab). null clears it. Same gate as `name`/identity changes
+    // generally (canChangeIdentity).
+    locationName?: string | null;
   }
 ): Promise<NucleusFields | null> {
   const mutation = `

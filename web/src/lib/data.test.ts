@@ -11,11 +11,13 @@ vi.mock('./clusterNotebook', () => ({
   getNucleusWorkers: vi.fn(),
   createNucleus: vi.fn(),
   deleteNucleus: vi.fn(),
+  getLocationOptions: vi.fn(),
   individualDisplayName: vi.fn((ind: { firstName?: string | null }) => ind.firstName ?? ''),
 }));
 
 import {
   getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus, getNucleusWorkers, createNucleus, deleteNucleus,
+  getLocationOptions,
 } from './clusterNotebook';
 import { getRowData, saveRowData, createRowData, deleteRowData } from './data';
 
@@ -26,12 +28,16 @@ const mockUpdateNucleus = vi.mocked(updateNucleus);
 const mockGetNucleusWorkers = vi.mocked(getNucleusWorkers);
 const mockCreateNucleus = vi.mocked(createNucleus);
 const mockDeleteNucleus = vi.mocked(deleteNucleus);
+const mockGetLocationOptions = vi.mocked(getLocationOptions);
 
 describe('getRowData', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: no workers, for tests that don't care about the worker lists specifically.
     mockGetNucleusWorkers.mockResolvedValue([]);
+    // Default: no location options, for tests that don't care about the location
+    // picker specifically.
+    mockGetLocationOptions.mockResolvedValue([]);
     // Default: no activity data, for tests that don't care about the activities card specifically.
     mockGetActivitySummaries.mockResolvedValue(null);
   });
@@ -82,6 +88,7 @@ describe('getRowData', () => {
       parentNucleus: null,
       cluster: { name: '', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const result = await getRowData('Newly Created');
@@ -121,6 +128,7 @@ describe('getRowData', () => {
         auxiliaryBoardMembers: 'Pat Doe (Propagation), Sam Roe (Protection)',
       },
       lastUpdated: null,
+      location: null,
     });
 
     const result = await getRowData('Alpha');
@@ -159,6 +167,7 @@ describe('getRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const result = await getRowData('Alpha');
@@ -179,6 +188,7 @@ describe('getRowData', () => {
       parentNucleus: null,
       cluster: { name: '', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const result = await getRowData('Alpha');
@@ -206,6 +216,7 @@ describe('getRowData', () => {
         parentNucleus: null,
         cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone, auxiliaryBoardMembers: null },
         lastUpdated: null,
+        location: null,
       });
       const result = await getRowData('Alpha');
       expect(result?.row.pg).toBe(expectedPg);
@@ -225,6 +236,7 @@ describe('getRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const result = await getRowData('Alpha');
@@ -246,6 +258,7 @@ describe('getRowData', () => {
       parentNucleus: null,
       cluster: { name: '', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const result = await getRowData('Alpha');
@@ -272,6 +285,7 @@ describe('getRowData', () => {
       parentNucleus: null,
       cluster: { name: '', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
     const blank = { familyName: null, middleNames: null, nickname: null, sex: null, phone: null, ageCategory: null };
     mockGetNucleusWorkers.mockImplementation(async (_name: string, role: string) => {
@@ -310,6 +324,7 @@ describe('getRowData', () => {
       parentNucleus: null,
       cluster: { name: '', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: { at: '2026-10-03T19:18:09-04:00', by: null },
+      location: null,
     });
 
     const result = await getRowData('Alpha');
@@ -330,6 +345,7 @@ describe('getRowData', () => {
       parentNucleus: null,
       cluster: { name: '', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const result = await getRowData('Alpha');
@@ -358,6 +374,7 @@ describe('getRowData', () => {
       parentNucleus: null,
       cluster: { name: '', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const result = await getRowData('Alpha');
@@ -366,6 +383,52 @@ describe('getRowData', () => {
     expect(result?.row.protagonists).toBe('');
     expect(result?.row.devotionalHosts).toBe('');
     expect(result?.row.accompanying).toBe('');
+  });
+
+  test('maps location to locationName on the row, and passes through locationOptions for the cluster', async () => {
+    mockGetActivitySummaries.mockResolvedValue(null);
+    mockGetNucleusFields.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null,
+      nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
+      location: { name: 'Main St Setting', type: 'SETTING' },
+    });
+    const options = [{ name: 'Carrboro', settings: [{ name: 'Main St Setting', srpLinked: true, nuclei: ['Alpha'] }] }];
+    mockGetLocationOptions.mockResolvedValue(options);
+
+    const result = await getRowData('Alpha');
+
+    expect(mockGetLocationOptions).toHaveBeenCalledWith('NC-215 Triangle');
+    expect(result?.row.locationName).toBe('Main St Setting');
+    expect(result?.locationOptions).toEqual(options);
+  });
+
+  test('renders a null location as an empty locationName', async () => {
+    mockGetActivitySummaries.mockResolvedValue(null);
+    mockGetNucleusFields.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null,
+      nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
+      location: null,
+    });
+
+    const result = await getRowData('Alpha');
+
+    expect(result?.row.locationName).toBe('');
   });
 });
 
@@ -451,6 +514,7 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const formData = { ...baseFormData, stage: 'Advanced/5', locality: 'Durham', makeup: 'Students' };
@@ -476,6 +540,7 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const formData = { ...baseFormData, totalPop: '500', totalHH: '120', indNum: '80', hhNum: '30' };
@@ -499,6 +564,7 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const formData = {
@@ -529,6 +595,7 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const formData = { ...baseFormData, protagonists: '' };
@@ -550,6 +617,7 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const formData = {
@@ -578,6 +646,7 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const formData = { ...baseFormData, narrative: 'A growing community of practice.' };
@@ -626,6 +695,7 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const formData = {
@@ -651,6 +721,7 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     // identity present (admin save), but nucleusType/parentNucleus specifically omitted from it.
@@ -676,6 +747,7 @@ describe('saveRowData', () => {
       parentNucleus: { name: 'Chapelboro' },
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const formData = { ...baseFormData, identity: { nucleus: 'Alpha', parentNucleus: 'Chapelboro' } };
@@ -696,12 +768,55 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const formData = { ...baseFormData, identity: { nucleus: 'Alpha', parentNucleus: '' } };
     await saveRowData('Alpha', formData);
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { parentNucleusName: null });
+  });
+
+  test('writes locationName via cluster-notebook when identity.location is set', async () => {
+    mockUpdateActivitySummary.mockResolvedValue(null);
+    mockUpdateNucleus.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
+      location: { name: 'Main St Setting', type: 'SETTING' },
+    });
+
+    const formData = { ...baseFormData, identity: { nucleus: 'Alpha', location: 'Main St Setting' } };
+    await saveRowData('Alpha', formData);
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { locationName: 'Main St Setting' });
+  });
+
+  test('clears locationName (sends explicit null) when identity.location is emptied', async () => {
+    mockUpdateActivitySummary.mockResolvedValue(null);
+    mockUpdateNucleus.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
+      location: null,
+    });
+
+    const formData = { ...baseFormData, identity: { nucleus: 'Alpha', location: '' } };
+    await saveRowData('Alpha', formData);
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { locationName: null });
   });
 
   test('maps a never-touched presence/gatherings value to null, not false', async () => {
@@ -717,6 +832,7 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const formData = { ...baseFormData, presence: '', gatherings: '' };
@@ -740,6 +856,7 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const formData: Record<string, unknown> = { ...baseFormData, stage: 'Advanced/5' };
@@ -785,6 +902,7 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     const result = await saveRowData('Alpha', { stage: 'Advanced/5' });
@@ -808,6 +926,7 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: { at: '2026-10-04T10:36:04-04:00', by: 'Cee Esso' },
+      location: null,
     });
 
     const result = await saveRowData('Alpha', { stage: 'Advanced/5' });
@@ -833,6 +952,7 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: { at: '2026-10-04T10:00:00-04:00', by: 'Michael Kalantar' },
+      location: null,
     });
 
     const result = await saveRowData('Alpha', baseFormData);
@@ -859,6 +979,7 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: { at: '2026-10-04T09:00:00-04:00', by: 'Stale Response' },
+      location: null,
     });
     mockGetNucleusFields.mockResolvedValue({
       stage: 'Advanced/5', locality: null, populationMakeup: null,
@@ -870,6 +991,7 @@ describe('saveRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: { at: '2026-10-04T10:00:00-04:00', by: 'Michael Kalantar' },
+      location: null,
     });
 
     const formData = { ...baseFormData, stage: 'Advanced/5' };
@@ -904,6 +1026,7 @@ describe('createRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
 
     await createRowData(baseCreateFormData);
@@ -961,6 +1084,7 @@ describe('createRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
     mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue(null);
@@ -987,6 +1111,7 @@ describe('createRowData', () => {
       parentNucleus: { name: 'Chapelboro' },
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
     mockUpdateNucleus.mockResolvedValue(null);
 
@@ -1011,6 +1136,7 @@ describe('createRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
@@ -1022,6 +1148,7 @@ describe('createRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: { at: '2026-10-04T10:05:00-04:00', by: 'Michael Kalantar' },
+      location: null,
     });
 
     const result = await createRowData(baseCreateFormData);
@@ -1044,6 +1171,7 @@ describe('createRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null,
+      location: null,
     });
     mockUpdateNucleus.mockResolvedValue({
       stage: 'Initial/2', locality: null, populationMakeup: null,
@@ -1055,6 +1183,7 @@ describe('createRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: { at: '2026-10-04T10:36:04-04:00', by: 'Cee Esso' },
+      location: null,
     });
 
     const formData = { identity: baseCreateFormData.identity, stage: 'Initial/2' };
@@ -1077,6 +1206,7 @@ describe('createRowData', () => {
       parentNucleus: null,
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: { at: '2026-10-04T10:40:00-04:00', by: 'Michael Kalantar' },
+      location: null,
     });
 
     const result = await createRowData({ identity: baseCreateFormData.identity });

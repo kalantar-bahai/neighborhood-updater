@@ -8,7 +8,7 @@ import {
   getActivitySummaries, updateActivitySummary, getAllNuclei, getNucleusFields, updateNucleus,
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError,
-  getMyPermissions, getAssignableRoleDetails, getIsAdministrator,
+  getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions,
 } from './clusterNotebook';
 import type { Individual } from './clusterNotebook';
 import { auth } from '@clerk/nextjs/server';
@@ -312,6 +312,73 @@ describe('getNucleusFields', () => {
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.query).toContain('inConversation inCommunityActivities protagonists devotionalHosts inEducationalActivities educationalFacilitators helpingOthers accompanying');
   });
+
+  test('requests and returns the raw location, distinct from derived locality/cluster', async () => {
+    // Confirmed with cluster-notebook directly, 2026-10-08: locality/cluster are
+    // both derived by walking up from this -- this is the one that distinguishes
+    // "no location" from "location set to a Locality" from "...to a Setting".
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: {
+        nucleus: {
+          stage: null, locality: null, populationMakeup: null,
+          location: { name: 'Main St Setting', type: 'SETTING' },
+        },
+      },
+    }));
+
+    const result = await getNucleusFields('Alpha');
+
+    expect(result?.location).toEqual({ name: 'Main St Setting', type: 'SETTING' });
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('location { name type }');
+  });
+});
+
+describe('getLocationOptions', () => {
+  test('requests one cluster\'s localities and their settings, scoped by name', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: {
+        clusters: [{
+          localities: [{
+            name: 'Carrboro',
+            settings: [
+              { name: 'Main St Setting', srpLinked: true, nuclei: ['Alpha'] },
+              { name: 'Oak Grove', srpLinked: false, nuclei: [] },
+            ],
+          }],
+        }],
+      },
+    }));
+
+    const result = await getLocationOptions('NC-215 Triangle');
+
+    expect(result).toEqual([{
+      name: 'Carrboro',
+      settings: [
+        { name: 'Main St Setting', srpLinked: true, nuclei: ['Alpha'] },
+        { name: 'Oak Grove', srpLinked: false, nuclei: [] },
+      ],
+    }]);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ clusterName: 'NC-215 Triangle' });
+    expect(body.query).toContain('localities { name settings { name srpLinked nuclei } }');
+  });
+
+  test('returns an empty array when the cluster has no readable localities', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { clusters: [{ localities: [] }] } }));
+
+    const result = await getLocationOptions('NC-215 Triangle');
+
+    expect(result).toEqual([]);
+  });
+
+  test('returns an empty array when the cluster itself is not readable', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { clusters: [] } }));
+
+    const result = await getLocationOptions('Nonexistent');
+
+    expect(result).toEqual([]);
+  });
 });
 
 describe('updateNucleus', () => {
@@ -401,6 +468,17 @@ describe('updateNucleus', () => {
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables.patch).toEqual(patch);
+  });
+
+  test('sends locationName, including explicit null to clear', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: { updateNucleus: { stage: null, locality: null, populationMakeup: null, location: { name: 'Main St Setting', type: 'SETTING' } } },
+    }));
+
+    await updateNucleus('Alpha', { locationName: 'Main St Setting' });
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables.patch).toEqual({ locationName: 'Main St Setting' });
   });
 
   test('sends the tri-state social-action/gatherings booleans, including explicit false', async () => {

@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { NucleusDetail, NucleusRow, Activity } from '@/types';
 import type { Worker } from '@/types';
 import type { PermissionSet } from '@/lib/access';
-import type { LastUpdated } from '@/lib/clusterNotebook';
+import type { LastUpdated, LocalityOption } from '@/lib/clusterNotebook';
 import WorkerListModal from './WorkerListModal';
 import ManageAccessCard from './ManageAccessCard';
 
@@ -16,6 +16,10 @@ interface Props {
   showBack: boolean;
   onBack: () => void;
   onSaved: (savedBy: string, savedAt: string) => void;
+  // Backs the Parent Nucleus picker's suggestions (2026-10-08) -- every nucleus
+  // name the current user can read, same list the main picker uses. Filtered to
+  // exclude this nucleus's own name before rendering.
+  allNucleusNames: string[];
 }
 
 type FormState = NucleusRow;
@@ -33,6 +37,28 @@ function computedPct(connected: string, total: string): string {
 }
 
 function isValidInt(v: string) { return !v || /^\d+$/.test(v.trim()); }
+
+// Surfaces the two consequences cluster-notebook described directly, 2026-10-08,
+// for whichever Setting is currently chosen (a Locality-only or cluster-level
+// choice has neither): other nuclei already there (their counts get SUMMED
+// together in SRP, which double-counts if this nucleus's people are a subset of
+// theirs) and a Setting that isn't linked to SRP yet (entered numbers stay local
+// for now). `ownNucleusName` is filtered out of "already has" -- a nucleus already
+// placed at this Setting isn't "sharing" with itself.
+function locationWarningFor(locationName: string, options: LocalityOption[], ownNucleusName: string): string | null {
+  if (!locationName) return null;
+  for (const locality of options) {
+    for (const setting of locality.settings) {
+      if (setting.name !== locationName) continue;
+      const others = setting.nuclei.filter(n => n !== ownNucleusName);
+      if (others.length > 0) {
+        return `This Setting already has ${others.join(', ')} — your counts will be summed together in SRP.`;
+      }
+      return setting.srpLinked ? null : 'This Setting isn’t linked to SRP yet — entered numbers will stay local for now.';
+    }
+  }
+  return null;
+}
 
 // The three actually-editable Activity fields -- excludes isOverridden, which is
 // server-computed display state, never something a blur/change event commits.
@@ -594,7 +620,7 @@ function StaggeredConcentricDiagram({ labels }: { labels: AlignedLabel[] }) {
   );
 }
 
-export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved }: Props) {
+export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, allNucleusNames }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   // Baseline to diff a blur-triggered field's current value against, so clicking into
@@ -740,6 +766,24 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     void attempt();
   }
 
+  // Parent Nucleus: blur/Enter-triggered like commitField, but (like nucleusType/
+  // location) its patch fragment is nested under identity -- commitField only
+  // builds flat top-level fragments, so this gets its own small commit function
+  // rather than trying to make that one handle both shapes.
+  function commitParentNucleus(label: string) {
+    const value = form.parentNucleus;
+    if (value === committedRef.current.parentNucleus) return;
+    const attempt = async () => {
+      const result = await saveField({ identity: { parentNucleus: value } }, label);
+      if (result.ok) {
+        committedRef.current = { ...committedRef.current, parentNucleus: value };
+      } else {
+        setRetry({ label, run: () => void attempt() });
+      }
+    };
+    void attempt();
+  }
+
   // Activities: blur/Enter-triggered, per sub-field (act/part/fof independently) --
   // updateActivitySummary's fields are each genuinely optional, server-side: cluster-
   // notebook's resolver defaults them to strawberry.UNSET and only assigns a field
@@ -853,6 +897,8 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
       ? `Last updated by ${lastUpdated.by} on ${new Date(lastUpdated.at).toLocaleString()}`
       : `Last updated on ${new Date(lastUpdated.at).toLocaleString()}`;
 
+  const locationWarning = locationWarningFor(form.locationName, detail.locationOptions, row.nucleus);
+
   return (
     <>
       <div className="page-header">
@@ -898,15 +944,39 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
               <Field label="PG"           value={form.pg}          readonly />
             </div>
             <div className="field-grid-4">
-              {/* Locality is read-only everywhere: cluster-notebook derives it from
-                  Nucleus.location's own containment chain, and has no write path for
-                  it (removed from NucleusPatch 2026-09-13) — not an admin-permission
-                  distinction like the other Identity fields. Nucleus (the name itself)
+              {/* Location replaces Locality here, 2026-10-08 -- Locality was always
+                  just a read-only derived VIEW of Location (walking up from it until
+                  a Locality is found), and showing both was redundant now that
+                  Location itself is editable. Any Cluster/Locality/Setting name is a
+                  valid choice; the tree (detail.locationOptions) is already scoped
+                  to this nucleus's own cluster and to what this caller can read --
+                  confirmed with cluster-notebook directly. Nucleus (the name itself)
                   is read-only: cluster-notebook's own name is now the canonical identifier
                   (2026-09-13, the user directly) and cluster-notebook has no rename
                   mutation — an edit here would silently revert on next load. Set once, at
                   creation time, via CreateNucleusModal, 2026-09-14. */}
-              <Field label="Locality" value={form.locality} readonly />
+              {permissions.canChangeIdentity ? (
+                <div className="field">
+                  <label>Location</label>
+                  <select
+                    value={form.locationName}
+                    onChange={e => setAndSave('locationName', e.target.value, { identity: { location: e.target.value } }, 'Location')}
+                  >
+                    <option value="">— No location —</option>
+                    <option value={form.cluster}>— This cluster ({form.cluster}) —</option>
+                    {detail.locationOptions.map(locality => (
+                      <optgroup key={locality.name} label={locality.name}>
+                        <option value={locality.name}>{locality.name} (locality)</option>
+                        {locality.settings.map(setting => (
+                          <option key={setting.name} value={setting.name}>{setting.name}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <Field label="Location" value={form.locationName} readonly />
+              )}
               <Field label="Nucleus" value={form.nucleus} readonly />
               {permissions.canChangeIdentity
                 ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => setAndSave('nucleusType', v, { identity: { nucleusType: v } }, 'Type')} />
@@ -938,6 +1008,48 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 onLabelClick={permissions.canAssignRoles && permissions.assignableRoles.includes('abm-assistant') ? () => setShowAbmAssistantModal(true) : undefined}
               />
             </div>
+            {/* Parent Nucleus ("pocket grouping") -- data/save plumbing already
+                existed (the picker already reads it to group nuclei), but nothing
+                ever let a user SET it until now, 2026-10-08. A search-assisted text
+                input rather than a flat dropdown: nucleus counts can run larger than
+                clusters/localities. datalist gives free browser-native autocomplete
+                over allNucleusNames without a new search API -- the same list the
+                main picker already uses, just filtered to exclude this nucleus. */}
+            <div className="field-grid-2">
+              {permissions.canChangeIdentity ? (
+                <div className="field">
+                  <label>Parent Nucleus</label>
+                  <input
+                    list="parent-nucleus-options"
+                    value={form.parentNucleus}
+                    onChange={e => set('parentNucleus', e.target.value)}
+                    onBlur={() => commitParentNucleus('Parent Nucleus')}
+                    onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                  />
+                  <datalist id="parent-nucleus-options">
+                    {allNucleusNames.filter(n => n !== row.nucleus).map(n => <option key={n} value={n} />)}
+                  </datalist>
+                </div>
+              ) : (
+                <Field label="Parent Nucleus" value={form.parentNucleus} readonly />
+              )}
+            </div>
+            {/* Confirmed with cluster-notebook directly, 2026-10-08: permissions and
+                SRP sync both follow nesting, so a pocket with no location is still
+                covered by its parent's -- giving it the SAME location as the parent
+                instead sums their counts together in SRP, which double-counts if
+                this nucleus's people are a subset of the parent's. Surfaced
+                proactively whenever a parent is set, not only once it's "wrong". */}
+            {form.parentNucleus && (
+              <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>
+                This nucleus has a parent — it’s usually covered by the parent’s own location. Leave Location empty unless this nucleus’s counts should add to a neighbourhood separately.
+              </p>
+            )}
+            {locationWarning && (
+              <p style={{ fontSize: 12, color: '#975a16', background: '#fffaf0', border: '1px solid #f6e05e', borderRadius: 6, padding: '6px 10px', margin: '4px 0 0' }}>
+                {locationWarning}
+              </p>
+            )}
           </div>}
         </div>
 

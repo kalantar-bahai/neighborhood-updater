@@ -1,5 +1,5 @@
 import type { PermissionSet } from './lib/access';
-import type { LastUpdated } from './lib/clusterNotebook';
+import type { LastUpdated, LocalityOption } from './lib/clusterNotebook';
 
 export interface Activity {
   act: string;
@@ -40,6 +40,10 @@ export interface NucleusRow {
   totalHH: string;
   indNum: string;
   hhNum: string;
+  // Added 2026-10-08 -- the raw value `locationName` sets, distinct from locality/
+  // cluster above (both derived from it). '' means no location. See NucleusFields'
+  // own comment in clusterNotebook.ts.
+  locationName: string;
   // Overview card's nine fields (2026-10-07, totalPop being the ninth) -- hand-
   // entered estimates synced both ways with SRP, deliberately independent of our
   // role-assignment lists (protagonist/promoter/accompanier workers). See
@@ -98,6 +102,10 @@ export interface NucleusDetail {
   // exists at all (predates audit logging, 2026-09-25); see LastUpdated for what
   // `by` can be once this is non-null.
   lastUpdated: LastUpdated | null;
+  // Location picker's options, scoped to this nucleus's own cluster (2026-10-08).
+  // Empty for a caller who can't edit location anyway -- their read scope won't
+  // reach locality/setting level (confirmed with cluster-notebook directly).
+  locationOptions: LocalityOption[];
 }
 
 export interface InitialData {

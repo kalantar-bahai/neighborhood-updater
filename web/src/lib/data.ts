@@ -1,8 +1,8 @@
 import {
   getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus,
-  getNucleusWorkers, individualDisplayName, createNucleus, deleteNucleus,
+  getNucleusWorkers, individualDisplayName, createNucleus, deleteNucleus, getLocationOptions,
 } from './clusterNotebook';
-import type { ActivitySummary, ActivitySummaries, ActivityType, NucleusFields, Individual } from './clusterNotebook';
+import type { ActivitySummary, ActivitySummaries, ActivityType, NucleusFields, Individual, LocalityOption } from './clusterNotebook';
 import type { Activity, Worker } from '@/types';
 
 // Lets callers (route handlers) distinguish error cases (e.g. 409 vs 400)
@@ -130,6 +130,13 @@ function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
     // picker, unrelated to the cluster/grouping hierarchy. Now cluster-notebook's
     // own field (parentNucleus { name }), not a Sheet column.
     parentNucleus: fields?.parentNucleus?.name ?? '',
+    // Added 2026-10-08 -- the raw value `locationName` sets (any Cluster/Locality/
+    // Setting name), distinct from the derived locality/cluster above. Flattened to
+    // just the name: nothing in our UI needs to distinguish which tier it's at, and
+    // the save path only ever needs the name (cluster-notebook resolves the type
+    // itself). '' means no location, same blank-string convention as every other
+    // field here.
+    locationName: fields?.location?.name ?? '',
     // Read-only on cluster-notebook's side — no mutation exists for any of these four.
     cluster: fields?.cluster.name ?? '',
     grouping: fields?.cluster.groupOfClusters ?? '',
@@ -162,6 +169,13 @@ export async function getRowData(nucleusName: string) {
   // authoritative "does this exist" check.
   if (nucleusFields === null) return null;
 
+  // Location picker's options -- scoped to this nucleus's own (fixed) cluster, so
+  // this can only run after nucleusFields resolves (need cluster.name first), not
+  // batched into the Promise.all above. Comes back [] for a caller who can't edit
+  // location anyway (their read scope won't reach locality/setting level) --
+  // confirmed with cluster-notebook directly, 2026-10-08.
+  const locationOptions = await getLocationOptions(nucleusFields?.cluster?.name ?? '');
+
   const row = {
     // The list of valid nuclei comes from cluster-notebook, not any hand-typed
     // copy (2026-09-13, the user directly) -- `nucleusName` (this function's own
@@ -182,6 +196,7 @@ export async function getRowData(nucleusName: string) {
     contactNames: toWorkers(contactWorkers),
     promoterNames: toWorkers(promoterWorkers),
     lastUpdated: nucleusFields?.lastUpdated ?? null,
+    locationOptions,
   };
 }
 
@@ -212,7 +227,7 @@ interface FormDataInput {
   presence?: string; notesPresence?: string;
   gatherings?: string; notesGatherings?: string;
   narrative?: string;
-  identity?: { nucleusType?: string; parentNucleus?: string };
+  identity?: { nucleusType?: string; parentNucleus?: string; location?: string };
 }
 
 // Shared between createRowData and saveRowData -- each of the four activity
@@ -264,6 +279,7 @@ function nucleusPatchFromFormData(d: FormDataInput) {
     narrative?: string;
     nucleusType?: string;
     parentNucleusName?: string | null;
+    locationName?: string | null;
   } = {};
   if (d.stage !== undefined) nucleusPatch.stage = d.stage;
   if (d.makeup !== undefined) nucleusPatch.populationMakeup = d.makeup;
@@ -291,6 +307,11 @@ function nucleusPatchFromFormData(d: FormDataInput) {
   // parentNucleus likewise -- '' (cleared in the UI) means "no parent", so it maps to
   // null, not an empty-string patch value.
   if (d.identity && d.identity.parentNucleus !== undefined) nucleusPatch.parentNucleusName = d.identity.parentNucleus || null;
+  // location likewise -- '' means no location, same null-not-empty-string convention.
+  // Only the chosen name is sent; cluster-notebook resolves which tier (Cluster/
+  // Locality/Setting) it belongs to itself, and rejects a Nucleus name here (that's
+  // parentNucleus's job, confirmed with cluster-notebook directly, 2026-10-08).
+  if (d.identity && d.identity.location !== undefined) nucleusPatch.locationName = d.identity.location || null;
   return nucleusPatch;
 }
 

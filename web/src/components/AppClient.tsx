@@ -83,6 +83,7 @@ export default function AppClient() {
         showBack={initialData.rows.length > 1}
         onBack={handleBack}
         onSaved={() => {}}
+        allNucleusNames={initialData.rows.map(r => r.nucleus)}
       />
     );
   }
