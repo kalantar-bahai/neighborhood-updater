@@ -1046,8 +1046,6 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             <div className="field-grid-2">
               {/* Total Population moved to the Overview card, 2026-10-07 -- see its own comment there. */}
               <Field label="Total Households" value={form.totalHH}  onChange={v => set('totalHH', v)} onBlur={() => commitField('totalHH', 'Total Households', true)} readonly={!canWrite} integer />
-            </div>
-            <div className="field-grid-2">
               {/* Individuals Connected (indNum/connectedPopulation) removed 2026-10-08 --
                   meaningless now that the Overview card's "In Conversation" field covers
                   the same idea with real SRP sync. The underlying cluster-notebook field
