@@ -630,6 +630,14 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const [diagramCardOpen, setDiagramCardOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
   const [dangerOpen, setDangerOpen] = useState(false);
+  // Open by default (2026-10-08) -- these five were previously always shown with
+  // no way to collapse them at all; now they're collapsible like every other card,
+  // just starting open instead of closed.
+  const [overviewOpen, setOverviewOpen] = useState(true);
+  const [populationOpen, setPopulationOpen] = useState(true);
+  const [activitiesOpen, setActivitiesOpen] = useState(true);
+  const [detailsOpen, setDetailsOpen] = useState(true);
+  const [narrativeOpen, setNarrativeOpen] = useState(true);
   const [deleteInput, setDeleteInput] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -953,8 +961,14 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             Total Population moved here from the Population card below, as the first
             of the nine (it was already a NucleusPatch field, just newly SRP-synced). */}
         <div className="card">
-          <div className="card-header">Overview</div>
-          <div className="card-body">
+          <div
+            className="card-header"
+            onClick={() => setOverviewOpen(o => !o)}
+            style={{ cursor: 'pointer', userSelect: 'none' }}
+          >
+            <span><span style={{ fontSize: 11, marginRight: 6 }}>{overviewOpen ? '▼' : '▶'}</span>Overview</span>
+          </div>
+          {overviewOpen && <div className="card-body">
             <div className="field-grid-3">
               <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} onBlur={() => commitField('totalPop', 'Total Population', true)} readonly={!canWrite} integer />
               <Field
@@ -1008,13 +1022,19 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 info="Estimated number of individuals who have gained a measure of experience from the institute’s courses alongside acts of service, whose actions are motivated by a desire to see capacity develop in others and to foster friendships founded on cooperation and reciprocity."
               />
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* Population */}
         <div className="card">
-          <div className="card-header">Population</div>
-          <div className="card-body">
+          <div
+            className="card-header"
+            onClick={() => setPopulationOpen(o => !o)}
+            style={{ cursor: 'pointer', userSelect: 'none' }}
+          >
+            <span><span style={{ fontSize: 11, marginRight: 6 }}>{populationOpen ? '▼' : '▶'}</span>Population</span>
+          </div>
+          {populationOpen && <div className="card-body">
             <div className="field-grid-2">
               {/* Total Population moved to the Overview card, 2026-10-07 -- see its own comment there. */}
               <Field label="Total Households" value={form.totalHH}  onChange={v => set('totalHH', v)} onBlur={() => commitField('totalHH', 'Total Households', true)} readonly={!canWrite} integer />
@@ -1037,7 +1057,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
               <label>Makeup of Population</label>
               <textarea value={form.makeup || ''} onChange={e => set('makeup', e.target.value)} onBlur={() => commitField('makeup', 'Makeup of Population')} readOnly={!canWrite} />
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* Concentric Circles (Staggered) */}
@@ -1058,10 +1078,14 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
 
         {/* Activities */}
         <div className="card">
-          <div className="card-header">
-            Educational Activities &amp; Devotionals
+          <div
+            className="card-header"
+            onClick={() => setActivitiesOpen(o => !o)}
+            style={{ cursor: 'pointer', userSelect: 'none' }}
+          >
+            <span><span style={{ fontSize: 11, marginRight: 6 }}>{activitiesOpen ? '▼' : '▶'}</span>Educational Activities &amp; Devotionals</span>
           </div>
-          <div className="card-body">
+          {activitiesOpen && <div className="card-body">
             <div className="sync-note">
               Numbers come from cluster-notebook. Amber rows are manually overridden.
             </div>
@@ -1087,13 +1111,19 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 </tbody>
               </table>
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* Additional Details */}
         <div className="card">
-          <div className="card-header">Additional Details</div>
-          <div className="card-body">
+          <div
+            className="card-header"
+            onClick={() => setDetailsOpen(o => !o)}
+            style={{ cursor: 'pointer', userSelect: 'none' }}
+          >
+            <span><span style={{ fontSize: 11, marginRight: 6 }}>{detailsOpen ? '▼' : '▶'}</span>Additional Details</span>
+          </div>
+          {detailsOpen && <div className="card-body">
             <div className="detail-grid">
               <ToggleItem label="Social Action" value={form.presence} notes={form.notesPresence} readonly={!canWrite}
                 onToggle={v => setAndSave('presence', v, { presence: v }, 'Social Action')}
@@ -1104,13 +1134,19 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 onNotes={v => set('notesGatherings', v)} onNotesBlur={() => commitField('notesGatherings', 'Regular Gatherings / Festivals notes')}
                 info="Well-prepared community gatherings, camps, festivals, service projects, arts endeavours, and collective teaching initiatives that occur regularly, each according to its own rhythm, and with increasing frequency." />
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* Narrative */}
         <div className="card">
-          <div className="card-header">Narrative</div>
-          <div className="card-body">
+          <div
+            className="card-header"
+            onClick={() => setNarrativeOpen(o => !o)}
+            style={{ cursor: 'pointer', userSelect: 'none' }}
+          >
+            <span><span style={{ fontSize: 11, marginRight: 6 }}>{narrativeOpen ? '▼' : '▶'}</span>Narrative</span>
+          </div>
+          {narrativeOpen && <div className="card-body">
             <div className="field">
               <textarea
                 value={form.narrative || ''}
@@ -1120,7 +1156,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 rows={6}
               />
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* Manage Access — anyone cluster-notebook lets assign roles here */}
