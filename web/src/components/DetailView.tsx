@@ -613,9 +613,12 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // (history exists, actor withheld by role), or { at, by } (full info) -- see
   // LastUpdated/updatedLine below for how each renders.
   const [lastUpdated, setLastUpdated] = useState<LastUpdated | null>(() => detail.lastUpdated);
-  const [showDiagram, setShowDiagram] = useState(false);
-  const [showDiagram2, setShowDiagram2] = useState(false);
-  const [showDiagram3, setShowDiagram3] = useState(false);
+  // Which of the three concentric-circle diagrams the Concentric Circles card
+  // currently shows -- replaces three separate full-screen modals (one per type,
+  // each reachable only from its own page-header button) with one switcher inside
+  // the single card, 2026-10-08. Defaults to 'staggered', matching that diagram's
+  // prior status as the one already embedded directly in the card.
+  const [diagramType, setDiagramType] = useState<'simple' | 'aligned' | 'staggered'>('staggered');
   const [accompanierNames, setAccompanierNames] = useState<Worker[]>(() => detail.accompanierNames);
   const [showAccompaniersModal, setShowAccompaniersModal] = useState(false);
   const [protagonistNames, setProtagonistNames] = useState<Worker[]>(() => detail.protagonistNames);
@@ -862,15 +865,6 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-          <button onClick={() => setShowDiagram(true)} title="Concentric Circles" aria-label="Concentric Circles" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
-            <IcoDiagram />
-          </button>
-          <button onClick={() => setShowDiagram2(true)} title="Concentric Circles (Aligned)" aria-label="Concentric Circles (Aligned)" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
-            <IcoDiagram2 />
-          </button>
-          <button onClick={() => setShowDiagram3(true)} title="Concentric Circles (Staggered)" aria-label="Concentric Circles (Staggered)" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
-            <IcoDiagram3 />
-          </button>
           <button onClick={handleSignOut} title="Sign out" aria-label="Sign out" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', background: 'none', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 7px', cursor: 'pointer' }}>
             <IcoLogOut />
           </button>
@@ -1060,18 +1054,47 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           </div>}
         </div>
 
-        {/* Concentric Circles (Staggered) */}
+        {/* Concentric Circles -- one card showing any of the three diagram types,
+            switched via the small buttons below (moved here from the page header,
+            2026-10-08, where each used to open its own full-screen modal instead). */}
         <div className="card">
           <div
             className="card-header"
             onClick={() => setDiagramCardOpen(o => !o)}
             style={{ cursor: 'pointer', userSelect: 'none' }}
           >
-            <span><span style={{ fontSize: 11, marginRight: 6 }}>{diagramCardOpen ? '▼' : '▶'}</span>Concentric Circles (Staggered)</span>
+            <span><span style={{ fontSize: 11, marginRight: 6 }}>{diagramCardOpen ? '▼' : '▶'}</span>Concentric Circles</span>
           </div>
           {diagramCardOpen && (
             <div className="card-body">
-              <StaggeredConcentricDiagram labels={staggeredLabels} />
+              <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                {([
+                  ['simple', IcoDiagram, 'Concentric Circles'],
+                  ['aligned', IcoDiagram2, 'Concentric Circles (Aligned)'],
+                  ['staggered', IcoDiagram3, 'Concentric Circles (Staggered)'],
+                ] as const).map(([type, Icon, title]) => {
+                  const active = diagramType === type;
+                  return (
+                    <button
+                      key={type}
+                      onClick={e => { e.stopPropagation(); setDiagramType(type); }}
+                      title={title} aria-label={title}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        color: active ? '#2b6cb0' : '#a0aec0',
+                        background: active ? '#ebf8ff' : 'none',
+                        border: `1px solid ${active ? '#90cdf4' : '#e2e8f0'}`,
+                        borderRadius: 6, padding: '5px 7px', cursor: 'pointer',
+                      }}
+                    >
+                      <Icon />
+                    </button>
+                  );
+                })}
+              </div>
+              {diagramType === 'simple' && <ConcentricDiagram data={diagramData} />}
+              {diagramType === 'aligned' && <AlignedConcentricDiagram rings={alignedRings} residing={alignedResiding} />}
+              {diagramType === 'staggered' && <StaggeredConcentricDiagram labels={staggeredLabels} />}
             </div>
           )}
         </div>
@@ -1237,60 +1260,6 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           </div>
         )}
       </div>
-
-      {showDiagram && (
-        <div
-          onClick={() => setShowDiagram(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-        >
-          <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: 12, padding: '20px 24px', maxWidth: 560, width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: '#2d3748' }}>{row.nucleus}</div>
-                <div style={{ fontSize: 11, color: '#718096', marginTop: 2 }}>{row.clusterCode} · {row.cluster} · {row.locality}</div>
-              </div>
-              <button onClick={() => setShowDiagram(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#718096', lineHeight: 1, padding: 0 }}>×</button>
-            </div>
-            <ConcentricDiagram data={diagramData} />
-          </div>
-        </div>
-      )}
-
-      {showDiagram2 && (
-        <div
-          onClick={() => setShowDiagram2(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-        >
-          <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: 12, padding: '20px 24px', maxWidth: 560, width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: '#2d3748' }}>{row.nucleus}</div>
-                <div style={{ fontSize: 11, color: '#718096', marginTop: 2 }}>{row.clusterCode} · {row.cluster} · {row.locality}</div>
-              </div>
-              <button onClick={() => setShowDiagram2(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#718096', lineHeight: 1, padding: 0 }}>×</button>
-            </div>
-            <AlignedConcentricDiagram rings={alignedRings} residing={alignedResiding} />
-          </div>
-        </div>
-      )}
-
-      {showDiagram3 && (
-        <div
-          onClick={() => setShowDiagram3(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-        >
-          <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: 12, padding: '20px 24px', maxWidth: 560, width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: '#2d3748' }}>{row.nucleus}</div>
-                <div style={{ fontSize: 11, color: '#718096', marginTop: 2 }}>{row.clusterCode} · {row.cluster} · {row.locality}</div>
-              </div>
-              <button onClick={() => setShowDiagram3(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#718096', lineHeight: 1, padding: 0 }}>×</button>
-            </div>
-            <StaggeredConcentricDiagram labels={staggeredLabels} />
-          </div>
-        </div>
-      )}
 
       {showAccompaniersModal && (
         <WorkerListModal
