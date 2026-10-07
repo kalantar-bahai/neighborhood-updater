@@ -778,51 +778,51 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const edTotal  = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs]);
   const allTotal = actTotal([form.activities.ccs, form.activities.jygs, form.activities.scs, form.activities.devotionals]);
 
-  const actKeys = ['ccs', 'jygs', 'scs', 'devotionals'] as const;
-  const hasAnyActPart = actKeys.some(k => form.activities[k].part !== '');
-  // "Helping Others" here (relabeled from "Sustaining") is still the protagonist role --
-  // this simpler 5-ring diagram has no slot for Promoting (the newer promoter role)
-  // or Facilitating, unlike the aligned diagram below.
+  // All three diagrams below were switched 2026-10-07 to the Overview card's own
+  // nine independently-editable, SRP-synced fields, for the same reason the
+  // Overview card itself switched: these numbers no longer come from our role-
+  // assignment lists (promoter/protagonist/accompanier workers) or from summing
+  // activity data, so showing the diagrams' old computed/counted values would
+  // silently disagree with what the Overview card now shows for the exact same
+  // concept. Role-list click-to-manage-names (onClick) stays wherever it was --
+  // unrelated to, and still independent of, the number displayed.
   const diagramData = [
     { label: 'Residing',      value: form.totalPop },
-    { label: 'Connected',     value: form.indNum },
-    { label: 'Participating', value: hasAnyActPart ? String(allTotal.part) : '' },
-    { label: 'Helping Others', value: String(protagonistNames.length), onClick: () => setShowProtagonistsModal(true) },
-    { label: 'Accompanying',  value: String(accompanierNames.length), onClick: () => setShowAccompaniersModal(true) },
+    { label: 'Connected',     value: form.inConversation },
+    { label: 'Participating', value: form.inCommunityActivities },
+    { label: 'Helping Others', value: form.helpingOthers, onClick: () => setShowProtagonistsModal(true) },
+    { label: 'Accompanying',  value: form.accompanying, onClick: () => setShowAccompaniersModal(true) },
   ];
 
   const alignedResiding = { label: 'Residing', value: form.totalPop };
-  // Redefined 2026-09-14 to match the Overview card: Promoting is the promoter role
-  // (was mistakenly the protagonist role), Helping is the protagonist role (was
-  // empty), Facilitating is the summed facilitators count (was empty), In core
-  // activity is the educational-activities participant total (was empty).
   const alignedRings: AlignedRingContent[] = [
-    { single: { label: 'In conversation', value: form.indNum } },
+    { single: { label: 'In conversation', value: form.inConversation } },
     {
-      right: { label: 'In core activity', value: String(edTotal.part) },
-      left:  { label: 'Participating',    value: hasAnyActPart ? String(allTotal.part) : '' },
+      right: { label: 'In core activity', value: form.inEducationalActivities },
+      left:  { label: 'Participating',    value: form.inCommunityActivities },
     },
     {
-      right: { label: 'Facilitating', value: form.facilitatorsCount },
-      left:  { label: 'Promoting',    value: String(promoterNames.length), onClick: () => setShowPromotersModal(true) },
+      right: { label: 'Facilitating', value: form.educationalFacilitators },
+      left:  { label: 'Promoting',    value: form.protagonists, onClick: () => setShowPromotersModal(true) },
     },
     {
-      right: { label: 'Accompanying', value: String(accompanierNames.length), onClick: () => setShowAccompaniersModal(true) },
-      left:  { label: 'Helping Others', value: String(protagonistNames.length), onClick: () => setShowProtagonistsModal(true) },
+      right: { label: 'Accompanying', value: form.accompanying, onClick: () => setShowAccompaniersModal(true) },
+      left:  { label: 'Helping Others', value: form.helpingOthers, onClick: () => setShowProtagonistsModal(true) },
     },
   ];
 
-  // Innermost -> outermost, same values as the Aligned diagram's rings (except
-  // "Hosting Devotional Meetings/Gatherings", which has no mapping yet -- always blank).
+  // Innermost -> outermost, same values as the Aligned diagram's rings. Hosting
+  // Devotional Meetings/Gatherings has a real mapping now (devotionalHosts,
+  // 2026-10-07) -- was always blank before, no field existed for it yet.
   const staggeredLabels: AlignedLabel[] = [
-    { label: 'Accompanying',                           value: String(accompanierNames.length), onClick: () => setShowAccompaniersModal(true) },
-    { label: 'Helping Others',                          value: String(protagonistNames.length), onClick: () => setShowProtagonistsModal(true) },
-    { label: 'Facilitating Ed. Act.',                   value: form.facilitatorsCount },
-    { label: 'Participating in Ed. Act.',               value: String(edTotal.part) },
-    { label: 'Hosting Devotional Meetings/Gatherings',  value: '' },
-    { label: 'Protagonists/Promoting',                  value: String(promoterNames.length), onClick: () => setShowPromotersModal(true) },
-    { label: 'Participating',                           value: hasAnyActPart ? String(allTotal.part) : '' },
-    { label: 'In Conversation',                         value: form.indNum },
+    { label: 'Accompanying',                           value: form.accompanying, onClick: () => setShowAccompaniersModal(true) },
+    { label: 'Helping Others',                          value: form.helpingOthers, onClick: () => setShowProtagonistsModal(true) },
+    { label: 'Facilitating Ed. Act.',                   value: form.educationalFacilitators },
+    { label: 'Participating in Ed. Act.',               value: form.inEducationalActivities },
+    { label: 'Hosting Devotional Meetings/Gatherings',  value: form.devotionalHosts },
+    { label: 'Protagonists/Promoting',                  value: form.protagonists, onClick: () => setShowPromotersModal(true) },
+    { label: 'Participating',                           value: form.inCommunityActivities },
+    { label: 'In Conversation',                         value: form.inConversation },
     { label: 'Population/Residing',                     value: form.totalPop },
   ];
 
