@@ -688,10 +688,13 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   }
 
   // Blur/Enter-triggered fields: totalPop, totalHH, indNum, hhNum, makeup,
-  // notesPresence, notesGatherings, narrative. Skips the request entirely if the value
-  // hasn't changed since the last successful save, or (for integer fields) is invalid --
-  // an invalid number is never sent, and doesn't block saving any other field.
-  type TextFieldKey = 'totalPop' | 'totalHH' | 'indNum' | 'hhNum' | 'makeup' | 'notesPresence' | 'notesGatherings' | 'narrative';
+  // notesPresence, notesGatherings, narrative, and the Overview card's eight new
+  // fields. Skips the request entirely if the value hasn't changed since the last
+  // successful save, or (for integer fields) is invalid -- an invalid number is
+  // never sent, and doesn't block saving any other field.
+  type TextFieldKey = 'totalPop' | 'totalHH' | 'indNum' | 'hhNum' | 'makeup' | 'notesPresence' | 'notesGatherings' | 'narrative'
+    | 'inConversation' | 'inCommunityActivities' | 'protagonists' | 'devotionalHosts'
+    | 'inEducationalActivities' | 'educationalFacilitators' | 'helpingOthers' | 'accompanying';
   function commitField(key: TextFieldKey, label: string, integer?: boolean) {
     const value = form[key];
     if (value === committedRef.current[key]) return;
@@ -935,63 +938,72 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           </div>}
         </div>
 
-        {/* Overview (formerly "Workers & Prevalence"). Mixed-source now: Helpers/
-            Accompanying are still Sheet-sourced free-text counts, Facilitating
-            Educational Activity is cluster-notebook-sourced, Participating/In
-            Educational Activity are computed totals from the Activities card.
-            All three of Promoting/Helping/Accompanying are cluster-notebook role
-            lists now (2026-09-14) -- no more
-            hand-typed counts, no more Sheet writes for any field in this card, so the
-            fromSheet marker is gone entirely (was already gone from the card wrapper;
-            now gone from the two remaining fields that still had it, too). */}
+        {/* Overview (formerly "Workers & Prevalence"). Restructured 2026-10-07: all
+            nine fields are now independently editable, hand-entered estimates
+            synced both ways with SRP -- confirmed with cluster-notebook directly.
+            Previously Participating/In Educational Activity/Facilitating Educational
+            Activity were computed from the Activities card's totals, and Promoting/
+            Helping Others/Accompanying were read off our own role-assignment lists
+            (promoter/protagonist/accompanier workers) -- both approaches are gone
+            now, deliberately: SRP itself only stores numbers, never names, so a
+            count derived from our own lists could never round-trip with it. The role
+            lists themselves are untouched and still reachable via each field's
+            clickable label (for naming specific individuals) -- that's now fully
+            decoupled from the number shown, which the user enters directly instead.
+            Total Population moved here from the Population card below, as the first
+            of the nine (it was already a NucleusPatch field, just newly SRP-synced). */}
         <div className="card">
           <div className="card-header">Overview</div>
           <div className="card-body">
             <div className="field-grid-3">
-              {/* Copied from the Activities card's totals, not independently entered --
-                  same non-editable treatment as Facilitating Educational Activity below. */}
+              <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} onBlur={() => commitField('totalPop', 'Total Population', true)} readonly={!canWrite} integer />
+              <Field
+                label="In Conversation"
+                value={form.inConversation} onChange={v => set('inConversation', v)} onBlur={() => commitField('inConversation', 'In Conversation', true)} readonly={!canWrite} integer
+                info="Estimated number of individuals with whom there is some contact or conversation in the neighborhood, but who do not yet participate regularly in activities or collective spaces."
+              />
               <Field
                 label="Participating"
-                value={String(allTotal.part)}
-                readonly
+                value={form.inCommunityActivities} onChange={v => set('inCommunityActivities', v)} onBlur={() => commitField('inCommunityActivities', 'Participating', true)} readonly={!canWrite} integer
                 info="Estimated number of individuals who participate with some regularity in collective spaces in the neighborhood, such as devotional meetings, family groups, neighborhood gatherings, festivals, community gatherings, Bahá’í holy days, or neighborhood Feasts, and home visits."
               />
-              {/* Promoting/Helping/Accompanying show a count, not the name list --
-                  these can be large; unlike Contact (a singleton, shows the name
-                  directly), a name list here wouldn't scale. Click the label to see
-                  or edit the actual names in the modal. */}
+            </div>
+            <div className="field-grid-3">
+              {/* Promoting/Helping Others/Accompanying still open their role list on
+                  a label click (naming specific individuals), entirely independent
+                  of the number itself now -- see this card's own comment above. */}
               <Field
                 label="Promoting"
-                value={String(promoterNames.length)}
-                readonly
+                value={form.protagonists} onChange={v => set('protagonists', v)} onBlur={() => commitField('protagonists', 'Promoting', true)} readonly={!canWrite} integer
                 onLabelClick={permissions.canAssignRoles ? () => setShowPromotersModal(true) : undefined}
                 info="Estimated number of individuals promoting various aspects of community life such as parents encouraging participation, junior youth bringing friends, or youth inviting peers. It also includes promoting collective spaces such as festivals, Summer of Service, family gatherings, and various logistical assistance such as providing food, giving rides, serving others, etc."
               />
               <Field
-                label="Helping Others"
-                value={String(protagonistNames.length)}
-                readonly
-                onLabelClick={permissions.canAssignRoles ? () => setShowProtagonistsModal(true) : undefined}
-                info="Estimated number of individuals who assist others in taking initial steps in serving others. For example, one may walk with another to do home visits, to share a prayer, to learn a quotation, to introduce the institute’s programs, or other acts of service."
+                label="Hosting Devotional Gatherings"
+                value={form.devotionalHosts} onChange={v => set('devotionalHosts', v)} onBlur={() => commitField('devotionalHosts', 'Hosting Devotional Gatherings', true)} readonly={!canWrite} integer
+                info="Estimated number of individuals who are sharing prayers with others, with family members, and inviting others to attend devotional meetings or gatherings. Examples include where prayers are shared in home visits, community gatherings, festivals, and educational activities."
+              />
+              <Field
+                label="In Educational Activity"
+                value={form.inEducationalActivities} onChange={v => set('inEducationalActivities', v)} onBlur={() => commitField('inEducationalActivities', 'In Educational Activity', true)} readonly={!canWrite} integer
+                info="Estimated number of children, junior youth, youth, and adults participating in educational activities in various modalities and forms: children’s classes, junior youth groups, and study circles."
               />
             </div>
             <div className="field-grid-3">
               <Field
-                label="In Educational Activity"
-                value={String(edTotal.part)}
-                readonly
-                info="Estimated number of children, junior youth, youth, and adults participating in educational activities in various modalities and forms: children’s classes, junior youth groups, and study circles."
-              />
-              <Field
                 label="Facilitating Educational Activity"
-                value={form.facilitators}
-                readonly
+                value={form.educationalFacilitators} onChange={v => set('educationalFacilitators', v)} onBlur={() => commitField('educationalFacilitators', 'Facilitating Educational Activity', true)} readonly={!canWrite} integer
                 info="Estimated number of individuals who facilitate or share the content of the institute’s educational programs, in various forms, approaches, methods, and modalities, to all ages in the neighborhood."
               />
               <Field
+                label="Helping Others"
+                value={form.helpingOthers} onChange={v => set('helpingOthers', v)} onBlur={() => commitField('helpingOthers', 'Helping Others', true)} readonly={!canWrite} integer
+                onLabelClick={permissions.canAssignRoles ? () => setShowProtagonistsModal(true) : undefined}
+                info="Estimated number of individuals who assist others in taking initial steps in serving others. For example, one may walk with another to do home visits, to share a prayer, to learn a quotation, to introduce the institute’s programs, or other acts of service."
+              />
+              <Field
                 label="Accompanying"
-                value={String(accompanierNames.length)}
-                readonly
+                value={form.accompanying} onChange={v => set('accompanying', v)} onBlur={() => commitField('accompanying', 'Accompanying', true)} readonly={!canWrite} integer
                 onLabelClick={permissions.canAssignRoles && permissions.assignableRoles.includes('accompanier') ? () => setShowAccompaniersModal(true) : undefined}
                 info="Estimated number of individuals who have gained a measure of experience from the institute’s courses alongside acts of service, whose actions are motivated by a desire to see capacity develop in others and to foster friendships founded on cooperation and reciprocity."
               />
@@ -1004,7 +1016,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           <div className="card-header">Population</div>
           <div className="card-body">
             <div className="field-grid-2">
-              <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} onBlur={() => commitField('totalPop', 'Total Population', true)} readonly={!canWrite} integer />
+              {/* Total Population moved to the Overview card, 2026-10-07 -- see its own comment there. */}
               <Field label="Total Households" value={form.totalHH}  onChange={v => set('totalHH', v)} onBlur={() => commitField('totalHH', 'Total Households', true)} readonly={!canWrite} integer />
             </div>
             <div className="field-grid-2">

@@ -286,6 +286,32 @@ describe('getNucleusFields', () => {
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.query).toContain('lastUpdated { at by }');
   });
+
+  test('requests and returns the Overview card\'s nine SRP-synced fields (population plus the eight new ones)', async () => {
+    // Confirmed with cluster-notebook directly, 2026-10-07 -- hand-entered estimates,
+    // synced both ways with SRP, deliberately independent of our role-assignment
+    // lists (promoter/protagonist/accompanier workers).
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: {
+        nucleus: {
+          stage: null, locality: null, populationMakeup: null,
+          population: 500,
+          inConversation: 10, inCommunityActivities: 20, protagonists: 3, devotionalHosts: 4,
+          inEducationalActivities: 30, educationalFacilitators: 5, helpingOthers: 6, accompanying: 7,
+        },
+      },
+    }));
+
+    const result = await getNucleusFields('Alpha');
+
+    expect(result).toMatchObject({
+      population: 500,
+      inConversation: 10, inCommunityActivities: 20, protagonists: 3, devotionalHosts: 4,
+      inEducationalActivities: 30, educationalFacilitators: 5, helpingOthers: 6, accompanying: 7,
+    });
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('inConversation inCommunityActivities protagonists devotionalHosts inEducationalActivities educationalFacilitators helpingOthers accompanying');
+  });
 });
 
 describe('updateNucleus', () => {
@@ -351,6 +377,30 @@ describe('updateNucleus', () => {
     expect(body.variables.patch).toEqual({
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: null,
     });
+  });
+
+  test('sends the Overview card\'s eight new fields, including explicit null to clear', async () => {
+    // Confirmed with cluster-notebook directly, 2026-10-07 -- same convention as
+    // population/households/connected* above: null means "not recorded", a real,
+    // explicit value to send, never defaulted away.
+    mockFetch.mockResolvedValue(jsonResponse({
+      data: {
+        updateNucleus: {
+          stage: null, locality: null, populationMakeup: null,
+          inConversation: 10, inCommunityActivities: 20, protagonists: 3, devotionalHosts: null,
+          inEducationalActivities: 30, educationalFacilitators: 5, helpingOthers: 6, accompanying: 7,
+        },
+      },
+    }));
+
+    const patch = {
+      inConversation: 10, inCommunityActivities: 20, protagonists: 3, devotionalHosts: null,
+      inEducationalActivities: 30, educationalFacilitators: 5, helpingOthers: 6, accompanying: 7,
+    };
+    await updateNucleus('Alpha', patch);
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables.patch).toEqual(patch);
   });
 
   test('sends the tri-state social-action/gatherings booleans, including explicit false', async () => {

@@ -110,6 +110,17 @@ function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
     totalHH: fields?.households != null ? String(fields.households) : '',
     indNum: fields?.connectedPopulation != null ? String(fields.connectedPopulation) : '',
     hhNum: fields?.connectedHouseholds != null ? String(fields.connectedHouseholds) : '',
+    // Overview card's nine fields (2026-10-07) -- hand-entered, SRP-synced estimates,
+    // independent of our role-assignment lists. See NucleusFields' own comment in
+    // clusterNotebook.ts.
+    inConversation: fields?.inConversation != null ? String(fields.inConversation) : '',
+    inCommunityActivities: fields?.inCommunityActivities != null ? String(fields.inCommunityActivities) : '',
+    protagonists: fields?.protagonists != null ? String(fields.protagonists) : '',
+    devotionalHosts: fields?.devotionalHosts != null ? String(fields.devotionalHosts) : '',
+    inEducationalActivities: fields?.inEducationalActivities != null ? String(fields.inEducationalActivities) : '',
+    educationalFacilitators: fields?.educationalFacilitators != null ? String(fields.educationalFacilitators) : '',
+    helpingOthers: fields?.helpingOthers != null ? String(fields.helpingOthers) : '',
+    accompanying: fields?.accompanying != null ? String(fields.accompanying) : '',
     presence: boolToYesNo(fields?.hasSocialAction),
     notesPresence: fields?.socialActionDescription ?? '',
     gatherings: boolToYesNo(fields?.hasCommunityGatherings),
@@ -193,6 +204,11 @@ interface FormDataInput {
   activities?: Partial<Record<'ccs' | 'jygs' | 'scs' | 'devotionals', { act?: string; part?: string; fof?: string }>>;
   stage?: string; makeup?: string;
   totalPop?: string; totalHH?: string; indNum?: string; hhNum?: string;
+  // Overview card's nine fields (2026-10-07) -- see nucleusPatchFromFormData below.
+  inConversation?: string; inCommunityActivities?: string;
+  protagonists?: string; devotionalHosts?: string;
+  inEducationalActivities?: string; educationalFacilitators?: string;
+  helpingOthers?: string; accompanying?: string;
   presence?: string; notesPresence?: string;
   gatherings?: string; notesGatherings?: string;
   narrative?: string;
@@ -239,6 +255,10 @@ function nucleusPatchFromFormData(d: FormDataInput) {
     stage?: string; populationMakeup?: string;
     population?: number | null; households?: number | null;
     connectedPopulation?: number | null; connectedHouseholds?: number | null;
+    inConversation?: number | null; inCommunityActivities?: number | null;
+    protagonists?: number | null; devotionalHosts?: number | null;
+    inEducationalActivities?: number | null; educationalFacilitators?: number | null;
+    helpingOthers?: number | null; accompanying?: number | null;
     hasSocialAction?: boolean | null; socialActionDescription?: string;
     hasCommunityGatherings?: boolean | null; communityGatheringDescription?: string;
     narrative?: string;
@@ -251,6 +271,16 @@ function nucleusPatchFromFormData(d: FormDataInput) {
   if (d.totalHH !== undefined) nucleusPatch.households = toIntOrNull(d.totalHH);
   if (d.indNum !== undefined) nucleusPatch.connectedPopulation = toIntOrNull(d.indNum);
   if (d.hhNum !== undefined) nucleusPatch.connectedHouseholds = toIntOrNull(d.hhNum);
+  // toIntOrNull('') is null, not 0 -- cluster-notebook was explicit that a blank
+  // input must stay blank (null = "not recorded"), never sent as a false zero.
+  if (d.inConversation !== undefined) nucleusPatch.inConversation = toIntOrNull(d.inConversation);
+  if (d.inCommunityActivities !== undefined) nucleusPatch.inCommunityActivities = toIntOrNull(d.inCommunityActivities);
+  if (d.protagonists !== undefined) nucleusPatch.protagonists = toIntOrNull(d.protagonists);
+  if (d.devotionalHosts !== undefined) nucleusPatch.devotionalHosts = toIntOrNull(d.devotionalHosts);
+  if (d.inEducationalActivities !== undefined) nucleusPatch.inEducationalActivities = toIntOrNull(d.inEducationalActivities);
+  if (d.educationalFacilitators !== undefined) nucleusPatch.educationalFacilitators = toIntOrNull(d.educationalFacilitators);
+  if (d.helpingOthers !== undefined) nucleusPatch.helpingOthers = toIntOrNull(d.helpingOthers);
+  if (d.accompanying !== undefined) nucleusPatch.accompanying = toIntOrNull(d.accompanying);
   if (d.presence !== undefined) nucleusPatch.hasSocialAction = toBoolOrNull(d.presence);
   if (d.notesPresence !== undefined) nucleusPatch.socialActionDescription = d.notesPresence;
   if (d.gatherings !== undefined) nucleusPatch.hasCommunityGatherings = toBoolOrNull(d.gatherings);

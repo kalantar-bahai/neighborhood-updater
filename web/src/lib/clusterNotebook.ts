@@ -118,6 +118,26 @@ export interface NucleusFields {
   households: number | null;
   connectedPopulation: number | null;
   connectedHouseholds: number | null;
+  // The following eight, added 2026-10-07, are a different kind of field from
+  // population/households/connectedPopulation/connectedHouseholds above: hand-
+  // entered estimates, synced BOTH WAYS with SRP's FocusNeighbourhood record (SRP
+  // sums across co-located nuclei on write -- same rule as households). Null means
+  // "not recorded", never coerce to 0. Deliberately NOT derived from our own role-
+  // assignment lists (protagonist/promoter/accompanier workers()) or from activity-
+  // summary totals -- SRP itself only stores numbers, never names, so a count
+  // derived from our lists could never round-trip with it. The role lists stay,
+  // for naming specific individuals, but these numbers are now independently
+  // editable -- confirmed with cluster-notebook directly. `protagonists` is their
+  // term for what our UI calls "Promoting" (SRP: "protagonists promoting") --
+  // unrelated to our own 'protagonist' role, which we display as "Helping Others".
+  inConversation: number | null;
+  inCommunityActivities: number | null;
+  protagonists: number | null;
+  devotionalHosts: number | null;
+  inEducationalActivities: number | null;
+  educationalFacilitators: number | null;
+  helpingOthers: number | null;
+  accompanying: number | null;
   hasSocialAction: boolean | null;
   socialActionDescription: string | null;
   hasCommunityGatherings: boolean | null;
@@ -261,6 +281,7 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
 }
 
 const NUCLEUS_FIELDS_SELECTION = 'stage locality populationMakeup population households connectedPopulation connectedHouseholds '
+  + 'inConversation inCommunityActivities protagonists devotionalHosts inEducationalActivities educationalFacilitators helpingOthers accompanying '
   + 'hasSocialAction socialActionDescription hasCommunityGatherings communityGatheringDescription narrative nucleusType '
   + 'cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers } parentNucleus { name } lastUpdated { at by }';
 
@@ -285,6 +306,12 @@ export async function updateNucleus(
     stage?: string; populationMakeup?: string;
     population?: number | null; households?: number | null;
     connectedPopulation?: number | null; connectedHouseholds?: number | null;
+    // The following eight -- see NucleusFields' own comment above for what makes
+    // them different (SRP-synced estimates, independent of our role lists).
+    inConversation?: number | null; inCommunityActivities?: number | null;
+    protagonists?: number | null; devotionalHosts?: number | null;
+    inEducationalActivities?: number | null; educationalFacilitators?: number | null;
+    helpingOthers?: number | null; accompanying?: number | null;
     hasSocialAction?: boolean | null; socialActionDescription?: string;
     hasCommunityGatherings?: boolean | null; communityGatheringDescription?: string;
     narrative?: string;

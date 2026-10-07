@@ -74,6 +74,8 @@ describe('getRowData', () => {
     mockGetNucleusFields.mockResolvedValue({
       stage: 'Advanced/5', locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
@@ -108,6 +110,8 @@ describe('getRowData', () => {
     mockGetNucleusFields.mockResolvedValue({
       stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students',
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: true, socialActionDescription: 'Cleanup drive', hasCommunityGatherings: false, communityGatheringDescription: null,
       narrative: 'A growing community of practice.',
       nucleusType: 'Neighborhood',
@@ -147,6 +151,8 @@ describe('getRowData', () => {
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
@@ -165,6 +171,8 @@ describe('getRowData', () => {
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
@@ -190,6 +198,8 @@ describe('getRowData', () => {
       mockGetNucleusFields.mockResolvedValue({
         stage: null, locality: null, populationMakeup: null,
         population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+        inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+        inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
         hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
         narrative: null,
         nucleusType: 'Neighborhood',
@@ -207,6 +217,8 @@ describe('getRowData', () => {
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
@@ -226,6 +238,8 @@ describe('getRowData', () => {
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
@@ -250,6 +264,8 @@ describe('getRowData', () => {
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
@@ -286,6 +302,8 @@ describe('getRowData', () => {
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
@@ -297,6 +315,57 @@ describe('getRowData', () => {
     const result = await getRowData('Alpha');
 
     expect(result?.lastUpdated).toEqual({ at: '2026-10-03T19:18:09-04:00', by: null });
+  });
+
+  test('maps the Overview card\'s nine SRP-synced fields onto the row (population plus the eight new ones)', async () => {
+    mockGetActivitySummaries.mockResolvedValue(null);
+    mockGetNucleusFields.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: 500, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: 10, inCommunityActivities: 20, protagonists: 3, devotionalHosts: 4,
+      inEducationalActivities: 30, educationalFacilitators: 5, helpingOthers: 6, accompanying: 7,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null,
+      nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: '', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
+    });
+
+    const result = await getRowData('Alpha');
+
+    expect(result?.row.totalPop).toBe('500');
+    expect(result?.row.inConversation).toBe('10');
+    expect(result?.row.inCommunityActivities).toBe('20');
+    expect(result?.row.protagonists).toBe('3');
+    expect(result?.row.devotionalHosts).toBe('4');
+    expect(result?.row.inEducationalActivities).toBe('30');
+    expect(result?.row.educationalFacilitators).toBe('5');
+    expect(result?.row.helpingOthers).toBe('6');
+    expect(result?.row.accompanying).toBe('7');
+  });
+
+  test('renders a null value for any of the nine fields as an empty string, not "null" or "0"', async () => {
+    mockGetActivitySummaries.mockResolvedValue(null);
+    mockGetNucleusFields.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null,
+      nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: '', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
+    });
+
+    const result = await getRowData('Alpha');
+
+    expect(result?.row.inConversation).toBe('');
+    expect(result?.row.protagonists).toBe('');
+    expect(result?.row.devotionalHosts).toBe('');
+    expect(result?.row.accompanying).toBe('');
   });
 });
 
@@ -374,6 +443,8 @@ describe('saveRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: 'Advanced/5', locality: 'Durham', populationMakeup: 'Students',
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
@@ -397,6 +468,8 @@ describe('saveRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: 500, households: 120, connectedPopulation: 80, connectedHouseholds: 30,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
@@ -413,11 +486,64 @@ describe('saveRowData', () => {
     });
   });
 
+  test('writes the Overview card\'s eight new fields via cluster-notebook', async () => {
+    mockUpdateActivitySummary.mockResolvedValue(null);
+    mockUpdateNucleus.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: 10, inCommunityActivities: 20, protagonists: 3, devotionalHosts: 4,
+      inEducationalActivities: 30, educationalFacilitators: 5, helpingOthers: 6, accompanying: 7,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null,
+      nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
+    });
+
+    const formData = {
+      ...baseFormData,
+      inConversation: '10', inCommunityActivities: '20', protagonists: '3', devotionalHosts: '4',
+      inEducationalActivities: '30', educationalFacilitators: '5', helpingOthers: '6', accompanying: '7',
+    };
+    await saveRowData('Alpha', formData);
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', {
+      inConversation: 10, inCommunityActivities: 20, protagonists: 3, devotionalHosts: 4,
+      inEducationalActivities: 30, educationalFacilitators: 5, helpingOthers: 6, accompanying: 7,
+    });
+  });
+
+  test('sends null, not 0, for a blanked-out field among the Overview card\'s eight new ones', async () => {
+    // Explicit requirement from cluster-notebook, 2026-10-07: null means "not
+    // recorded", a real, distinct value from 0 -- a blank input must stay blank.
+    mockUpdateActivitySummary.mockResolvedValue(null);
+    mockUpdateNucleus.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null,
+      nucleusType: null,
+      parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null,
+    });
+
+    const formData = { ...baseFormData, protagonists: '' };
+    await saveRowData('Alpha', formData);
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { protagonists: null });
+  });
+
   test('writes presence/gatherings as tri-state booleans via cluster-notebook', async () => {
     mockUpdateActivitySummary.mockResolvedValue(null);
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: true, socialActionDescription: 'Cleanup drive', hasCommunityGatherings: false, communityGatheringDescription: '',
       narrative: null,
       nucleusType: null,
@@ -444,6 +570,8 @@ describe('saveRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: 'A growing community of practice.',
       nucleusType: null,
@@ -491,6 +619,8 @@ describe('saveRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: 'Network',
       parentNucleus: null,
@@ -514,6 +644,8 @@ describe('saveRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: 'Advanced/5', locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: null,
@@ -537,6 +669,8 @@ describe('saveRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: { name: 'Chapelboro' },
@@ -555,6 +689,8 @@ describe('saveRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: null,
@@ -573,6 +709,8 @@ describe('saveRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
@@ -594,6 +732,8 @@ describe('saveRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: 'Advanced/5', locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null,
       nucleusType: null,
@@ -638,6 +778,8 @@ describe('saveRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: 'Advanced/5', locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: null,
@@ -659,6 +801,8 @@ describe('saveRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: 'Advanced/5', locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: null,
@@ -682,6 +826,8 @@ describe('saveRowData', () => {
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: null,
@@ -706,6 +852,8 @@ describe('saveRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: 'Advanced/5', locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: null,
@@ -715,6 +863,8 @@ describe('saveRowData', () => {
     mockGetNucleusFields.mockResolvedValue({
       stage: 'Advanced/5', locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: null,
@@ -747,6 +897,8 @@ describe('createRowData', () => {
     mockCreateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: null,
@@ -802,6 +954,8 @@ describe('createRowData', () => {
     mockCreateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: null,
@@ -826,6 +980,8 @@ describe('createRowData', () => {
     mockCreateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: { name: 'Chapelboro' },
@@ -848,6 +1004,8 @@ describe('createRowData', () => {
     mockCreateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: null,
@@ -857,6 +1015,8 @@ describe('createRowData', () => {
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: null,
@@ -877,6 +1037,8 @@ describe('createRowData', () => {
     mockCreateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: null,
@@ -886,6 +1048,8 @@ describe('createRowData', () => {
     mockUpdateNucleus.mockResolvedValue({
       stage: 'Initial/2', locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: null,
@@ -906,6 +1070,8 @@ describe('createRowData', () => {
     mockCreateNucleus.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
       hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
       narrative: null, nucleusType: null,
       parentNucleus: null,

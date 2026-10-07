@@ -40,6 +40,18 @@ export interface NucleusRow {
   totalHH: string;
   indNum: string;
   hhNum: string;
+  // Overview card's nine fields (2026-10-07, totalPop being the ninth) -- hand-
+  // entered estimates synced both ways with SRP, deliberately independent of our
+  // role-assignment lists (protagonist/promoter/accompanier workers). See
+  // NucleusFields' own comment in clusterNotebook.ts for the full story.
+  inConversation: string;
+  inCommunityActivities: string;
+  protagonists: string;
+  devotionalHosts: string;
+  inEducationalActivities: string;
+  educationalFacilitators: string;
+  helpingOthers: string;
+  accompanying: string;
   activities: {
     ccs: Activity;
     jygs: Activity;
