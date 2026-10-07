@@ -634,7 +634,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // no way to collapse them at all; now they're collapsible like every other card,
   // just starting open instead of closed.
   const [overviewOpen, setOverviewOpen] = useState(true);
-  const [populationOpen, setPopulationOpen] = useState(true);
+  const [familiesOpen, setFamiliesOpen] = useState(true);
   const [activitiesOpen, setActivitiesOpen] = useState(true);
   const [detailsOpen, setDetailsOpen] = useState(true);
   const [narrativeOpen, setNarrativeOpen] = useState(true);
@@ -695,12 +695,13 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     }
   }
 
-  // Blur/Enter-triggered fields: totalPop, totalHH, indNum, hhNum, makeup,
+  // Blur/Enter-triggered fields: totalPop, totalHH, hhNum, makeup,
   // notesPresence, notesGatherings, narrative, and the Overview card's eight new
   // fields. Skips the request entirely if the value hasn't changed since the last
   // successful save, or (for integer fields) is invalid -- an invalid number is
-  // never sent, and doesn't block saving any other field.
-  type TextFieldKey = 'totalPop' | 'totalHH' | 'indNum' | 'hhNum' | 'makeup' | 'notesPresence' | 'notesGatherings' | 'narrative'
+  // never sent, and doesn't block saving any other field. (indNum removed 2026-10-08
+  // along with the Individuals Connected field itself -- see the Families card.)
+  type TextFieldKey = 'totalPop' | 'totalHH' | 'hhNum' | 'makeup' | 'notesPresence' | 'notesGatherings' | 'narrative'
     | 'inConversation' | 'inCommunityActivities' | 'protagonists' | 'devotionalHosts'
     | 'inEducationalActivities' | 'educationalFacilitators' | 'helpingOthers' | 'accompanying';
   function commitField(key: TextFieldKey, label: string, integer?: boolean) {
@@ -1022,40 +1023,41 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 info="Estimated number of individuals who have gained a measure of experience from the institute’s courses alongside acts of service, whose actions are motivated by a desire to see capacity develop in others and to foster friendships founded on cooperation and reciprocity."
               />
             </div>
+            {/* Moved here from the Families card, 2026-10-08. */}
+            <div className="field">
+              <label>Makeup of Population</label>
+              <textarea value={form.makeup || ''} onChange={e => set('makeup', e.target.value)} onBlur={() => commitField('makeup', 'Makeup of Population')} readOnly={!canWrite} />
+            </div>
           </div>}
         </div>
 
-        {/* Population */}
+        {/* Families (formerly "Population" -- now households only, 2026-10-08:
+            Individuals Connected removed, Total Population and Makeup of Population
+            moved to the Overview card) */}
         <div className="card">
           <div
             className="card-header"
-            onClick={() => setPopulationOpen(o => !o)}
+            onClick={() => setFamiliesOpen(o => !o)}
             style={{ cursor: 'pointer', userSelect: 'none' }}
           >
-            <span><span style={{ fontSize: 11, marginRight: 6 }}>{populationOpen ? '▼' : '▶'}</span>Population</span>
+            <span><span style={{ fontSize: 11, marginRight: 6 }}>{familiesOpen ? '▼' : '▶'}</span>Families</span>
           </div>
-          {populationOpen && <div className="card-body">
+          {familiesOpen && <div className="card-body">
             <div className="field-grid-2">
               {/* Total Population moved to the Overview card, 2026-10-07 -- see its own comment there. */}
               <Field label="Total Households" value={form.totalHH}  onChange={v => set('totalHH', v)} onBlur={() => commitField('totalHH', 'Total Households', true)} readonly={!canWrite} integer />
             </div>
             <div className="field-grid-2">
-              <PairField
-                label="Individuals Connected"
-                info="Estimated number of individuals with whom there is some contact or conversation in the neighborhood, but who do not yet participate regularly in activities or collective spaces."
-                numVal={form.indNum} pctVal={computedPct(form.indNum, form.totalPop)}
-                onNumChange={v => set('indNum', v)} onNumBlur={() => commitField('indNum', 'Individuals Connected', true)} readonly={!canWrite} pctReadonly numInteger
-              />
+              {/* Individuals Connected (indNum/connectedPopulation) removed 2026-10-08 --
+                  meaningless now that the Overview card's "In Conversation" field covers
+                  the same idea with real SRP sync. The underlying cluster-notebook field
+                  (connectedPopulation) is untouched -- just no longer shown/edited here. */}
               <PairField
                 label="Households Connected"
                 info="Number of households where at least one person is engaged in a conversation about the Faith, participating, serving, and/or accompanying others."
                 numVal={form.hhNum} pctVal={computedPct(form.hhNum, form.totalHH)}
                 onNumChange={v => set('hhNum', v)} onNumBlur={() => commitField('hhNum', 'Households Connected', true)} readonly={!canWrite} pctReadonly numInteger
               />
-            </div>
-            <div className="field">
-              <label>Makeup of Population</label>
-              <textarea value={form.makeup || ''} onChange={e => set('makeup', e.target.value)} onBlur={() => commitField('makeup', 'Makeup of Population')} readOnly={!canWrite} />
             </div>
           </div>}
         </div>
