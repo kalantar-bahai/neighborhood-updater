@@ -41,9 +41,15 @@ export interface NucleusRow {
   indNum: string;
   hhNum: string;
   // Added 2026-10-08 -- the raw value `locationName` sets, distinct from locality/
-  // cluster above (both derived from it). '' means no location. See NucleusFields'
-  // own comment in clusterNotebook.ts.
+  // cluster above (both derived from it). '' means no location (should now only
+  // happen for already-archived nuclei that predate cluster-notebook requiring
+  // one). See NucleusFields' own comment in clusterNotebook.ts.
   locationName: string;
+  // 'CLUSTER' | 'LOCALITY' | 'SETTING' | '' -- governs whether nucleusType can be
+  // edited at all (forced to "Neighborhood" at a SETTING, freely settable at a
+  // CLUSTER or LOCALITY). See NucleusFields.location's own comment in
+  // clusterNotebook.ts.
+  locationType: string;
   // Overview card's nine fields (2026-10-07, totalPop being the ninth) -- hand-
   // entered estimates synced both ways with SRP, deliberately independent of our
   // role-assignment lists (protagonist/promoter/accompanier workers). See

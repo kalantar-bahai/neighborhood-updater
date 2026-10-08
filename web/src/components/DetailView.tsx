@@ -44,7 +44,10 @@ function isValidInt(v: string) { return !v || /^\d+$/.test(v.trim()); }
 // together in SRP, which double-counts if this nucleus's people are a subset of
 // theirs) and a Setting that isn't linked to SRP yet (entered numbers stay local
 // for now). `ownNucleusName` is filtered out of "already has" -- a nucleus already
-// placed at this Setting isn't "sharing" with itself.
+// placed at this Setting isn't "sharing" with itself. The `!locationName` guard is
+// defensive, not expected in practice -- every nucleus has a location now (commit
+// c40fb54, same day), so this should only ever trigger for a handful of already-
+// archived nuclei that predate that rule.
 function locationWarningFor(locationName: string, options: LocalityOption[], ownNucleusName: string): string | null {
   if (!locationName) return null;
   for (const locality of options) {
@@ -947,14 +950,18 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
               {/* Location replaces Locality here, 2026-10-08 -- Locality was always
                   just a read-only derived VIEW of Location (walking up from it until
                   a Locality is found), and showing both was redundant now that
-                  Location itself is editable. Any Cluster/Locality/Setting name is a
-                  valid choice; the tree (detail.locationOptions) is already scoped
-                  to this nucleus's own cluster and to what this caller can read --
-                  confirmed with cluster-notebook directly. Nucleus (the name itself)
-                  is read-only: cluster-notebook's own name is now the canonical identifier
-                  (2026-09-13, the user directly) and cluster-notebook has no rename
-                  mutation — an edit here would silently revert on next load. Set once, at
-                  creation time, via CreateNucleusModal, 2026-09-14. */}
+                  Location itself is editable. Every nucleus has one now (at minimum
+                  its own Cluster) -- cluster-notebook commit c40fb54, 2026-10-08,
+                  superseding their own earlier "null is legitimate" guidance, so
+                  there's no "none" option any more; a Cluster/Locality/Setting name
+                  is the only kind of choice. The tree (detail.locationOptions) is
+                  already scoped to this nucleus's own cluster and to what this
+                  caller can read -- confirmed with cluster-notebook directly.
+                  Nucleus (the name itself) is read-only: cluster-notebook's own
+                  name is now the canonical identifier (2026-09-13, the user
+                  directly) and cluster-notebook has no rename mutation — an edit
+                  here would silently revert on next load. Set once, at creation
+                  time, via CreateNucleusModal, 2026-09-14. */}
               {permissions.canChangeIdentity ? (
                 <div className="field">
                   <label>Location</label>
@@ -962,7 +969,6 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                     value={form.locationName}
                     onChange={e => setAndSave('locationName', e.target.value, { identity: { location: e.target.value } }, 'Location')}
                   >
-                    <option value="">— No location —</option>
                     <option value={form.cluster}>— This cluster ({form.cluster}) —</option>
                     {detail.locationOptions.map(locality => (
                       <optgroup key={locality.name} label={locality.name}>
@@ -978,7 +984,13 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 <Field label="Location" value={form.locationName} readonly />
               )}
               <Field label="Nucleus" value={form.nucleus} readonly />
-              {permissions.canChangeIdentity
+              {/* Type is only ever freely settable at a CLUSTER or LOCALITY location --
+                  at a SETTING, cluster-notebook forces it to "Neighborhood" and now
+                  raises a real error if you try to set anything else (previously a
+                  silent revert, confirmed with cluster-notebook directly, 2026-10-08,
+                  commit c40fb54), so there's no point offering the control at all in
+                  that case -- show it readonly instead of letting the save fail. */}
+              {permissions.canChangeIdentity && form.locationType !== 'SETTING'
                 ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => setAndSave('nucleusType', v, { identity: { nucleusType: v } }, 'Type')} />
                 : <Field label="Type" value={form.nucleusType} readonly />
               }
@@ -1034,15 +1046,25 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 <Field label="Parent Nucleus" value={form.parentNucleus} readonly />
               )}
             </div>
-            {/* Confirmed with cluster-notebook directly, 2026-10-08: permissions and
-                SRP sync both follow nesting, so a pocket with no location is still
-                covered by its parent's -- giving it the SAME location as the parent
-                instead sums their counts together in SRP, which double-counts if
-                this nucleus's people are a subset of the parent's. Surfaced
-                proactively whenever a parent is set, not only once it's "wrong". */}
+            {/* Confirmed with cluster-notebook directly, 2026-10-08: permissions
+                follow nesting, so a pocket's own location doesn't affect whether
+                its parent's people can reach it. SRP sums only happen at a
+                Setting -- a pocket can no longer have "no location" at all
+                (commit c40fb54, same day, superseding their own earlier advice to
+                leave it empty), so the way to keep a pocket's counts out of SRP
+                sums now is to place it at the Cluster or a Locality specifically,
+                never the same Setting as its parent. Surfaced proactively whenever
+                a parent is set, not only once it's "wrong". */}
             {form.parentNucleus && (
               <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>
-                This nucleus has a parent — it’s usually covered by the parent’s own location. Leave Location empty unless this nucleus’s counts should add to a neighbourhood separately.
+                This nucleus has a parent — give it the Cluster or a Locality (not a Setting) unless its counts should add to a neighbourhood separately.
+              </p>
+            )}
+            {/* Setting-level Type is read-only above for everyone, but only the
+                people who could otherwise edit it need telling why. */}
+            {permissions.canChangeIdentity && form.locationType === 'SETTING' && (
+              <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>
+                This nucleus is at a Setting, so its type is fixed to Neighborhood. Move it to a Locality or the Cluster to set Network or Population instead.
               </p>
             )}
             {locationWarning && (

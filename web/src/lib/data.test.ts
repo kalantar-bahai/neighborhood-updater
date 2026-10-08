@@ -407,10 +407,11 @@ describe('getRowData', () => {
 
     expect(mockGetLocationOptions).toHaveBeenCalledWith('NC-215 Triangle');
     expect(result?.row.locationName).toBe('Main St Setting');
+    expect(result?.row.locationType).toBe('SETTING');
     expect(result?.locationOptions).toEqual(options);
   });
 
-  test('renders a null location as an empty locationName', async () => {
+  test('renders a null location as an empty locationName and locationType', async () => {
     mockGetActivitySummaries.mockResolvedValue(null);
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
@@ -429,6 +430,7 @@ describe('getRowData', () => {
     const result = await getRowData('Alpha');
 
     expect(result?.row.locationName).toBe('');
+    expect(result?.row.locationType).toBe('');
   });
 });
 

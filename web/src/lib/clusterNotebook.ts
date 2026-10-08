@@ -162,12 +162,19 @@ export interface NucleusFields {
   // string, not nested) -- no cycle-guard on their side, human-entered data.
   parentNucleus: { name: string } | null;
   // The raw value `locationName` sets -- distinct from locality/cluster above,
-  // which are both DERIVED by walking up from this. Confirmed with cluster-notebook
-  // directly, 2026-10-08: null means no location at all (legitimate for a
-  // population-/network-based nucleus, and the recommended choice for a "pocket"
-  // nested under a parent -- see parentNucleus above, which it's otherwise easy to
-  // confuse this with). `type` says which tier `name` is at; naming a Nucleus here
-  // is rejected server-side (that's parentNucleusName's job, not this field's).
+  // which are both DERIVED by walking up from this. Every nucleus has one (at
+  // minimum its own Cluster) -- cluster-notebook commit c40fb54, 2026-10-08,
+  // superseding their own earlier guidance that null was legitimate here
+  // (including for a "pocket" -- see parentNucleus above; a pocket now needs a
+  // Cluster or Locality too, specifically to stay off a Setting, which is the one
+  // place SRP sums counts together). `type` says which tier `name` is at, and
+  // governs nucleusType below: at a SETTING, type is always forced to
+  // "Neighborhood" (attempting to set anything else now raises a real error,
+  // not a silent revert); at a CLUSTER or LOCALITY, nucleusType is freely
+  // settable. Naming a Nucleus here is rejected server-side (that's
+  // parentNucleusName's job, not this field's); `null` is also rejected now --
+  // this should only ever actually be null for a handful of already-archived
+  // (soft-deleted) nuclei that predate this rule.
   location: { name: string; type: PlaceType } | null;
   // Aggregated server-side across this Nucleus's own fields AND all four
   // ActivitySummary rows -- whichever changed most recently (so an activity-only
@@ -366,8 +373,11 @@ export async function updateNucleus(
     parentNucleusName?: string | null;
     // Added 2026-10-08 -- any Cluster/Locality/Setting name (never a Nucleus --
     // cluster-notebook rejects that, pointing at parentNucleusName instead, as of
-    // their commit 7142aab). null clears it. Same gate as `name`/identity changes
-    // generally (canChangeIdentity).
+    // their commit 7142aab). `null` is ALSO rejected as of commit c40fb54, same
+    // day -- every nucleus must have a location (at minimum its own Cluster), so
+    // our UI should never actually send null here; the type stays nullable only
+    // because the field itself is (not because sending null is ever a good idea).
+    // Same gate as `name`/identity changes generally (canChangeIdentity).
     locationName?: string | null;
   }
 ): Promise<NucleusFields | null> {

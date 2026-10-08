@@ -2,7 +2,7 @@ import {
   getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus,
   getNucleusWorkers, individualDisplayName, createNucleus, deleteNucleus, getLocationOptions,
 } from './clusterNotebook';
-import type { ActivitySummary, ActivitySummaries, ActivityType, NucleusFields, Individual, LocalityOption } from './clusterNotebook';
+import type { ActivitySummary, ActivitySummaries, ActivityType, NucleusFields, Individual } from './clusterNotebook';
 import type { Activity, Worker } from '@/types';
 
 // Lets callers (route handlers) distinguish error cases (e.g. 409 vs 400)
@@ -131,12 +131,18 @@ function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
     // own field (parentNucleus { name }), not a Sheet column.
     parentNucleus: fields?.parentNucleus?.name ?? '',
     // Added 2026-10-08 -- the raw value `locationName` sets (any Cluster/Locality/
-    // Setting name), distinct from the derived locality/cluster above. Flattened to
-    // just the name: nothing in our UI needs to distinguish which tier it's at, and
-    // the save path only ever needs the name (cluster-notebook resolves the type
-    // itself). '' means no location, same blank-string convention as every other
-    // field here.
+    // Setting name), distinct from the derived locality/cluster above. The save
+    // path only ever needs the name (cluster-notebook resolves which tier it's at
+    // itself) -- '' means no location, same blank-string convention as every other
+    // field here, though that should now only happen for the handful of already-
+    // archived nuclei that predate cluster-notebook requiring one (commit c40fb54).
     locationName: fields?.location?.name ?? '',
+    // locationType *is* needed in our UI, unlike locationName's tier -- it governs
+    // whether nucleusType can be edited at all: forced to "Neighborhood" at a
+    // SETTING (attempting anything else now raises a real error, not a silent
+    // revert), freely settable at a CLUSTER or LOCALITY. Confirmed with cluster-
+    // notebook directly, 2026-10-08 (commit c40fb54).
+    locationType: fields?.location?.type ?? '',
     // Read-only on cluster-notebook's side — no mutation exists for any of these four.
     cluster: fields?.cluster.name ?? '',
     grouping: fields?.cluster.groupOfClusters ?? '',
