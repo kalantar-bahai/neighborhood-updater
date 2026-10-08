@@ -96,27 +96,12 @@ export default function AppClient() {
   // wasn't also a global Administrator -- a different, much rarer role.
   const canCreateNucleus = initialData.clusterNames.length > 0;
 
-  const TYPE_META: Record<string, { label: string; bg: string; color: string; border: string }> = {
-    neighborhood: { label: 'Neighborhood', bg: '#bee3f8', color: '#2c5282', border: '#90cdf4' },
-    network:      { label: 'Network',      bg: '#c6f6d5', color: '#276749', border: '#9ae6b4' },
-    population:   { label: 'Population',   bg: '#e9d8fd', color: '#553c9a', border: '#d6bcfa' },
-  };
-
-  const typeTotals = initialData.rows.reduce<Record<string, { act: number; part: number; fof: number; count: number }>>((acc, r) => {
-    const key = (r.nucleusType || '').toLowerCase().trim() || 'neighborhood';
-    if (!acc[key]) acc[key] = { act: 0, part: 0, fof: 0, count: 0 };
-    acc[key].act   += r.totalAct  || 0;
-    acc[key].part  += r.totalPart || 0;
-    acc[key].fof   += r.totalFof  || 0;
-    acc[key].count += 1;
-    return acc;
-  }, {});
-const typeSummaries = (['neighborhood', 'network', 'population'] as const)
-    .filter(key => key in typeTotals)
-    .map(key => [key, typeTotals[key]] as const);
-
   return (
     <>
+      {/* The bottom-of-page by-nucleus-type summary cards (Neighborhood/Network/
+          Population) are gone, 2026-10-08 -- every bar in Picker's own hierarchy
+          (cluster, locality) now carries its own activities/participants/FoF
+          rollup, making a separate by-type summary redundant. */}
       <Picker
         rows={initialData.rows}
         email={initialData.email}
@@ -124,28 +109,6 @@ const typeSummaries = (['neighborhood', 'network', 'population'] as const)
         onSignOut={() => window.location.href = '/signout'}
         onAdd={canCreateNucleus ? () => setCreatingNew(true) : undefined}
       />
-      {typeSummaries.length > 0 && (
-        <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 16px 24px', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {typeSummaries.map(([key, s]) => {
-            const meta = TYPE_META[key];
-            return (
-              <div key={key} className="card" style={{ flex: '1 1 200px', margin: 0 }}>
-                <div className="card-header" style={{ background: meta.bg, color: meta.color, borderBottom: `1px solid ${meta.border}` }}>
-                  {meta.label}
-                </div>
-                <div className="card-body" style={{ fontSize: 13 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 12px' }}>
-                    <span style={{ color: '#718096', textAlign: 'right' }}>Nuclei</span>       <span style={{ fontWeight: 600 }}>{s.count}</span>
-                    <span style={{ color: '#718096', textAlign: 'right' }}>Activities</span>   <span style={{ fontWeight: 600 }}>{s.act}</span>
-                    <span style={{ color: '#718096', textAlign: 'right' }}>Participants</span> <span style={{ fontWeight: 600 }}>{s.part}</span>
-                    <span style={{ color: '#718096', textAlign: 'right' }}>Friends of the Faith</span> <span style={{ fontWeight: 600 }}>{s.fof}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       {creatingNew && (
         <CreateNucleusModal

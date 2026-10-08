@@ -19,6 +19,29 @@ function typeBadgeStyle(nucleusType: string): React.CSSProperties {
   return {};
 }
 
+// Backs the rollup shown on each Cluster/Locality bar, 2026-10-08 -- same totals
+// the bottom-of-page type cards used to show (totalAct/totalPart/totalFof, already
+// on every NucleusSummary row), just rolled up by cluster/locality instead of by
+// nucleus type. Those cards are gone now that every bar in the hierarchy carries
+// its own rollup.
+function rollup(rowsIn: NucleusSummary[]) {
+  return rowsIn.reduce((acc, r) => ({
+    count: acc.count + 1,
+    act: acc.act + (r.totalAct || 0),
+    part: acc.part + (r.totalPart || 0),
+    fof: acc.fof + (r.totalFof || 0),
+  }), { count: 0, act: 0, part: 0, fof: 0 });
+}
+
+function RollupSummary({ rows: rowsIn }: { rows: NucleusSummary[] }) {
+  const s = rollup(rowsIn);
+  return (
+    <span className="cluster-count">
+      {s.count} nucle{s.count !== 1 ? 'i' : 'us'} · {s.act} act · {s.part} part · {s.fof} FoF
+    </span>
+  );
+}
+
 export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Props) {
   const [openClusters, setOpenClusters] = useState<Set<string>>(new Set());
   const [openPockets, setOpenPockets] = useState<Set<string>>(new Set());
@@ -133,19 +156,28 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
       if (a === '' || b === '') return a === b ? 0 : (a === '' ? -1 : 1);
       return a.localeCompare(b);
     });
+    // Same reasoning as the single-cluster case above -- one locality bucket
+    // (very likely in practice: every nucleus with no locality set lands in one
+    // "(No Locality)" bucket) shouldn't need a click to reveal, since there's
+    // nothing to filter between.
+    const isSingleLocality = localityOrder.length === 1;
 
     return localityOrder.map(loc => {
       const localityRows = localityMap[loc];
       const localityKey = `${keyPrefix}__loc_${loc || '(none)'}`;
-      const isOpen = openLocalities.has(localityKey);
+      const isOpen = isSingleLocality || openLocalities.has(localityKey);
       return (
         <div key={localityKey}>
-          <div className="cluster-header" onClick={() => toggleLocality(localityKey)} style={{ paddingLeft: 20 }}>
+          <div
+            className="cluster-header"
+            onClick={isSingleLocality ? undefined : () => toggleLocality(localityKey)}
+            style={isSingleLocality ? { paddingLeft: 20, cursor: 'default' } : { paddingLeft: 20 }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className={`cluster-arrow${isOpen ? ' open' : ''}`}>▶</span>
+              {!isSingleLocality && <span className={`cluster-arrow${isOpen ? ' open' : ''}`}>▶</span>}
               <span className="cluster-name">{loc || '(No Locality)'}</span>
             </div>
-            <span className="cluster-count">{localityRows.length} nucle{localityRows.length !== 1 ? 'i' : 'us'}</span>
+            <RollupSummary rows={localityRows} />
           </div>
           <div className={`cluster-rows${isOpen ? ' open' : ''}`}>
             {renderClusterContent(localityRows, localityKey)}
@@ -174,8 +206,17 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
     Object.values(g.clusterMap).forEach(arr => arr.sort((a, b) => a.nucleus.localeCompare(b.nucleus)));
   });
 
-  const uniqueClusters = new Set(rows.map(r => (r.cluster || '').trim()));
-  const isSingleCluster = uniqueClusters.size <= 1;
+  // Separate from the cluster-level change below -- grouping is its own, pre-
+  // existing concept (unaffected by that change), and keeps its existing "don't
+  // bother labeling it when there's only one" behavior.
+  const isSingleGrouping = new Set(rows.map(r => (r.grouping || '').trim())).size <= 1;
+  // With cluster bars now always rendered (see below), the common single-cluster
+  // case (cluster-notebook deployments are one cluster each by design) would
+  // otherwise start collapsed behind an extra, pointless click -- collapsing the
+  // only option filters nothing. So a single cluster renders as a plain,
+  // non-interactive summary bar, always open; multiple clusters keep the
+  // existing click-to-expand behavior, collapsed by default.
+  const isSingleCluster = new Set(rows.map(r => (r.cluster || '').trim())).size <= 1;
 
   return (
     <div className="picker-container">
@@ -194,26 +235,33 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
       </div>
       <div className="picker-sub">{email}</div>
 
-      {isSingleCluster ? (
-        renderLocalityGroups(rows, 'flat')
-      ) : groupingOrder.map(gName => {
+      {groupingOrder.map(gName => {
         const gEntry = groupingMap[gName];
         return (
           <div key={gName}>
-            <div className="grouping-label">{gName}</div>
+            {/* Cluster bars now always show, with their own rollup (2026-10-08) --
+                previously skipped entirely whenever there was only one cluster
+                (the common case: cluster-notebook deployments are one cluster
+                each by design), which meant no cluster-level summary ever
+                appeared at all in practice. */}
+            {!isSingleGrouping && <div className="grouping-label">{gName}</div>}
             {gEntry.clusterOrder.map(clusterName => {
               const clusterRows = gEntry.clusterMap[clusterName];
               const clusterKey = `${gName}__${clusterName}`;
-              const isClusterOpen = openClusters.has(clusterKey);
+              const isClusterOpen = isSingleCluster || openClusters.has(clusterKey);
 
               return (
                 <div key={clusterKey}>
-                  <div className="cluster-header" onClick={() => toggleCluster(clusterKey)}>
+                  <div
+                    className="cluster-header"
+                    onClick={isSingleCluster ? undefined : () => toggleCluster(clusterKey)}
+                    style={isSingleCluster ? { cursor: 'default' } : undefined}
+                  >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span className={`cluster-arrow${isClusterOpen ? ' open' : ''}`}>▶</span>
+                      {!isSingleCluster && <span className={`cluster-arrow${isClusterOpen ? ' open' : ''}`}>▶</span>}
                       <span className="cluster-name">{clusterName}</span>
                     </div>
-                    <span className="cluster-count">{clusterRows.length} nucle{clusterRows.length !== 1 ? 'i' : 'us'}</span>
+                    <RollupSummary rows={clusterRows} />
                   </div>
 
                   <div className={`cluster-rows${isClusterOpen ? ' open' : ''}`}>
