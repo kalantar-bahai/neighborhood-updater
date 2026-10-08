@@ -41,6 +41,8 @@ describe('getAllNuclei', () => {
             cluster: { name: 'NC-215 Triangle', groupOfClusters: 'NC Eastern', growthMilestone: 'IPG Embracing Large Numbers', auxiliaryBoardMembers: null },
             parentNucleus: { name: 'Chapelboro' },
             myPermissions: { canRead: true, canWrite: true, canChangeIdentity: false, canDelete: false, canAssignRoles: true, assignableRoles: ['accompanier'], createableEntityTypes: [] },
+            population: 120, inConversation: 40, inCommunityActivities: 25, protagonists: 10, devotionalHosts: 5,
+            inEducationalActivities: 15, educationalFacilitators: 3, helpingOthers: 2, accompanying: 1,
           },
           {
             name: 'Beta', stage: null, locality: null, populationMakeup: null, nucleusType: null,
@@ -48,6 +50,8 @@ describe('getAllNuclei', () => {
             cluster: { name: 'NC-330 Foothills', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
             parentNucleus: null,
             myPermissions: { canRead: true, canWrite: false, canChangeIdentity: false, canDelete: false, canAssignRoles: false, assignableRoles: [], createableEntityTypes: [] },
+            population: null, inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+            inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
           },
         ],
       },
@@ -65,6 +69,13 @@ describe('getAllNuclei', () => {
     expect(result[1].parentNucleus).toBeNull();
     expect(result[0].myPermissions).toEqual({ canRead: true, canWrite: true, canChangeIdentity: false, canDelete: false, canAssignRoles: true, assignableRoles: ['accompanier'], createableEntityTypes: [] });
     expect(result[1].myPermissions.canWrite).toBe(false);
+    // Overview card's nine fields, added 2026-10-08 for Picker's rollup-card
+    // popup diagram -- fetched for every nucleus in the list, not just the one
+    // being viewed.
+    expect(result[0].population).toBe(120);
+    expect(result[0].inConversation).toBe(40);
+    expect(result[0].accompanying).toBe(1);
+    expect(result[1].population).toBeNull();
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.query).toContain('nucleusType');
     expect(body.query).toContain('childrensClasses');
@@ -73,6 +84,8 @@ describe('getAllNuclei', () => {
     expect(body.query).toContain('cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers }');
     expect(body.query).toContain('parentNucleus { name }');
     expect(body.query).toContain('myPermissions');
+    expect(body.query).toContain('population inConversation inCommunityActivities protagonists devotionalHosts');
+    expect(body.query).toContain('inEducationalActivities educationalFacilitators helpingOthers accompanying');
   });
 
   test('returns an empty array when there are no nuclei', async () => {

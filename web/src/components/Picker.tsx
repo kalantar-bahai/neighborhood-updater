@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { NucleusSummary } from '@/types';
+import StaggeredConcentricDiagram, { type AlignedLabel } from './StaggeredConcentricDiagram';
 
 interface Props {
   rows: NucleusSummary[];
@@ -34,15 +35,73 @@ function nucleusCountLabel(rowsIn: NucleusSummary[]): string {
   return `${rowsIn.length} nucle${rowsIn.length !== 1 ? 'i' : 'us'}`;
 }
 
+// The Overview card's nine fields, summed across a set of rows for the popup
+// diagram. Every row is added -- nuclei sharing a Setting are separate groups
+// of people working the same neighbourhood, and SRP itself sums every nucleus
+// at a Setting (confirmed with cluster-notebook 2026-10-08: that's exactly
+// what gets sent to SRP), so there's no overlap to dedupe there. See
+// findOverlappingPockets below for the one overlap that IS a real open
+// question -- a pocket vs. its own parentNucleus, not Setting-sharing.
+function sumNineFields(rowsIn: NucleusSummary[]) {
+  const totals = {
+    totalPop: 0, inConversation: 0, inCommunityActivities: 0, protagonists: 0,
+    devotionalHosts: 0, inEducationalActivities: 0, educationalFacilitators: 0,
+    helpingOthers: 0, accompanying: 0,
+  };
+  rowsIn.forEach(r => {
+    totals.totalPop               += r.totalPop               || 0;
+    totals.inConversation         += r.inConversation         || 0;
+    totals.inCommunityActivities  += r.inCommunityActivities  || 0;
+    totals.protagonists           += r.protagonists           || 0;
+    totals.devotionalHosts        += r.devotionalHosts        || 0;
+    totals.inEducationalActivities  += r.inEducationalActivities  || 0;
+    totals.educationalFacilitators  += r.educationalFacilitators  || 0;
+    totals.helpingOthers          += r.helpingOthers           || 0;
+    totals.accompanying           += r.accompanying            || 0;
+  });
+  return totals;
+}
+
+// Whether a pocket's people are already counted in its parent's own numbers is
+// a modelling question cluster-notebook has put to Michael, not something
+// either side should assume (2026-10-08) -- so rather than drop one side's
+// numbers (which could just as easily be wrong), flag any nucleus in this set
+// whose parentNucleus is ALSO in this set, and let the popup show a warning
+// instead of silently misstating the total.
+function findOverlappingPockets(rowsIn: NucleusSummary[]): string[] {
+  const names = new Set(rowsIn.map(r => r.nucleus));
+  return rowsIn
+    .filter(r => r.parentNucleus && names.has(r.parentNucleus))
+    .map(r => r.nucleus);
+}
+
+// Same inner -> outer order as DetailView's own staggeredLabels, minus the
+// per-nucleus worker-list onClicks (those drill into one nucleus's own
+// workers; a rollup across several nuclei has no single worker list to show).
+function nineFieldsToStaggeredLabels(totals: ReturnType<typeof sumNineFields>): AlignedLabel[] {
+  return [
+    { label: 'Accompanying',                          value: String(totals.accompanying) },
+    { label: 'Helping Others',                         value: String(totals.helpingOthers) },
+    { label: 'Facilitating Ed. Act.',                  value: String(totals.educationalFacilitators) },
+    { label: 'Participating in Ed. Act.',              value: String(totals.inEducationalActivities) },
+    { label: 'Hosting Devotional Meetings/Gatherings', value: String(totals.devotionalHosts) },
+    { label: 'Protagonists/Promoting',                 value: String(totals.protagonists) },
+    { label: 'Participating',                          value: String(totals.inCommunityActivities) },
+    { label: 'In Conversation',                        value: String(totals.inConversation) },
+    { label: 'Population/Residing',                    value: String(totals.totalPop) },
+  ];
+}
+
 function rollupByType(rowsIn: NucleusSummary[]) {
-  const totals: Record<string, { count: number; act: number; part: number; fof: number }> = {};
+  const totals: Record<string, { count: number; act: number; part: number; fof: number; rows: NucleusSummary[] }> = {};
   rowsIn.forEach(r => {
     const key = (r.nucleusType || '').toLowerCase().trim() || 'neighborhood';
-    if (!totals[key]) totals[key] = { count: 0, act: 0, part: 0, fof: 0 };
+    if (!totals[key]) totals[key] = { count: 0, act: 0, part: 0, fof: 0, rows: [] };
     totals[key].count += 1;
     totals[key].act   += r.totalAct  || 0;
     totals[key].part  += r.totalPart || 0;
     totals[key].fof   += r.totalFof  || 0;
+    totals[key].rows.push(r);
   });
   return (['neighborhood', 'network', 'population'] as const)
     .filter(key => key in totals)
@@ -50,15 +109,24 @@ function rollupByType(rowsIn: NucleusSummary[]) {
 }
 
 // One small card per nucleus type actually present in this group -- a group with
-// only Neighborhoods shows one card, a mixed one shows two or three.
-function RollupCards({ rows: rowsIn }: { rows: NucleusSummary[] }) {
+// only Neighborhoods shows one card, a mixed one shows two or three. Clicking a
+// card (2026-10-08) opens a popup rollup diagram of all the nuclei it summarizes;
+// groupLabel names that group (a locality or cluster name) for the popup's title.
+function RollupCards({ rows: rowsIn, groupLabel, onCardClick }: {
+  rows: NucleusSummary[];
+  groupLabel: string;
+  onCardClick: (title: string, rows: NucleusSummary[]) => void;
+}) {
   const summaries = rollupByType(rowsIn);
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '8px 0 8px 20px' }}>
       {summaries.map(([key, s]) => {
         const meta = TYPE_META[key];
         return (
-          <div key={key} className="card" style={{ flex: '0 1 150px', margin: 0 }}>
+          <div
+            key={key} className="card" style={{ flex: '0 1 150px', margin: 0, cursor: 'pointer' }}
+            onClick={() => onCardClick(`${meta.label} — ${groupLabel}`, s.rows)}
+          >
             <div className="card-header" style={{ background: meta.bg, color: meta.color, borderBottom: `1px solid ${meta.border}`, fontSize: 12, padding: '4px 10px' }}>
               {meta.label}
             </div>
@@ -81,6 +149,15 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
   const [openClusters, setOpenClusters] = useState<Set<string>>(new Set());
   const [openPockets, setOpenPockets] = useState<Set<string>>(new Set());
   const [openLocalities, setOpenLocalities] = useState<Set<string>>(new Set());
+  // Rollup-card popup (2026-10-08) -- null when closed. `rows` are the exact
+  // nuclei the clicked card already summed, re-summed here into the nine-field
+  // totals the staggered diagram needs (the card itself only shows nuclei/act/
+  // part/FoF, not the nine fields, so this is computed on click, not upfront).
+  const [popup, setPopup] = useState<{ title: string; rows: NucleusSummary[] } | null>(null);
+
+  function openRollupPopup(title: string, rowsIn: NucleusSummary[]) {
+    setPopup({ title, rows: rowsIn });
+  }
 
   function toggleCluster(key: string) {
     setOpenClusters(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
@@ -215,7 +292,7 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
             <span className="cluster-count">{nucleusCountLabel(localityRows)}</span>
           </div>
           <div className={`cluster-rows${isOpen ? ' open' : ''}`}>
-            {isOpen && <RollupCards rows={localityRows} />}
+            {isOpen && <RollupCards rows={localityRows} groupLabel={loc || '(No Locality)'} onCardClick={openRollupPopup} />}
             {renderClusterContent(localityRows, localityKey)}
           </div>
         </div>
@@ -255,6 +332,7 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
   const isSingleCluster = new Set(rows.map(r => (r.cluster || '').trim())).size <= 1;
 
   return (
+    <>
     <div className="picker-container">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
         <div className="picker-title">My Nuclei</div>
@@ -301,7 +379,7 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
                   </div>
 
                   <div className={`cluster-rows${isClusterOpen ? ' open' : ''}`}>
-                    {isClusterOpen && <RollupCards rows={clusterRows} />}
+                    {isClusterOpen && <RollupCards rows={clusterRows} groupLabel={clusterName} onCardClick={openRollupPopup} />}
                     {renderLocalityGroups(clusterRows, clusterKey)}
                   </div>
                 </div>
@@ -311,5 +389,36 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
         );
       })}
     </div>
+
+    {/* Rollup-card popup (2026-10-08) -- same click-outside-to-close overlay
+        pattern as CreateNucleusModal/WorkerListModal. */}
+    {popup && (
+      <div
+        onClick={() => setPopup(null)}
+        onKeyDown={e => { if (e.key === 'Escape') setPopup(null); }}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      >
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{ background: 'white', borderRadius: 12, padding: '20px 24px', maxWidth: 560, width: '100%' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#2d3748' }}>{popup.title}</div>
+            <button onClick={() => setPopup(null)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#718096', lineHeight: 1, padding: 0 }}>×</button>
+          </div>
+          <div style={{ fontSize: 12, color: '#718096', marginBottom: 8 }}>{nucleusCountLabel(popup.rows)}</div>
+          {(() => {
+            const overlapping = findOverlappingPockets(popup.rows);
+            return overlapping.length > 0 && (
+              <div style={{ fontSize: 12, color: '#975a16', background: '#fefcbf', border: '1px solid #faf089', borderRadius: 6, padding: '6px 10px', marginBottom: 8 }}>
+                Totals may double-count: {overlapping.join(', ')} {overlapping.length === 1 ? 'is' : 'are'} also counted under {overlapping.length === 1 ? 'its' : 'their'} parent nucleus, and whether its numbers overlap is still an open question.
+              </div>
+            );
+          })()}
+          <StaggeredConcentricDiagram labels={nineFieldsToStaggeredLabels(sumNineFields(popup.rows))} />
+        </div>
+      </div>
+    )}
+    </>
   );
 }

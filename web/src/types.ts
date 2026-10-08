@@ -22,6 +22,21 @@ export interface NucleusSummary {
   totalAct: number;
   totalPart: number;
   totalFof: number;
+  // Overview card's nine fields (2026-10-08), fetched eagerly for every nucleus
+  // here (not just the one being viewed) so Picker's rollup cards can sum them
+  // into a popup concentric diagram without a per-nucleus follow-up query. Numeric
+  // (unlike NucleusRow's string convention) because these only ever get summed,
+  // never edited, on this row shape -- see NucleusFields' own comment in
+  // clusterNotebook.ts for the fields' story.
+  totalPop: number;
+  inConversation: number;
+  inCommunityActivities: number;
+  protagonists: number;
+  devotionalHosts: number;
+  inEducationalActivities: number;
+  educationalFacilitators: number;
+  helpingOthers: number;
+  accompanying: number;
 }
 
 export interface NucleusRow {

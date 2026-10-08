@@ -209,6 +209,23 @@ export interface NucleusSummary {
   // request as the rest of the list (cluster-notebook designed this as a field
   // specifically so a list of nuclei costs one request, not one per nucleus).
   myPermissions: PermissionSet;
+  // Overview card's nine fields, added 2026-10-08 so Picker's rollup cards can
+  // sum them into a popup concentric diagram without a per-nucleus follow-up
+  // query (confirmed with cluster-notebook: these are plain columns on the
+  // nucleus row, so selecting them in the list query adds no per-nucleus work,
+  // unlike computed fields such as workers/myPermissions's own activity-summary
+  // siblings). `population` kept under that name here, not renamed to totalPop
+  // -- the totalPop rename only happens where this gets mapped onto the row
+  // shape, in data.ts/route.ts.
+  population: number | null;
+  inConversation: number | null;
+  inCommunityActivities: number | null;
+  protagonists: number | null;
+  devotionalHosts: number | null;
+  inEducationalActivities: number | null;
+  educationalFacilitators: number | null;
+  helpingOthers: number | null;
+  accompanying: number | null;
 }
 
 // Deliberately not `extends ClusterFields` -- same reasoning as NucleusSummary not
@@ -325,6 +342,8 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
         cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers }
         parentNucleus { name }
         myPermissions { ${PERMISSION_SET_SELECTION} }
+        population inConversation inCommunityActivities protagonists devotionalHosts
+        inEducationalActivities educationalFacilitators helpingOthers accompanying
       }
     }
   `;
