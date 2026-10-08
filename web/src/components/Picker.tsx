@@ -35,6 +35,12 @@ function nucleusCountLabel(rowsIn: NucleusSummary[]): string {
   return `${rowsIn.length} nucle${rowsIn.length !== 1 ? 'i' : 'us'}`;
 }
 
+const NINE_FIELD_KEYS = [
+  'totalPop', 'inConversation', 'inCommunityActivities', 'protagonists', 'devotionalHosts',
+  'inEducationalActivities', 'educationalFacilitators', 'helpingOthers', 'accompanying',
+] as const;
+type NineFieldKey = typeof NINE_FIELD_KEYS[number];
+
 // The Overview card's nine fields, summed across a set of rows for the popup
 // diagram. Every row is added -- nuclei sharing a Setting are separate groups
 // of people working the same neighbourhood, and SRP itself sums every nucleus
@@ -42,24 +48,23 @@ function nucleusCountLabel(rowsIn: NucleusSummary[]): string {
 // what gets sent to SRP), so there's no overlap to dedupe there. See
 // findOverlappingPockets below for the one overlap that IS a real open
 // question -- a pocket vs. its own parentNucleus, not Setting-sharing.
+//
+// Per field, also tracks whether ANY row in the set has ever had it set at all
+// (confirmed with cluster-notebook 2026-10-08: most nuclei in dev data have
+// never set any of these nine, so a group containing only never-set nuclei
+// must read as "not set", not as a real, reported 0 -- see
+// nineFieldsToStaggeredLabels below for where that distinction surfaces).
 function sumNineFields(rowsIn: NucleusSummary[]) {
-  const totals = {
-    totalPop: 0, inConversation: 0, inCommunityActivities: 0, protagonists: 0,
-    devotionalHosts: 0, inEducationalActivities: 0, educationalFacilitators: 0,
-    helpingOthers: 0, accompanying: 0,
-  };
+  const sums = {} as Record<NineFieldKey, number>;
+  const everSet = {} as Record<NineFieldKey, boolean>;
+  NINE_FIELD_KEYS.forEach(key => { sums[key] = 0; everSet[key] = false; });
   rowsIn.forEach(r => {
-    totals.totalPop               += r.totalPop               || 0;
-    totals.inConversation         += r.inConversation         || 0;
-    totals.inCommunityActivities  += r.inCommunityActivities  || 0;
-    totals.protagonists           += r.protagonists           || 0;
-    totals.devotionalHosts        += r.devotionalHosts        || 0;
-    totals.inEducationalActivities  += r.inEducationalActivities  || 0;
-    totals.educationalFacilitators  += r.educationalFacilitators  || 0;
-    totals.helpingOthers          += r.helpingOthers           || 0;
-    totals.accompanying           += r.accompanying            || 0;
+    NINE_FIELD_KEYS.forEach(key => {
+      const v = r[key];
+      if (v != null) { sums[key] += v; everSet[key] = true; }
+    });
   });
-  return totals;
+  return { sums, everSet };
 }
 
 // Whether a pocket's people are already counted in its parent's own numbers is
@@ -78,17 +83,22 @@ function findOverlappingPockets(rowsIn: NucleusSummary[]): string[] {
 // Same inner -> outer order as DetailView's own staggeredLabels, minus the
 // per-nucleus worker-list onClicks (those drill into one nucleus's own
 // workers; a rollup across several nuclei has no single worker list to show).
-function nineFieldsToStaggeredLabels(totals: ReturnType<typeof sumNineFields>): AlignedLabel[] {
+// A field nobody in the group ever set renders as '' -- formatNum already
+// turns that into "____", the same "not set" look DetailView itself uses for
+// one nucleus's own unset fields, so a never-set group reads as unset rather
+// than as a suspiciously-precise 0.
+function nineFieldsToStaggeredLabels({ sums, everSet }: ReturnType<typeof sumNineFields>): AlignedLabel[] {
+  const v = (key: NineFieldKey) => everSet[key] ? String(sums[key]) : '';
   return [
-    { label: 'Accompanying',                          value: String(totals.accompanying) },
-    { label: 'Helping Others',                         value: String(totals.helpingOthers) },
-    { label: 'Facilitating Ed. Act.',                  value: String(totals.educationalFacilitators) },
-    { label: 'Participating in Ed. Act.',              value: String(totals.inEducationalActivities) },
-    { label: 'Hosting Devotional Meetings/Gatherings', value: String(totals.devotionalHosts) },
-    { label: 'Protagonists/Promoting',                 value: String(totals.protagonists) },
-    { label: 'Participating',                          value: String(totals.inCommunityActivities) },
-    { label: 'In Conversation',                        value: String(totals.inConversation) },
-    { label: 'Population/Residing',                    value: String(totals.totalPop) },
+    { label: 'Accompanying',                          value: v('accompanying') },
+    { label: 'Helping Others',                         value: v('helpingOthers') },
+    { label: 'Facilitating Ed. Act.',                  value: v('educationalFacilitators') },
+    { label: 'Participating in Ed. Act.',              value: v('inEducationalActivities') },
+    { label: 'Hosting Devotional Meetings/Gatherings', value: v('devotionalHosts') },
+    { label: 'Protagonists/Promoting',                 value: v('protagonists') },
+    { label: 'Participating',                          value: v('inCommunityActivities') },
+    { label: 'In Conversation',                        value: v('inConversation') },
+    { label: 'Population/Residing',                    value: v('totalPop') },
   ];
 }
 

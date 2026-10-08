@@ -55,15 +55,17 @@ export async function GET() {
         totalAct:  acts.reduce((s, a) => s + n(a.act),  0),
         totalPart: acts.reduce((s, a) => s + n(a.part), 0),
         totalFof:  acts.reduce((s, a) => s + n(a.fof),  0),
-        totalPop:               cn.population ?? 0,
-        inConversation:         cn.inConversation ?? 0,
-        inCommunityActivities:  cn.inCommunityActivities ?? 0,
-        protagonists:           cn.protagonists ?? 0,
-        devotionalHosts:        cn.devotionalHosts ?? 0,
-        inEducationalActivities:  cn.inEducationalActivities ?? 0,
-        educationalFacilitators:  cn.educationalFacilitators ?? 0,
-        helpingOthers:          cn.helpingOthers ?? 0,
-        accompanying:           cn.accompanying ?? 0,
+        // Passed through as-is, null and all -- see NucleusSummary's own comment
+        // in types.ts for why collapsing null to 0 here would be wrong.
+        totalPop:               cn.population,
+        inConversation:         cn.inConversation,
+        inCommunityActivities:  cn.inCommunityActivities,
+        protagonists:           cn.protagonists,
+        devotionalHosts:        cn.devotionalHosts,
+        inEducationalActivities:  cn.inEducationalActivities,
+        educationalFacilitators:  cn.educationalFacilitators,
+        helpingOthers:          cn.helpingOthers,
+        accompanying:           cn.accompanying,
       };
     });
 

@@ -27,16 +27,21 @@ export interface NucleusSummary {
   // into a popup concentric diagram without a per-nucleus follow-up query. Numeric
   // (unlike NucleusRow's string convention) because these only ever get summed,
   // never edited, on this row shape -- see NucleusFields' own comment in
-  // clusterNotebook.ts for the fields' story.
-  totalPop: number;
-  inConversation: number;
-  inCommunityActivities: number;
-  protagonists: number;
-  devotionalHosts: number;
-  inEducationalActivities: number;
-  educationalFacilitators: number;
-  helpingOthers: number;
-  accompanying: number;
+  // clusterNotebook.ts for the fields' story. `null` means never set (confirmed
+  // with cluster-notebook 2026-10-08: most nuclei in dev data have never had any
+  // of these nine set) -- kept distinct from 0 all the way out here so Picker's
+  // rollup can tell "nobody here has entered this yet" from a real zero, rather
+  // than defaulting to 0 at the API boundary and making every unset group look
+  // like a real, reported zero.
+  totalPop: number | null;
+  inConversation: number | null;
+  inCommunityActivities: number | null;
+  protagonists: number | null;
+  devotionalHosts: number | null;
+  inEducationalActivities: number | null;
+  educationalFacilitators: number | null;
+  helpingOthers: number | null;
+  accompanying: number | null;
 }
 
 export interface NucleusRow {
