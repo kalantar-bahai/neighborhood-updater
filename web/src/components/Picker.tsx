@@ -22,6 +22,7 @@ function typeBadgeStyle(nucleusType: string): React.CSSProperties {
 export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Props) {
   const [openClusters, setOpenClusters] = useState<Set<string>>(new Set());
   const [openPockets, setOpenPockets] = useState<Set<string>>(new Set());
+  const [openLocalities, setOpenLocalities] = useState<Set<string>>(new Set());
 
   function toggleCluster(key: string) {
     setOpenClusters(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
@@ -29,6 +30,10 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
 
   function togglePocket(key: string) {
     setOpenPockets(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
+  }
+
+  function toggleLocality(key: string) {
+    setOpenLocalities(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
   }
 
   function NeighborhoodItem({ r, isPocket }: { r: NucleusSummary; isPocket: boolean }) {
@@ -100,6 +105,56 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
     });
   }
 
+  // New locality level, 2026-10-08, sitting between Cluster and the existing
+  // parent/pocket nesting above: no-locality nuclei first, then real localities
+  // alphabetically. A pocket buckets under its PARENT's locality, not its own --
+  // cluster-notebook recommends a pocket have no locality at all (it's meant to be
+  // covered by the parent's), so bucketing it by its own locality would split it
+  // from the very parent it's supposed to nest under. Falls back to the pocket's
+  // own locality if the parent isn't found in this same cluster (shouldn't happen
+  // for real data). Each bucket still gets passed whole into renderClusterContent,
+  // so that function's own parent/pocket nesting needs no changes at all.
+  function renderLocalityGroups(clusterRows: NucleusSummary[], keyPrefix: string) {
+    function effectiveLocality(r: NucleusSummary): string {
+      const parentName = (r.parentNucleus || '').trim();
+      if (!parentName) return (r.locality || '').trim();
+      const parent = clusterRows.find(p => p.nucleus === parentName);
+      return ((parent ? parent.locality : r.locality) || '').trim();
+    }
+
+    const localityOrder: string[] = [];
+    const localityMap: Record<string, NucleusSummary[]> = {};
+    clusterRows.forEach(r => {
+      const loc = effectiveLocality(r);
+      if (!localityMap[loc]) { localityMap[loc] = []; localityOrder.push(loc); }
+      localityMap[loc].push(r);
+    });
+    localityOrder.sort((a, b) => {
+      if (a === '' || b === '') return a === b ? 0 : (a === '' ? -1 : 1);
+      return a.localeCompare(b);
+    });
+
+    return localityOrder.map(loc => {
+      const localityRows = localityMap[loc];
+      const localityKey = `${keyPrefix}__loc_${loc || '(none)'}`;
+      const isOpen = openLocalities.has(localityKey);
+      return (
+        <div key={localityKey}>
+          <div className="cluster-header" onClick={() => toggleLocality(localityKey)} style={{ paddingLeft: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className={`cluster-arrow${isOpen ? ' open' : ''}`}>▶</span>
+              <span className="cluster-name">{loc || '(No Locality)'}</span>
+            </div>
+            <span className="cluster-count">{localityRows.length} nucle{localityRows.length !== 1 ? 'i' : 'us'}</span>
+          </div>
+          <div className={`cluster-rows${isOpen ? ' open' : ''}`}>
+            {renderClusterContent(localityRows, localityKey)}
+          </div>
+        </div>
+      );
+    });
+  }
+
   // Build grouping → cluster → rows hierarchy
   const groupingOrder: string[] = [];
   const groupingMap: Record<string, { clusterOrder: string[]; clusterMap: Record<string, NucleusSummary[]> }> = {};
@@ -140,7 +195,7 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
       <div className="picker-sub">{email}</div>
 
       {isSingleCluster ? (
-        renderClusterContent(rows, 'flat')
+        renderLocalityGroups(rows, 'flat')
       ) : groupingOrder.map(gName => {
         const gEntry = groupingMap[gName];
         return (
@@ -162,7 +217,7 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
                   </div>
 
                   <div className={`cluster-rows${isClusterOpen ? ' open' : ''}`}>
-                    {renderClusterContent(clusterRows, clusterKey)}
+                    {renderLocalityGroups(clusterRows, clusterKey)}
                   </div>
                 </div>
               );
