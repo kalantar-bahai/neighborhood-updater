@@ -51,7 +51,11 @@ const SRINGS = [
   { fill: '#dbeafe', dashed: false }, // 9 Population/Residing (outermost)
 ];
 
-export default function StaggeredConcentricDiagram({ labels }: { labels: AlignedLabel[] }) {
+// `compact` (2026-10-08) drops the labels and just shows the rings -- for use
+// as a small thumbnail icon (e.g. Picker's "All types" rollup card) where the
+// labels would shrink to illegible anyway at icon size, so there's no point
+// paying for their layout.
+export default function StaggeredConcentricDiagram({ labels, compact }: { labels: AlignedLabel[]; compact?: boolean }) {
   const cos45 = Math.SQRT1_2;
   return (
     <svg viewBox="0 0 580 480" style={{ width: '100%', display: 'block' }}>
@@ -63,7 +67,7 @@ export default function StaggeredConcentricDiagram({ labels }: { labels: Aligned
           strokeDasharray={ring.dashed ? '6 5' : undefined}
         />
       ))}
-      {labels.map((l, i) => {
+      {!compact && labels.map((l, i) => {
         const mid = (i + 0.5) * SSTEP;
         // Dark-fill rings (white text) vs light-fill rings (navy text) -- the new ring
         // 5's fill (#4e94f8) is still closer to the dark side than the light one, so the

@@ -103,7 +103,11 @@ function nineFieldsToStaggeredLabels({ sums, everSet }: ReturnType<typeof sumNin
 }
 
 function rollupByType(rowsIn: NucleusSummary[]) {
-  const totals: Record<string, { count: number; act: number; part: number; fof: number; rows: NucleusSummary[] }> = {};
+  // Population pre-seeded so its card always renders (2026-10-08), even at 0 --
+  // every other type only shows up when at least one nucleus has it.
+  const totals: Record<string, { count: number; act: number; part: number; fof: number; rows: NucleusSummary[] }> = {
+    population: { count: 0, act: 0, part: 0, fof: 0, rows: [] },
+  };
   rowsIn.forEach(r => {
     const key = (r.nucleusType || '').toLowerCase().trim() || 'neighborhood';
     if (!totals[key]) totals[key] = { count: 0, act: 0, part: 0, fof: 0, rows: [] };
@@ -118,10 +122,18 @@ function rollupByType(rowsIn: NucleusSummary[]) {
     .map(key => [key, totals[key]] as const);
 }
 
-// One small card per nucleus type actually present in this group -- a group with
-// only Neighborhoods shows one card, a mixed one shows two or three. Clicking a
-// card (2026-10-08) opens a popup rollup diagram of all the nuclei it summarizes;
-// groupLabel names that group (a locality or cluster name) for the popup's title.
+// Neutral styling for the "All" card (2026-10-08) -- deliberately not one of
+// TYPE_META's type colors, since it spans every type rather than belonging to
+// one.
+const ALL_TYPES_META = { label: 'All', bg: '#edf2f7', color: '#2d3748', border: '#cbd5e0' };
+
+// One small card per nucleus type actually present in this group (population
+// always included, even at 0 -- see rollupByType), plus one "All" card first
+// summing every type together. A group with only Neighborhoods shows two
+// cards (All, Neighborhood, Population); a mixed one shows up to four.
+// Clicking a card (2026-10-08) opens a popup rollup diagram of all the
+// nuclei it summarizes; groupLabel names that group (a locality or cluster
+// name) for the popup's title.
 function RollupCards({ rows: rowsIn, groupLabel, onCardClick }: {
   rows: NucleusSummary[];
   groupLabel: string;
@@ -130,6 +142,22 @@ function RollupCards({ rows: rowsIn, groupLabel, onCardClick }: {
   const summaries = rollupByType(rowsIn);
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '8px 0 8px 20px' }}>
+      <div
+        className="card" style={{ flex: '0 1 150px', margin: 0, cursor: 'pointer' }}
+        onClick={() => onCardClick(`${ALL_TYPES_META.label} — ${groupLabel}`, rowsIn)}
+      >
+        <div className="card-header" style={{ background: ALL_TYPES_META.bg, color: ALL_TYPES_META.color, borderBottom: `1px solid ${ALL_TYPES_META.border}`, fontSize: 12, padding: '4px 10px' }}>
+          {ALL_TYPES_META.label}
+        </div>
+        <div className="card-body" style={{ padding: '6px 10px' }}>
+          {/* Thumbnail of the same diagram the popup shows full-size -- compact
+              drops the labels, which would shrink to illegible at this size. */}
+          <div style={{ width: 70, margin: '0 auto' }}>
+            <StaggeredConcentricDiagram labels={nineFieldsToStaggeredLabels(sumNineFields(rowsIn))} compact />
+          </div>
+          <div style={{ fontSize: 12, textAlign: 'center', color: '#718096', marginTop: 2 }}>{nucleusCountLabel(rowsIn)}</div>
+        </div>
+      </div>
       {summaries.map(([key, s]) => {
         const meta = TYPE_META[key];
         return (
