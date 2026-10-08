@@ -19,26 +19,61 @@ function typeBadgeStyle(nucleusType: string): React.CSSProperties {
   return {};
 }
 
-// Backs the rollup shown on each Cluster/Locality bar, 2026-10-08 -- same totals
-// the bottom-of-page type cards used to show (totalAct/totalPart/totalFof, already
-// on every NucleusSummary row), just rolled up by cluster/locality instead of by
-// nucleus type. Those cards are gone now that every bar in the hierarchy carries
-// its own rollup.
-function rollup(rowsIn: NucleusSummary[]) {
-  return rowsIn.reduce((acc, r) => ({
-    count: acc.count + 1,
-    act: acc.act + (r.totalAct || 0),
-    part: acc.part + (r.totalPart || 0),
-    fof: acc.fof + (r.totalFof || 0),
-  }), { count: 0, act: 0, part: 0, fof: 0 });
+// Exact styling the old bottom-of-page by-type cards used (removed 2026-10-08) --
+// now shown per Cluster/Locality group instead of once for the whole page.
+const TYPE_META: Record<string, { label: string; bg: string; color: string; border: string }> = {
+  neighborhood: { label: 'Neighborhood', bg: '#bee3f8', color: '#2c5282', border: '#90cdf4' },
+  network:      { label: 'Network',      bg: '#c6f6d5', color: '#276749', border: '#9ae6b4' },
+  population:   { label: 'Population',   bg: '#e9d8fd', color: '#553c9a', border: '#d6bcfa' },
+};
+
+// A bar's own single line just shows the nucleus count -- act/part/FoF moved into
+// RollupCards below, broken down by type, shown only once a group is expanded
+// (rather than crowding the always-visible bar with four numbers per type).
+function nucleusCountLabel(rowsIn: NucleusSummary[]): string {
+  return `${rowsIn.length} nucle${rowsIn.length !== 1 ? 'i' : 'us'}`;
 }
 
-function RollupSummary({ rows: rowsIn }: { rows: NucleusSummary[] }) {
-  const s = rollup(rowsIn);
+function rollupByType(rowsIn: NucleusSummary[]) {
+  const totals: Record<string, { count: number; act: number; part: number; fof: number }> = {};
+  rowsIn.forEach(r => {
+    const key = (r.nucleusType || '').toLowerCase().trim() || 'neighborhood';
+    if (!totals[key]) totals[key] = { count: 0, act: 0, part: 0, fof: 0 };
+    totals[key].count += 1;
+    totals[key].act   += r.totalAct  || 0;
+    totals[key].part  += r.totalPart || 0;
+    totals[key].fof   += r.totalFof  || 0;
+  });
+  return (['neighborhood', 'network', 'population'] as const)
+    .filter(key => key in totals)
+    .map(key => [key, totals[key]] as const);
+}
+
+// One small card per nucleus type actually present in this group -- a group with
+// only Neighborhoods shows one card, a mixed one shows two or three.
+function RollupCards({ rows: rowsIn }: { rows: NucleusSummary[] }) {
+  const summaries = rollupByType(rowsIn);
   return (
-    <span className="cluster-count">
-      {s.count} nucle{s.count !== 1 ? 'i' : 'us'} · {s.act} act · {s.part} part · {s.fof} FoF
-    </span>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '8px 0 8px 20px' }}>
+      {summaries.map(([key, s]) => {
+        const meta = TYPE_META[key];
+        return (
+          <div key={key} className="card" style={{ flex: '0 1 150px', margin: 0 }}>
+            <div className="card-header" style={{ background: meta.bg, color: meta.color, borderBottom: `1px solid ${meta.border}`, fontSize: 12, padding: '4px 10px' }}>
+              {meta.label}
+            </div>
+            <div className="card-body" style={{ fontSize: 12, padding: '6px 10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 8px' }}>
+                <span style={{ color: '#718096', textAlign: 'right' }}>Nuclei</span>       <span style={{ fontWeight: 600 }}>{s.count}</span>
+                <span style={{ color: '#718096', textAlign: 'right' }}>Activities</span>   <span style={{ fontWeight: 600 }}>{s.act}</span>
+                <span style={{ color: '#718096', textAlign: 'right' }}>Participants</span> <span style={{ fontWeight: 600 }}>{s.part}</span>
+                <span style={{ color: '#718096', textAlign: 'right' }}>FoF</span>          <span style={{ fontWeight: 600 }}>{s.fof}</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -177,9 +212,10 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
               {!isSingleLocality && <span className={`cluster-arrow${isOpen ? ' open' : ''}`}>▶</span>}
               <span className="cluster-name">{loc || '(No Locality)'}</span>
             </div>
-            <RollupSummary rows={localityRows} />
+            <span className="cluster-count">{nucleusCountLabel(localityRows)}</span>
           </div>
           <div className={`cluster-rows${isOpen ? ' open' : ''}`}>
+            {isOpen && <RollupCards rows={localityRows} />}
             {renderClusterContent(localityRows, localityKey)}
           </div>
         </div>
@@ -261,10 +297,11 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
                       {!isSingleCluster && <span className={`cluster-arrow${isClusterOpen ? ' open' : ''}`}>▶</span>}
                       <span className="cluster-name">{clusterName}</span>
                     </div>
-                    <RollupSummary rows={clusterRows} />
+                    <span className="cluster-count">{nucleusCountLabel(clusterRows)}</span>
                   </div>
 
                   <div className={`cluster-rows${isClusterOpen ? ' open' : ''}`}>
+                    {isClusterOpen && <RollupCards rows={clusterRows} />}
                     {renderLocalityGroups(clusterRows, clusterKey)}
                   </div>
                 </div>
