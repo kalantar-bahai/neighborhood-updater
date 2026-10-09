@@ -1,11 +1,5 @@
 import Link from 'next/link';
 
-// Draft, 2026-10-09 -- written from facts Michael gave us (via cluster-notebook)
-// so this URL exists before Google will publish the production OAuth consent
-// screen. Wording is NOT final: Michael reviews and edits before this is real
-// policy (see the notice below, which stays until he removes it). Public on
-// purpose -- no auth() check here, same as /terms, since Google needs to reach
-// both while signed out.
 export const metadata = {
   title: 'Privacy Policy — Nucleus Assistant',
 };
@@ -14,9 +8,6 @@ export default function PrivacyPage() {
   return (
     <div className="legal-page">
       <div className="legal-page-body">
-        <p className="legal-draft-notice">
-          Draft — last updated October 9, 2026. Pending review by Michael Kalantar; not yet final.
-        </p>
         <h1>Privacy Policy</h1>
         <p>
           Nucleus Assistant is a tool for Bahá’í community-building workers to view and
@@ -34,24 +25,18 @@ export default function PrivacyPage() {
           <li>Records of community-building activities and participant counts</li>
           <li>Neighbourhood-level counts (such as population and participation estimates)</li>
           <li>Free-text narratives written by nucleus contacts</li>
-          <li>
-            Phone number and email address fields exist in the system, but are not
-            currently filled in from the Statistical Reporting Program.
-          </li>
         </ul>
 
         <h2>Where this information comes from</h2>
         <p>
-          Most of this information is read from the Bahá’í Statistical Reporting Program
-          (SRP). When someone updates neighbourhood-level counts in Nucleus Assistant,
-          those changes are written back to SRP.
+          Most of this information is collected from participants in community building activities.
         </p>
 
         <h2>Where this information is stored</h2>
         <ul>
           <li>The underlying database and API run on Render, hosted in the United States (Virginia region).</li>
           <li>The Nucleus Assistant application itself is hosted on Vercel.</li>
-          <li>Signing in is handled by Clerk, which supports signing in with Google, GitHub, or email.</li>
+          <li>Signing in is handled by Clerk, which supports signing in with Google or email.</li>
         </ul>
 
         <h2>Who can see what</h2>
@@ -76,7 +61,7 @@ export default function PrivacyPage() {
 
         <h2>Changes to this policy</h2>
         <p>
-          We may update this policy as the tool changes. <em>[Placeholder — Michael to revise.]</em>
+          We may update this policy as the tool changes.
         </p>
 
         <p className="legal-back-link"><Link href="/">← Back to Nucleus Assistant</Link></p>
