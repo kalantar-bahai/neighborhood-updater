@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -12,8 +13,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    // suppressHydrationWarning: some browsers (e.g. Chrome on iOS adds __gcrremoteframetoken)
+    // inject attributes onto <html> before React hydrates. It only silences attribute
+    // mismatches on this one element, not on its children.
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <ClerkProvider>{children}</ClerkProvider>
+      </body>
     </html>
   );
 }

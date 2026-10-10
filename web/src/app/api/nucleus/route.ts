@@ -1,101 +1,110 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
-import { getAccess } from '@/lib/access';
-import { getRowData, saveRowData, createRowData, deleteRowData } from '@/lib/data';
-function norm(s: string) { return (s || '').toLowerCase().trim(); }
+import { NextResponse, type NextRequest } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { getNucleusPermissions } from '@/lib/access';
+import { getRowData, saveRowData, createRowData, deleteRowData, CodedError } from '@/lib/data';
+import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
 
-function effectiveRole(roleMap: Record<string, string>, nucleus: string) {
-  return roleMap[norm(nucleus)] ?? roleMap['*'] ?? null;
-}
-
-export const GET = auth(async (req) => {
-  if (!req.auth?.user?.email) {
+export async function GET(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
   const name = req.nextUrl.searchParams.get('name');
   if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400 });
 
-  const access = await getAccess(req.auth.user.email);
-  if (access.role === 'none') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  const permissions = await getNucleusPermissions(name);
+  if (!permissions.canRead) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
-  const role = effectiveRole(access.roleMap, name);
-  if (!role) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  try {
+    const data = await getRowData(name);
+    if (!data) return NextResponse.json({ error: `Not found: ${name}` }, { status: 404 });
+    return NextResponse.json(data);
+  } catch (e: unknown) {
+    return clusterNotebookErrorResponse(e);
+  }
+}
 
-  const data = await getRowData(name);
-  if (!data) return NextResponse.json({ error: `Not found: ${name}` }, { status: 404 });
-
-  return NextResponse.json(data);
-});
-
-export const POST = auth(async (req) => {
-  if (!req.auth?.user?.email) {
+export async function POST(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
   const { name, formData } = await req.json();
   if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400 });
+  if (!formData || typeof formData !== 'object') {
+    return NextResponse.json({ error: 'Missing formData' }, { status: 400 });
+  }
 
-  const email = req.auth.user.email;
-  const access = await getAccess(email);
-  if (access.role === 'none') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  const permissions = await getNucleusPermissions(name);
+  if (!permissions.canWrite) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
-  const role = effectiveRole(access.roleMap, name);
-  if (!role || role === 'read') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-
-  // Strip admin-only fields unless caller is admin (defense-in-depth)
-  if (role !== 'admin') {
+  // Strip identity-changing fields unless caller has canChangeIdentity (defense-in-depth)
+  if (!permissions.canChangeIdentity) {
     delete formData.identity;
     delete formData.locality;
     delete formData.stage;
-    delete formData.contact;
-    delete formData.email;
     delete formData.auxBoard;
   }
 
-  const result = await saveRowData(name, formData, email);
-  return NextResponse.json(result);
-});
-
-export const DELETE = auth(async (req) => {
-  if (!req.auth?.user?.email) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  try {
+    const result = await saveRowData(name, formData);
+    return NextResponse.json(result);
+  } catch (e: unknown) {
+    return clusterNotebookErrorResponse(e);
   }
+}
 
-  const email = req.auth.user.email;
-  const access = await getAccess(email);
-  if (access.role === 'none' || access.roleMap['*'] !== 'admin') {
-    return NextResponse.json({ error: 'Access denied — global admin required' }, { status: 403 });
+export async function DELETE(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
   const name = req.nextUrl.searchParams.get('name');
   if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400 });
 
-  await deleteRowData(name);
-  return NextResponse.json({ success: true });
-});
+  const permissions = await getNucleusPermissions(name);
+  if (!permissions.canDelete) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  }
 
-export const PUT = auth(async (req) => {
-  if (!req.auth?.user?.email) {
+  try {
+    const deleted = await deleteRowData(name);
+    if (!deleted) return NextResponse.json({ error: `Not found: ${name}` }, { status: 404 });
+    return NextResponse.json({ success: true });
+  } catch (e: unknown) {
+    return clusterNotebookErrorResponse(e);
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const email = req.auth.user.email;
-  const access = await getAccess(email);
-
-  if (access.role === 'none' || access.roleMap['*'] !== 'admin') {
-    return NextResponse.json({ error: 'Access denied — global admin required' }, { status: 403 });
-  }
-
   const { formData } = await req.json();
+  const d = formData as { identity?: { cluster?: string } } | undefined;
+  const clusterName = (d?.identity?.cluster || '').trim();
+  if (!clusterName) return NextResponse.json({ error: 'Missing cluster' }, { status: 400 });
+
+  const permissions = await getNucleusPermissions(clusterName);
+  if (!permissions.createableEntityTypes.includes('nucleus')) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  }
 
   try {
-    const result = await createRowData(formData, email);
+    const result = await createRowData(formData);
     return NextResponse.json(result);
   } catch (e: unknown) {
-    if (e instanceof Error && (e as any).code === 'CONFLICT') {
+    if (e instanceof CodedError && e.code === 'CONFLICT') {
       return NextResponse.json({ error: e.message }, { status: 409 });
     }
-    throw e;
+    if (e instanceof CodedError && e.code === 'BAD_CLUSTER') {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+    return clusterNotebookErrorResponse(e);
   }
-});
+}

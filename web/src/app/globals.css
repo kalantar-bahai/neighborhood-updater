@@ -62,21 +62,6 @@
 .page-header h1 { font-size: 16px; font-weight: 700; }
 .page-header .meta { font-size: 11px; opacity: 0.7; margin-top: 2px; }
 .page-header .last-updated { font-size: 10px; opacity: 0.6; margin-top: 2px; }
-.save-btn {
-  background: #48bb78;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.save-btn:disabled { background: #a0aec0; cursor: default; }
-.save-btn-label { display: none; }
-@media (min-width: 480px) { .save-btn-label { display: inline; } }
 .back-btn {
   background: rgba(255,255,255,0.2);
   border: none;
@@ -93,6 +78,11 @@
 
 /* ── Cards ────────────────────────────────────────────────────────────────── */
 .card { background: white; border-radius: 10px; border: 1px solid #e2e8f0; overflow: hidden; }
+
+/* TEMPORARY migration-progress indicator: purple outline marks data still sourced
+   from the Google Sheet (vs. migrated to cluster-notebook). Remove once the
+   Sheets -> cluster-notebook migration is complete. */
+.from-sheet { outline: 2px solid #9333ea; outline-offset: 2px; }
 .card-header {
   background: #ebf4ff;
   border-bottom: 1px solid #bee3f8;
@@ -105,17 +95,6 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-.srp-badge {
-  font-size: 10px;
-  font-weight: 600;
-  background: #ebf8ff;
-  color: #2b6cb0;
-  border: 1px solid #bee3f8;
-  border-radius: 10px;
-  padding: 2px 8px;
-  text-transform: none;
-  letter-spacing: 0;
 }
 .card-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 
@@ -184,12 +163,8 @@
   letter-spacing: 0.3px;
 }
 .act-table th.left { text-align: left; min-width: 140px; }
-.act-table th.srp-col { color: #a0aec0; font-weight: 600; font-size: 9px; }
 .act-table td { border: 1px solid #e2e8f0; padding: 4px 5px; vertical-align: middle; }
 .act-table td.row-label { font-weight: 600; font-size: 12px; color: #2d3748; padding-left: 10px; }
-.act-table td.srp-cell { background: #f7fafc; text-align: center; font-size: 11px; color: #a0aec0; white-space: nowrap; }
-.act-table td.srp-cell.differs { color: #dd6b20; background: #fffaf0; }
-.act-table .reset-btn { font-size: 9px; color: #3182ce; background: none; border: none; cursor: pointer; padding: 0 0 0 3px; text-decoration: underline; }
 .act-table tr.total-row td { background: #f0f4f8; }
 .act-table tr.total-row td.row-label { color: #4a5568; }
 .act-table td input {
@@ -206,9 +181,6 @@
 .act-table td input.error { border-color: #e53e3e; background: #fff5f5; }
 .act-table td input.plain { border: none; background: transparent; color: #4a5568; text-align: center; width: 100%; font-size: 12px; }
 
-/* ── SRP reference ────────────────────────────────────────────────────────── */
-.srp-ref { font-size: 11px; color: #a0aec0; background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 10px; }
-.srp-ref strong { color: #718096; }
 .sync-note { font-size: 11px; color: #718096; background: #f7fafc; border-radius: 6px; padding: 7px 12px; border: 1px solid #e2e8f0; }
 .divider { height: 1px; background: #e2e8f0; margin: 2px 0; }
 
@@ -216,7 +188,7 @@
 .detail-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
 @media (min-width: 640px) { .detail-grid { grid-template-columns: 1fr 1fr; } }
 .detail-item { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
-.detail-item .q { font-weight: 700; font-size: 13px; margin-bottom: 7px; }
+.detail-item .q { font-size: 10px; font-weight: 700; color: #718096; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 7px; display: inline-flex; align-items: center; }
 .toggle-row { display: flex; gap: 6px; margin-bottom: 8px; }
 .tb { padding: 4px 14px; border-radius: 20px; border: 1px solid #cbd5e0; background: white; font-size: 12px; cursor: pointer; color: #718096; }
 .tb.yes { background: #c6f6d5; border-color: #9ae6b4; color: #276749; font-weight: 700; }
@@ -280,7 +252,6 @@
 .picker-item .name { font-weight: 600; font-size: 13px; }
 .picker-item .sub { font-size: 11px; color: #718096; margin-top: 1px; }
 .stage-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: #c6f6d5; color: #276749; flex-shrink: 0; }
-.no-srp-badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; text-decoration: line-through; flex-shrink: 0; letter-spacing: 0.3px; }
 
 /* ── States ───────────────────────────────────────────────────────────────── */
 .error-state { text-align: center; padding: 60px 20px; color: #e53e3e; }
@@ -300,8 +271,22 @@
   flex-wrap: wrap;
 }
 .btn-cancel { padding: 7px 14px; border-radius: 6px; border: 1px solid #cbd5e0; background: white; font-size: 13px; cursor: pointer; color: #4a5568; }
-.btn-save { padding: 7px 20px; border-radius: 6px; border: none; background: #3182ce; color: white; font-size: 13px; font-weight: 600; cursor: pointer; }
-.btn-save:disabled { background: #a0aec0; cursor: default; }
 .save-status { font-size: 12px; color: #718096; margin-right: auto; }
 .save-status.error { color: #e53e3e; }
+
+/* ── Legal pages (privacy/terms) ──────────────────────────────────────────── */
+.legal-page { min-height: 100vh; padding: 32px 16px 60px; }
+.legal-page-body { max-width: 640px; margin: 0 auto; background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 32px 36px; }
+.legal-page-body h1 { font-size: 24px; font-weight: 700; margin-bottom: 16px; }
+.legal-page-body h2 { font-size: 16px; font-weight: 700; margin: 24px 0 8px; color: #2c5282; }
+.legal-page-body p { font-size: 14px; line-height: 1.6; margin-bottom: 10px; }
+.legal-page-body ul { font-size: 14px; line-height: 1.6; margin: 0 0 10px 20px; }
+.legal-back-link { margin-top: 28px; }
+.legal-back-link a { font-size: 13px; color: #2b6cb0; text-decoration: none; }
+.legal-back-link a:hover { text-decoration: underline; }
+
+/* ── Sign-in page footer links (privacy/terms) ───────────────────────────── */
+.signin-legal-links { margin-top: 18px; display: flex; justify-content: center; gap: 14px; }
+.signin-legal-links a { font-size: 12px; color: #a0aec0; text-decoration: none; }
+.signin-legal-links a:hover { text-decoration: underline; }
 .save-status.success { color: #38a169; }

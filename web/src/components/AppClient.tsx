@@ -1,12 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { InitialData, NucleusDetail, Role } from '@/types';
+import { InitialData, NucleusDetail } from '@/types';
+import type { PermissionSet } from '@/lib/access';
 import Picker from './Picker';
 import DetailView from './DetailView';
-import AccessPanel from './AccessPanel';
+import CreateNucleusModal from './CreateNucleusModal';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
+
+const NO_ACCESS: PermissionSet = {
+  canRead: false, canWrite: false, canChangeIdentity: false, canDelete: false,
+  canAssignRoles: false, assignableRoles: [], createableEntityTypes: [],
+};
 
 export default function AppClient() {
   const [initialData, setInitialData] = useState<InitialData | null>(null);
@@ -15,7 +21,6 @@ export default function AppClient() {
   const [selectedNucleus, setSelectedNucleus] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [creatingNew, setCreatingNew] = useState(false);
-  const [accessOpen, setAccessOpen] = useState(false);
 
   function loadInitialData() {
     fetch('/api/initial-data')
@@ -68,134 +73,49 @@ export default function AppClient() {
     return <div className="loading-state">Loading...</div>;
   }
 
-  if (creatingNew) {
-    const emptyDetail: NucleusDetail = {
-      row: {
-        nucleus: '', parentNucleus: '', nucleusType: '', grouping: 'NC Eastern', cluster: 'Triangle',
-        pg: 'M3', clusterCode: 'NC-215', locality: '', stage: '', contact: '', email: '',
-        auxBoard: '', makeup: '', totalPop: '', totalHH: '', indNum: '', indPct: '',
-        hhNum: '', hhPct: '',
-        activities: {
-          ccs:         { act: '', part: '', fof: '' },
-          jygs:        { act: '', part: '', fof: '' },
-          scs:         { act: '', part: '', fof: '' },
-          devotionals: { act: '', part: '', fof: '' },
-        },
-        protagonists: '', accompaniers: '', level: '', notesPrevalence: '',
-        supported: '', notesSupported: '', presence: '', notesPresence: '',
-        involved: '', notesInvolved: '', efforts: '', notesEfforts: '',
-        gatherings: '', notesGatherings: '', narrative: '',
-      },
-      srp: null,
-      accompanierNames: [],
-      protagonistNames: [],
-      abmAssistantNames: [],
-    };
-    return (
-      <DetailView
-        detail={emptyDetail}
-        role="admin"
-        roleMap={initialData.access.roleMap}
-        email={initialData.email}
-        showBack={false}
-        spreadsheetUrl={initialData.spreadsheetUrl}
-        onBack={() => setCreatingNew(false)}
-        onSaved={() => {}}
-        isNew
-        onCreated={(name) => { setCreatingNew(false); loadNucleus(name); }}
-      />
-    );
-  }
-
   if (detail && selectedNucleus) {
-    const roleMap = initialData.access.roleMap;
-    const role: Role = (roleMap[norm(selectedNucleus)] ?? roleMap['*'] ?? 'read') as Role;
+    const permissions = initialData.access.permissions[norm(selectedNucleus)] ?? NO_ACCESS;
     return (
       <DetailView
         detail={detail}
-        role={role}
-        roleMap={initialData.access.roleMap}
+        permissions={permissions}
         email={initialData.email}
         showBack={initialData.rows.length > 1}
-        spreadsheetUrl={initialData.spreadsheetUrl}
         onBack={handleBack}
         onSaved={() => {}}
+        allNucleusNames={initialData.rows.map(r => r.nucleus)}
       />
     );
   }
 
-  const roleMap = initialData.access.roleMap;
-  const isGlobalAdmin = roleMap['*'] === 'admin' || roleMap['*'] === 'collaborator';
-
-  const TYPE_META: Record<string, { label: string; bg: string; color: string; border: string }> = {
-    neighborhood: { label: 'Neighborhood', bg: '#bee3f8', color: '#2c5282', border: '#90cdf4' },
-    network:      { label: 'Network',      bg: '#c6f6d5', color: '#276749', border: '#9ae6b4' },
-    population:   { label: 'Population',   bg: '#e9d8fd', color: '#553c9a', border: '#d6bcfa' },
-  };
-
-  const typeTotals = initialData.rows.reduce<Record<string, { act: number; part: number; fof: number; count: number }>>((acc, r) => {
-    const key = (r.nucleusType || '').toLowerCase().trim() || 'neighborhood';
-    if (!acc[key]) acc[key] = { act: 0, part: 0, fof: 0, count: 0 };
-    acc[key].act   += r.totalAct  || 0;
-    acc[key].part  += r.totalPart || 0;
-    acc[key].fof   += r.totalFof  || 0;
-    acc[key].count += 1;
-    return acc;
-  }, {});
-const typeSummaries = (['neighborhood', 'network', 'population'] as const)
-    .filter(key => key in typeTotals)
-    .map(key => [key, typeTotals[key]] as const);
+  // Gates "+Add nucleus" on whether there's any cluster this user can actually
+  // create one under (2026-10-05) -- clusterNames is already filtered to exactly
+  // those clusters (see /api/initial-data/route.ts), so this is the same check the
+  // PUT route itself enforces, not a separate approximation of it. Replaces the
+  // old isAdministrator-based gate, which hid this capability from anyone who
+  // wasn't also a global Administrator -- a different, much rarer role.
+  const canCreateNucleus = initialData.clusterNames.length > 0;
 
   return (
     <>
+      {/* The bottom-of-page by-nucleus-type summary cards (Neighborhood/Network/
+          Population) are gone, 2026-10-08 -- every bar in Picker's own hierarchy
+          (cluster, locality) now carries its own activities/participants/FoF
+          rollup, making a separate by-type summary redundant. */}
       <Picker
         rows={initialData.rows}
         email={initialData.email}
-        srpNames={initialData.srpNames}
         onSelect={loadNucleus}
         onSignOut={() => window.location.href = '/signout'}
-        onAdd={isGlobalAdmin ? () => setCreatingNew(true) : undefined}
+        onAdd={canCreateNucleus ? () => setCreatingNew(true) : undefined}
       />
-      {typeSummaries.length > 0 && (
-        <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 16px 24px', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {typeSummaries.map(([key, s]) => {
-            const meta = TYPE_META[key];
-            return (
-              <div key={key} className="card" style={{ flex: '1 1 200px', margin: 0 }}>
-                <div className="card-header" style={{ background: meta.bg, color: meta.color, borderBottom: `1px solid ${meta.border}` }}>
-                  {meta.label}
-                </div>
-                <div className="card-body" style={{ fontSize: 13 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 12px' }}>
-                    <span style={{ color: '#718096', textAlign: 'right' }}>Nuclei</span>       <span style={{ fontWeight: 600 }}>{s.count}</span>
-                    <span style={{ color: '#718096', textAlign: 'right' }}>Activities</span>   <span style={{ fontWeight: 600 }}>{s.act}</span>
-                    <span style={{ color: '#718096', textAlign: 'right' }}>Participants</span> <span style={{ fontWeight: 600 }}>{s.part}</span>
-                    <span style={{ color: '#718096', textAlign: 'right' }}>Friends of the Faith</span> <span style={{ fontWeight: 600 }}>{s.fof}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
-      {isGlobalAdmin && (
-        <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 16px 32px' }}>
-          <div className="card">
-            <div
-              className="card-header"
-              onClick={() => setAccessOpen(o => !o)}
-              style={{ cursor: 'pointer', userSelect: 'none' }}
-            >
-              <span><span style={{ fontSize: 11, marginRight: 6 }}>{accessOpen ? '▼' : '▶'}</span>Manage Access</span>
-            </div>
-            {accessOpen && (
-              <div className="card-body">
-                <AccessPanel roleMap={roleMap} />
-              </div>
-            )}
-          </div>
-        </div>
+      {creatingNew && (
+        <CreateNucleusModal
+          clusterNames={initialData.clusterNames}
+          onClose={() => setCreatingNew(false)}
+          onCreated={(name) => { setCreatingNew(false); loadNucleus(name); }}
+        />
       )}
     </>
   );

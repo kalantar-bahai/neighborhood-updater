@@ -1,17 +1,19 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
-import { getAccess } from '@/lib/access';
-import { getAllMasterRows, getWorkerNames, saveWorkerNames } from '@/lib/data';
-import { COL, WORKER_TYPES } from '@/lib/config';
+import { NextResponse, type NextRequest } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { getNucleusPermissions } from '@/lib/access';
+import { getNucleusWorkers, updateNucleusWorkers, individualDisplayName } from '@/lib/clusterNotebook';
+import type { Individual } from '@/lib/clusterNotebook';
+import { INFORMAL_WORKER_TYPES } from '@/lib/config';
+import type { Worker } from '@/types';
+import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
 
-function norm(s: string) { return (s || '').toLowerCase().trim(); }
-
-function effectiveRole(roleMap: Record<string, string>, nucleus: string) {
-  return roleMap[norm(nucleus)] ?? roleMap['*'] ?? null;
+function toWorkers(individuals: Individual[]): Worker[] {
+  return individuals.map(ind => ({ id: ind.id, name: individualDisplayName(ind), email: ind.email }));
 }
 
-export const GET = auth(async (req) => {
-  if (!req.auth?.user?.email) {
+export async function GET(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
@@ -19,50 +21,41 @@ export const GET = auth(async (req) => {
   const type = req.nextUrl.searchParams.get('type');
   if (!name) return NextResponse.json({ error: 'Missing nucleus' }, { status: 400 });
   if (!type) return NextResponse.json({ error: 'Missing type' }, { status: 400 });
-  if (!WORKER_TYPES.includes(type as typeof WORKER_TYPES[number])) {
-    return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
+
+  const permissions = await getNucleusPermissions(name);
+  if (!permissions.canRead) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+
+  try {
+    const workers = await getNucleusWorkers(name, type);
+    return NextResponse.json({ workers: toWorkers(workers) });
+  } catch (e: unknown) {
+    return clusterNotebookErrorResponse(e);
   }
+}
 
-  const access = await getAccess(req.auth.user.email);
-  if (access.role === 'none') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-  if (!effectiveRole(access.roleMap, name)) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-
-  const names = await getWorkerNames(name, type);
-  return NextResponse.json({ names });
-});
-
-export const POST = auth(async (req) => {
-  if (!req.auth?.user?.email) {
+export async function POST(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const { nucleus, type, names } = await req.json();
+  const { nucleus, type, personIds } = await req.json();
   if (!nucleus) return NextResponse.json({ error: 'Missing nucleus' }, { status: 400 });
   if (!type) return NextResponse.json({ error: 'Missing type' }, { status: 400 });
-  if (!WORKER_TYPES.includes(type as typeof WORKER_TYPES[number])) {
-    return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
+  if (!Array.isArray(personIds)) return NextResponse.json({ error: 'personIds must be an array' }, { status: 400 });
+
+  const permissions = await getNucleusPermissions(nucleus);
+  if (!permissions.canAssignRoles) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+
+  const isInformal = (INFORMAL_WORKER_TYPES as readonly string[]).includes(type);
+  if (!isInformal && !permissions.assignableRoles.includes(type)) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
-  if (!Array.isArray(names)) return NextResponse.json({ error: 'names must be an array' }, { status: 400 });
 
-  const email = req.auth.user.email;
-  const access = await getAccess(email);
-  if (access.role === 'none') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-
-  const role = effectiveRole(access.roleMap, nucleus);
-  if (!role || role === 'read') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-  if (type === 'abm-assistant' && role !== 'admin') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-
-  const allRows = await getAllMasterRows();
-  const masterRow = allRows.find(r => norm(r[COL.NUCLEUS]) === norm(nucleus));
-  if (!masterRow) return NextResponse.json({ error: `Not found: ${nucleus}` }, { status: 404 });
-
-  const context = {
-    cluster:       masterRow[COL.CLUSTER],
-    clusterCode:   masterRow[COL.CLUSTER_CODE],
-    locality:      masterRow[COL.LOCALITY],
-    parentNucleus: masterRow[COL.PARENT_NUCLEUS],
-  };
-
-  await saveWorkerNames(masterRow[COL.NUCLEUS], type, names, context);
-  return NextResponse.json({ success: true });
-});
+  try {
+    const workers = await updateNucleusWorkers(nucleus, type, personIds);
+    return NextResponse.json({ workers: toWorkers(workers) });
+  } catch (e: unknown) {
+    return clusterNotebookErrorResponse(e);
+  }
+}

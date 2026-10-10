@@ -1,21 +1,12 @@
-import { auth, signIn } from '@/auth';
+import { auth } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
 import AppClient from '@/components/AppClient';
 
 export default async function Home() {
-  const session = await auth();
+  const { userId } = await auth();
 
-  if (!session) {
-    return (
-      <div className="signin-page">
-        <div className="signin-card">
-          <h1>Nucleus Assistant</h1>
-          <p>Sign in with your Google account to view and update your neighborhood data.</p>
-          <form action={async () => { 'use server'; await signIn('google'); }}>
-            <button type="submit" className="signin-btn">Sign in with Google</button>
-          </form>
-        </div>
-      </div>
-    );
+  if (!userId) {
+    redirect('/sign-in');
   }
 
   return <AppClient />;

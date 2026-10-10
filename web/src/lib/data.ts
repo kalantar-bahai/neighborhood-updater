@@ -1,317 +1,416 @@
-import { sheetsGet, sheetsBatchUpdate, sheetsClear, sheetsDeleteRow } from './sheets';
 import {
-  MASTER_SHEET_ID, SRP_SHEET_ID,
-  MASTER_TAB, ACCESS_TAB, DEV_TAB, EDU_TAB,
-  MASTER_DATA_ROW, SRP_DATA_ROW,
-  COL, DEV_COL, EDU_COL,
-  WORKERS_TAB, WORKERS_DATA_ROW, ACC_COL,
-  ACCESS_COL,
-} from './config';
-import type { AccessEntry } from '@/types';
+  getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus,
+  getNucleusWorkers, individualDisplayName, createNucleus, deleteNucleus, getLocationOptions,
+} from './clusterNotebook';
+import type { ActivitySummary, ActivitySummaries, ActivityType, NucleusFields, Individual } from './clusterNotebook';
+import type { Activity, Worker } from '@/types';
 
-function normalize(row: string[], numCols: number): string[] {
-  const r = row ? [...row] : [];
-  while (r.length < numCols) r.push('');
-  return r;
+// Lets callers (route handlers) distinguish error cases (e.g. 409 vs 400)
+// without an `as any` cast on `.code`.
+export class CodedError extends Error {
+  constructor(message: string, public code: string) {
+    super(message);
+  }
 }
-
-function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
 function stripCommas(s: string) { return s ? s.replace(/,/g, '') : s; }
 
-export async function getAccessEntries(): Promise<AccessEntry[]> {
-  const rows = await sheetsGet(MASTER_SHEET_ID, `${ACCESS_TAB}!A2:D`);
-  return rows
-    .filter(r => (r[ACCESS_COL.EMAIL] || '').trim() !== '')
-    .map(r => ({
-      name:    r[ACCESS_COL.NAME]    || '',
-      email:   r[ACCESS_COL.EMAIL]   || '',
-      role:    (r[ACCESS_COL.ROLE]   || 'read') as AccessEntry['role'],
-      nucleus: r[ACCESS_COL.NUCLEUS] || '*',
-    }));
-}
-
-export async function saveAccessEntries(entries: AccessEntry[]): Promise<void> {
-  await sheetsClear(MASTER_SHEET_ID, `${ACCESS_TAB}!A2:D`);
-  if (entries.length === 0) return;
-  await sheetsBatchUpdate(MASTER_SHEET_ID, [{
-    range: `${ACCESS_TAB}!A2`,
-    values: entries.map(e => [e.name, e.email, e.role, e.nucleus]),
-  }]);
-}
-
-export async function getAllMasterRows() {
-  const rows = await sheetsGet(MASTER_SHEET_ID, `${MASTER_TAB}!A${MASTER_DATA_ROW}:AZ`);
-  return rows.map(r => normalize(r, 52));
-}
-
-export async function getAllDevRows() {
-  const rows = await sheetsGet(SRP_SHEET_ID, `${DEV_TAB}!A${SRP_DATA_ROW}:N`);
-  return rows.map(r => normalize(r, 14));
-}
-
-export async function getAllEduRows() {
-  const rows = await sheetsGet(SRP_SHEET_ID, `${EDU_TAB}!A${SRP_DATA_ROW}:K`);
-  return rows.map(r => normalize(r, 11));
-}
-
-export function parseRow(row: string[]) {
+function activityFromSummary(summary: ActivitySummary | null): Activity {
   return {
-    grouping:            row[COL.GROUPING],
-    cluster:             row[COL.CLUSTER],
-    pg:                  row[COL.PG],
-    clusterCode:         row[COL.CLUSTER_CODE],
-    locality:            row[COL.LOCALITY],
-    nucleus:             row[COL.NUCLEUS],
-    parentNucleus:       row[COL.PARENT_NUCLEUS],
-    nucleusType:         row[COL.TYPE],
-    stage:               row[COL.STAGE],
-    contact:             row[COL.CONTACT],
-    email:               row[COL.EMAIL],
-    auxBoard:            row[COL.AUX_BOARD],
-    makeup:              row[COL.MAKEUP],
-    totalPop:            stripCommas(row[COL.TOTAL_POP]),
-    totalHH:             stripCommas(row[COL.TOTAL_HH]),
-    indNum:              stripCommas(row[COL.IND_NUM]),
-    indPct:              row[COL.IND_PCT],
-    hhNum:               stripCommas(row[COL.HH_NUM]),
-    hhPct:               row[COL.HH_PCT],
-    activities: {
-      ccs:         { act: stripCommas(row[COL.CC_ACT]),   part: stripCommas(row[COL.CC_PART]),   fof: stripCommas(row[COL.CC_FOF]) },
-      jygs:        { act: stripCommas(row[COL.JYG_ACT]),  part: stripCommas(row[COL.JYG_PART]),  fof: stripCommas(row[COL.JYG_FOF]) },
-      scs:         { act: stripCommas(row[COL.SC_ACT]),   part: stripCommas(row[COL.SC_PART]),   fof: stripCommas(row[COL.SC_FOF]) },
-      devotionals: { act: stripCommas(row[COL.DEV_ACT]),  part: stripCommas(row[COL.DEV_PART]),  fof: stripCommas(row[COL.DEV_FOF]) },
-    },
-    protagonists:    stripCommas(row[COL.PROTAGONISTS]),
-    accompaniers:    stripCommas(row[COL.ACCOMPANIERS]),
-    level:           row[COL.LEVEL],
-    notesPrevalence: row[COL.NOTES_PREVALENCE],
-    supported:       row[COL.SUPPORTED],
-    notesSupported:  row[COL.NOTES_SUPPORTED],
-    presence:        row[COL.PRESENCE],
-    notesPresence:   row[COL.NOTES_PRESENCE],
-    involved:        row[COL.INVOLVED],
-    notesInvolved:   row[COL.NOTES_INVOLVED],
-    efforts:          row[COL.EFFORTS],
-    notesEfforts:     row[COL.NOTES_EFFORTS],
-    gatherings:       row[COL.GATHERINGS],
-    notesGatherings:  row[COL.NOTES_GATHERINGS],
-    narrative:        row[COL.NARRATIVE],
+    act: summary?.number != null ? String(summary.number) : '',
+    part: summary?.participants != null ? String(summary.participants) : '',
+    fof: summary?.participantsFof != null ? String(summary.participantsFof) : '',
+    isOverridden: summary?.isOverridden ?? false,
   };
 }
 
-export function findSrpRow(name: string, rows: string[][], nameCol: number) {
-  const needle = norm(name);
-  return rows.find(r => norm(r[nameCol]) === needle) ?? null;
+// Maps all four cluster-notebook activity rollups onto NucleusRow.activities' shape.
+// Used both for a single nucleus's detail (getRowData) and the picker summary
+// (/api/initial-data), so both stay in sync rather than drifting apart.
+export function activitiesFromClusterNotebook(summaries: ActivitySummaries | null) {
+  return {
+    ccs: activityFromSummary(summaries?.childrensClasses ?? null),
+    jygs: activityFromSummary(summaries?.juniorYouthGroups ?? null),
+    scs: activityFromSummary(summaries?.studyCircles ?? null),
+    devotionals: activityFromSummary(summaries?.devotionalGathering ?? null),
+  };
 }
 
-export function parseSrpData(devRow: string[] | null, eduRow: string[] | null) {
-  if (!devRow && !eduRow) return null;
+// Our UI shows one combined facilitators line per nucleus, not per activity type --
+// collect the distinct non-empty facilitatorNames across all four rollups.
+export function facilitatorsFromClusterNotebook(summaries: ActivitySummaries | null): string {
+  if (!summaries) return '';
+  const names = [summaries.childrensClasses, summaries.juniorYouthGroups, summaries.studyCircles, summaries.devotionalGathering]
+    .map(s => s?.facilitatorNames?.trim())
+    .filter((s): s is string => !!s);
+  return Array.from(new Set(names)).join('; ');
+}
+
+// Summed count across all four rollups' `facilitators` -- the numeric sibling of
+// facilitatorNames above, used for the concentric diagram's "Facilitating" ring
+// (which needs a number, not a name string).
+export function facilitatorsCountFromClusterNotebook(summaries: ActivitySummaries | null): string {
+  if (!summaries) return '';
+  const counts = [summaries.childrensClasses, summaries.juniorYouthGroups, summaries.studyCircles, summaries.devotionalGathering]
+    .map(s => s?.facilitators)
+    .filter((n): n is number => n != null);
+  if (counts.length === 0) return '';
+  return String(counts.reduce((a, b) => a + b, 0));
+}
+
+function toIntOrNull(value: unknown): number | null {
+  const cleaned = stripCommas(String(value ?? ''));
+  const n = parseInt(cleaned, 10);
+  return Number.isNaN(n) ? null : n;
+}
+
+// Tri-state mapping for our Yes/No toggles onto cluster-notebook's nullable
+// booleans: 'Yes' -> true, 'No' -> explicit false, anything else (never
+// touched) -> null. Symmetric with boolToYesNo below.
+function toBoolOrNull(value: unknown): boolean | null {
+  const v = String(value ?? '').trim().toLowerCase();
+  if (v === 'yes') return true;
+  if (v === 'no') return false;
+  return null;
+}
+
+function boolToYesNo(value: boolean | null | undefined): string {
+  if (value === true) return 'Yes';
+  if (value === false) return 'No';
+  return '';
+}
+
+// cluster-notebook's Cluster.growthMilestone stores SRP's own verbatim strings;
+// our UI's "PG" field uses short M1/M2/M3 codes. Confirmed 2026-09-13 (the user
+// directly): this is the complete set of values SRP produces, no others exist.
+const GROWTH_MILESTONE_TO_PG: Record<string, string> = {
+  'Programme of Growth (PG)': 'M1',
+  'Intensive Program of Growth (IPG)': 'M2',
+  'IPG Embracing Large Numbers': 'M3',
+};
+
+function pgFromGrowthMilestone(value: string | null | undefined): string {
+  if (!value) return '';
+  return GROWTH_MILESTONE_TO_PG[value] ?? '';
+}
+
+// clusterCode has no separate field on cluster-notebook's side (confirmed 2026-09-13) --
+// it's just the first whitespace-separated token of the cluster's full name,
+// e.g. "NC-215" from "NC-215 Triangle". Derived here rather than stored/edited.
+function clusterCodeFromClusterName(name: string | undefined): string {
+  return (name || '').trim().split(/\s+/)[0] || '';
+}
+
+function nucleusFieldsFromClusterNotebook(fields: NucleusFields | null) {
   return {
-    facilitators: eduRow ? eduRow[EDU_COL.FACILITATORS] : '',
-    ccs:          eduRow ? { act: eduRow[EDU_COL.CC_ACT],  part: eduRow[EDU_COL.CC_PART],  fof: eduRow[EDU_COL.CC_FOF]  } : null,
-    jygs:         eduRow ? { act: eduRow[EDU_COL.JYG_ACT], part: eduRow[EDU_COL.JYG_PART], fof: eduRow[EDU_COL.JYG_FOF] } : null,
-    scs:          eduRow ? { act: eduRow[EDU_COL.SC_ACT],  part: eduRow[EDU_COL.SC_PART],  fof: eduRow[EDU_COL.SC_FOF]  } : null,
-    devotionals:  devRow ? { act: devRow[DEV_COL.DEV_ACT], part: devRow[DEV_COL.DEV_PART], fof: devRow[DEV_COL.DEV_FOF] } : null,
+    stage: fields?.stage ?? '',
+    locality: fields?.locality ?? '',
+    makeup: fields?.populationMakeup ?? '',
+    totalPop: fields?.population != null ? String(fields.population) : '',
+    totalHH: fields?.households != null ? String(fields.households) : '',
+    indNum: fields?.connectedPopulation != null ? String(fields.connectedPopulation) : '',
+    hhNum: fields?.connectedHouseholds != null ? String(fields.connectedHouseholds) : '',
+    // Overview card's nine fields (2026-10-07) -- hand-entered, SRP-synced estimates,
+    // independent of our role-assignment lists. See NucleusFields' own comment in
+    // clusterNotebook.ts.
+    inConversation: fields?.inConversation != null ? String(fields.inConversation) : '',
+    inCommunityActivities: fields?.inCommunityActivities != null ? String(fields.inCommunityActivities) : '',
+    protagonists: fields?.protagonists != null ? String(fields.protagonists) : '',
+    devotionalHosts: fields?.devotionalHosts != null ? String(fields.devotionalHosts) : '',
+    inEducationalActivities: fields?.inEducationalActivities != null ? String(fields.inEducationalActivities) : '',
+    educationalFacilitators: fields?.educationalFacilitators != null ? String(fields.educationalFacilitators) : '',
+    helpingOthers: fields?.helpingOthers != null ? String(fields.helpingOthers) : '',
+    accompanying: fields?.accompanying != null ? String(fields.accompanying) : '',
+    presence: boolToYesNo(fields?.hasSocialAction),
+    notesPresence: fields?.socialActionDescription ?? '',
+    gatherings: boolToYesNo(fields?.hasCommunityGatherings),
+    notesGatherings: fields?.communityGatheringDescription ?? '',
+    narrative: fields?.narrative ?? '',
+    // "Pocket" grouping (2026-09-14) -- one nucleus nested under another in the
+    // picker, unrelated to the cluster/grouping hierarchy. Now cluster-notebook's
+    // own field (parentNucleus { name }), not a Sheet column.
+    parentNucleus: fields?.parentNucleus?.name ?? '',
+    // Added 2026-10-08 -- the raw value `locationName` sets (any Cluster/Locality/
+    // Setting name), distinct from the derived locality/cluster above. The save
+    // path only ever needs the name (cluster-notebook resolves which tier it's at
+    // itself) -- '' means no location, same blank-string convention as every other
+    // field here, though that should now only happen for the handful of already-
+    // archived nuclei that predate cluster-notebook requiring one (commit c40fb54).
+    locationName: fields?.location?.name ?? '',
+    // locationType *is* needed in our UI, unlike locationName's tier -- it governs
+    // whether nucleusType can be edited at all: forced to "Neighborhood" at a
+    // SETTING (attempting anything else now raises a real error, not a silent
+    // revert), freely settable at a CLUSTER or LOCALITY. Confirmed with cluster-
+    // notebook directly, 2026-10-08 (commit c40fb54).
+    locationType: fields?.location?.type ?? '',
+    // Read-only on cluster-notebook's side — no mutation exists for any of these four.
+    cluster: fields?.cluster.name ?? '',
+    grouping: fields?.cluster.groupOfClusters ?? '',
+    pg: pgFromGrowthMilestone(fields?.cluster.growthMilestone),
+    auxBoard: fields?.cluster.auxiliaryBoardMembers ?? '',
+    // Derived client-side (not a cluster-notebook field at all) from cluster.name.
+    clusterCode: clusterCodeFromClusterName(fields?.cluster.name),
+    // Writable, but only truly settable when the nucleus has no location — see
+    // NucleusFields.nucleusType's own comment in clusterNotebook.ts.
+    nucleusType: fields?.nucleusType ?? '',
   };
+}
+
+function toWorkers(individuals: Individual[]): Worker[] {
+  return individuals.map(ind => ({ id: ind.id, name: individualDisplayName(ind), email: ind.email }));
 }
 
 export async function getRowData(nucleusName: string) {
-  const [masterRows, devRows, eduRows, accompanierNames, protagonistNames, abmAssistantNames] = await Promise.all([
-    getAllMasterRows(), getAllDevRows(), getAllEduRows(),
-    getWorkerNames(nucleusName, 'accompanier'),
-    getWorkerNames(nucleusName, 'protagonist'),
-    getWorkerNames(nucleusName, 'abm-assistant'),
+  const [accompanierWorkers, protagonistWorkers, abmAssistantWorkers, contactWorkers, promoterWorkers, activitySummaries, nucleusFields] = await Promise.all([
+    getNucleusWorkers(nucleusName, 'accompanier'),
+    getNucleusWorkers(nucleusName, 'protagonist'),
+    getNucleusWorkers(nucleusName, 'abm-assistant'),
+    getNucleusWorkers(nucleusName, 'contact'),
+    getNucleusWorkers(nucleusName, 'promoter'),
+    getActivitySummaries(nucleusName),
+    getNucleusFields(nucleusName),
   ]);
 
-  const masterRow = masterRows.find(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
-  if (!masterRow) return null;
+  // cluster-notebook is the sole source of truth now -- nucleusFields is the
+  // authoritative "does this exist" check.
+  if (nucleusFields === null) return null;
 
-  const lookup = (rows: string[][], nameCol: number) => {
-    let match = findSrpRow(nucleusName, rows, nameCol);
-    if (!match && masterRow[COL.PARENT_NUCLEUS]) {
-      match = findSrpRow(`${masterRow[COL.PARENT_NUCLEUS]} - ${nucleusName}`, rows, nameCol);
-    }
-    return match;
+  // Location picker's options -- scoped to this nucleus's own (fixed) cluster, so
+  // this can only run after nucleusFields resolves (need cluster.name first), not
+  // batched into the Promise.all above. Comes back [] for a caller who can't edit
+  // location anyway (their read scope won't reach locality/setting level) --
+  // confirmed with cluster-notebook directly, 2026-10-08.
+  const locationOptions = await getLocationOptions(nucleusFields?.cluster?.name ?? '');
+
+  const row = {
+    // The list of valid nuclei comes from cluster-notebook, not any hand-typed
+    // copy (2026-09-13, the user directly) -- `nucleusName` (this function's own
+    // parameter) already IS that canonical value once it flows from the picker,
+    // so it's authoritative here.
+    nucleus: nucleusName,
+    activities: activitiesFromClusterNotebook(activitySummaries),
+    facilitators: facilitatorsFromClusterNotebook(activitySummaries),
+    facilitatorsCount: facilitatorsCountFromClusterNotebook(activitySummaries),
+    ...nucleusFieldsFromClusterNotebook(nucleusFields),
   };
 
   return {
-    row: parseRow(masterRow),
-    srp: parseSrpData(lookup(devRows, DEV_COL.NAME), lookup(eduRows, EDU_COL.NAME)),
-    accompanierNames,
-    protagonistNames,
-    abmAssistantNames,
+    row,
+    accompanierNames: toWorkers(accompanierWorkers),
+    protagonistNames: toWorkers(protagonistWorkers),
+    abmAssistantNames: toWorkers(abmAssistantWorkers),
+    contactNames: toWorkers(contactWorkers),
+    promoterNames: toWorkers(promoterWorkers),
+    lastUpdated: nucleusFields?.lastUpdated ?? null,
+    locationOptions,
   };
 }
 
-async function getAllWorkerRows() {
-  const rows = await sheetsGet(MASTER_SHEET_ID, `${WORKERS_TAB}!A${WORKERS_DATA_ROW}:G`);
-  return rows.map(r => normalize(r, 7));
+// Fully cluster-notebook's call now, 2026-09-14 -- no Sheet interaction at all (matching
+// createRowData/saveRowData). Their deleteNucleus is a soft delete: the row persists but
+// disappears from nuclei/nucleus(name) immediately, ActivitySummaryOverride rows are
+// hard-deleted, real Activity rows are reassigned (never deleted) up the parentNucleus/
+// locality/cluster chain, and role-holders are ended. Returns false for "never existed" and
+// "already deleted" alike -- we surface that to the caller so the route can 404 on it,
+// same as getRowData's existence check.
+export async function deleteRowData(nucleusName: string): Promise<boolean> {
+  return deleteNucleus(nucleusName);
 }
 
-export async function getWorkerNames(nucleusName: string, type: string): Promise<string[]> {
-  const rows = await getAllWorkerRows();
-  const needle = norm(nucleusName);
-  return rows
-    .filter(r => norm(r[ACC_COL.NUCLEUS]) === needle && norm(r[ACC_COL.TYPE]) === norm(type))
-    .map(r => r[ACC_COL.NAME]);
+// Shape of the bits of submitted form data activityUpdateWrites/
+// nucleusPatchFromFormData actually read -- formData itself arrives as
+// Record<string, unknown> from the API route, so this is a narrowing, not a
+// claim about the full form shape.
+interface FormDataInput {
+  activities?: Partial<Record<'ccs' | 'jygs' | 'scs' | 'devotionals', { act?: string; part?: string; fof?: string }>>;
+  stage?: string; makeup?: string;
+  totalPop?: string; totalHH?: string; indNum?: string; hhNum?: string;
+  // Overview card's nine fields (2026-10-07) -- see nucleusPatchFromFormData below.
+  inConversation?: string; inCommunityActivities?: string;
+  protagonists?: string; devotionalHosts?: string;
+  inEducationalActivities?: string; educationalFacilitators?: string;
+  helpingOthers?: string; accompanying?: string;
+  presence?: string; notesPresence?: string;
+  gatherings?: string; notesGatherings?: string;
+  narrative?: string;
+  identity?: { nucleusType?: string; parentNucleus?: string; location?: string };
 }
 
-export async function saveWorkerNames(
-  nucleusName: string,
-  type: string,
-  names: string[],
-  context: { cluster: string; clusterCode: string; locality: string; parentNucleus: string }
-): Promise<void> {
-  const allRows = await getAllWorkerRows();
-  const needle = norm(nucleusName);
-  const otherRows = allRows.filter(r =>
-    !(norm(r[ACC_COL.NUCLEUS]) === needle && norm(r[ACC_COL.TYPE]) === norm(type))
-  );
-  const newRows = names.map(name => [
-    context.cluster,
-    context.clusterCode,
-    context.locality,
-    context.parentNucleus,
-    nucleusName,
-    type,
-    name,
-  ]);
-  const combined = [...otherRows, ...newRows];
-  await sheetsClear(MASTER_SHEET_ID, `${WORKERS_TAB}!A${WORKERS_DATA_ROW}:G`);
-  if (combined.length > 0) {
-    await sheetsBatchUpdate(MASTER_SHEET_ID, [{
-      range: `${WORKERS_TAB}!A${WORKERS_DATA_ROW}`,
-      values: combined,
-    }]);
+// Shared between createRowData and saveRowData -- each of the four activity
+// rollups writes straight to cluster-notebook's updateActivitySummary, one call
+// per activity type present in the submitted form. Each of number/participants/
+// participantsFof is independently optional on an activity object (DetailView.tsx's
+// per-sub-field blur sends just one at a time) -- only include the sub-fields the
+// caller actually submitted (`!== undefined`, matching nucleusPatchFromFormData's
+// own convention below), never defaulting a missing one via toIntOrNull(undefined).
+// Confirmed with cluster-notebook directly, 2026-10-03: their resolver distinguishes
+// an omitted field (left alone) from an explicit null (a real clear) -- sending null
+// for every sub-field we didn't mean to touch was silently wiping real data.
+function activityUpdateWrites(nucleusName: string, d: FormDataInput): Promise<unknown>[] {
+  const ACTIVITY_KEYS: [keyof NonNullable<FormDataInput['activities']>, ActivityType][] = [
+    ['ccs', 'CHILDRENS_CLASS'],
+    ['jygs', 'JUNIOR_YOUTH_GROUP'],
+    ['scs', 'STUDY_CIRCLE'],
+    ['devotionals', 'DEVOTIONAL_GATHERING'],
+  ];
+  const writes: Promise<unknown>[] = [];
+  for (const [key, activityType] of ACTIVITY_KEYS) {
+    const act = d.activities?.[key];
+    if (act) {
+      const patch: { number?: number | null; participants?: number | null; participantsFof?: number | null } = {};
+      if (act.act !== undefined) patch.number = toIntOrNull(act.act);
+      if (act.part !== undefined) patch.participants = toIntOrNull(act.part);
+      if (act.fof !== undefined) patch.participantsFof = toIntOrNull(act.fof);
+      writes.push(updateActivitySummary(nucleusName, activityType, patch));
+    }
   }
+  return writes;
 }
 
-export async function deleteRowData(nucleusName: string): Promise<void> {
-  const allRows = await getAllMasterRows();
-  const rowIndex = allRows.findIndex(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
-  if (rowIndex === -1) throw new Error(`Row not found: ${nucleusName}`);
-  const sheetRowIndex = MASTER_DATA_ROW + rowIndex - 1; // 0-based index for deleteDimension
-  await sheetsDeleteRow(MASTER_SHEET_ID, MASTER_TAB, sheetRowIndex);
+// Shared between createRowData and saveRowData -- builds the same NucleusPatch
+// shape from submitted form data either way. No `locality`: cluster-notebook
+// removed NucleusPatch.locality 2026-09-13 (it's now a read-only value derived
+// from Nucleus.location's own containment chain, not a hand-entered field).
+function nucleusPatchFromFormData(d: FormDataInput) {
+  const nucleusPatch: {
+    stage?: string; populationMakeup?: string;
+    population?: number | null; households?: number | null;
+    connectedPopulation?: number | null; connectedHouseholds?: number | null;
+    inConversation?: number | null; inCommunityActivities?: number | null;
+    protagonists?: number | null; devotionalHosts?: number | null;
+    inEducationalActivities?: number | null; educationalFacilitators?: number | null;
+    helpingOthers?: number | null; accompanying?: number | null;
+    hasSocialAction?: boolean | null; socialActionDescription?: string;
+    hasCommunityGatherings?: boolean | null; communityGatheringDescription?: string;
+    narrative?: string;
+    nucleusType?: string;
+    parentNucleusName?: string | null;
+    locationName?: string | null;
+  } = {};
+  if (d.stage !== undefined) nucleusPatch.stage = d.stage;
+  if (d.makeup !== undefined) nucleusPatch.populationMakeup = d.makeup;
+  if (d.totalPop !== undefined) nucleusPatch.population = toIntOrNull(d.totalPop);
+  if (d.totalHH !== undefined) nucleusPatch.households = toIntOrNull(d.totalHH);
+  if (d.indNum !== undefined) nucleusPatch.connectedPopulation = toIntOrNull(d.indNum);
+  if (d.hhNum !== undefined) nucleusPatch.connectedHouseholds = toIntOrNull(d.hhNum);
+  // toIntOrNull('') is null, not 0 -- cluster-notebook was explicit that a blank
+  // input must stay blank (null = "not recorded"), never sent as a false zero.
+  if (d.inConversation !== undefined) nucleusPatch.inConversation = toIntOrNull(d.inConversation);
+  if (d.inCommunityActivities !== undefined) nucleusPatch.inCommunityActivities = toIntOrNull(d.inCommunityActivities);
+  if (d.protagonists !== undefined) nucleusPatch.protagonists = toIntOrNull(d.protagonists);
+  if (d.devotionalHosts !== undefined) nucleusPatch.devotionalHosts = toIntOrNull(d.devotionalHosts);
+  if (d.inEducationalActivities !== undefined) nucleusPatch.inEducationalActivities = toIntOrNull(d.inEducationalActivities);
+  if (d.educationalFacilitators !== undefined) nucleusPatch.educationalFacilitators = toIntOrNull(d.educationalFacilitators);
+  if (d.helpingOthers !== undefined) nucleusPatch.helpingOthers = toIntOrNull(d.helpingOthers);
+  if (d.accompanying !== undefined) nucleusPatch.accompanying = toIntOrNull(d.accompanying);
+  if (d.presence !== undefined) nucleusPatch.hasSocialAction = toBoolOrNull(d.presence);
+  if (d.notesPresence !== undefined) nucleusPatch.socialActionDescription = d.notesPresence;
+  if (d.gatherings !== undefined) nucleusPatch.hasCommunityGatherings = toBoolOrNull(d.gatherings);
+  if (d.notesGatherings !== undefined) nucleusPatch.communityGatheringDescription = d.notesGatherings;
+  if (d.narrative !== undefined) nucleusPatch.narrative = d.narrative;
+  // nucleusType is nested under identity (admin/create-only), unlike the other patch fields above.
+  if (d.identity && d.identity.nucleusType !== undefined) nucleusPatch.nucleusType = d.identity.nucleusType;
+  // parentNucleus likewise -- '' (cleared in the UI) means "no parent", so it maps to
+  // null, not an empty-string patch value.
+  if (d.identity && d.identity.parentNucleus !== undefined) nucleusPatch.parentNucleusName = d.identity.parentNucleus || null;
+  // location likewise -- '' means no location, same null-not-empty-string convention.
+  // Only the chosen name is sent; cluster-notebook resolves which tier (Cluster/
+  // Locality/Setting) it belongs to itself, and rejects a Nucleus name here (that's
+  // parentNucleus's job, confirmed with cluster-notebook directly, 2026-10-08).
+  if (d.identity && d.identity.location !== undefined) nucleusPatch.locationName = d.identity.location || null;
+  return nucleusPatch;
 }
 
-export async function createRowData(formData: Record<string, unknown>, userEmail: string) {
-  const allRows = await getAllMasterRows();
+// Identity (name + cluster) is established via cluster-notebook's createNucleus,
+// 2026-09-14 -- everything else (stage, population, activities, narrative,
+// parentNucleus, etc.) goes through the exact same update calls saveRowData uses
+// for editing, not a separate seed-write. No Sheet row is written at all anymore --
+// access control no longer requires one (see access.ts) and parentNucleus, the
+// last field that needed one, is now cluster-notebook's own field.
+export async function createRowData(formData: Record<string, unknown>) {
   const d = formData as any;
   const newNucleus = ((d.identity?.nucleus) || '').trim();
+  const clusterName = ((d.identity?.cluster) || '').trim();
 
   if (!newNucleus) throw new Error('Nucleus name is required');
+  if (!clusterName) throw new Error('Cluster is required');
 
-  if (allRows.some(r => norm(r[COL.NUCLEUS]) === norm(newNucleus))) {
-    const err = new Error(`A nucleus named "${newNucleus}" already exists`);
-    (err as any).code = 'CONFLICT';
-    throw err;
+  let created;
+  try {
+    created = await createNucleus(newNucleus, clusterName);
+  } catch (e) {
+    // Global uniqueness is enforced at cluster-notebook's DB level (2026-09-14) --
+    // this is now our only duplicate-name check (the Sheet-based pre-check that used
+    // to run here was dropped along with the Sheet stub-row write it existed to guard).
+    if (e instanceof Error && /already exists/i.test(e.message)) {
+      throw new CodedError(`A nucleus named "${newNucleus}" already exists`, 'CONFLICT');
+    }
+    throw e;
+  }
+  if (created === null) {
+    throw new CodedError(`cluster-notebook has no cluster named "${clusterName}" — nucleus not created`, 'BAD_CLUSTER');
   }
 
-  const sheetRow = MASTER_DATA_ROW + allRows.length;
-  const newRow = new Array(52).fill('');
+  const nucleusPatch = nucleusPatchFromFormData(d);
+  const nucleusWrite = Object.keys(nucleusPatch).length > 0 ? updateNucleus(newNucleus, nucleusPatch) : null;
+  await Promise.all([...activityUpdateWrites(newNucleus, d), nucleusWrite]);
+  const updatedFields = nucleusWrite ? await nucleusWrite : null;
 
-  newRow[COL.GROUPING]       = d.identity?.grouping       || '';
-  newRow[COL.CLUSTER]        = d.identity?.cluster        || '';
-  newRow[COL.PG]             = d.identity?.pg             || '';
-  newRow[COL.CLUSTER_CODE]   = d.identity?.clusterCode    || '';
-  newRow[COL.LOCALITY]       = d.locality                 || '';
-  newRow[COL.NUCLEUS]        = d.identity?.nucleus        || '';
-  newRow[COL.PARENT_NUCLEUS] = d.identity?.parentNucleus  || '';
-  newRow[COL.TYPE]           = d.identity?.nucleusType    || '';
-  newRow[COL.STAGE]          = d.stage                    || '';
-  newRow[COL.CONTACT]        = d.contact                  || '';
-  newRow[COL.EMAIL]          = d.email                    || '';
-  newRow[COL.AUX_BOARD]      = d.auxBoard                 || '';
-  newRow[COL.MAKEUP]         = d.makeup                   || '';
-  newRow[COL.TOTAL_POP]      = d.totalPop                 || '';
-  newRow[COL.TOTAL_HH]       = d.totalHH                  || '';
-  newRow[COL.IND_NUM]        = d.indNum                   || '';
-  newRow[COL.HH_NUM]         = d.hhNum                    || '';
-  newRow[COL.CC_ACT]         = d.activities?.ccs?.act     || '';
-  newRow[COL.CC_PART]        = d.activities?.ccs?.part    || '';
-  newRow[COL.CC_FOF]         = d.activities?.ccs?.fof     || '';
-  newRow[COL.JYG_ACT]        = d.activities?.jygs?.act    || '';
-  newRow[COL.JYG_PART]       = d.activities?.jygs?.part   || '';
-  newRow[COL.JYG_FOF]        = d.activities?.jygs?.fof    || '';
-  newRow[COL.SC_ACT]         = d.activities?.scs?.act     || '';
-  newRow[COL.SC_PART]        = d.activities?.scs?.part    || '';
-  newRow[COL.SC_FOF]         = d.activities?.scs?.fof     || '';
-  newRow[COL.DEV_ACT]        = d.activities?.devotionals?.act  || '';
-  newRow[COL.DEV_PART]       = d.activities?.devotionals?.part || '';
-  newRow[COL.DEV_FOF]        = d.activities?.devotionals?.fof  || '';
-  newRow[COL.PROTAGONISTS]   = d.protagonists             || '';
-  newRow[COL.ACCOMPANIERS]   = d.accompaniers             || '';
-  newRow[COL.LEVEL]          = d.level                    || '';
-  newRow[COL.NOTES_PREVALENCE] = d.notesPrevalence        || '';
-  newRow[COL.SUPPORTED]      = d.supported                || '';
-  newRow[COL.NOTES_SUPPORTED]= d.notesSupported           || '';
-  newRow[COL.PRESENCE]       = d.presence                 || '';
-  newRow[COL.NOTES_PRESENCE] = d.notesPresence            || '';
-  newRow[COL.INVOLVED]       = d.involved                 || '';
-  newRow[COL.NOTES_INVOLVED] = d.notesInvolved            || '';
-  newRow[COL.EFFORTS]        = d.efforts                  || '';
-  newRow[COL.NOTES_EFFORTS]  = d.notesEfforts             || '';
-  newRow[COL.GATHERINGS]     = d.gatherings               || '';
-  newRow[COL.NOTES_GATHERINGS] = d.notesGatherings        || '';
-  newRow[COL.NARRATIVE]      = d.narrative                || '';
-
-  await sheetsBatchUpdate(MASTER_SHEET_ID, [{
-    range: `${MASTER_TAB}!A${sheetRow}`,
-    values: [newRow],
-  }]);
-
-  return { success: true, savedBy: userEmail, savedAt: new Date().toISOString() };
+  // lastUpdated: confirmed with cluster-notebook 2026-10-04 that updateNucleus's own
+  // response already carries an accurate value (its audit row commits in the same
+  // transaction the mutation resolves against) -- reuse it when it's the only write
+  // that ran after creation. updateActivitySummary's response has no lastUpdated at
+  // all (it returns ActivitySummary, not Nucleus), and even alongside a concurrent
+  // nucleus-patch write, that write's own response reflects only ITS OWN transaction,
+  // not an activity write that might settle a moment later -- so activities touched
+  // always means a fresh aggregate read instead. Neither write happening at all (a
+  // bare identity-only create) means createNucleus's own response, above, is already
+  // the freshest thing we have.
+  const lastUpdated = d.activities
+    ? (await getNucleusFields(newNucleus))?.lastUpdated ?? null
+    : (updatedFields ?? created).lastUpdated;
+  return { success: true, lastUpdated };
 }
 
-export async function saveRowData(nucleusName: string, formData: Record<string, unknown>, userEmail: string) {
-  const allRows = await getAllMasterRows();
-  const rowIndex = allRows.findIndex(r => norm(r[COL.NUCLEUS]) === norm(nucleusName));
-  if (rowIndex === -1) throw new Error(`Row not found: ${nucleusName}`);
-
-  const sheetRow = MASTER_DATA_ROW + rowIndex;
+// nucleus/grouping/cluster/pg/clusterCode are deliberately absent from nucleusPatch below —
+// nucleus (the name itself) is no longer editable at all: cluster-notebook's own name is
+// the canonical identifier now (2026-09-13, the user directly), and cluster-notebook has no
+// rename mutation. grouping/cluster/pg are read-only from cluster-notebook
+// (Cluster.groupOfClusters/name/growthMilestone, no mutation exists); clusterCode is derived
+// client-side from cluster.name, not a stored field at all. Every field this function writes,
+// including parentNucleus now, routes entirely through cluster-notebook -- no Sheet write at
+// all anymore, 2026-09-14.
+export async function saveRowData(nucleusName: string, formData: Record<string, unknown>) {
   const d = formData as any;
-  const colLetter = (i: number) => {
-    let letter = '', idx = i + 1;
-    while (idx > 0) { const rem = (idx - 1) % 26; letter = String.fromCharCode(65 + rem) + letter; idx = Math.floor((idx - 1) / 26); }
-    return letter;
-  };
 
-  const identityPairs: [number, unknown][] = d.identity ? [
-    [COL.NUCLEUS,        d.identity.nucleus],
-    [COL.PARENT_NUCLEUS, d.identity.parentNucleus],
-    [COL.GROUPING,       d.identity.grouping],
-    [COL.CLUSTER,        d.identity.cluster],
-    [COL.PG,             d.identity.pg],
-    [COL.CLUSTER_CODE,   d.identity.clusterCode],
-    [COL.TYPE,           d.identity.nucleusType],
-  ] : [];
+  // cc/jyg/sc/devotionals are no longer Sheet columns at all (see COL.CC_ACT etc.'s
+  // "dead" comments) -- each now writes straight to cluster-notebook's shared
+  // updateActivitySummary mutation, one call per activity type.
+  const nucleusPatch = nucleusPatchFromFormData(d);
+  const nucleusWrite = Object.keys(nucleusPatch).length > 0 ? updateNucleus(nucleusName, nucleusPatch) : null;
+  await Promise.all([...activityUpdateWrites(nucleusName, d), nucleusWrite]);
+  const updatedFields = nucleusWrite ? await nucleusWrite : null;
 
-  const updates = [
-    ...identityPairs,
-    [COL.LOCALITY, d.locality], [COL.STAGE, d.stage], [COL.CONTACT, d.contact],
-    [COL.EMAIL, d.email], [COL.AUX_BOARD, d.auxBoard], [COL.MAKEUP, d.makeup],
-    [COL.TOTAL_POP, d.totalPop], [COL.TOTAL_HH, d.totalHH],
-    [COL.IND_NUM, d.indNum],
-    [COL.HH_NUM, d.hhNum],
-    [COL.CC_ACT, d.activities.ccs.act], [COL.CC_PART, d.activities.ccs.part], [COL.CC_FOF, d.activities.ccs.fof],
-    [COL.JYG_ACT, d.activities.jygs.act], [COL.JYG_PART, d.activities.jygs.part], [COL.JYG_FOF, d.activities.jygs.fof],
-    [COL.SC_ACT, d.activities.scs.act], [COL.SC_PART, d.activities.scs.part], [COL.SC_FOF, d.activities.scs.fof],
-    [COL.DEV_ACT, d.activities.devotionals.act], [COL.DEV_PART, d.activities.devotionals.part], [COL.DEV_FOF, d.activities.devotionals.fof],
-    [COL.PROTAGONISTS, d.protagonists], [COL.ACCOMPANIERS, d.accompaniers],
-    [COL.LEVEL, d.level], [COL.NOTES_PREVALENCE, d.notesPrevalence],
-    [COL.SUPPORTED, d.supported], [COL.NOTES_SUPPORTED, d.notesSupported],
-    [COL.PRESENCE, d.presence], [COL.NOTES_PRESENCE, d.notesPresence],
-    [COL.INVOLVED, d.involved], [COL.NOTES_INVOLVED, d.notesInvolved],
-    [COL.EFFORTS, d.efforts], [COL.NOTES_EFFORTS, d.notesEfforts],
-    [COL.GATHERINGS, d.gatherings], [COL.NOTES_GATHERINGS, d.notesGatherings],
-    [COL.NARRATIVE, d.narrative],
-  ].filter(([, value]) => value !== undefined)
-    .map(([col, value]) => ({
-      range: `${MASTER_TAB}!${colLetter(col as number)}${sheetRow}`,
-      values: [[(value ?? '') as string]],
-    }));
+  // Fresh post-write state for activities (in particular isOverridden) -- not
+  // derivable from what we sent: cluster-notebook recomputes it server-side
+  // (comparison against its own SRP-derived numbers).
+  const activities = d.activities
+    ? activitiesFromClusterNotebook(await getActivitySummaries(nucleusName))
+    : undefined;
 
-  await sheetsBatchUpdate(MASTER_SHEET_ID, updates);
-  return { success: true, savedBy: userEmail, savedAt: new Date().toISOString() };
+  // lastUpdated: confirmed with cluster-notebook 2026-10-04 that updateNucleus's own
+  // response already carries an accurate value (its audit row commits in the same
+  // transaction the mutation resolves against) -- reuse it when it's the only write
+  // this save made. updateActivitySummary's response has no lastUpdated at all (it
+  // returns ActivitySummary, not Nucleus), and even alongside a concurrent
+  // nucleus-patch write, that write's own response reflects only ITS OWN transaction,
+  // not an activity write that might settle a moment later -- so activities touched
+  // always means a fresh aggregate read instead. Also falls back to a fresh read if
+  // nothing was written at all (defensive -- the UI never calls this without a real
+  // change, so there'd be no write to reuse a value from).
+  const lastUpdated = (d.activities || !updatedFields)
+    ? (await getNucleusFields(nucleusName))?.lastUpdated ?? null
+    : updatedFields.lastUpdated;
+
+  return { success: true, activities, lastUpdated };
 }

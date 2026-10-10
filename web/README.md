@@ -29,6 +29,18 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
+## Local dev with cluster-notebook
+
+The devotional-gathering field is served by `cluster-notebook`, a separate service. Run it alongside this app:
+
+`cluster-notebook` must be checked out as a sibling of this repository (i.e. `neighborhood/` and `cluster-notebook/` share a parent directory). From inside your `cluster-notebook` checkout, run:
+
+```bash
+.venv/bin/uvicorn cluster_notebook.app:app --reload
+```
+
+It listens on `http://localhost:8000` by default (matches `CLUSTER_NOTEBOOK_URL` in `.env.local`). Requires a local Postgres instance per `cluster-notebook`'s own README/`.env`.
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
