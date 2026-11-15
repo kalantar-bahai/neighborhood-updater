@@ -23,6 +23,8 @@ export function clusterNotebookErrorResponse(e: unknown): NextResponse {
     return NextResponse.json({ error: "You don't have permission to make this change." }, { status: 403 });
   }
   const message = e instanceof Error ? e.message : 'Unexpected error contacting cluster-notebook';
-  console.error('cluster-notebook call failed:', message);
+  // Log the cause too: Node's fetch reports every connection problem as a bare
+  // "fetch failed", and only `cause` says which (ECONNREFUSED host:port, ENOTFOUND, ...).
+  console.error('cluster-notebook call failed:', message, e instanceof Error && e.cause ? e.cause : '');
   return NextResponse.json({ error: message }, { status: 502 });
 }
