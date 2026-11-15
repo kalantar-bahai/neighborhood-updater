@@ -22,13 +22,17 @@ export default function AppClient() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [creatingNew, setCreatingNew] = useState(false);
 
-  function loadInitialData() {
+  // openAfter: a nucleus to open once the fresh data (and its permissions) is in.
+  // Used after creating a nucleus -- the permissions map loaded at startup has no
+  // entry for it, so opening it straight away fell back to NO_ACCESS (read-only).
+  function loadInitialData(openAfter?: string) {
     fetch('/api/initial-data')
       .then(r => r.json())
       .then(data => {
         if (data.error) { setError(data.error); return; }
         setInitialData(data);
-        if (data.rows.length === 1) loadNucleus(data.rows[0].nucleus);
+        if (openAfter) loadNucleus(openAfter);
+        else if (data.rows.length === 1) loadNucleus(data.rows[0].nucleus);
       })
       .catch(() => setError('Failed to load. Please refresh.'));
   }
@@ -114,7 +118,7 @@ export default function AppClient() {
         <CreateNucleusModal
           clusterNames={initialData.clusterNames}
           onClose={() => setCreatingNew(false)}
-          onCreated={(name) => { setCreatingNew(false); loadNucleus(name); }}
+          onCreated={(name) => { setCreatingNew(false); loadInitialData(name); }}
         />
       )}
     </>
