@@ -31,7 +31,7 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Local dev with cluster-notebook
 
-The devotional-gathering field is served by `cluster-notebook`, a separate service. Run it alongside this app:
+All of the app's data (nuclei, locations, activities, people, roles and permissions) comes from `cluster-notebook`, a separate service. Run it alongside this app:
 
 `cluster-notebook` must be checked out as a sibling of this repository (i.e. `neighborhood/` and `cluster-notebook/` share a parent directory). From inside your `cluster-notebook` checkout, run:
 
@@ -39,7 +39,7 @@ The devotional-gathering field is served by `cluster-notebook`, a separate servi
 .venv/bin/uvicorn cluster_notebook.app:app --reload
 ```
 
-It listens on `http://localhost:8000` by default (matches `CLUSTER_NOTEBOOK_URL` in `.env.local`). Requires a local Postgres instance per `cluster-notebook`'s own README/`.env`.
+It listens on `http://localhost:8000` by default, which is also the app's default `CLUSTER_NOTEBOOK_URL`. If `.env.local` sets `CLUSTER_NOTEBOOK_URL` to a different port, start uvicorn with a matching `--port` (e.g. `--port 8123`). A mismatch shows up as "fetch failed" in the app and `ECONNREFUSED` in the dev-server log. Requires a local Postgres instance per `cluster-notebook`'s own README/`.env`.
 
 ## Deploy on Vercel
 
