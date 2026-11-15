@@ -86,6 +86,9 @@ They log in with TOTP from `srp-cache/.env` and write through a service account 
 - Vercel's GitHub integration auto-deploys `main` to production and builds preview deploys for branches and PRs. Merging to `main` therefore *is* the deploy. **Never push, merge or tag without explicit approval.**
 - Workflow: work on a feature branch, open a PR to `main` (CI runs vitest and tsc on Node 24), merge, then tag with `git tag vX.Y.Z` and run `gh release create`. Tags so far: v1.0.0, v1.1.0, v2.0.0 (the cluster-notebook migration).
 - The owner sets production env vars in Vercel. Production Clerk uses live keys and Google-only sign-in.
+- **Production URL is https://nucleus.kalantar.us.** The live Clerk instance only works on `*.kalantar.us`.
+  On `neighborhood-updater.vercel.app` (or any `*.vercel.app` preview) with live keys, the page is blank: cookies
+  are rejected for an invalid domain and `/__clerk/v1/environment` returns 400. Preview deploys need Clerk dev keys.
 - Coordinate releases that change the API with the cluster-notebook team, for example DB moves or Clerk issuer changes.
 
 ## Conventions the owner insists on
