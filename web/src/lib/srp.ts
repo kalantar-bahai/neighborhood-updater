@@ -44,7 +44,7 @@ export function srpBadge(
 ): { label: string; color: 'green' | 'amber' | 'red' | 'grey' } {
   switch (state) {
     case 'IN_SRP':
-      return { label: 'SRP', color: 'green' };
+      return { label: 'In SRP', color: 'green' };
     case 'PENDING':
       return { label: action === 'delete' ? 'Deleting in SRP' : 'SRP pending', color: 'amber' };
     case 'REFUSED':

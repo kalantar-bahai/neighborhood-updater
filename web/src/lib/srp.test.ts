@@ -58,7 +58,7 @@ describe('srpStateFor with locationType', () => {
 
 describe('srpBadge', () => {
   it('returns label and color', () => {
-    expect(srpBadge('IN_SRP')).toEqual({ label: 'SRP', color: 'green' });
+    expect(srpBadge('IN_SRP')).toEqual({ label: 'In SRP', color: 'green' });
     expect(srpBadge('PENDING')).toEqual({ label: 'SRP pending', color: 'amber' });
     expect(srpBadge('PENDING', 'delete')).toEqual({ label: 'Deleting in SRP', color: 'amber' });
     expect(srpBadge('REFUSED')).toEqual({ label: 'SRP refused', color: 'red' });
