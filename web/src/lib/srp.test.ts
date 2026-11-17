@@ -3,7 +3,7 @@ import type { LocalityOption, PermissionSet, SrpAction } from './clusterNotebook
 import { createPayload, effectivePermissions, findNameClash, nextNameAfterRename, reloadOutcome, srpBadge, srpDetailMessage, srpStateFor } from './srp';
 
 const act = (over: Partial<SrpAction> = {}): SrpAction => ({
-  action: 'create', status: 'pending', requestedAt: '2026-11-16T00:00:00Z', error: null, individuals: null, activities: null, ...over,
+  action: 'create', status: 'pending', requestedAt: '2026-11-16T00:00:00Z', error: null, individuals: null, activities: null, srpChanged: false, ...over,
 });
 
 describe('srpStateFor', () => {
@@ -174,5 +174,32 @@ describe('nextNameAfterRename', () => {
     expect(nextNameAfterRename('Alpha', ' Beta ', true)).toBe('Beta');
     expect(nextNameAfterRename('Alpha', 'Beta', false)).toBe('Alpha');
     expect(nextNameAfterRename('Alpha', '  ', true)).toBe('Alpha');
+  });
+});
+
+describe('failed actions that may have reached SRP (srpChanged)', () => {
+  const CHECK = 'SRP may already have this change. Ask an admin to check SRP before trying again.';
+  it('shows a failed create with srpChanged at the Cluster as FAILED with the check-SRP message', () => {
+    const a = act({ status: 'failed', srpChanged: true });
+    expect(srpStateFor('Neighborhood', false, a, 'CLUSTER')).toBe('FAILED');
+    expect(srpDetailMessage('FAILED', a)).toBe(CHECK);
+  });
+  it('shows a failed delete with srpChanged as FAILED even when inSrp is true', () => {
+    const a = act({ action: 'delete', status: 'failed', srpChanged: true });
+    expect(srpStateFor('Neighborhood', true, a)).toBe('FAILED');
+    expect(srpDetailMessage('FAILED', a)).toBe(CHECK);
+  });
+  it('shows a failed rename with srpChanged as FAILED even when inSrp is true', () => {
+    expect(srpStateFor('Neighborhood', true, act({ action: 'rename', status: 'failed', srpChanged: true }))).toBe('FAILED');
+  });
+  it('keeps a failed delete that never reached SRP as IN_SRP with the change message', () => {
+    const a = act({ action: 'delete', status: 'failed', srpChanged: false });
+    expect(srpStateFor('Neighborhood', true, a)).toBe('IN_SRP');
+    expect(srpDetailMessage('IN_SRP', a)).toBe('Something went wrong sending this change to SRP. Contact an admin.');
+  });
+  it('keeps a failed create that never reached SRP as FAILED with the create-failed message', () => {
+    const a = act({ status: 'failed', srpChanged: false });
+    expect(srpStateFor('Neighborhood', false, a, 'LOCALITY')).toBe('FAILED');
+    expect(srpDetailMessage('FAILED', a)).toBe('Something went wrong sending this to SRP. Contact an admin.');
   });
 });

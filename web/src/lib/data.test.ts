@@ -118,7 +118,7 @@ describe('getRowData', () => {
       cluster: { name: 'NC-1 Test', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null, location: null,
       inSrp: false,
-      srpAction: { action: 'create', status: 'refused', requestedAt: '2026-11-16T00:00:00Z', error: 'Name taken', individuals: null, activities: null },
+      srpAction: { action: 'create', status: 'refused', requestedAt: '2026-11-16T00:00:00Z', error: 'Name taken', individuals: null, activities: null, srpChanged: false },
     });
 
     const result = await getRowData('Alpha');

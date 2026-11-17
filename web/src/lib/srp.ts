@@ -13,6 +13,8 @@ export function srpStateFor(
   const type = nucleusType.trim().toLowerCase();
   if (type !== '' && type !== 'neighborhood') return null;
   if (srpAction) {
+    // Confirmed with cluster-notebook 2026-11-17: srpChanged=true on a failed action means SRP may already hold the change — show as check-SRP regardless of inSrp.
+    if (srpAction.status === 'failed' && srpAction.srpChanged === true) return 'FAILED';
     switch (srpAction.status) {
       case 'pending':
       case 'in_flight':
@@ -56,6 +58,7 @@ export function srpBadge(
 
 export function srpDetailMessage(state: SrpState, srpAction: SrpAction | null | undefined): string | null {
   if (!srpAction || (srpAction.status !== 'refused' && srpAction.status !== 'failed')) return null;
+  if (srpAction.status === 'failed' && srpAction.srpChanged === true) return CHECK_SRP;
   const refused = srpAction.status === 'refused';
   const error = srpAction.error ?? null;
   switch (srpAction.action) {
@@ -80,6 +83,7 @@ export function srpDetailMessage(state: SrpState, srpAction: SrpAction | null | 
   }
 }
 
+const CHECK_SRP = 'SRP may already have this change. Ask an admin to check SRP before trying again.';
 const CHANGE_FAILED = 'Something went wrong sending this change to SRP. Contact an admin.';
 
 export function findNameClash(name: string, locality: LocalityOption | undefined): string | null {

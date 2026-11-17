@@ -138,9 +138,12 @@ export interface SrpAction {
   error: string | null;
   individuals: number | null;
   activities: number | null;
+  // Confirmed with cluster-notebook 2026-11-17: true when SRP has applied the change, or may have.
+  // Meaningful when status is 'failed'.
+  srpChanged: boolean;
 }
 
-const SRP_SELECTION = 'inSrp srpAction { action status requestedAt error individuals activities }';
+const SRP_SELECTION = 'inSrp srpAction { action status requestedAt error individuals activities srpChanged }';
 
 export interface NucleusFields {
   // Optional: `inSrp` isn't on the cluster-notebook branch yet; `srpAction` is

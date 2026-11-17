@@ -66,7 +66,7 @@ Corrected with cluster-notebook on 2026-11-16:
 |---|---|---|
 | `PENDING` | `srpAction.status` in pending, in_flight | amber "SRP pending" (for a delete: "Deleting in SRP") |
 | `REFUSED` | a `create` with status refused, and the nucleus not at its Cluster | red "SRP refused"; the reason, with "rename or move it to try again" |
-| `FAILED` | a `create` with status failed, and the nucleus not at its Cluster | red "SRP error"; "Something went wrong sending this to SRP. Contact an admin." |
+| `FAILED` | a `create` with status failed, and the nucleus not at its Cluster; or any action with status failed and `srpChanged=true` (checked first, regardless of `inSrp` or Cluster) | red "SRP error"; "Something went wrong sending this to SRP. Contact an admin."; with `srpChanged=true`: "SRP may already have this change. Ask an admin to check SRP before trying again." |
 | `IN_SRP` | `inSrp`; a refused or failed rename or delete keeps this state | green "SRP"; for a refused or failed rename or delete, a warning that it didn't happen (with counts for a refused delete) |
 | `LOCAL_ONLY` | `!inSrp`, including a refused or failed create on a nucleus moved to its Cluster (giving up; our UI call) | grey "Not in SRP" |
 | none | nucleus type is not Neighborhood (Network, Population) | no badge (owner, 2026-11-16) |
