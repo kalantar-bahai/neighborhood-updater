@@ -28,6 +28,8 @@ const CODED_ERRORS: Record<string, { status: number; message: string | null }> =
   SRP_ALREADY_LINKED: { status: 409, message: 'This nucleus is already in SRP.' },
   SRP_NOT_AT_LOCALITY: { status: 400, message: 'Choose a locality for this nucleus before sending it to SRP.' },
   SRP_NOT_NEIGHBORHOOD: { status: 400, message: 'Only Neighborhood nuclei can be sent to SRP.' },
+  // Confirmed with cluster-notebook 2026-11-16: SRP_IS_NEIGHBOURHOOD (OU spelling) -- moving a nucleus that is in SRP; their message says to delete instead.
+  SRP_IS_NEIGHBOURHOOD: { status: 409, message: null },
   SRP_NOT_DEFAULT: { status: 409, message: "This nucleus shares its Setting with another, so it can't be changed in SRP from here." },
 };
 

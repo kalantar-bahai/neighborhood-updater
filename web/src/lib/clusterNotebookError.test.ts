@@ -32,6 +32,7 @@ describe('clusterNotebookErrorResponse', () => {
     ['SRP_ALREADY_LINKED', 409, 'This nucleus is already in SRP.'],
     ['SRP_NOT_AT_LOCALITY', 400, 'Choose a locality for this nucleus before sending it to SRP.'],
     ['SRP_NOT_NEIGHBORHOOD', 400, 'Only Neighborhood nuclei can be sent to SRP.'],
+    ['SRP_IS_NEIGHBOURHOOD', 409, 'upstream: 3 groups in use'],
     ['SRP_NOT_DEFAULT', 409, "This nucleus shares its Setting with another, so it can't be changed in SRP from here."],
     ['SOMETHING_NEW', 502, 'upstream: 3 groups in use'],
   ])('maps coded error %s to status %i with { error, code }', async (code, status, error) => {
