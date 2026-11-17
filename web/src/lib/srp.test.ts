@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LocalityOption, PermissionSet, SrpAction } from './clusterNotebook';
-import { createPayload, effectivePermissions, findNameClash, srpBadge, srpDetailMessage, srpStateFor } from './srp';
+import { createPayload, effectivePermissions, findNameClash, nextNameAfterRename, reloadOutcome, srpBadge, srpDetailMessage, srpStateFor } from './srp';
 
 const act = (over: Partial<SrpAction> = {}): SrpAction => ({
   action: 'create', status: 'pending', requestedAt: '2026-11-16T00:00:00Z', error: null, individuals: null, activities: null, ...over,
@@ -132,5 +132,22 @@ describe('createPayload', () => {
     const r = createPayload({ ...base, locality: '', createInSrp: true });
     expect(r).toEqual({ identity: { nucleus: 'Alpha', cluster: 'C' } });
     expect('srpLocality' in r.identity).toBe(false);
+  });
+});
+
+describe('reloadOutcome', () => {
+  it('maps statuses', () => {
+    expect(reloadOutcome(200)).toBe('show');
+    expect(reloadOutcome(404)).toBe('gone');
+    expect(reloadOutcome(502)).toBe('error');
+    expect(reloadOutcome(403)).toBe('error');
+  });
+});
+
+describe('nextNameAfterRename', () => {
+  it('returns the trimmed name only on success with a non-empty value', () => {
+    expect(nextNameAfterRename('Alpha', ' Beta ', true)).toBe('Beta');
+    expect(nextNameAfterRename('Alpha', 'Beta', false)).toBe('Alpha');
+    expect(nextNameAfterRename('Alpha', '  ', true)).toBe('Alpha');
   });
 });

@@ -108,3 +108,14 @@ export function createPayload(input: {
   }
   return { identity };
 }
+
+export function reloadOutcome(status: number): 'show' | 'gone' | 'error' {
+  if (status === 200) return 'show';
+  if (status === 404) return 'gone';
+  return 'error';
+}
+
+export function nextNameAfterRename(oldName: string, submitted: string, ok: boolean): string {
+  const trimmed = submitted.trim();
+  return ok && trimmed ? trimmed : oldName;
+}
