@@ -28,6 +28,19 @@ describe('srpStateFor', () => {
   });
 });
 
+describe('srpStateFor with locationType', () => {
+  it('shows a refused or failed create at the Cluster as LOCAL_ONLY', () => {
+    expect(srpStateFor('Neighborhood', false, act({ status: 'refused' }), 'CLUSTER')).toBe('LOCAL_ONLY');
+    expect(srpStateFor('Neighborhood', false, act({ status: 'failed' }), 'CLUSTER')).toBe('LOCAL_ONLY');
+  });
+  it('leaves other cases unchanged', () => {
+    expect(srpStateFor('Neighborhood', false, act({ status: 'refused' }), 'LOCALITY')).toBe('REFUSED');
+    expect(srpStateFor('Neighborhood', false, act({ action: 'delete', status: 'refused' }), 'CLUSTER')).toBe('REFUSED');
+    expect(srpStateFor('Neighborhood', false, act({ status: 'refused' }))).toBe('REFUSED');
+    expect(srpStateFor('Neighborhood', false, act({ status: 'pending' }), 'CLUSTER')).toBe('PENDING');
+  });
+});
+
 describe('srpBadge', () => {
   it('returns label and color', () => {
     expect(srpBadge('IN_SRP')).toEqual({ label: 'SRP', color: 'green' });

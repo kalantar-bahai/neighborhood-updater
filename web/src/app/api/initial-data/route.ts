@@ -52,7 +52,7 @@ export async function GET() {
         cluster:       cn.cluster.name,
         locality:      cn.locality ?? '',
         nucleusType:   cn.nucleusType ?? '',
-        srpState:      srpStateFor(cn.nucleusType ?? '', cn.inSrp, cn.srpAction ?? null),
+        srpState:      srpStateFor(cn.nucleusType ?? '', cn.inSrp, cn.srpAction ?? null, cn.location?.type),
         stage:         cn.stage ?? '',
         totalAct:  acts.reduce((s, a) => s + n(a.act),  0),
         totalPart: acts.reduce((s, a) => s + n(a.part), 0),

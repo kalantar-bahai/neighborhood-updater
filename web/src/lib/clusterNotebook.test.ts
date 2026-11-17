@@ -920,5 +920,6 @@ describe('SRP actions and coded errors', () => {
     const { query } = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(query).toContain('inSrp');
     expect(query).toContain('srpAction { action status');
+    expect(query).toContain('location { type }');
   });
 });

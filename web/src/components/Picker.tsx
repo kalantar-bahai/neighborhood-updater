@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { NucleusSummary } from '@/types';
 import StaggeredConcentricDiagram, { type AlignedLabel } from './StaggeredConcentricDiagram';
+import SrpBadge from './SrpBadge';
 
 interface Props {
   rows: NucleusSummary[];
@@ -218,6 +219,7 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {r.stage && <span className="stage-badge" style={typeBadgeStyle(r.nucleusType)}>{r.stage}</span>}
+          <SrpBadge state={r.srpState} />
         </div>
       </div>
     );

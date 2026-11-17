@@ -8,6 +8,8 @@ import type { PermissionSet } from '@/lib/access';
 import type { LastUpdated, LocalityOption } from '@/lib/clusterNotebook';
 import WorkerListModal from './WorkerListModal';
 import ManageAccessCard from './ManageAccessCard';
+import SrpBadge from './SrpBadge';
+import { srpDetailMessage } from '@/lib/srp';
 import StaggeredConcentricDiagram, { formatNum, type AlignedLabel } from './StaggeredConcentricDiagram';
 
 interface Props {
@@ -17,6 +19,8 @@ interface Props {
   showBack: boolean;
   onBack: () => void;
   onSaved: (savedBy: string, savedAt: string) => void;
+  // Re-fetches this nucleus (used after Push to SRP and by the PENDING "Refresh" link).
+  onReload: () => void;
   // Backs the Parent Nucleus picker's suggestions (2026-10-08) -- every nucleus
   // name the current user can read, same list the main picker uses. Filtered to
   // exclude this nucleus's own name before rendering.
@@ -546,7 +550,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 // StaggeredConcentricDiagram (9-ring) moved to its own file, 2026-10-08, so
 // Picker.tsx can also render a rollup version of it from its own popup.
 
-export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, allNucleusNames }: Props) {
+export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, allNucleusNames }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   // Baseline to diff a blur-triggered field's current value against, so clicking into
@@ -554,6 +558,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // successful save of that specific field -- see saveField/commitField/setAndSave.
   const committedRef = useRef<FormState>(rowToForm(row));
   const [saving, setSaving] = useState(false);
+  const [pushing, setPushing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ msg: string; type: 'idle' | 'success' | 'error' }>({ msg: '', type: 'idle' });
   // The most recent failed field save, so the status bar can offer a one-click Retry
   // instead of requiring the user to re-edit the field to re-trigger a blur.
@@ -823,6 +828,37 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
       ? `Last updated by ${lastUpdated.by} on ${new Date(lastUpdated.at).toLocaleString()}`
       : `Last updated on ${new Date(lastUpdated.at).toLocaleString()}`;
 
+  const srpState = detail.srp.state;
+  const srpMessage = srpState ? srpDetailMessage(srpState, detail.srp.action) : null;
+  const locationSetting = form.locationType === 'SETTING'
+    ? detail.locationOptions.flatMap(l => l.settings).find(st => st.name === form.locationName)
+    : undefined;
+  const canPushToSrp =
+    srpState === 'LOCAL_ONLY' &&
+    permissions.createableEntityTypes.includes('nucleus') &&
+    (form.locationType === 'LOCALITY' || (locationSetting !== undefined && locationSetting.srpLinked === false));
+
+  async function pushToSrp() {
+    setPushing(true);
+    try {
+      const res = await fetch('/api/nucleus/push-srp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: row.nucleus }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSaveStatus({ msg: body.error ?? 'Failed to push to SRP', type: 'error' });
+        return;
+      }
+      onReload();
+    } catch {
+      setSaveStatus({ msg: 'Failed to push to SRP', type: 'error' });
+    } finally {
+      setPushing(false);
+    }
+  }
+
   const locationWarning = locationWarningFor(form.locationName, detail.locationOptions, row.nucleus);
 
   return (
@@ -905,6 +941,22 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 </div>
               ) : (
                 <Field label="Location" value={form.locationName} readonly />
+              )}
+              {srpState && (
+                <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <SrpBadge state={srpState} action={detail.srp.action?.action} />
+                    {srpState === 'PENDING' && (
+                      <button type="button" onClick={onReload} style={{ background: 'none', border: 'none', padding: 0, color: '#3182ce', cursor: 'pointer', fontSize: 12, textDecoration: 'underline' }}>Refresh</button>
+                    )}
+                    {canPushToSrp && (
+                      <button type="button" disabled={pushing} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #3182ce', background: '#3182ce', color: 'white', fontSize: 13, cursor: pushing ? 'default' : 'pointer', opacity: pushing ? 0.6 : 1 }} onClick={pushToSrp}>
+                        {pushing ? 'Sending…' : 'Push to SRP'}
+                      </button>
+                    )}
+                  </div>
+                  {srpMessage && <div style={{ fontSize: 12, color: '#c53030' }}>{srpMessage}</div>}
+                </div>
               )}
               <Field label="Nucleus" value={form.nucleus} readonly />
               {/* Type is only ever freely settable at a CLUSTER or LOCALITY location --

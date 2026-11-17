@@ -205,7 +205,7 @@ export async function getRowData(nucleusName: string) {
     lastUpdated: nucleusFields?.lastUpdated ?? null,
     locationOptions,
     srp: {
-      state: srpStateFor(nucleusFields?.nucleusType ?? '', nucleusFields?.inSrp, nucleusFields?.srpAction ?? null),
+      state: srpStateFor(nucleusFields?.nucleusType ?? '', nucleusFields?.inSrp, nucleusFields?.srpAction ?? null, nucleusFields?.location?.type),
       action: nucleusFields?.srpAction ?? null,
     },
   };

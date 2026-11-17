@@ -87,6 +87,7 @@ export default function AppClient() {
         showBack={initialData.rows.length > 1}
         onBack={handleBack}
         onSaved={() => {}}
+        onReload={() => loadNucleus(selectedNucleus)}
         allNucleusNames={initialData.rows.map(r => r.nucleus)}
       />
     );

@@ -7,6 +7,7 @@ export function srpStateFor(
   nucleusType: string,
   inSrp: boolean | undefined,
   srpAction: SrpAction | null | undefined,
+  locationType?: string,
 ): SrpState | null {
   const type = nucleusType.trim().toLowerCase();
   if (type !== '' && type !== 'neighborhood') return null;
@@ -16,9 +17,13 @@ export function srpStateFor(
       case 'in_flight':
         return 'PENDING';
       case 'refused':
-        return 'REFUSED';
-      case 'failed':
-        return 'FAILED';
+      case 'failed': {
+        // Confirmed with cluster-notebook 2026-11-16: after moving a refused-create nucleus to its
+        // Cluster, srpAction stays {create, refused}; showing it as Not in SRP is our UI call.
+        // Moving to the Cluster is how a user gives up on SRP.
+        if (srpAction.action === 'create' && locationType === 'CLUSTER') return 'LOCAL_ONLY';
+        return srpAction.status === 'refused' ? 'REFUSED' : 'FAILED';
+      }
       default:
         return null;
     }

@@ -238,6 +238,8 @@ export interface NucleusSummary {
   cluster: ClusterFields;
   // Added 2026-09-14 for the same reason -- see NucleusFields.parentNucleus.
   parentNucleus: { name: string } | null;
+  // Only `type` is requested here; srpStateFor uses it to show a given-up (moved to Cluster) nucleus as local-only.
+  location?: { type: PlaceType } | null;
   // Added 2026-09-24 for real per-nucleus authorization -- fetched in the same
   // request as the rest of the list (cluster-notebook designed this as a field
   // specifically so a list of nuclei costs one request, not one per nucleus).
@@ -394,6 +396,7 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
         studyCircles { ${ACTIVITY_SUMMARY_SELECTION} }
         cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers }
         parentNucleus { name }
+        location { type }
         myPermissions { ${PERMISSION_SET_SELECTION} }
         population inConversation inCommunityActivities protagonists devotionalHosts
         inEducationalActivities educationalFacilitators helpingOthers accompanying
