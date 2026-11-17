@@ -118,6 +118,15 @@ We didn't ask for anything further here — this fully covers what we needed. Ou
 - **`SrpAction.srpChanged: Boolean!`** (confirmed 2026-11-17, live): true when SRP has applied the change, or may have. Meaningful when `status` is `failed`. `refused` means it did not happen in SRP; `failed` with false means it never reached SRP; `failed` with true means SRP may already hold the change (a failed create can exist in SRP though `inSrp` is false; a failed delete can be gone from SRP though `inSrp` is true). We show it as check-SRP.
 - **Giving up on SRP:** moving a refused-create nucleus to its Cluster applies the move without re-queueing. `srpAction` stays `{create, refused}`, and whether to show it is our UI call. We show such a nucleus as "Not in SRP" (grey), not refused.
 
+**Further changes, confirmed with cluster-notebook 2026-11-17** (fn-lifecycle; no field changes, no code change needed here):
+- **Names are unique among live nuclei only.** An archived nucleus keeps its name, and a new nucleus or a rename may reuse it. Every lookup by name skips archived entities, so a name held only by an archived nucleus resolves to null.
+- **`createNucleus` with `srpLocalityName` is all-or-nothing.** If the SRP request is refused at once (for example `SRP_NAME_CLASH`), the mutation fails and no nucleus is created. The "+ Add" dialog already shows that error and stays open. A late refusal from the worker still gives `{create, refused}`.
+- **Edits to SRP-mapped fields are queued whether or not the nucleus is in SRP.** Being in SRP only decides when they are sent; a later push sends the current values. Edits made while local do reach SRP once pushed.
+- **`pushNucleusToSrp`:** the nucleus type, when set, must be Neighborhood (`SRP_NOT_NEIGHBORHOOD`).
+- **`individuals` / `activities`** can also appear on a failed delete, not only a refused one. We show them only for a refused delete; a failed delete shows the generic or check-SRP message.
+- **`srpChanged` on a pending action** means the worker is finishing the local half itself. We show it as pending.
+- **A failed action's `error`** always starts with a prefix saying whether SRP already changed. We don't display `error` for failed actions.
+
 ## 5. Worker lists (named-list pattern)
 
 **Done, 2026-09-13.** Worker lists are now backed by your `Individual`/`RoleInNE` model end to end, not free-text strings.
