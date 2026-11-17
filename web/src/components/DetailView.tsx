@@ -8,6 +8,8 @@ import type { PermissionSet } from '@/lib/access';
 import type { LastUpdated, LocalityOption } from '@/lib/clusterNotebook';
 import WorkerListModal from './WorkerListModal';
 import ManageAccessCard from './ManageAccessCard';
+import SrpBadge from './SrpBadge';
+import { nextNameAfterRename, srpDetailMessage } from '@/lib/srp';
 import StaggeredConcentricDiagram, { formatNum, type AlignedLabel } from './StaggeredConcentricDiagram';
 
 interface Props {
@@ -17,6 +19,12 @@ interface Props {
   showBack: boolean;
   onBack: () => void;
   onSaved: (savedBy: string, savedAt: string) => void;
+  // Re-fetches this nucleus (used after Push to SRP and by the PENDING "Refresh" link).
+  onReload: () => void;
+  // Called after a successful rename with the new name, so the shell reloads under it.
+  onRenamed: (newName: string) => void;
+  // True when the user can create a nucleus in this nucleus's cluster (the capability lives on the Cluster).
+  canCreateInCluster: boolean;
   // Backs the Parent Nucleus picker's suggestions (2026-10-08) -- every nucleus
   // name the current user can read, same list the main picker uses. Filtered to
   // exclude this nucleus's own name before rendering.
@@ -546,7 +554,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 // StaggeredConcentricDiagram (9-ring) moved to its own file, 2026-10-08, so
 // Picker.tsx can also render a rollup version of it from its own popup.
 
-export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, allNucleusNames }: Props) {
+export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, onRenamed, canCreateInCluster, allNucleusNames }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   // Baseline to diff a blur-triggered field's current value against, so clicking into
@@ -554,6 +562,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // successful save of that specific field -- see saveField/commitField/setAndSave.
   const committedRef = useRef<FormState>(rowToForm(row));
   const [saving, setSaving] = useState(false);
+  const [pushing, setPushing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ msg: string; type: 'idle' | 'success' | 'error' }>({ msg: '', type: 'idle' });
   // The most recent failed field save, so the status bar can offer a one-click Retry
   // instead of requiring the user to re-edit the field to re-trigger a blur.
@@ -679,17 +688,41 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
 
   // Immediate-trigger fields: stage, nucleusType (admin dropdowns), presence, gatherings
   // (toggles) -- the change event itself is the complete, discrete action, no blur needed.
-  function setAndSave<K extends keyof FormState>(key: K, value: FormState[K], fragment: Record<string, unknown>, label: string) {
+  function setAndSave<K extends keyof FormState>(key: K, value: FormState[K], fragment: Record<string, unknown>, label: string, reloadAfter = false) {
     setForm(f => ({ ...f, [key]: value }));
     const attempt = async () => {
       const result = await saveField(fragment, label);
       if (result.ok) {
         committedRef.current = { ...committedRef.current, [key]: value };
+        // Moving changes SRP state, permissions and the Push gate; refresh them.
+        if (reloadAfter) onReload();
       } else {
         setRetry({ label, run: () => void attempt() });
       }
     };
     void attempt();
+  }
+
+  // Rename: sends ONLY the name (saveRowData re-reads by the old name, so it must never be
+  // bundled with other fields). On success the shell reloads under the new name, which remounts
+  // this view; on failure the field reverts and the error shows in the save-status bar.
+  const canRename = permissions.canChangeIdentity
+    && (detail.srp.state === 'LOCAL_ONLY' || detail.srp.state === 'REFUSED');
+  async function commitName() {
+    const value = form.nucleus.trim();
+    if (saving && value !== row.nucleus) {
+      set('nucleus', row.nucleus);
+      setSaveStatus({ msg: 'Wait for the current save to finish, then rename.', type: 'error' });
+      return;
+    }
+    if (value === row.nucleus) {
+      if (form.nucleus !== row.nucleus) set('nucleus', row.nucleus);
+      return;
+    }
+    if (!value) { set('nucleus', row.nucleus); return; }
+    const result = await saveField({ identity: { name: value } }, 'Nucleus');
+    if (result.ok) onRenamed(nextNameAfterRename(row.nucleus, value, true));
+    else set('nucleus', row.nucleus);
   }
 
   // Parent Nucleus: blur/Enter-triggered like commitField, but (like nucleusType/
@@ -823,6 +856,37 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
       ? `Last updated by ${lastUpdated.by} on ${new Date(lastUpdated.at).toLocaleString()}`
       : `Last updated on ${new Date(lastUpdated.at).toLocaleString()}`;
 
+  const srpState = detail.srp.state;
+  const srpMessage = srpState ? srpDetailMessage(srpState, detail.srp.action) : null;
+  const locationSetting = row.locationType === 'SETTING'
+    ? detail.locationOptions.flatMap(l => l.settings).find(st => st.name === row.locationName)
+    : undefined;
+  const canPushToSrp =
+    srpState === 'LOCAL_ONLY' &&
+    canCreateInCluster &&
+    (row.locationType === 'LOCALITY' || (locationSetting !== undefined && locationSetting.srpLinked === false));
+
+  async function pushToSrp() {
+    setPushing(true);
+    try {
+      const res = await fetch('/api/nucleus/push-srp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: row.nucleus }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSaveStatus({ msg: body.error ?? 'Failed to push to SRP', type: 'error' });
+        return;
+      }
+      onReload();
+    } catch {
+      setSaveStatus({ msg: 'Failed to push to SRP', type: 'error' });
+    } finally {
+      setPushing(false);
+    }
+  }
+
   const locationWarning = locationWarningFor(form.locationName, detail.locationOptions, row.nucleus);
 
   return (
@@ -880,17 +944,15 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   is the only kind of choice. The tree (detail.locationOptions) is
                   already scoped to this nucleus's own cluster and to what this
                   caller can read -- confirmed with cluster-notebook directly.
-                  Nucleus (the name itself) is read-only: cluster-notebook's own
-                  name is now the canonical identifier (2026-09-13, the user
-                  directly) and cluster-notebook has no rename mutation — an edit
-                  here would silently revert on next load. Set once, at creation
-                  time, via CreateNucleusModal, 2026-09-14. */}
+                  Nucleus (the name itself) is cluster-notebook's canonical identifier.
+                  Confirmed with cluster-notebook 2026-11-16: updateNucleus { name } renames;
+                  editable here only while not in SRP (in-SRP rename is issue #42). */}
               {permissions.canChangeIdentity ? (
                 <div className="field">
                   <label>Location</label>
                   <select
                     value={form.locationName}
-                    onChange={e => setAndSave('locationName', e.target.value, { identity: { location: e.target.value } }, 'Location')}
+                    onChange={e => setAndSave('locationName', e.target.value, { identity: { location: e.target.value } }, 'Location', true)}
                   >
                     <option value={form.cluster}>— This cluster ({form.cluster}) —</option>
                     {detail.locationOptions.map(locality => (
@@ -906,7 +968,29 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
               ) : (
                 <Field label="Location" value={form.locationName} readonly />
               )}
-              <Field label="Nucleus" value={form.nucleus} readonly />
+              {srpState && (
+                <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <SrpBadge state={srpState} action={detail.srp.action?.action} />
+                    {srpState === 'PENDING' && (
+                      <button type="button" onClick={onReload} style={{ background: 'none', border: 'none', padding: 0, color: '#3182ce', cursor: 'pointer', fontSize: 12, textDecoration: 'underline' }}>Refresh</button>
+                    )}
+                    {canPushToSrp && (
+                      <button type="button" disabled={pushing} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #3182ce', background: '#3182ce', color: 'white', fontSize: 13, cursor: pushing ? 'default' : 'pointer', opacity: pushing ? 0.6 : 1 }} onClick={pushToSrp}>
+                        {pushing ? 'Sending…' : 'Push to SRP'}
+                      </button>
+                    )}
+                  </div>
+                  {srpMessage && <div style={{ fontSize: 12, color: '#c53030' }}>{srpMessage}</div>}
+                </div>
+              )}
+              <Field
+                label="Nucleus"
+                value={form.nucleus}
+                readonly={!canRename}
+                onChange={canRename ? v => set('nucleus', v) : undefined}
+                onBlur={canRename ? commitName : undefined}
+              />
               {/* Type is only ever freely settable at a CLUSTER or LOCALITY location --
                   at a SETTING, cluster-notebook forces it to "Neighborhood" and now
                   raises a real error if you try to set anything else (previously a
@@ -1294,7 +1378,9 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                         const res = await fetch(`/api/nucleus?name=${encodeURIComponent(row.nucleus)}`, { method: 'DELETE' });
                         const data = await res.json();
                         if (!res.ok) throw new Error(data.error || 'Delete failed');
-                        onBack();
+                        // Queued in SRP: the nucleus stays, shown as "Deleting in SRP".
+                        // Otherwise it is gone, and the permission-less GET would 403, so go back.
+                        if (data.queued) onReload(); else onBack();
                       } catch (e: unknown) {
                         setDeleteError(e instanceof Error ? e.message : 'Delete failed');
                       } finally {

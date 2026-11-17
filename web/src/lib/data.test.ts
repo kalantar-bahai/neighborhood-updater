@@ -3,7 +3,8 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { facilitatorsFromClusterNotebook, facilitatorsCountFromClusterNotebook } from './data';
 import type { ActivitySummary } from './clusterNotebook';
 
-vi.mock('./clusterNotebook', () => ({
+vi.mock('./clusterNotebook', async (importOriginal) => ({
+  ClusterNotebookCodedError: (await importOriginal<typeof import('./clusterNotebook')>()).ClusterNotebookCodedError,
   getActivitySummaries: vi.fn(),
   updateActivitySummary: vi.fn(),
   getNucleusFields: vi.fn(),
@@ -17,7 +18,7 @@ vi.mock('./clusterNotebook', () => ({
 
 import {
   getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus, getNucleusWorkers, createNucleus, deleteNucleus,
-  getLocationOptions,
+  getLocationOptions, ClusterNotebookCodedError,
 } from './clusterNotebook';
 import { getRowData, saveRowData, createRowData, deleteRowData } from './data';
 
@@ -104,6 +105,26 @@ describe('getRowData', () => {
     const result = await getRowData('Alpha');
 
     expect(result?.row.nucleus).toBe('Alpha');
+  });
+
+  test('returns srp state and action', async () => {
+    mockGetNucleusFields.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: 'Neighborhood', parentNucleus: null,
+      cluster: { name: 'NC-1 Test', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null, location: null,
+      inSrp: false,
+      srpAction: { action: 'create', status: 'refused', requestedAt: '2026-11-16T00:00:00Z', error: 'Name taken', individuals: null, activities: null, srpChanged: false },
+    });
+
+    const result = await getRowData('Alpha');
+
+    expect(result?.srp.state).toBe('REFUSED');
+    expect(result?.srp.action?.error).toBe('Name taken');
   });
 
   test('propagates a cluster-notebook read failure', async () => {
@@ -446,6 +467,21 @@ describe('saveRowData', () => {
       devotionals: { act: '5', part: '40', fof: '12' },
     },
   };
+
+  test('maps identity.name to patch.name, trimmed', async () => {
+    mockUpdateNucleus.mockResolvedValue(null as never);
+    mockUpdateActivitySummary.mockResolvedValue(null);
+
+    await saveRowData('Alpha', { identity: { name: ' Beta ' } });
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { name: 'Beta' });
+  });
+
+  test('ignores a blank identity.name', async () => {
+    await saveRowData('Alpha', { identity: { name: '  ' } });
+
+    expect(mockUpdateNucleus).not.toHaveBeenCalled();
+  });
 
   test('writes all four activity rollups via cluster-notebook', async () => {
     mockUpdateActivitySummary.mockResolvedValue(null);
@@ -1033,7 +1069,20 @@ describe('createRowData', () => {
 
     await createRowData(baseCreateFormData);
 
-    expect(mockCreateNucleus).toHaveBeenCalledWith('Riverside', 'NC-215 Triangle');
+    expect(mockCreateNucleus).toHaveBeenCalledWith('Riverside', 'NC-215 Triangle', undefined);
+  });
+
+  test('with srpLocality passes it to createNucleus and sends no locationName', async () => {
+    mockCreateNucleus.mockResolvedValue({
+      lastUpdated: null,
+    } as never);
+
+    await createRowData({
+      identity: { nucleus: 'Alpha', cluster: 'NC-1 Test', srpLocality: 'Elm Locality', location: 'Ignored' },
+    });
+
+    expect(mockCreateNucleus).toHaveBeenCalledWith('Alpha', 'NC-1 Test', 'Elm Locality');
+    expect(mockUpdateNucleus).not.toHaveBeenCalled();
   });
 
   test('throws when nucleus name is missing', async () => {
@@ -1048,18 +1097,11 @@ describe('createRowData', () => {
     expect(mockCreateNucleus).not.toHaveBeenCalled();
   });
 
-  test('maps a duplicate-name error from cluster-notebook to the same CONFLICT code', async () => {
-    mockCreateNucleus.mockRejectedValue(new Error("cluster-notebook GraphQL error: A nucleus named 'Riverside' already exists."));
+  test('lets a NAME_TAKEN coded error from cluster-notebook propagate', async () => {
+    const err = new ClusterNotebookCodedError("cluster-notebook GraphQL error: A nucleus named 'Riverside' is taken.", 'NAME_TAKEN', "A nucleus named 'Riverside' is taken.");
+    mockCreateNucleus.mockRejectedValue(err);
 
-    let caught: unknown;
-    try {
-      await createRowData(baseCreateFormData);
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(Error);
-    expect((caught as Error).message).toContain('already exists');
-    expect((caught as { code?: string }).code).toBe('CONFLICT');
+    await expect(createRowData(baseCreateFormData)).rejects.toBe(err);
   });
 
   test('throws a BAD_CLUSTER-coded error when the cluster name is not found', async () => {

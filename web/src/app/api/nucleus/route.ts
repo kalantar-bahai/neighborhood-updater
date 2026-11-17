@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getNucleusPermissions } from '@/lib/access';
 import { getRowData, saveRowData, createRowData, deleteRowData, CodedError } from '@/lib/data';
+import { getNucleusFields } from '@/lib/clusterNotebook';
 import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
 
 export async function GET(req: NextRequest) {
@@ -73,7 +74,10 @@ export async function DELETE(req: NextRequest) {
   try {
     const deleted = await deleteRowData(name);
     if (!deleted) return NextResponse.json({ error: `Not found: ${name}` }, { status: 404 });
-    return NextResponse.json({ success: true });
+    // Confirmed with cluster-notebook 2026-11-16: deleteNucleus on a nucleus in SRP is queued
+    // and returns true; the nucleus stays visible until SRP accepts.
+    const stillThere = await getNucleusFields(name);
+    return NextResponse.json({ success: true, queued: stillThere !== null });
   } catch (e: unknown) {
     return clusterNotebookErrorResponse(e);
   }
@@ -99,9 +103,6 @@ export async function PUT(req: NextRequest) {
     const result = await createRowData(formData);
     return NextResponse.json(result);
   } catch (e: unknown) {
-    if (e instanceof CodedError && e.code === 'CONFLICT') {
-      return NextResponse.json({ error: e.message }, { status: 409 });
-    }
     if (e instanceof CodedError && e.code === 'BAD_CLUSTER') {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }

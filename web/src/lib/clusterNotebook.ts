@@ -23,7 +23,7 @@ export interface ActivitySummary {
 export type ActivityType = 'DEVOTIONAL_GATHERING' | 'CHILDRENS_CLASS' | 'JUNIOR_YOUTH_GROUP' | 'STUDY_CIRCLE';
 
 // Confirmed live with cluster-notebook 2026-09-24. canChangeIdentity gates a
-// Nucleus's Type/Stage (and any future rename/relocate) specifically -- a
+// Nucleus's Type/Stage (and rename/relocate -- `name` is now patchable, see updateNucleus) specifically -- a
 // stricter tier than plain canWrite. assignableRoles lists which RECOGNIZED
 // roles this caller may grant here; informal roles (protagonist/promoter) are
 // always assignable whenever canAssignRoles is true, regardless of this list.
@@ -53,6 +53,16 @@ interface GraphQLResponse<T> {
 // should never rely on it, only on this error type).
 export class ClusterNotebookForbiddenError extends Error {}
 
+// Any other extensions.code (e.g. SRP_NAME_CLASH) -- callers branch on `.code`,
+// never on the message text.
+export class ClusterNotebookCodedError extends Error {
+  // `message` carries the "cluster-notebook GraphQL error: " prefix for logs;
+  // `upstreamMessage` is the raw first-error text, safe to show to users.
+  constructor(message: string, public code: string, public upstreamMessage: string) {
+    super(message);
+  }
+}
+
 async function request<T>(query: string, variables: Record<string, unknown>): Promise<T> {
   const { getToken } = await auth();
   const token = await getToken();
@@ -78,7 +88,12 @@ async function request<T>(query: string, variables: Record<string, unknown>): Pr
     if (json.errors.some(e => e.extensions?.code === 'FORBIDDEN')) {
       throw new ClusterNotebookForbiddenError('cluster-notebook denied this request (FORBIDDEN)');
     }
-    throw new Error(`cluster-notebook GraphQL error: ${json.errors.map(e => e.message).join('; ')}`);
+    const message = `cluster-notebook GraphQL error: ${json.errors.map(e => e.message).join('; ')}`;
+    const code = json.errors[0]?.extensions?.code;
+    if (typeof code === 'string' && code) {
+      throw new ClusterNotebookCodedError(message, code, json.errors[0].message);
+    }
+    throw new Error(message);
   }
   if (json.data === undefined) {
     throw new Error('cluster-notebook response contained neither data nor errors');
@@ -113,7 +128,28 @@ export interface LastUpdated {
 // Confirmed with cluster-notebook directly, 2026-10-08.
 export type PlaceType = 'CLUSTER' | 'LOCALITY' | 'SETTING';
 
+// Confirmed with cluster-notebook 2026-11-16: srpAction is the latest SRP
+// create/rename/delete request for a nucleus (null when none). `status` is a
+// plain string so values we don't know yet survive.
+export interface SrpAction {
+  action: 'create' | 'rename' | 'delete';
+  status: string;
+  requestedAt: string;
+  error: string | null;
+  individuals: number | null;
+  activities: number | null;
+  // Confirmed with cluster-notebook 2026-11-17: true when SRP has applied the change, or may have.
+  // Meaningful when status is 'failed'.
+  srpChanged: boolean;
+}
+
+const SRP_SELECTION = 'inSrp srpAction { action status requestedAt error individuals activities srpChanged }';
+
 export interface NucleusFields {
+  // Optional: `inSrp` isn't on the cluster-notebook branch yet; `srpAction` is
+  // optional here only so existing NucleusFields fixtures keep compiling.
+  inSrp?: boolean;
+  srpAction?: SrpAction | null;
   stage: string | null;
   locality: string | null;
   populationMakeup: string | null;
@@ -191,6 +227,8 @@ export interface NucleusFields {
 // request them, so keep this decoupled from NucleusFields' full shape.
 export interface NucleusSummary {
   name: string;
+  inSrp?: boolean;
+  srpAction: SrpAction | null;
   stage: string | null;
   locality: string | null;
   populationMakeup: string | null;
@@ -205,6 +243,8 @@ export interface NucleusSummary {
   cluster: ClusterFields;
   // Added 2026-09-14 for the same reason -- see NucleusFields.parentNucleus.
   parentNucleus: { name: string } | null;
+  // Only `type` is requested here; srpStateFor uses it to show a given-up (moved to Cluster) nucleus as local-only.
+  location?: { type: PlaceType } | null;
   // Added 2026-09-24 for real per-nucleus authorization -- fetched in the same
   // request as the rest of the list (cluster-notebook designed this as a field
   // specifically so a list of nuclei costs one request, not one per nucleus).
@@ -301,16 +341,36 @@ export async function getLocationOptions(clusterName: string): Promise<LocalityO
 // real GraphQL error for a duplicate name (global uniqueness, enforced at the DB
 // level on cluster-notebook's side, 2026-09-14) -- distinguishable from the null
 // case so callers can tell "bad cluster" from "name taken".
-export async function createNucleus(name: string, clusterName: string): Promise<NucleusFields | null> {
+// Confirmed with cluster-notebook 2026-11-16: the optional srpLocalityName asks
+// cluster-notebook to also create the nucleus in SRP under that locality; SRP
+// failures surface as coded errors (e.g. SRP_NAME_CLASH, see
+// ClusterNotebookCodedError). Sent only when given.
+export async function createNucleus(name: string, clusterName: string, srpLocalityName?: string): Promise<NucleusFields | null> {
   const mutation = `
-    mutation CreateNucleus($name: String!, $clusterName: String!) {
-      createNucleus(name: $name, clusterName: $clusterName) {
+    mutation CreateNucleus($name: String!, $clusterName: String!, $srpLocalityName: String) {
+      createNucleus(name: $name, clusterName: $clusterName, srpLocalityName: $srpLocalityName) {
         ${NUCLEUS_FIELDS_SELECTION}
       }
     }
   `;
-  const data = await request<{ createNucleus: NucleusFields | null }>(mutation, { name, clusterName });
+  const variables: Record<string, unknown> = { name, clusterName };
+  if (srpLocalityName !== undefined) variables.srpLocalityName = srpLocalityName;
+  const data = await request<{ createNucleus: NucleusFields | null }>(mutation, variables);
   return data.createNucleus;
+}
+
+// Confirmed with cluster-notebook 2026-11-16: pushes an existing nucleus to SRP.
+// Returns the refreshed fields (srpAction reflects the new request).
+export async function pushNucleusToSrp(name: string): Promise<NucleusFields | null> {
+  const mutation = `
+    mutation PushNucleusToSrp($name: String!) {
+      pushNucleusToSrp(name: $name) {
+        ${NUCLEUS_FIELDS_SELECTION}
+      }
+    }
+  `;
+  const data = await request<{ pushNucleusToSrp: NucleusFields | null }>(mutation, { name });
+  return data.pushNucleusToSrp;
 }
 
 // Soft delete on cluster-notebook's side (2026-09-14) -- the Nucleus row persists
@@ -341,9 +401,11 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
         studyCircles { ${ACTIVITY_SUMMARY_SELECTION} }
         cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers }
         parentNucleus { name }
+        location { type }
         myPermissions { ${PERMISSION_SET_SELECTION} }
         population inConversation inCommunityActivities protagonists devotionalHosts
         inEducationalActivities educationalFacilitators helpingOthers accompanying
+        ${SRP_SELECTION}
       }
     }
   `;
@@ -355,7 +417,7 @@ const NUCLEUS_FIELDS_SELECTION = 'stage locality populationMakeup population hou
   + 'inConversation inCommunityActivities protagonists devotionalHosts inEducationalActivities educationalFacilitators helpingOthers accompanying '
   + 'hasSocialAction socialActionDescription hasCommunityGatherings communityGatheringDescription narrative nucleusType '
   + 'cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers } parentNucleus { name } lastUpdated { at by } '
-  + 'location { name type }';
+  + 'location { name type } ' + SRP_SELECTION;
 
 export async function getNucleusFields(nucleusName: string): Promise<NucleusFields | null> {
   const query = `
@@ -373,6 +435,9 @@ export async function updateNucleus(
   // coming back: it's a read-only derived value (walked up from `locationName`
   // below), not a hand-entered field.
   patch: {
+    // Confirmed with cluster-notebook 2026-11-16: rename via the patch (gated by
+    // canChangeIdentity; for SRP-linked nuclei it queues an SRP rename action).
+    name?: string;
     stage?: string; populationMakeup?: string;
     population?: number | null; households?: number | null;
     connectedPopulation?: number | null; connectedHouseholds?: number | null;

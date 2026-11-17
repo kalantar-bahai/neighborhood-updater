@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { InitialData, NucleusDetail } from '@/types';
 import type { PermissionSet } from '@/lib/access';
+import { effectivePermissions, reloadOutcome } from '@/lib/srp';
 import Picker from './Picker';
 import DetailView from './DetailView';
 import CreateNucleusModal from './CreateNucleusModal';
@@ -19,6 +20,8 @@ export default function AppClient() {
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<NucleusDetail | null>(null);
   const [selectedNucleus, setSelectedNucleus] = useState<string | null>(null);
+  // Bumped on every successful (re)load so DetailView remounts with fresh form state.
+  const [detailVersion, setDetailVersion] = useState(0);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [creatingNew, setCreatingNew] = useState(false);
 
@@ -48,9 +51,24 @@ export default function AppClient() {
       .then(data => {
         if (data.error) { setError(data.error); return; }
         setDetail(data);
+        setDetailVersion(v => v + 1);
       })
       .catch(() => setError('Failed to load nucleus.'))
       .finally(() => setLoadingDetail(false));
+  }
+
+  // In-place reload (Refresh, Push to SRP, Delete): no full-page "Loading..." flash.
+  function reloadNucleus(name: string) {
+    fetch(`/api/nucleus?name=${encodeURIComponent(name)}`)
+      .then(async r => {
+        const outcome = reloadOutcome(r.status);
+        if (outcome === 'gone') { handleBack(); return; }
+        const data = await r.json();
+        if (outcome === 'error' || data.error) { setError(data.error || 'Failed to load nucleus.'); return; }
+        setDetail(data);
+        setDetailVersion(v => v + 1);
+      })
+      .catch(() => setError('Failed to load nucleus.'));
   }
 
   function handleBack() {
@@ -78,15 +96,20 @@ export default function AppClient() {
   }
 
   if (detail && selectedNucleus) {
-    const permissions = initialData.access.permissions[norm(selectedNucleus)] ?? NO_ACCESS;
+    const perms = initialData.access.permissions[norm(selectedNucleus)] ?? NO_ACCESS;
+    const permissions = effectivePermissions(perms, detail.srp.state, detail.srp.action?.action);
     return (
       <DetailView
+        key={`${selectedNucleus}:${detailVersion}`}
         detail={detail}
         permissions={permissions}
         email={initialData.email}
         showBack={initialData.rows.length > 1}
         onBack={handleBack}
         onSaved={() => {}}
+        onReload={() => reloadNucleus(selectedNucleus)}
+        onRenamed={(newName) => { setDetail(null); setSelectedNucleus(newName); setLoadingDetail(true); loadInitialData(newName); }}
+        canCreateInCluster={initialData.clusterNames.includes(detail.row.cluster)}
         allNucleusNames={initialData.rows.map(r => r.nucleus)}
       />
     );

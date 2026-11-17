@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { srpStateFor } from '@/lib/srp';
 import { auth } from '@clerk/nextjs/server';
 import { getCurrentUserEmail } from '@/lib/clerkUser';
 import { activitiesFromClusterNotebook } from '@/lib/data';
@@ -51,6 +52,8 @@ export async function GET() {
         cluster:       cn.cluster.name,
         locality:      cn.locality ?? '',
         nucleusType:   cn.nucleusType ?? '',
+        srpAction:     cn.srpAction?.action ?? null,
+        srpState:      srpStateFor(cn.nucleusType ?? '', cn.inSrp, cn.srpAction ?? null, cn.location?.type),
         stage:         cn.stage ?? '',
         totalAct:  acts.reduce((s, a) => s + n(a.act),  0),
         totalPart: acts.reduce((s, a) => s + n(a.part), 0),

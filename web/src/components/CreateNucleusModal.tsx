@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import type { LocalityOption } from '@/lib/clusterNotebook';
+import { createPayload, findNameClash } from '@/lib/srp';
 
 interface Props {
   clusterNames: string[];
@@ -8,7 +10,7 @@ interface Props {
   onCreated: (name: string) => void;
 }
 
-// Only the two fields createNucleus actually needs (identity: name + cluster).
+// Only what createNucleus needs: name, cluster, an optional locality and Create in SRP.
 // Everything else -- population, activities, narrative, worker roles like
 // Contact/Promoting/Helping/Accompanying/ABm Assistant -- can't be set until the
 // nucleus exists in cluster-notebook anyway (those all query/mutate by nucleus
@@ -18,10 +20,43 @@ interface Props {
 export default function CreateNucleusModal({ clusterNames, onClose, onCreated }: Props) {
   const [nucleus, setNucleus] = useState('');
   const [cluster, setCluster] = useState('');
+  const [locality, setLocality] = useState('');
+  const [localities, setLocalities] = useState<LocalityOption[]>([]);
+  const [loadingLocalities, setLoadingLocalities] = useState(false);
+  const [localityError, setLocalityError] = useState('');
+  const [createInSrp, setCreateInSrp] = useState(false);
+  const latestCluster = useRef('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
-  const canCreate = nucleus.trim() !== '' && cluster.trim() !== '' && !creating;
+  const selectedLocality = localities.find(l => l.name === locality);
+  const clash = findNameClash(nucleus, selectedLocality);
+  const canCreate = nucleus.trim() !== '' && cluster.trim() !== '' && !creating && !(createInSrp && clash);
+
+  async function handleClusterChange(next: string) {
+    setCluster(next);
+    setLocality('');
+    setLocalities([]);
+    setCreateInSrp(false);
+    setLocalityError('');
+    latestCluster.current = next;
+    if (!next) {
+      setLoadingLocalities(false);
+      return;
+    }
+    setLoadingLocalities(true);
+    try {
+      const res = await fetch(`/api/locations?cluster=${encodeURIComponent(next)}`);
+      const data = await res.json();
+      if (latestCluster.current !== next) return; // cluster changed again; stale response
+      if (!res.ok) throw new Error(data.error || 'Could not load localities');
+      setLocalities(data.localities ?? []);
+    } catch (e: unknown) {
+      if (latestCluster.current !== next) return;
+      setLocalityError(e instanceof Error ? e.message : String(e));
+    }
+    setLoadingLocalities(false);
+  }
 
   async function handleCreate() {
     if (!canCreate) return;
@@ -31,7 +66,7 @@ export default function CreateNucleusModal({ clusterNames, onClose, onCreated }:
       const res = await fetch('/api/nucleus', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formData: { identity: { nucleus: nucleus.trim(), cluster } } }),
+        body: JSON.stringify({ formData: createPayload({ name: nucleus, cluster, locality, createInSrp }) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Create failed');
@@ -69,16 +104,55 @@ export default function CreateNucleusModal({ clusterNames, onClose, onCreated }:
           />
         </div>
 
-        <div className="field" style={{ marginBottom: 16 }}>
+        {locality && clash && (
+          <div style={{ color: '#b7791f', fontSize: 13, marginBottom: 12 }}>
+            ⚠ &quot;{clash}&quot; already exists in {locality}
+          </div>
+        )}
+
+        <div className="field" style={{ marginBottom: 12 }}>
           <label>Cluster</label>
           <select
             value={cluster}
-            onChange={e => setCluster(e.target.value)}
+            onChange={e => void handleClusterChange(e.target.value)}
             style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 14, boxSizing: 'border-box', background: 'white' }}
           >
             <option value="">Select a cluster…</option>
             {clusterNames.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
+        </div>
+
+        <div className="field" style={{ marginBottom: 12 }}>
+          <label>Locality</label>
+          <select
+            value={locality}
+            disabled={loadingLocalities || !cluster}
+            onChange={e => { setLocality(e.target.value); if (!e.target.value) setCreateInSrp(false); }}
+            style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 14, boxSizing: 'border-box', background: 'white' }}
+          >
+            {loadingLocalities ? (
+              <option value="">(loading…)</option>
+            ) : (
+              <>
+                <option value="">(none)</option>
+                {localities.map(l => <option key={l.name} value={l.name}>{l.name}</option>)}
+              </>
+            )}
+          </select>
+          {localityError && <div style={{ color: '#e53e3e', fontSize: 13, marginTop: 4 }}>{localityError}</div>}
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: locality ? '#2d3748' : '#a0aec0' }}>
+            <input
+              type="checkbox"
+              checked={createInSrp}
+              disabled={!locality}
+              onChange={e => setCreateInSrp(e.target.checked)}
+            />
+            Create in SRP
+          </label>
+          {!locality && <div style={{ fontSize: 12, color: '#718096', marginTop: 2 }}>Choose a locality to create this in SRP</div>}
         </div>
 
         {error && <div style={{ color: '#e53e3e', fontSize: 13, marginBottom: 12 }}>{error}</div>}
