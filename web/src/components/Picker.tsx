@@ -219,7 +219,7 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {r.stage && <span className="stage-badge" style={typeBadgeStyle(r.nucleusType)}>{r.stage}</span>}
-          <SrpBadge state={r.srpState} />
+          <SrpBadge state={r.srpState} action={r.srpAction ?? undefined} />
         </div>
       </div>
     );

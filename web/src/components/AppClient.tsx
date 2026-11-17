@@ -108,7 +108,8 @@ export default function AppClient() {
         onBack={handleBack}
         onSaved={() => {}}
         onReload={() => reloadNucleus(selectedNucleus)}
-        onRenamed={(newName) => loadInitialData(newName)}
+        onRenamed={(newName) => { setDetail(null); setSelectedNucleus(newName); setLoadingDetail(true); loadInitialData(newName); }}
+        canCreateInCluster={initialData.clusterNames.includes(detail.row.cluster)}
         allNucleusNames={initialData.rows.map(r => r.nucleus)}
       />
     );

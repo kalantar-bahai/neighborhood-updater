@@ -124,7 +124,9 @@ export function createPayload(input: {
 
 export function reloadOutcome(status: number): 'show' | 'gone' | 'error' {
   if (status === 200) return 'show';
-  if (status === 404) return 'gone';
+  // A nucleus that becomes unreadable during an in-place reload is gone. GET /api/nucleus
+  // checks permissions before existence, so an archived (SRP-deleted) nucleus answers 403, not 404.
+  if (status === 404 || status === 403) return 'gone';
   return 'error';
 }
 

@@ -886,6 +886,7 @@ describe('SRP actions and coded errors', () => {
     const err = await createNucleus('Alpha', 'NC-1 Test', 'Elm Locality').catch(e => e);
     expect(err).toBeInstanceOf(ClusterNotebookCodedError);
     expect(err.code).toBe('SRP_NAME_CLASH');
+    expect(err.upstreamMessage).toBe('x');
     expect(err).not.toBeInstanceOf(ClusterNotebookForbiddenError);
   });
 

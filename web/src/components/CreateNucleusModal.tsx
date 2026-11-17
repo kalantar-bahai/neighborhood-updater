@@ -10,7 +10,7 @@ interface Props {
   onCreated: (name: string) => void;
 }
 
-// Only the two fields createNucleus actually needs (identity: name + cluster).
+// Only what createNucleus needs: name, cluster, an optional locality and Create in SRP.
 // Everything else -- population, activities, narrative, worker roles like
 // Contact/Promoting/Helping/Accompanying/ABm Assistant -- can't be set until the
 // nucleus exists in cluster-notebook anyway (those all query/mutate by nucleus

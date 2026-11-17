@@ -23,6 +23,8 @@ interface Props {
   onReload: () => void;
   // Called after a successful rename with the new name, so the shell reloads under it.
   onRenamed: (newName: string) => void;
+  // True when the user can create a nucleus in this nucleus's cluster (the capability lives on the Cluster).
+  canCreateInCluster: boolean;
   // Backs the Parent Nucleus picker's suggestions (2026-10-08) -- every nucleus
   // name the current user can read, same list the main picker uses. Filtered to
   // exclude this nucleus's own name before rendering.
@@ -552,7 +554,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 // StaggeredConcentricDiagram (9-ring) moved to its own file, 2026-10-08, so
 // Picker.tsx can also render a rollup version of it from its own popup.
 
-export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, onRenamed, allNucleusNames }: Props) {
+export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, onRenamed, canCreateInCluster, allNucleusNames }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   // Baseline to diff a blur-triggered field's current value against, so clicking into
@@ -686,12 +688,14 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
 
   // Immediate-trigger fields: stage, nucleusType (admin dropdowns), presence, gatherings
   // (toggles) -- the change event itself is the complete, discrete action, no blur needed.
-  function setAndSave<K extends keyof FormState>(key: K, value: FormState[K], fragment: Record<string, unknown>, label: string) {
+  function setAndSave<K extends keyof FormState>(key: K, value: FormState[K], fragment: Record<string, unknown>, label: string, reloadAfter = false) {
     setForm(f => ({ ...f, [key]: value }));
     const attempt = async () => {
       const result = await saveField(fragment, label);
       if (result.ok) {
         committedRef.current = { ...committedRef.current, [key]: value };
+        // Moving changes SRP state, permissions and the Push gate; refresh them.
+        if (reloadAfter) onReload();
       } else {
         setRetry({ label, run: () => void attempt() });
       }
@@ -854,13 +858,13 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
 
   const srpState = detail.srp.state;
   const srpMessage = srpState ? srpDetailMessage(srpState, detail.srp.action) : null;
-  const locationSetting = form.locationType === 'SETTING'
-    ? detail.locationOptions.flatMap(l => l.settings).find(st => st.name === form.locationName)
+  const locationSetting = row.locationType === 'SETTING'
+    ? detail.locationOptions.flatMap(l => l.settings).find(st => st.name === row.locationName)
     : undefined;
   const canPushToSrp =
     srpState === 'LOCAL_ONLY' &&
-    permissions.createableEntityTypes.includes('nucleus') &&
-    (form.locationType === 'LOCALITY' || (locationSetting !== undefined && locationSetting.srpLinked === false));
+    canCreateInCluster &&
+    (row.locationType === 'LOCALITY' || (locationSetting !== undefined && locationSetting.srpLinked === false));
 
   async function pushToSrp() {
     setPushing(true);
@@ -948,7 +952,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   <label>Location</label>
                   <select
                     value={form.locationName}
-                    onChange={e => setAndSave('locationName', e.target.value, { identity: { location: e.target.value } }, 'Location')}
+                    onChange={e => setAndSave('locationName', e.target.value, { identity: { location: e.target.value } }, 'Location', true)}
                   >
                     <option value={form.cluster}>— This cluster ({form.cluster}) —</option>
                     {detail.locationOptions.map(locality => (

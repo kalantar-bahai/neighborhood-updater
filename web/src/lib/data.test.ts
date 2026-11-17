@@ -1098,7 +1098,7 @@ describe('createRowData', () => {
   });
 
   test('lets a NAME_TAKEN coded error from cluster-notebook propagate', async () => {
-    const err = new ClusterNotebookCodedError("A nucleus named 'Riverside' is taken.", 'NAME_TAKEN');
+    const err = new ClusterNotebookCodedError("cluster-notebook GraphQL error: A nucleus named 'Riverside' is taken.", 'NAME_TAKEN', "A nucleus named 'Riverside' is taken.");
     mockCreateNucleus.mockRejectedValue(err);
 
     await expect(createRowData(baseCreateFormData)).rejects.toBe(err);

@@ -165,7 +165,7 @@ describe('reloadOutcome', () => {
     expect(reloadOutcome(200)).toBe('show');
     expect(reloadOutcome(404)).toBe('gone');
     expect(reloadOutcome(502)).toBe('error');
-    expect(reloadOutcome(403)).toBe('error');
+    expect(reloadOutcome(403)).toBe('gone');
   });
 });
 

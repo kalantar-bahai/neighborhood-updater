@@ -16,8 +16,10 @@ import { ClusterNotebookCodedError, ClusterNotebookForbiddenError } from './clus
 // maps to a real 403 with our own message, not cluster-notebook's raw text
 // (their message is "Not authenticated." even for a genuine permission denial,
 // which would be a confusing thing to show a user). Everything else cluster-
-// notebook throws maps to a generic 502 with the raw upstream message, since we
-// have no more specific contract for it.
+// notebook throws maps to a generic 502 with the raw upstream message, unless it
+// is a coded error (any other extensions.code): those go through the CODED_ERRORS
+// table below for a status and user-facing text (a null message there means
+// "show the raw upstream message").
 // Coded errors (extensions.code other than FORBIDDEN): status + user-facing text.
 // A null message means "use the upstream message" (SRP_IN_USE carries the counts).
 const CODED_ERRORS: Record<string, { status: number; message: string | null }> = {
@@ -44,7 +46,7 @@ export function clusterNotebookErrorResponse(e: unknown): NextResponse {
   if (e instanceof ClusterNotebookCodedError) {
     const mapped = CODED_ERRORS[e.code];
     return NextResponse.json(
-      { error: mapped?.message ?? message, code: e.code },
+      { error: mapped ? (mapped.message ?? e.upstreamMessage) : message, code: e.code },
       { status: mapped?.status ?? 502 },
     );
   }

@@ -56,7 +56,9 @@ export class ClusterNotebookForbiddenError extends Error {}
 // Any other extensions.code (e.g. SRP_NAME_CLASH) -- callers branch on `.code`,
 // never on the message text.
 export class ClusterNotebookCodedError extends Error {
-  constructor(message: string, public code: string) {
+  // `message` carries the "cluster-notebook GraphQL error: " prefix for logs;
+  // `upstreamMessage` is the raw first-error text, safe to show to users.
+  constructor(message: string, public code: string, public upstreamMessage: string) {
     super(message);
   }
 }
@@ -89,7 +91,7 @@ async function request<T>(query: string, variables: Record<string, unknown>): Pr
     const message = `cluster-notebook GraphQL error: ${json.errors.map(e => e.message).join('; ')}`;
     const code = json.errors[0]?.extensions?.code;
     if (typeof code === 'string' && code) {
-      throw new ClusterNotebookCodedError(message, code);
+      throw new ClusterNotebookCodedError(message, code, json.errors[0].message);
     }
     throw new Error(message);
   }

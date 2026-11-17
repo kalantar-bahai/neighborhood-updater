@@ -20,6 +20,7 @@ export interface NucleusSummary {
   locality: string;
   nucleusType: string;
   srpState: SrpState | null;
+  srpAction: 'create' | 'rename' | 'delete' | null;
   stage: string;
   totalAct: number;
   totalPart: number;

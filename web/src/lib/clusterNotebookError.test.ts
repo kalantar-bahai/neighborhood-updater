@@ -34,10 +34,15 @@ describe('clusterNotebookErrorResponse', () => {
     ['SRP_NOT_NEIGHBORHOOD', 400, 'Only Neighborhood nuclei can be sent to SRP.'],
     ['SRP_IS_NEIGHBOURHOOD', 409, 'upstream: 3 groups in use'],
     ['SRP_NOT_DEFAULT', 409, "This nucleus shares its Setting with another, so it can't be changed in SRP from here."],
-    ['SOMETHING_NEW', 502, 'upstream: 3 groups in use'],
+    ['SOMETHING_NEW', 502, 'cluster-notebook GraphQL error: upstream: 3 groups in use'],
   ])('maps coded error %s to status %i with { error, code }', async (code, status, error) => {
-    const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('upstream: 3 groups in use', code));
+    const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('cluster-notebook GraphQL error: upstream: 3 groups in use', code, 'upstream: 3 groups in use'));
     expect(res.status).toBe(status);
     expect(await res.json()).toEqual({ error, code });
+  });
+
+  test.each(['SRP_IN_USE', 'SRP_IS_NEIGHBOURHOOD'])('%s shows the raw upstream text without the log prefix', async (code) => {
+    const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('cluster-notebook GraphQL error: raw text', code, 'raw text'));
+    expect((await res.json()).error).toBe('raw text');
   });
 });
