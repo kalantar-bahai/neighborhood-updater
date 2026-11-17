@@ -4,6 +4,7 @@ import {
 } from './clusterNotebook';
 import type { ActivitySummary, ActivitySummaries, ActivityType, NucleusFields, Individual } from './clusterNotebook';
 import type { Activity, Worker } from '@/types';
+import { srpStateFor } from './srp';
 
 // Lets callers (route handlers) distinguish error cases (e.g. 409 vs 400)
 // without an `as any` cast on `.code`.
@@ -203,6 +204,10 @@ export async function getRowData(nucleusName: string) {
     promoterNames: toWorkers(promoterWorkers),
     lastUpdated: nucleusFields?.lastUpdated ?? null,
     locationOptions,
+    srp: {
+      state: srpStateFor(nucleusFields?.nucleusType ?? '', nucleusFields?.inSrp, nucleusFields?.srpAction ?? null),
+      action: nucleusFields?.srpAction ?? null,
+    },
   };
 }
 
@@ -233,7 +238,7 @@ interface FormDataInput {
   presence?: string; notesPresence?: string;
   gatherings?: string; notesGatherings?: string;
   narrative?: string;
-  identity?: { nucleusType?: string; parentNucleus?: string; location?: string };
+  identity?: { nucleusType?: string; parentNucleus?: string; location?: string; srpLocality?: string; name?: string };
 }
 
 // Shared between createRowData and saveRowData -- each of the four activity
@@ -273,7 +278,7 @@ function activityUpdateWrites(nucleusName: string, d: FormDataInput): Promise<un
 // from Nucleus.location's own containment chain, not a hand-entered field).
 function nucleusPatchFromFormData(d: FormDataInput) {
   const nucleusPatch: {
-    stage?: string; populationMakeup?: string;
+    name?: string; stage?: string; populationMakeup?: string;
     population?: number | null; households?: number | null;
     connectedPopulation?: number | null; connectedHouseholds?: number | null;
     inConversation?: number | null; inCommunityActivities?: number | null;
@@ -318,6 +323,9 @@ function nucleusPatchFromFormData(d: FormDataInput) {
   // Locality/Setting) it belongs to itself, and rejects a Nucleus name here (that's
   // parentNucleus's job, confirmed with cluster-notebook directly, 2026-10-08).
   if (d.identity && d.identity.location !== undefined) nucleusPatch.locationName = d.identity.location || null;
+  // Rename: a blank name is not a rename.
+  const newName = d.identity?.name?.trim();
+  if (newName) nucleusPatch.name = newName;
   return nucleusPatch;
 }
 
@@ -337,12 +345,14 @@ export async function createRowData(formData: Record<string, unknown>) {
 
   // Global uniqueness is enforced at cluster-notebook's DB level (2026-09-14); a duplicate
   // name arrives as a ClusterNotebookCodedError (NAME_TAKEN), which the route maps to a 409.
-  const created = await createNucleus(newNucleus, clusterName);
+  // With srpLocality, cluster-notebook places the nucleus itself, so any location is ignored.
+  const srpLocality = ((d.identity?.srpLocality) || '').trim();
+  const created = await createNucleus(newNucleus, clusterName, srpLocality || undefined);
   if (created === null) {
     throw new CodedError(`cluster-notebook has no cluster named "${clusterName}" — nucleus not created`, 'BAD_CLUSTER');
   }
 
-  const nucleusPatch = nucleusPatchFromFormData(d);
+  const nucleusPatch = nucleusPatchFromFormData(srpLocality ? { ...d, identity: { ...d.identity, location: undefined } } : d);
   const nucleusWrite = Object.keys(nucleusPatch).length > 0 ? updateNucleus(newNucleus, nucleusPatch) : null;
   await Promise.all([...activityUpdateWrites(newNucleus, d), nucleusWrite]);
   const updatedFields = nucleusWrite ? await nucleusWrite : null;

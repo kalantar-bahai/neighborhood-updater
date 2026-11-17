@@ -107,6 +107,26 @@ describe('getRowData', () => {
     expect(result?.row.nucleus).toBe('Alpha');
   });
 
+  test('returns srp state and action', async () => {
+    mockGetNucleusFields.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: 'Neighborhood', parentNucleus: null,
+      cluster: { name: 'NC-1 Test', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null, location: null,
+      inSrp: false,
+      srpAction: { action: 'create', status: 'refused', requestedAt: '2026-11-16T00:00:00Z', error: 'Name taken', individuals: null, activities: null },
+    });
+
+    const result = await getRowData('Alpha');
+
+    expect(result?.srp.state).toBe('REFUSED');
+    expect(result?.srp.action?.error).toBe('Name taken');
+  });
+
   test('propagates a cluster-notebook read failure', async () => {
     mockGetActivitySummaries.mockRejectedValue(new Error('cluster-notebook request failed: 500 Internal Server Error'));
 
@@ -447,6 +467,21 @@ describe('saveRowData', () => {
       devotionals: { act: '5', part: '40', fof: '12' },
     },
   };
+
+  test('maps identity.name to patch.name, trimmed', async () => {
+    mockUpdateNucleus.mockResolvedValue(null as never);
+    mockUpdateActivitySummary.mockResolvedValue(null);
+
+    await saveRowData('Alpha', { identity: { name: ' Beta ' } });
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { name: 'Beta' });
+  });
+
+  test('ignores a blank identity.name', async () => {
+    await saveRowData('Alpha', { identity: { name: '  ' } });
+
+    expect(mockUpdateNucleus).not.toHaveBeenCalled();
+  });
 
   test('writes all four activity rollups via cluster-notebook', async () => {
     mockUpdateActivitySummary.mockResolvedValue(null);
@@ -1034,7 +1069,20 @@ describe('createRowData', () => {
 
     await createRowData(baseCreateFormData);
 
-    expect(mockCreateNucleus).toHaveBeenCalledWith('Riverside', 'NC-215 Triangle');
+    expect(mockCreateNucleus).toHaveBeenCalledWith('Riverside', 'NC-215 Triangle', undefined);
+  });
+
+  test('with srpLocality passes it to createNucleus and sends no locationName', async () => {
+    mockCreateNucleus.mockResolvedValue({
+      lastUpdated: null,
+    } as never);
+
+    await createRowData({
+      identity: { nucleus: 'Alpha', cluster: 'NC-1 Test', srpLocality: 'Elm Locality', location: 'Ignored' },
+    });
+
+    expect(mockCreateNucleus).toHaveBeenCalledWith('Alpha', 'NC-1 Test', 'Elm Locality');
+    expect(mockUpdateNucleus).not.toHaveBeenCalled();
   });
 
   test('throws when nucleus name is missing', async () => {

@@ -1,5 +1,6 @@
 import type { PermissionSet } from './lib/access';
-import type { LastUpdated, LocalityOption } from './lib/clusterNotebook';
+import type { LastUpdated, LocalityOption, SrpAction } from './lib/clusterNotebook';
+import type { SrpState } from './lib/srp';
 
 export interface Activity {
   act: string;
@@ -18,6 +19,7 @@ export interface NucleusSummary {
   cluster: string;
   locality: string;
   nucleusType: string;
+  srpState: SrpState | null;
   stage: string;
   totalAct: number;
   totalPart: number;
@@ -116,6 +118,7 @@ export interface Worker {
 
 export interface NucleusDetail {
   row: NucleusRow;
+  srp: { state: SrpState | null; action: SrpAction | null };
   accompanierNames: Worker[];
   protagonistNames: Worker[];
   abmAssistantNames: Worker[];
