@@ -69,6 +69,47 @@ This is additive to what your own `docs/data-model.md` ("Nucleus Assistant" sect
 
 We didn't ask for anything further here — this fully covers what we needed. Our own UI already has a type-the-name-to-confirm step before calling this.
 
+**Create in SRP, SRP status, queued delete — confirmed with cluster-notebook 2026-11-16, not yet deployed** (their issue #32, branch `fn-lifecycle`). Our design is `docs/superpowers/specs/2026-11-16-create-in-srp-design.md`.
+
+- **Create:** `createNucleus(name, clusterName, srpLocalityName: String)`. With `srpLocalityName`, the nucleus is created at that Locality, immediately and editable, and an SRP create is queued in the same transaction. The worker makes the SRP call. On success it creates and links a Setting and moves the nucleus onto it.
+  - The server refuses up front if another Setting or nucleus in that locality has the same name ignoring case.
+  - SRP can still refuse later, because it may hold FNs cluster-notebook hasn't read.
+- **Locality without SRP:** `createNucleus(name, clusterName)` then `updateNucleus(name, {locationName})`.
+- **Push an existing nucleus:** `pushNucleusToSrp(name)` works for a local-only nucleus at a Locality, or at a Setting not yet in SRP. This is also the retry after a refusal.
+- **Gate:** for both create-in-SRP and push, the same as create: the cluster's `createableEntityTypes` includes `'nucleus'`.
+- **Status:** `Nucleus.srpAction` is null when no action is unfinished. Otherwise it holds:
+  - `action`: create | rename | delete
+  - `status`: pending | in_flight | refused | failed
+  - `requestedAt`
+  - `error`
+  - `individuals` and `activities`: counts on a refused delete
+- **`Nucleus.inSrp: Boolean!`:** true when the location is an SRP-linked Setting. **Promised, not yet landed.**
+- **While an SRP action is pending:**
+  - Field edits are allowed. They are queued, and the create sends current values.
+  - Name and location changes are refused with "An SRP change for this nucleus is pending".
+  - Delete works locally, and the queued create is then refused.
+- **After a refusal:** the nucleus stays local with `srpAction.status = refused` and the reason. The user fixes the cause, usually by renaming, then calls `pushNucleusToSrp` again.
+- **Delete of a nucleus in SRP:** it is queued and `deleteNucleus` returns true. `srpAction` then shows the pending delete, or a refusal with the counts of people and activities still assigned in SRP. Those are moved by hand in SRP, the locality is read again, then the delete is retried.
+- Rename and delete of a nucleus already in SRP stay "SRP first".
+
+**Follow-ups, confirmed with cluster-notebook 2026-11-16 (fn-lifecycle; some still promised):**
+- **Rename:** `updateNucleus(name, {name: "New"})`, gated by `canChangeIdentity`.
+  - A nucleus not in SRP is renamed at once.
+  - A nucleus in SRP has its rename queued.
+  - Rename is refused while any SRP action is pending.
+- **Re-queue (promised):** if the latest `srpAction` is `{create, refused}` and the nucleus isn't linked, a rename, or a move to another Locality or an unlinked Setting, queues a fresh create in the same transaction. A clash refuses the whole update with `SRP_NAME_CLASH`. A `failed` create is never re-queued. The owner asked for this so users never press "push" again.
+- **`refused` vs `failed`:**
+  - `refused`: SRP or cluster-notebook's own checks said no, and a person has to change something.
+  - `failed`: an unexpected error persisted through 3 automatic attempts, and it needs a developer.
+  - `in_flight`: the worker is running it now; treat it as pending.
+- **Error codes (promised):** `NAME_TAKEN`, `SRP_NAME_CLASH`, `SRP_NOT_AT_LOCALITY`, `SRP_ALREADY_LINKED`, `SRP_ACTION_PENDING`, `SRP_IN_USE`, `SRP_NOT_DEFAULT`, `SRP_NOT_NEIGHBORHOOD`.
+- **Pending delete:**
+  - The nucleus stays visible in `nuclei` and `nucleus(name)` with `srpAction {delete, pending}` until SRP accepts, then it is archived.
+  - Field edits are refused while the delete is pending (promised).
+  - A refused delete leaves the nucleus fully live.
+- **Push of non-Neighborhood nuclei** will be refused (`SRP_NOT_NEIGHBORHOOD`). Network and Population nuclei never get `inSrp` or `srpAction`.
+- **No `dismissSrpAction`:** owner decision. A refused action stays until a later SRP action succeeds.
+
 ## 5. Worker lists (named-list pattern)
 
 **Done, 2026-09-13.** Worker lists are now backed by your `Individual`/`RoleInNE` model end to end, not free-text strings.
