@@ -2,6 +2,7 @@ import type { LocalityOption, PermissionSet, SrpAction } from './clusterNotebook
 
 export type SrpState = 'IN_SRP' | 'PENDING' | 'REFUSED' | 'FAILED' | 'LOCAL_ONLY';
 
+// Confirmed with cluster-notebook 2026-11-16 (corrected): inSrp is current truth; srpAction is an attempted change — refused/failed rename|delete leaves the nucleus in SRP.
 // Only neighborhoods (an empty type means Neighborhood, as in Picker's typeKey) are tracked in SRP.
 export function srpStateFor(
   nucleusType: string,
@@ -17,13 +18,16 @@ export function srpStateFor(
       case 'in_flight':
         return 'PENDING';
       case 'refused':
-      case 'failed': {
-        // Confirmed with cluster-notebook 2026-11-16: after moving a refused-create nucleus to its
-        // Cluster, srpAction stays {create, refused}; showing it as Not in SRP is our UI call.
-        // Moving to the Cluster is how a user gives up on SRP.
-        if (srpAction.action === 'create' && locationType === 'CLUSTER') return 'LOCAL_ONLY';
-        return srpAction.status === 'refused' ? 'REFUSED' : 'FAILED';
-      }
+      case 'failed':
+        if (srpAction.action === 'create') {
+          // Confirmed with cluster-notebook 2026-11-16: after moving a refused-create nucleus to its
+          // Cluster, srpAction stays {create, refused}; showing it as Not in SRP is our UI call.
+          // Moving to the Cluster is how a user gives up on SRP.
+          if (locationType === 'CLUSTER') return 'LOCAL_ONLY';
+          return srpAction.status === 'refused' ? 'REFUSED' : 'FAILED';
+        }
+        // A refused/failed rename or delete did not happen; inSrp below says where the nucleus stands.
+        break;
       default:
         return null;
     }
@@ -51,23 +55,32 @@ export function srpBadge(
 }
 
 export function srpDetailMessage(state: SrpState, srpAction: SrpAction | null | undefined): string | null {
-  if (state === 'FAILED') return 'Something went wrong sending this to SRP. Contact an admin.';
-  if (state !== 'REFUSED') return null;
-  const error = srpAction?.error ?? null;
-  const action = srpAction?.action;
-  if (action === 'delete') {
-    // Null counts mean "not recorded"; never coerce them to 0.
-    if (srpAction && srpAction.individuals !== null && srpAction.activities !== null) {
-      return `${srpAction.individuals} people and ${srpAction.activities} activities are still assigned in SRP. Move them in SRP, then try again.`;
+  if (!srpAction || (srpAction.status !== 'refused' && srpAction.status !== 'failed')) return null;
+  const refused = srpAction.status === 'refused';
+  const error = srpAction.error ?? null;
+  switch (srpAction.action) {
+    case 'create': {
+      if (state === 'LOCAL_ONLY') return null;
+      if (!refused) return 'Something went wrong sending this to SRP. Contact an admin.';
+      const hint = 'Rename it or move it to another locality to try again.';
+      return error ? `SRP refused this: ${error}. ${hint}` : `SRP refused this. ${hint}`;
     }
-    return error ? `SRP refused the delete: ${error}.` : 'SRP refused the delete.';
+    case 'rename':
+      if (!refused) return CHANGE_FAILED;
+      return error ? `SRP refused the rename: ${error}.` : 'SRP refused the rename.';
+    case 'delete':
+      if (!refused) return CHANGE_FAILED;
+      // Null counts mean "not recorded"; never coerce them to 0.
+      if (srpAction.individuals !== null && srpAction.activities !== null) {
+        return `${srpAction.individuals} people and ${srpAction.activities} activities are still assigned in SRP. Move them in SRP, then try again.`;
+      }
+      return error ? `SRP refused the delete: ${error}.` : 'SRP refused the delete.';
+    default:
+      return null;
   }
-  if (action === 'rename') {
-    return error ? `SRP refused this: ${error}.` : 'SRP refused this.';
-  }
-  const hint = 'Rename it or move it to another locality to try again.';
-  return error ? `SRP refused this: ${error}. ${hint}` : `SRP refused this. ${hint}`;
 }
+
+const CHANGE_FAILED = 'Something went wrong sending this change to SRP. Contact an admin.';
 
 export function findNameClash(name: string, locality: LocalityOption | undefined): string | null {
   const key = name.trim().toLocaleLowerCase();

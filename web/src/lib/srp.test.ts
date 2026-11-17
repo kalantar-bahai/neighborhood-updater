@@ -17,14 +17,29 @@ describe('srpStateFor', () => {
   it('maps action status', () => {
     expect(srpStateFor('Neighborhood', true, act({ status: 'pending' }))).toBe('PENDING');
     expect(srpStateFor('Neighborhood', true, act({ status: 'in_flight' }))).toBe('PENDING');
-    expect(srpStateFor('Neighborhood', true, act({ status: 'refused' }))).toBe('REFUSED');
-    expect(srpStateFor('Neighborhood', true, act({ status: 'failed' }))).toBe('FAILED');
+    expect(srpStateFor('Neighborhood', false, act({ status: 'refused' }))).toBe('REFUSED');
+    expect(srpStateFor('Neighborhood', false, act({ status: 'failed' }))).toBe('FAILED');
     expect(srpStateFor('Neighborhood', true, act({ status: 'weird' }))).toBeNull();
   });
   it('gives no badge for other types or unknown inSrp', () => {
     expect(srpStateFor('Network', false, null)).toBeNull();
     expect(srpStateFor('Population', false, null)).toBeNull();
     expect(srpStateFor('Neighborhood', undefined, null)).toBeNull();
+  });
+});
+
+describe('srpStateFor reads inSrp as current truth', () => {
+  it('keeps a nucleus in SRP when a rename or delete was refused or failed', () => {
+    expect(srpStateFor('Neighborhood', true, act({ action: 'rename', status: 'refused' }))).toBe('IN_SRP');
+    expect(srpStateFor('Neighborhood', true, act({ action: 'delete', status: 'failed' }))).toBe('IN_SRP');
+    expect(srpStateFor('Neighborhood', true, act({ action: 'delete', status: 'refused' }))).toBe('IN_SRP');
+  });
+  it('shows refused or failed create at a locality as REFUSED or FAILED', () => {
+    expect(srpStateFor('Neighborhood', false, act({ status: 'refused' }), 'LOCALITY')).toBe('REFUSED');
+    expect(srpStateFor('Neighborhood', false, act({ status: 'failed' }), 'LOCALITY')).toBe('FAILED');
+  });
+  it('shows a pending delete as PENDING', () => {
+    expect(srpStateFor('Neighborhood', true, act({ action: 'delete', status: 'pending' }))).toBe('PENDING');
   });
 });
 
@@ -35,7 +50,7 @@ describe('srpStateFor with locationType', () => {
   });
   it('leaves other cases unchanged', () => {
     expect(srpStateFor('Neighborhood', false, act({ status: 'refused' }), 'LOCALITY')).toBe('REFUSED');
-    expect(srpStateFor('Neighborhood', false, act({ action: 'delete', status: 'refused' }), 'CLUSTER')).toBe('REFUSED');
+    expect(srpStateFor('Neighborhood', true, act({ action: 'delete', status: 'refused' }), 'CLUSTER')).toBe('IN_SRP');
     expect(srpStateFor('Neighborhood', false, act({ status: 'refused' }))).toBe('REFUSED');
     expect(srpStateFor('Neighborhood', false, act({ status: 'pending' }), 'CLUSTER')).toBe('PENDING');
   });
@@ -59,22 +74,32 @@ describe('srpDetailMessage', () => {
     expect(srpDetailMessage('REFUSED', act({ status: 'refused' })))
       .toBe('SRP refused this. Rename it or move it to another locality to try again.');
   });
-  it('explains refused rename without a hint', () => {
-    expect(srpDetailMessage('REFUSED', act({ action: 'rename', status: 'refused', error: 'Bad' }))).toBe('SRP refused this: Bad.');
-    expect(srpDetailMessage('REFUSED', act({ action: 'rename', status: 'refused' }))).toBe('SRP refused this.');
+  it('gives no message for a given-up create', () => {
+    expect(srpDetailMessage('LOCAL_ONLY', act({ status: 'refused', error: 'Name taken' }))).toBeNull();
+    expect(srpDetailMessage('LOCAL_ONLY', act({ status: 'failed' }))).toBeNull();
+  });
+  it('explains refused rename', () => {
+    expect(srpDetailMessage('IN_SRP', act({ action: 'rename', status: 'refused', error: 'Name taken' }))).toBe('SRP refused the rename: Name taken.');
+    expect(srpDetailMessage('IN_SRP', act({ action: 'rename', status: 'refused' }))).toBe('SRP refused the rename.');
   });
   it('explains refused delete', () => {
-    expect(srpDetailMessage('REFUSED', act({ action: 'delete', status: 'refused', individuals: 3, activities: 2 })))
+    expect(srpDetailMessage('IN_SRP', act({ action: 'delete', status: 'refused', individuals: 3, activities: 2 })))
       .toBe('3 people and 2 activities are still assigned in SRP. Move them in SRP, then try again.');
-    expect(srpDetailMessage('REFUSED', act({ action: 'delete', status: 'refused', error: 'In use' }))).toBe('SRP refused the delete: In use.');
-    expect(srpDetailMessage('REFUSED', act({ action: 'delete', status: 'refused', individuals: 3, error: 'In use' })))
+    expect(srpDetailMessage('IN_SRP', act({ action: 'delete', status: 'refused', error: 'In use' }))).toBe('SRP refused the delete: In use.');
+    expect(srpDetailMessage('IN_SRP', act({ action: 'delete', status: 'refused', individuals: 3, error: 'In use' })))
       .toBe('SRP refused the delete: In use.');
-    expect(srpDetailMessage('REFUSED', act({ action: 'delete', status: 'refused' }))).toBe('SRP refused the delete.');
+    expect(srpDetailMessage('IN_SRP', act({ action: 'delete', status: 'refused' }))).toBe('SRP refused the delete.');
+  });
+  it('explains failed changes', () => {
+    expect(srpDetailMessage('FAILED', act({ status: 'failed' }))).toBe('Something went wrong sending this to SRP. Contact an admin.');
+    const change = 'Something went wrong sending this change to SRP. Contact an admin.';
+    expect(srpDetailMessage('IN_SRP', act({ action: 'rename', status: 'failed' }))).toBe(change);
+    expect(srpDetailMessage('IN_SRP', act({ action: 'delete', status: 'failed' }))).toBe(change);
   });
   it('handles other states', () => {
-    expect(srpDetailMessage('FAILED', act({ status: 'failed' }))).toBe('Something went wrong sending this to SRP. Contact an admin.');
     expect(srpDetailMessage('IN_SRP', null)).toBeNull();
     expect(srpDetailMessage('PENDING', act())).toBeNull();
+    expect(srpDetailMessage('PENDING', act({ action: 'delete', status: 'in_flight' }))).toBeNull();
     expect(srpDetailMessage('LOCAL_ONLY', null)).toBeNull();
   });
 });
