@@ -58,16 +58,20 @@ A nucleus added in Nucleus Assistant exists only in cluster-notebook. To get it 
 
 ## Status model (pure function in `lib/`, unit tested)
 
+Corrected with cluster-notebook on 2026-11-16:
+- `inSrp` says whether the nucleus is in SRP **now**.
+- `srpAction`, when present, is an **attempted change**. `pending` or `in_flight` means it is queued. `refused` or `failed` means it didn't happen, and `srpAction.action` says which change.
+
 | State | Rule | Badge |
 |---|---|---|
-| `IN_SRP` | `inSrp && !srpAction` | green "SRP" |
 | `PENDING` | `srpAction.status` in pending, in_flight | amber "SRP pending" (for a delete: "Deleting in SRP") |
-| `REFUSED` | `srpAction.status` = refused | red "SRP refused"; reason on the nucleus page, with "rename or move it to try again" for a refused create |
-| `FAILED` | `srpAction.status` = failed | red "SRP error"; "Something went wrong sending this to SRP. Contact an admin." |
-| `LOCAL_ONLY` | `!inSrp && !srpAction` | grey "Not in SRP" |
+| `REFUSED` | a `create` with status refused, and the nucleus not at its Cluster | red "SRP refused"; the reason, with "rename or move it to try again" |
+| `FAILED` | a `create` with status failed, and the nucleus not at its Cluster | red "SRP error"; "Something went wrong sending this to SRP. Contact an admin." |
+| `IN_SRP` | `inSrp`; a refused or failed rename or delete keeps this state | green "SRP"; for a refused or failed rename or delete, a warning that it didn't happen (with counts for a refused delete) |
+| `LOCAL_ONLY` | `!inSrp`, including a refused or failed create on a nucleus moved to its Cluster (giving up; our UI call) | grey "Not in SRP" |
 | none | nucleus type is not Neighborhood (Network, Population) | no badge (owner, 2026-11-16) |
 
-If `srpAction` is non-null with `status` absent or unknown, show no badge rather than guess.
+If `srpAction` has an unknown status, or `inSrp` is missing, show no badge rather than guess.
 
 ## Design
 
