@@ -7,7 +7,7 @@ vi.mock('@clerk/nextjs/server', () => ({
 import {
   getActivitySummaries, updateActivitySummary, getAllNuclei, getNucleusFields, updateNucleus,
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
-  getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError,
+  getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
   getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions,
 } from './clusterNotebook';
 import type { Individual } from './clusterNotebook';
@@ -877,5 +877,48 @@ describe('getIsAdministrator', () => {
   test('returns false for a non-administrator', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { isAdministrator: false } }));
     expect(await getIsAdministrator()).toBe(false);
+  });
+});
+
+describe('SRP actions and coded errors', () => {
+  test('request maps extensions.code to ClusterNotebookCodedError', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ errors: [{ message: 'x', extensions: { code: 'SRP_NAME_CLASH' } }] }));
+    const err = await createNucleus('Alpha', 'NC-1 Test', 'Elm Locality').catch(e => e);
+    expect(err).toBeInstanceOf(ClusterNotebookCodedError);
+    expect(err.code).toBe('SRP_NAME_CLASH');
+    expect(err).not.toBeInstanceOf(ClusterNotebookForbiddenError);
+  });
+
+  test('FORBIDDEN still throws ClusterNotebookForbiddenError', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ errors: [{ message: 'x', extensions: { code: 'FORBIDDEN' } }] }));
+    await expect(createNucleus('Alpha', 'NC-1 Test')).rejects.toBeInstanceOf(ClusterNotebookForbiddenError);
+  });
+
+  test('createNucleus sends srpLocalityName only when given', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { createNucleus: null } }));
+    await createNucleus('Alpha', 'NC-1 Test', 'Elm Locality');
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body).variables)
+      .toEqual({ name: 'Alpha', clusterName: 'NC-1 Test', srpLocalityName: 'Elm Locality' });
+    await createNucleus('Alpha', 'NC-1 Test');
+    expect(JSON.parse(mockFetch.mock.calls[1][1].body).variables)
+      .toEqual({ name: 'Alpha', clusterName: 'NC-1 Test' });
+  });
+
+  test('pushNucleusToSrp posts the mutation with the name', async () => {
+    const fields = { stage: 'Initial/2' };
+    mockFetch.mockResolvedValue(jsonResponse({ data: { pushNucleusToSrp: fields } }));
+    const result = await pushNucleusToSrp('Alpha');
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.query).toContain('pushNucleusToSrp(name: $name)');
+    expect(body.variables).toEqual({ name: 'Alpha' });
+    expect(result).toEqual(fields);
+  });
+
+  test('getAllNuclei requests inSrp and srpAction', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nuclei: [] } }));
+    await getAllNuclei();
+    const { query } = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(query).toContain('inSrp');
+    expect(query).toContain('srpAction { action status');
   });
 });
