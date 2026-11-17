@@ -706,6 +706,11 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     && (detail.srp.state === 'LOCAL_ONLY' || detail.srp.state === 'REFUSED');
   async function commitName() {
     const value = form.nucleus.trim();
+    if (saving && value !== row.nucleus) {
+      set('nucleus', row.nucleus);
+      setSaveStatus({ msg: 'Wait for the current save to finish, then rename.', type: 'error' });
+      return;
+    }
     if (value === row.nucleus) {
       if (form.nucleus !== row.nucleus) set('nucleus', row.nucleus);
       return;
@@ -1369,9 +1374,9 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                         const res = await fetch(`/api/nucleus?name=${encodeURIComponent(row.nucleus)}`, { method: 'DELETE' });
                         const data = await res.json();
                         if (!res.ok) throw new Error(data.error || 'Delete failed');
-                        // A local-only nucleus is gone (reload sends us to the list); an in-SRP
-                        // one is queued and stays, shown as "Deleting in SRP".
-                        onReload();
+                        // Queued in SRP: the nucleus stays, shown as "Deleting in SRP".
+                        // Otherwise it is gone, and the permission-less GET would 403, so go back.
+                        if (data.queued) onReload(); else onBack();
                       } catch (e: unknown) {
                         setDeleteError(e instanceof Error ? e.message : 'Delete failed');
                       } finally {
