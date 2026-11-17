@@ -24,6 +24,9 @@ export default function AppClient() {
   const [detailVersion, setDetailVersion] = useState(0);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [creatingNew, setCreatingNew] = useState(false);
+  // Card open/closed state for the open nucleus. Kept here, not in DetailView, so it survives
+  // the remount on an in-place reload; cleared when the user leaves the nucleus.
+  const [cardOpen, setCardOpen] = useState<Record<string, boolean>>({});
 
   // openAfter: a nucleus to open once the fresh data (and its permissions) is in.
   // Used after creating a nucleus -- the permissions map loaded at startup has no
@@ -72,6 +75,7 @@ export default function AppClient() {
   }
 
   function handleBack() {
+    setCardOpen({});
     setDetail(null);
     setSelectedNucleus(null);
     loadInitialData();
@@ -111,6 +115,8 @@ export default function AppClient() {
         onRenamed={(newName) => { setDetail(null); setSelectedNucleus(newName); setLoadingDetail(true); loadInitialData(newName); }}
         canCreateInCluster={initialData.clusterNames.includes(detail.row.cluster)}
         allNucleusNames={initialData.rows.map(r => r.nucleus)}
+        cardOpen={cardOpen}
+        onCardOpenChange={(key, open) => setCardOpen(c => ({ ...c, [key]: open }))}
       />
     );
   }
@@ -132,7 +138,7 @@ export default function AppClient() {
       <Picker
         rows={initialData.rows}
         email={initialData.email}
-        onSelect={loadNucleus}
+        onSelect={(name) => { setCardOpen({}); loadNucleus(name); }}
         onSignOut={() => window.location.href = '/signout'}
         onAdd={canCreateNucleus ? () => setCreatingNew(true) : undefined}
       />

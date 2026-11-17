@@ -29,6 +29,9 @@ interface Props {
   // name the current user can read, same list the main picker uses. Filtered to
   // exclude this nucleus's own name before rendering.
   allNucleusNames: string[];
+  // Open/closed state per card, keyed by card name; a missing key means the card's default.
+  cardOpen: Record<string, boolean>;
+  onCardOpenChange: (key: string, open: boolean) => void;
 }
 
 type FormState = NucleusRow;
@@ -554,7 +557,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 // StaggeredConcentricDiagram (9-ring) moved to its own file, 2026-10-08, so
 // Picker.tsx can also render a rollup version of it from its own popup.
 
-export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, onRenamed, canCreateInCluster, allNucleusNames }: Props) {
+export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, onRenamed, canCreateInCluster, allNucleusNames, cardOpen, onCardOpenChange }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   // Baseline to diff a blur-triggered field's current value against, so clicking into
@@ -590,18 +593,25 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const [showContactModal, setShowContactModal] = useState(false);
   const [promoterNames, setPromoterNames] = useState<Worker[]>(() => detail.promoterNames);
   const [showPromotersModal, setShowPromotersModal] = useState(false);
-  const [identityOpen, setIdentityOpen] = useState(false);
-  const [diagramCardOpen, setDiagramCardOpen] = useState(false);
-  const [accessOpen, setAccessOpen] = useState(false);
-  const [dangerOpen, setDangerOpen] = useState(false);
+  // Which cards are open lives in AppClient, so an in-place reload (Refresh, Push, Location
+  // save), which remounts this view, keeps the cards the user had open.
+  const card = (key: string, initial: boolean) => {
+    const open = cardOpen[key] ?? initial;
+    const setOpen = (v: boolean | ((o: boolean) => boolean)) => onCardOpenChange(key, typeof v === 'function' ? v(open) : v);
+    return [open, setOpen] as const;
+  };
+  const [identityOpen, setIdentityOpen] = card('identity', false);
+  const [diagramCardOpen, setDiagramCardOpen] = card('diagram', false);
+  const [accessOpen, setAccessOpen] = card('access', false);
+  const [dangerOpen, setDangerOpen] = card('danger', false);
   // Open by default (2026-10-08) -- these five were previously always shown with
   // no way to collapse them at all; now they're collapsible like every other card,
   // just starting open instead of closed.
-  const [overviewOpen, setOverviewOpen] = useState(true);
-  const [familiesOpen, setFamiliesOpen] = useState(true);
-  const [activitiesOpen, setActivitiesOpen] = useState(true);
-  const [detailsOpen, setDetailsOpen] = useState(true);
-  const [narrativeOpen, setNarrativeOpen] = useState(true);
+  const [overviewOpen, setOverviewOpen] = card('overview', true);
+  const [familiesOpen, setFamiliesOpen] = card('families', true);
+  const [activitiesOpen, setActivitiesOpen] = card('activities', true);
+  const [detailsOpen, setDetailsOpen] = card('details', true);
+  const [narrativeOpen, setNarrativeOpen] = card('narrative', true);
   const [deleteInput, setDeleteInput] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -947,7 +957,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   Nucleus (the name itself) is cluster-notebook's canonical identifier.
                   Confirmed with cluster-notebook 2026-11-16: updateNucleus { name } renames;
                   editable here only while not in SRP (in-SRP rename is issue #42). */}
-              {permissions.canChangeIdentity ? (
+              {permissions.canChangeIdentity && srpState !== 'IN_SRP' ? (
                 <div className="field">
                   <label>Location</label>
                   <select
@@ -967,22 +977,6 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 </div>
               ) : (
                 <Field label="Location" value={form.locationName} readonly />
-              )}
-              {srpState && (
-                <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <SrpBadge state={srpState} action={detail.srp.action?.action} />
-                    {srpState === 'PENDING' && (
-                      <button type="button" onClick={onReload} style={{ background: 'none', border: 'none', padding: 0, color: '#3182ce', cursor: 'pointer', fontSize: 12, textDecoration: 'underline' }}>Refresh</button>
-                    )}
-                    {canPushToSrp && (
-                      <button type="button" disabled={pushing} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #3182ce', background: '#3182ce', color: 'white', fontSize: 13, cursor: pushing ? 'default' : 'pointer', opacity: pushing ? 0.6 : 1 }} onClick={pushToSrp}>
-                        {pushing ? 'Sending…' : 'Push to SRP'}
-                      </button>
-                    )}
-                  </div>
-                  {srpMessage && <div style={{ fontSize: 12, color: '#c53030' }}>{srpMessage}</div>}
-                </div>
               )}
               <Field
                 label="Nucleus"
@@ -1052,6 +1046,23 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
               ) : (
                 <Field label="Parent Nucleus" value={form.parentNucleus} readonly />
               )}
+              {srpState && (
+                <div className="field">
+                  <label>SRP status</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minHeight: 32 }}>
+                    <SrpBadge state={srpState} action={detail.srp.action?.action} />
+                    {srpState === 'PENDING' && (
+                      <button type="button" onClick={onReload} aria-label="Refresh SRP status" title="Refresh" style={{ background: 'none', border: 'none', padding: '0 4px', color: '#3182ce', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>↻</button>
+                    )}
+                    {canPushToSrp && (
+                      <button type="button" disabled={pushing} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #3182ce', background: '#3182ce', color: 'white', fontSize: 13, cursor: pushing ? 'default' : 'pointer', opacity: pushing ? 0.6 : 1 }} onClick={pushToSrp}>
+                        {pushing ? 'Sending…' : 'Push to SRP'}
+                      </button>
+                    )}
+                  </div>
+                  {srpMessage && <div style={{ fontSize: 12, color: '#c53030', marginTop: 6 }}>{srpMessage}</div>}
+                </div>
+              )}
             </div>
             {/* Confirmed with cluster-notebook directly, 2026-10-08: permissions
                 follow nesting, so a pocket's own location doesn't affect whether
@@ -1072,6 +1083,13 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             {permissions.canChangeIdentity && form.locationType === 'SETTING' && (
               <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>
                 This nucleus is at a Setting, so its type is fixed to Neighborhood. Move it to a Locality or the Cluster to set Network or Population instead.
+              </p>
+            )}
+            {/* Confirmed with cluster-notebook 2026-11-16: moving a nucleus already in SRP is refused
+                (SRP_IS_NEIGHBOURHOOD), and renaming one is not built yet (#42). */}
+            {srpState === 'IN_SRP' && permissions.canChangeIdentity && (
+              <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>
+                Name and location can&apos;t be changed here while this nucleus is in SRP.
               </p>
             )}
             {locationWarning && (
