@@ -114,4 +114,5 @@ gitignored `tmp/`.
 
 - #9: centralize the field help text.
 - The Picker's nucleus hierarchy may be simplified soon, so check with the owner before investing in it.
+- Create in SRP (`feat/create-in-srp`) must not merge before cluster-notebook deploys `fn-lifecycle` with `inSrp`, the error codes and re-queue. Renaming a nucleus already in SRP is #42.
 - `docs/cluster-notebook-api-requirements.md` §3 still describes `parentNucleus` as read-only. In fact it is writable, gated by `canChangeIdentity`.
