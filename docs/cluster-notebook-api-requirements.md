@@ -110,6 +110,13 @@ We didn't ask for anything further here — this fully covers what we needed. Ou
 - **Push of non-Neighborhood nuclei** will be refused (`SRP_NOT_NEIGHBORHOOD`). Network and Population nuclei never get `inSrp` or `srpAction`.
 - **No `dismissSrpAction`:** owner decision. A refused action stays until a later SRP action succeeds.
 
+**Final API, confirmed with cluster-notebook 2026-11-16** (fn-lifecycle; not yet pushed or deployed):
+- `Nucleus.inSrp: Boolean!` has landed. Every code listed above is live.
+- **Extra code `SRP_IS_NEIGHBOURHOOD`:** keep the "OU" spelling. It is returned when someone moves a nucleus that is already in SRP, and its message tells the user to delete it instead. We map it to a 409 using their message.
+- **While a delete is pending,** all edits are refused, including `updateActivitySummary`.
+- **`deleteNucleus` is refused only while an action is pending or in_flight** (`SRP_ACTION_PENDING`). A refused or failed action blocks nothing, so a nucleus whose create was refused can be deleted locally.
+- **Giving up on SRP:** moving a refused-create nucleus to its Cluster applies the move without re-queueing. `srpAction` stays `{create, refused}`, and whether to show it is our UI call. We show such a nucleus as "Not in SRP" (grey), not refused.
+
 ## 5. Worker lists (named-list pattern)
 
 **Done, 2026-09-13.** Worker lists are now backed by your `Individual`/`RoleInNE` model end to end, not free-text strings.
