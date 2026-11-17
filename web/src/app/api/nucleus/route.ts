@@ -99,9 +99,6 @@ export async function PUT(req: NextRequest) {
     const result = await createRowData(formData);
     return NextResponse.json(result);
   } catch (e: unknown) {
-    if (e instanceof CodedError && e.code === 'CONFLICT') {
-      return NextResponse.json({ error: e.message }, { status: 409 });
-    }
     if (e instanceof CodedError && e.code === 'BAD_CLUSTER') {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }

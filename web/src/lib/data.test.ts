@@ -3,7 +3,8 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { facilitatorsFromClusterNotebook, facilitatorsCountFromClusterNotebook } from './data';
 import type { ActivitySummary } from './clusterNotebook';
 
-vi.mock('./clusterNotebook', () => ({
+vi.mock('./clusterNotebook', async (importOriginal) => ({
+  ClusterNotebookCodedError: (await importOriginal<typeof import('./clusterNotebook')>()).ClusterNotebookCodedError,
   getActivitySummaries: vi.fn(),
   updateActivitySummary: vi.fn(),
   getNucleusFields: vi.fn(),
@@ -17,7 +18,7 @@ vi.mock('./clusterNotebook', () => ({
 
 import {
   getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus, getNucleusWorkers, createNucleus, deleteNucleus,
-  getLocationOptions,
+  getLocationOptions, ClusterNotebookCodedError,
 } from './clusterNotebook';
 import { getRowData, saveRowData, createRowData, deleteRowData } from './data';
 
@@ -1048,18 +1049,11 @@ describe('createRowData', () => {
     expect(mockCreateNucleus).not.toHaveBeenCalled();
   });
 
-  test('maps a duplicate-name error from cluster-notebook to the same CONFLICT code', async () => {
-    mockCreateNucleus.mockRejectedValue(new Error("cluster-notebook GraphQL error: A nucleus named 'Riverside' already exists."));
+  test('lets a NAME_TAKEN coded error from cluster-notebook propagate', async () => {
+    const err = new ClusterNotebookCodedError("A nucleus named 'Riverside' is taken.", 'NAME_TAKEN');
+    mockCreateNucleus.mockRejectedValue(err);
 
-    let caught: unknown;
-    try {
-      await createRowData(baseCreateFormData);
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(Error);
-    expect((caught as Error).message).toContain('already exists');
-    expect((caught as { code?: string }).code).toBe('CONFLICT');
+    await expect(createRowData(baseCreateFormData)).rejects.toBe(err);
   });
 
   test('throws a BAD_CLUSTER-coded error when the cluster name is not found', async () => {

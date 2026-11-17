@@ -335,18 +335,9 @@ export async function createRowData(formData: Record<string, unknown>) {
   if (!newNucleus) throw new Error('Nucleus name is required');
   if (!clusterName) throw new Error('Cluster is required');
 
-  let created;
-  try {
-    created = await createNucleus(newNucleus, clusterName);
-  } catch (e) {
-    // Global uniqueness is enforced at cluster-notebook's DB level (2026-09-14) --
-    // this is now our only duplicate-name check (the Sheet-based pre-check that used
-    // to run here was dropped along with the Sheet stub-row write it existed to guard).
-    if (e instanceof Error && /already exists/i.test(e.message)) {
-      throw new CodedError(`A nucleus named "${newNucleus}" already exists`, 'CONFLICT');
-    }
-    throw e;
-  }
+  // Global uniqueness is enforced at cluster-notebook's DB level (2026-09-14); a duplicate
+  // name arrives as a ClusterNotebookCodedError (NAME_TAKEN), which the route maps to a 409.
+  const created = await createNucleus(newNucleus, clusterName);
   if (created === null) {
     throw new CodedError(`cluster-notebook has no cluster named "${clusterName}" — nucleus not created`, 'BAD_CLUSTER');
   }
