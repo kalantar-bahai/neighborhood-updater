@@ -259,3 +259,13 @@ describe('deleteNotice', () => {
     expect(deleteNotice(true, true)).toBe(`${home} ${kids}`);
   });
 });
+
+describe('srpDetailMessage once a refused rename is back in step', () => {
+  it('drops the refused or failed rename message when SRP already has this name', () => {
+    const refused = act({ action: 'rename', status: 'refused', error: 'name in use' });
+    expect(srpDetailMessage('IN_SRP', refused, true)).toBeNull();
+    expect(srpDetailMessage('IN_SRP', act({ action: 'rename', status: 'failed' }), true)).toBeNull();
+    expect(srpDetailMessage('IN_SRP', refused, false)).toBe('SRP refused the rename: name in use.');
+    expect(srpDetailMessage('IN_SRP', refused)).toBe('SRP refused the rename: name in use.');
+  });
+});

@@ -868,7 +868,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
       : `Last updated on ${new Date(lastUpdated.at).toLocaleString()}`;
 
   const srpState = detail.srp.state;
-  const srpMessage = srpState ? srpDetailMessage(srpState, detail.srp.action) : null;
+  const srpMessage = srpState ? srpDetailMessage(srpState, detail.srp.action, detail.srp.srpName === row.nucleus) : null;
   const locationSetting = row.locationType === 'SETTING'
     ? detail.locationOptions.flatMap(l => l.settings).find(st => st.name === row.locationName)
     : undefined;

@@ -56,8 +56,11 @@ export function srpBadge(
   }
 }
 
-export function srpDetailMessage(state: SrpState, srpAction: SrpAction | null | undefined): string | null {
+// inStep: SRP already has the nucleus's current name (srpName === name). A refused or failed rename is then
+// moot -- e.g. the user renamed back to adopt SRP's name, which queues nothing and leaves the old srpAction.
+export function srpDetailMessage(state: SrpState, srpAction: SrpAction | null | undefined, inStep = false): string | null {
   if (!srpAction || (srpAction.status !== 'refused' && srpAction.status !== 'failed')) return null;
+  if (inStep && srpAction.action === 'rename' && !(srpAction.status === 'failed' && srpAction.srpChanged)) return null;
   if (srpAction.status === 'failed' && srpAction.srpChanged === true) return CHECK_SRP;
   const refused = srpAction.status === 'refused';
   const error = srpAction.error ?? null;
