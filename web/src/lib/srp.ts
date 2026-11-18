@@ -56,8 +56,11 @@ export function srpBadge(
   }
 }
 
-export function srpDetailMessage(state: SrpState, srpAction: SrpAction | null | undefined): string | null {
+// inStep: SRP already has the nucleus's current name (srpName === name). A refused or failed rename is then
+// moot -- e.g. the user renamed back to adopt SRP's name, which queues nothing and leaves the old srpAction.
+export function srpDetailMessage(state: SrpState, srpAction: SrpAction | null | undefined, inStep = false): string | null {
   if (!srpAction || (srpAction.status !== 'refused' && srpAction.status !== 'failed')) return null;
+  if (inStep && srpAction.action === 'rename' && !(srpAction.status === 'failed' && srpAction.srpChanged)) return null;
   if (srpAction.status === 'failed' && srpAction.srpChanged === true) return CHECK_SRP;
   const refused = srpAction.status === 'refused';
   const error = srpAction.error ?? null;
@@ -137,4 +140,45 @@ export function reloadOutcome(status: number): 'show' | 'gone' | 'error' {
 export function nextNameAfterRename(oldName: string, submitted: string, ok: boolean): string {
   const trimmed = submitted.trim();
   return ok && trimmed ? trimmed : oldName;
+}
+
+// Confirmed with cluster-notebook 2026-11-18 (#39 step one): any nucleus can be renamed and the name
+// applies at once; a home nucleus's SRP rename follows. A FAILED action needs an admin to check SRP first.
+export function canRenameNucleus(canChangeIdentity: boolean, state: SrpState | null): boolean {
+  return canChangeIdentity && state !== 'PENDING' && state !== 'FAILED';
+}
+
+// srpName is SRP's last-known name for a home nucleus's FN; it differs from the nucleus name after a
+// refused rename or a rename made directly in SRP.
+export function srpOutOfStepMessage(state: SrpState | null, name: string, srpName: string | null): string | null {
+  if (state !== 'IN_SRP' || !srpName || srpName === name) return null;
+  return `SRP calls this “${srpName}”.`;
+}
+
+// What "Push to SRP" does here, if offered. Confirmed with cluster-notebook 2026-11-18: at a linked
+// Setting, a non-home nucleus becomes the home of a new FN; an out-of-step home re-sends its name.
+export function pushToSrpMode(input: {
+  state: SrpState | null;
+  name: string;
+  srpName: string | null;
+  locationType: string;
+  settingLinked: boolean | undefined;
+  canCreateInCluster: boolean;
+}): 'create' | 'newNeighbourhood' | 'resendName' | null {
+  if (!input.canCreateInCluster) return null;
+  if (input.state === 'IN_SRP') {
+    return input.srpName && input.srpName !== input.name ? 'resendName' : null;
+  }
+  if (input.state !== 'LOCAL_ONLY') return null;
+  if (input.locationType === 'LOCALITY') return 'create';
+  if (input.locationType === 'SETTING' && input.settingLinked === false) return 'create';
+  if (input.locationType === 'SETTING' && input.settingLinked === true) return 'newNeighbourhood';
+  return null;
+}
+
+export function deleteNotice(isHome: boolean, hasChildren: boolean): string {
+  const main = isHome
+    ? "This also deletes its neighbourhood in SRP once SRP accepts. Other nuclei at its place move to the parent nucleus's neighbourhood, or to the locality."
+    : 'Deleting a nucleus removes it immediately. This can’t be undone here.';
+  return hasChildren ? `${main} Its child nuclei move up to its parent.` : main;
 }

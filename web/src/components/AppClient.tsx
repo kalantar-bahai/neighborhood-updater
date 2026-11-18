@@ -115,6 +115,7 @@ export default function AppClient() {
         onRenamed={(newName) => { setDetail(null); setSelectedNucleus(newName); setLoadingDetail(true); loadInitialData(newName); }}
         canCreateInCluster={initialData.clusterNames.includes(detail.row.cluster)}
         allNucleusNames={initialData.rows.map(r => r.nucleus)}
+        childCount={initialData.rows.filter(r => r.parentNucleus === selectedNucleus).length}
         cardOpen={cardOpen}
         onCardOpenChange={(key, open) => setCardOpen(c => ({ ...c, [key]: open }))}
       />

@@ -28,12 +28,12 @@ describe('clusterNotebookErrorResponse', () => {
     ['NAME_TAKEN', 409, 'That name is already used by another nucleus.'],
     ['SRP_NAME_CLASH', 409, 'That name is already used in this locality (in SRP or here).'],
     ['SRP_ACTION_PENDING', 409, 'An SRP change for this nucleus is still pending. Try again once it finishes.'],
-    ['SRP_IN_USE', 409, 'upstream: 3 groups in use'],
     ['SRP_ALREADY_LINKED', 409, 'This nucleus is already in SRP.'],
     ['SRP_NOT_AT_LOCALITY', 400, 'Choose a locality for this nucleus before sending it to SRP.'],
     ['SRP_NOT_NEIGHBORHOOD', 400, 'Only Neighborhood nuclei can be sent to SRP.'],
     ['SRP_IS_NEIGHBOURHOOD', 409, 'upstream: 3 groups in use'],
-    ['SRP_NOT_DEFAULT', 409, "This nucleus shares its Setting with another, so it can't be changed in SRP from here."],
+    ['SRP_NOT_DEFAULT', 409, "This nucleus isn't the home nucleus of its SRP neighbourhood, so it can't be changed in SRP from here."],
+    ['SRP_FN_HAS_NO_HOME', 409, 'This neighbourhood in SRP has no home nucleus. Ask an admin.'],
     ['SOMETHING_NEW', 502, 'cluster-notebook GraphQL error: upstream: 3 groups in use'],
   ])('maps coded error %s to status %i with { error, code }', async (code, status, error) => {
     const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('cluster-notebook GraphQL error: upstream: 3 groups in use', code, 'upstream: 3 groups in use'));
@@ -41,7 +41,7 @@ describe('clusterNotebookErrorResponse', () => {
     expect(await res.json()).toEqual({ error, code });
   });
 
-  test.each(['SRP_IN_USE', 'SRP_IS_NEIGHBOURHOOD'])('%s shows the raw upstream text without the log prefix', async (code) => {
+  test.each(['SRP_IS_NEIGHBOURHOOD'])('%s shows the raw upstream text without the log prefix', async (code) => {
     const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('cluster-notebook GraphQL error: raw text', code, 'raw text'));
     expect((await res.json()).error).toBe('raw text');
   });

@@ -114,5 +114,5 @@ gitignored `tmp/`.
 
 - #9: centralize the field help text.
 - The Picker's nucleus hierarchy may be simplified soon, so check with the owner before investing in it.
-- Create in SRP needs cluster-notebook's `fn-lifecycle` (merged in their PR #37). Its SRP round trip can only be tested live: there is one SRP, the real one, so never run an SRP worker against a dev DB. Renaming a nucleus already in SRP is #42.
+- SRP: each SRP neighbourhood has one **home nucleus** (`inSrp`); renames apply at once and SRP follows (cluster-notebook #39). There is one SRP, the real one: locally, only ever run cluster-notebook's worker with `--serve --fake-srp`. Moving people and activities on delete is parked (needs srp-client writes).
 - `docs/cluster-notebook-api-requirements.md` §3 still describes `parentNucleus` as read-only. In fact it is writable, gated by `canChangeIdentity`.

@@ -143,12 +143,14 @@ export interface SrpAction {
   srpChanged: boolean;
 }
 
-const SRP_SELECTION = 'inSrp srpAction { action status requestedAt error individuals activities srpChanged }';
+const SRP_SELECTION = 'inSrp srpName srpAction { action status requestedAt error individuals activities srpChanged }';
 
 export interface NucleusFields {
   // Optional: `inSrp` isn't on the cluster-notebook branch yet; `srpAction` is
   // optional here only so existing NucleusFields fixtures keep compiling.
   inSrp?: boolean;
+  // Confirmed with cluster-notebook 2026-11-18 (#39): SRP's last-known name for a home nucleus's FN; null unless inSrp.
+  srpName?: string | null;
   srpAction?: SrpAction | null;
   stage: string | null;
   locality: string | null;
