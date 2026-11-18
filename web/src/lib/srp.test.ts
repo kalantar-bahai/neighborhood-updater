@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LocalityOption, PermissionSet, SrpAction } from './clusterNotebook';
-import { canRenameNucleus, createPayload, deleteNotice, effectivePermissions, findNameClash, nextNameAfterRename, pushToSrpMode, reloadOutcome, srpBadge, srpDetailMessage, srpOutOfStepMessage, srpStateFor } from './srp';
+import { canRenameNucleus, pendingIdentityLocks, createPayload, deleteNotice, effectivePermissions, findNameClash, nextNameAfterRename, pushToSrpMode, reloadOutcome, srpBadge, srpDetailMessage, srpOutOfStepMessage, srpStateFor } from './srp';
 
 const act = (over: Partial<SrpAction> = {}): SrpAction => ({
   action: 'create', status: 'pending', requestedAt: '2026-11-16T00:00:00Z', error: null, individuals: null, activities: null, srpChanged: false, ...over,
@@ -133,10 +133,9 @@ describe('effectivePermissions', () => {
     expect(r).toEqual({ ...p, canWrite: false, canChangeIdentity: false, canDelete: false, canAssignRoles: false });
     expect(p.canWrite).toBe(true);
   });
-  it('locks identity for pending create and rename', () => {
-    expect(effectivePermissions(p, 'PENDING', 'create')).toEqual({ ...p, canChangeIdentity: false });
-    expect(effectivePermissions(p, 'PENDING', 'rename')).toEqual({ ...p, canChangeIdentity: false });
-    expect(effectivePermissions(p, 'PENDING')).toEqual({ ...p, canChangeIdentity: false });
+  it('keeps identity editable for pending create and rename (field locks come from pendingIdentityLocks)', () => {
+    expect(effectivePermissions(p, 'PENDING', 'create')).toBe(p);
+    expect(effectivePermissions(p, 'PENDING', 'rename')).toBe(p);
   });
   it('leaves other states unchanged', () => {
     for (const s of ['IN_SRP', 'REFUSED', 'FAILED', 'LOCAL_ONLY', null] as const) {
@@ -267,5 +266,19 @@ describe('srpDetailMessage once a refused rename is back in step', () => {
     expect(srpDetailMessage('IN_SRP', act({ action: 'rename', status: 'failed' }), true)).toBeNull();
     expect(srpDetailMessage('IN_SRP', refused, false)).toBe('SRP refused the rename: name in use.');
     expect(srpDetailMessage('IN_SRP', refused)).toBe('SRP refused the rename: name in use.');
+  });
+});
+
+describe('pendingIdentityLocks', () => {
+  it('locks location and type while a create waits', () => {
+    expect(pendingIdentityLocks('PENDING', 'create')).toEqual({ location: true, type: true });
+  });
+  it('locks only location while a rename waits', () => {
+    expect(pendingIdentityLocks('PENDING', 'rename')).toEqual({ location: true, type: false });
+  });
+  it('locks nothing otherwise', () => {
+    for (const s of ['IN_SRP', 'REFUSED', 'FAILED', 'LOCAL_ONLY', null] as const) {
+      expect(pendingIdentityLocks(s, 'create')).toEqual({ location: false, type: false });
+    }
   });
 });

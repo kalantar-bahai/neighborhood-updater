@@ -9,7 +9,7 @@ import type { LastUpdated, LocalityOption } from '@/lib/clusterNotebook';
 import WorkerListModal from './WorkerListModal';
 import ManageAccessCard from './ManageAccessCard';
 import SrpBadge from './SrpBadge';
-import { canRenameNucleus, deleteNotice, nextNameAfterRename, pushToSrpMode, srpDetailMessage, srpOutOfStepMessage } from '@/lib/srp';
+import { canRenameNucleus, deleteNotice, pendingIdentityLocks, nextNameAfterRename, pushToSrpMode, srpDetailMessage, srpOutOfStepMessage } from '@/lib/srp';
 import StaggeredConcentricDiagram, { formatNum, type AlignedLabel } from './StaggeredConcentricDiagram';
 
 interface Props {
@@ -719,6 +719,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // bundled with other fields). On success the shell reloads under the new name, which remounts
   // this view; on failure the field reverts and the error shows in the save-status bar.
   const canRename = canRenameNucleus(permissions.canChangeIdentity, detail.srp.state);
+  const pendingLocks = pendingIdentityLocks(detail.srp.state, detail.srp.action?.action);
   async function commitName() {
     const value = form.nucleus.trim();
     if (saving && value !== row.nucleus) {
@@ -965,7 +966,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   Nucleus (the name itself) is cluster-notebook's canonical identifier.
                   Confirmed with cluster-notebook 2026-11-18 (#39): updateNucleus { name } renames
                   any nucleus at once (a home nucleus's SRP rename follows); see canRenameNucleus. */}
-              {permissions.canChangeIdentity && srpState !== 'IN_SRP' ? (
+              {permissions.canChangeIdentity && srpState !== 'IN_SRP' && !pendingLocks.location ? (
                 <div className="field">
                   <label>Location</label>
                   <select
@@ -999,7 +1000,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   silent revert, confirmed with cluster-notebook directly, 2026-10-08,
                   commit c40fb54), so there's no point offering the control at all in
                   that case -- show it readonly instead of letting the save fail. */}
-              {permissions.canChangeIdentity && form.locationType !== 'SETTING'
+              {permissions.canChangeIdentity && form.locationType !== 'SETTING' && !pendingLocks.type
                 ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => setAndSave('nucleusType', v, { identity: { nucleusType: v } }, 'Type')} />
                 : <Field label="Type" value={form.nucleusType} readonly />
               }
