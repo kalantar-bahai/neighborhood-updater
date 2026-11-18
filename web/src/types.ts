@@ -119,7 +119,7 @@ export interface Worker {
 
 export interface NucleusDetail {
   row: NucleusRow;
-  srp: { state: SrpState | null; action: SrpAction | null };
+  srp: { state: SrpState | null; action: SrpAction | null; srpName: string | null };
   accompanierNames: Worker[];
   protagonistNames: Worker[];
   abmAssistantNames: Worker[];

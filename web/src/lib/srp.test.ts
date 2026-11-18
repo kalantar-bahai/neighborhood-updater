@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LocalityOption, PermissionSet, SrpAction } from './clusterNotebook';
-import { createPayload, effectivePermissions, findNameClash, nextNameAfterRename, reloadOutcome, srpBadge, srpDetailMessage, srpStateFor } from './srp';
+import { canRenameNucleus, createPayload, deleteNotice, effectivePermissions, findNameClash, nextNameAfterRename, pushToSrpMode, reloadOutcome, srpBadge, srpDetailMessage, srpOutOfStepMessage, srpStateFor } from './srp';
 
 const act = (over: Partial<SrpAction> = {}): SrpAction => ({
   action: 'create', status: 'pending', requestedAt: '2026-11-16T00:00:00Z', error: null, individuals: null, activities: null, srpChanged: false, ...over,
@@ -201,5 +201,61 @@ describe('failed actions that may have reached SRP (srpChanged)', () => {
     const a = act({ status: 'failed', srpChanged: false });
     expect(srpStateFor('Neighborhood', false, a, 'LOCALITY')).toBe('FAILED');
     expect(srpDetailMessage('FAILED', a)).toBe('Something went wrong sending this to SRP. Contact an admin.');
+  });
+});
+
+describe('canRenameNucleus', () => {
+  it('allows any nucleus unless a change is pending or failed', () => {
+    expect(canRenameNucleus(true, null)).toBe(true);
+    expect(canRenameNucleus(true, 'LOCAL_ONLY')).toBe(true);
+    expect(canRenameNucleus(true, 'IN_SRP')).toBe(true);
+    expect(canRenameNucleus(true, 'REFUSED')).toBe(true);
+    expect(canRenameNucleus(true, 'PENDING')).toBe(false);
+    expect(canRenameNucleus(true, 'FAILED')).toBe(false);
+    expect(canRenameNucleus(false, 'LOCAL_ONLY')).toBe(false);
+  });
+});
+
+describe('srpOutOfStepMessage', () => {
+  it('names the SRP name when it differs on a home nucleus', () => {
+    expect(srpOutOfStepMessage('IN_SRP', 'B', 'A')).toBe('SRP calls this “A”.');
+  });
+  it('is silent otherwise', () => {
+    expect(srpOutOfStepMessage('IN_SRP', 'A', 'A')).toBeNull();
+    expect(srpOutOfStepMessage('IN_SRP', 'A', null)).toBeNull();
+    expect(srpOutOfStepMessage('PENDING', 'B', 'A')).toBeNull();
+    expect(srpOutOfStepMessage('LOCAL_ONLY', 'B', 'A')).toBeNull();
+  });
+});
+
+describe('pushToSrpMode', () => {
+  const base = { state: 'LOCAL_ONLY' as const, name: 'N', srpName: null, locationType: 'LOCALITY', settingLinked: undefined, canCreateInCluster: true };
+  it('creates at a locality or an unlinked setting', () => {
+    expect(pushToSrpMode(base)).toBe('create');
+    expect(pushToSrpMode({ ...base, locationType: 'SETTING', settingLinked: false })).toBe('create');
+  });
+  it('makes a new neighbourhood from a nucleus at a linked setting', () => {
+    expect(pushToSrpMode({ ...base, locationType: 'SETTING', settingLinked: true })).toBe('newNeighbourhood');
+  });
+  it('re-sends the name for an out-of-step home nucleus', () => {
+    expect(pushToSrpMode({ ...base, state: 'IN_SRP', srpName: 'Old', locationType: 'SETTING', settingLinked: true })).toBe('resendName');
+    expect(pushToSrpMode({ ...base, state: 'IN_SRP', srpName: 'N', locationType: 'SETTING', settingLinked: true })).toBeNull();
+  });
+  it('offers nothing without permission, at the cluster, or while pending', () => {
+    expect(pushToSrpMode({ ...base, canCreateInCluster: false })).toBeNull();
+    expect(pushToSrpMode({ ...base, locationType: 'CLUSTER' })).toBeNull();
+    expect(pushToSrpMode({ ...base, state: 'PENDING' })).toBeNull();
+  });
+});
+
+describe('deleteNotice', () => {
+  const plain = 'Deleting a nucleus removes it immediately. This can’t be undone here.';
+  const home = "This also deletes its neighbourhood in SRP once SRP accepts. Other nuclei at its place move to the parent nucleus's neighbourhood, or to the locality.";
+  const kids = 'Its child nuclei move up to its parent.';
+  it('describes what moves', () => {
+    expect(deleteNotice(false, false)).toBe(plain);
+    expect(deleteNotice(true, false)).toBe(home);
+    expect(deleteNotice(false, true)).toBe(`${plain} ${kids}`);
+    expect(deleteNotice(true, true)).toBe(`${home} ${kids}`);
   });
 });

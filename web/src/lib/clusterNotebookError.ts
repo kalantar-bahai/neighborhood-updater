@@ -21,18 +21,20 @@ import { ClusterNotebookCodedError, ClusterNotebookForbiddenError } from './clus
 // table below for a status and user-facing text (a null message there means
 // "show the raw upstream message").
 // Coded errors (extensions.code other than FORBIDDEN): status + user-facing text.
-// A null message means "use the upstream message" (SRP_IN_USE carries the counts).
+// A null message means "use the upstream message".
 const CODED_ERRORS: Record<string, { status: number; message: string | null }> = {
   NAME_TAKEN: { status: 409, message: 'That name is already used by another nucleus.' },
   SRP_NAME_CLASH: { status: 409, message: 'That name is already used in this locality (in SRP or here).' },
   SRP_ACTION_PENDING: { status: 409, message: 'An SRP change for this nucleus is still pending. Try again once it finishes.' },
-  SRP_IN_USE: { status: 409, message: null },
   SRP_ALREADY_LINKED: { status: 409, message: 'This nucleus is already in SRP.' },
   SRP_NOT_AT_LOCALITY: { status: 400, message: 'Choose a locality for this nucleus before sending it to SRP.' },
   SRP_NOT_NEIGHBORHOOD: { status: 400, message: 'Only Neighborhood nuclei can be sent to SRP.' },
   // Confirmed with cluster-notebook 2026-11-16: SRP_IS_NEIGHBOURHOOD (OU spelling) -- moving a nucleus that is in SRP; their message says to delete instead.
   SRP_IS_NEIGHBOURHOOD: { status: 409, message: null },
-  SRP_NOT_DEFAULT: { status: 409, message: "This nucleus shares its Setting with another, so it can't be changed in SRP from here." },
+  // Confirmed with cluster-notebook 2026-11-18 (#39): SRP_IN_USE is gone (a home delete is queued and SRP's
+  // live count decides); SRP_NOT_DEFAULT now means "not the home nucleus"; SRP_FN_HAS_NO_HOME is new.
+  SRP_NOT_DEFAULT: { status: 409, message: "This nucleus isn't the home nucleus of its SRP neighbourhood, so it can't be changed in SRP from here." },
+  SRP_FN_HAS_NO_HOME: { status: 409, message: 'This neighbourhood in SRP has no home nucleus. Ask an admin.' },
 };
 
 export function clusterNotebookErrorResponse(e: unknown): NextResponse {
