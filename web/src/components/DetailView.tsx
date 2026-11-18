@@ -9,7 +9,7 @@ import type { LastUpdated, LocalityOption } from '@/lib/clusterNotebook';
 import WorkerListModal from './WorkerListModal';
 import ManageAccessCard from './ManageAccessCard';
 import SrpBadge from './SrpBadge';
-import { nextNameAfterRename, srpDetailMessage } from '@/lib/srp';
+import { canRenameNucleus, deleteNotice, nextNameAfterRename, pushToSrpMode, srpDetailMessage, srpOutOfStepMessage } from '@/lib/srp';
 import StaggeredConcentricDiagram, { formatNum, type AlignedLabel } from './StaggeredConcentricDiagram';
 
 interface Props {
@@ -29,6 +29,8 @@ interface Props {
   // name the current user can read, same list the main picker uses. Filtered to
   // exclude this nucleus's own name before rendering.
   allNucleusNames: string[];
+  // How many nuclei name this one as their parent; they move up to its parent if it is deleted.
+  childCount: number;
   // Open/closed state per card, keyed by card name; a missing key means the card's default.
   cardOpen: Record<string, boolean>;
   onCardOpenChange: (key: string, open: boolean) => void;
@@ -557,7 +559,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 // StaggeredConcentricDiagram (9-ring) moved to its own file, 2026-10-08, so
 // Picker.tsx can also render a rollup version of it from its own popup.
 
-export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, onRenamed, canCreateInCluster, allNucleusNames, cardOpen, onCardOpenChange }: Props) {
+export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, onRenamed, canCreateInCluster, allNucleusNames, childCount, cardOpen, onCardOpenChange }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   // Baseline to diff a blur-triggered field's current value against, so clicking into
@@ -716,8 +718,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // Rename: sends ONLY the name (saveRowData re-reads by the old name, so it must never be
   // bundled with other fields). On success the shell reloads under the new name, which remounts
   // this view; on failure the field reverts and the error shows in the save-status bar.
-  const canRename = permissions.canChangeIdentity
-    && (detail.srp.state === 'LOCAL_ONLY' || detail.srp.state === 'REFUSED');
+  const canRename = canRenameNucleus(permissions.canChangeIdentity, detail.srp.state);
   async function commitName() {
     const value = form.nucleus.trim();
     if (saving && value !== row.nucleus) {
@@ -871,12 +872,19 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const locationSetting = row.locationType === 'SETTING'
     ? detail.locationOptions.flatMap(l => l.settings).find(st => st.name === row.locationName)
     : undefined;
-  const canPushToSrp =
-    srpState === 'LOCAL_ONLY' &&
-    canCreateInCluster &&
-    (row.locationType === 'LOCALITY' || (locationSetting !== undefined && locationSetting.srpLinked === false));
+  const pushMode = pushToSrpMode({
+    state: srpState,
+    name: row.nucleus,
+    srpName: detail.srp.srpName,
+    locationType: row.locationType,
+    settingLinked: locationSetting?.srpLinked,
+    canCreateInCluster,
+  });
+  const srpOutOfStep = srpOutOfStepMessage(srpState, row.nucleus, detail.srp.srpName);
 
   async function pushToSrp() {
+    if (pushMode === 'newNeighbourhood'
+      && !window.confirm(`This creates a new neighbourhood in SRP named “${row.nucleus}” and moves this nucleus there.`)) return;
     setPushing(true);
     try {
       const res = await fetch('/api/nucleus/push-srp', {
@@ -955,8 +963,8 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   already scoped to this nucleus's own cluster and to what this
                   caller can read -- confirmed with cluster-notebook directly.
                   Nucleus (the name itself) is cluster-notebook's canonical identifier.
-                  Confirmed with cluster-notebook 2026-11-16: updateNucleus { name } renames;
-                  editable here only while not in SRP (in-SRP rename is issue #42). */}
+                  Confirmed with cluster-notebook 2026-11-18 (#39): updateNucleus { name } renames
+                  any nucleus at once (a home nucleus's SRP rename follows); see canRenameNucleus. */}
               {permissions.canChangeIdentity && srpState !== 'IN_SRP' ? (
                 <div className="field">
                   <label>Location</label>
@@ -1054,13 +1062,14 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                     {srpState === 'PENDING' && (
                       <button type="button" onClick={onReload} aria-label="Refresh SRP status" title="Refresh" style={{ background: 'none', border: 'none', padding: '0 4px', color: '#3182ce', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>↻</button>
                     )}
-                    {canPushToSrp && (
+                    {pushMode && (
                       <button type="button" disabled={pushing} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #3182ce', background: '#3182ce', color: 'white', fontSize: 13, cursor: pushing ? 'default' : 'pointer', opacity: pushing ? 0.6 : 1 }} onClick={pushToSrp}>
                         {pushing ? 'Sending…' : 'Push to SRP'}
                       </button>
                     )}
                   </div>
                   {srpMessage && <div style={{ fontSize: 12, color: '#c53030', marginTop: 6 }}>{srpMessage}</div>}
+                  {srpOutOfStep && <div style={{ fontSize: 12, color: '#718096', marginTop: 6 }}>{srpOutOfStep}</div>}
                 </div>
               )}
             </div>
@@ -1085,11 +1094,10 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 This nucleus is at a Setting, so its type is fixed to Neighborhood. Move it to a Locality or the Cluster to set Network or Population instead.
               </p>
             )}
-            {/* Confirmed with cluster-notebook 2026-11-16: moving a nucleus already in SRP is refused
-                (SRP_IS_NEIGHBOURHOOD), and renaming one is not built yet (#42). */}
+            {/* Confirmed with cluster-notebook 2026-11-16: moving a home nucleus is refused (SRP_IS_NEIGHBOURHOOD). */}
             {srpState === 'IN_SRP' && permissions.canChangeIdentity && (
               <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>
-                Name and location can&apos;t be changed here while this nucleus is in SRP.
+                Location can&apos;t be changed while this nucleus is in SRP.
               </p>
             )}
             {locationWarning && (
@@ -1372,7 +1380,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             {dangerOpen && (
               <div className="card-body">
                 <p style={{ fontSize: 13, color: '#744210', background: '#fffbeb', border: '1px solid #f6e05e', borderRadius: 6, padding: '8px 12px', margin: 0 }}>
-                  Deleting a nucleus removes it immediately. This can&rsquo;t be undone here.
+                  {deleteNotice(srpState === 'IN_SRP', childCount > 0)}
                 </p>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 4 }}>
                   <div className="field" style={{ flex: 1, margin: 0 }}>
