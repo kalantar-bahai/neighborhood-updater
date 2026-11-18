@@ -8,7 +8,7 @@ import type { PermissionSet } from '@/lib/access';
 import type { LastUpdated, LocalityOption } from '@/lib/clusterNotebook';
 import WorkerListModal from './WorkerListModal';
 import ManageAccessCard from './ManageAccessCard';
-import SrpBadge from './SrpBadge';
+import { SrpDot } from './SrpBadge';
 import { canRenameNucleus, deleteNotice, pendingIdentityLocks, nextNameAfterRename, pushToSrpMode, srpDetailMessage, srpOutOfStepMessage } from '@/lib/srp';
 import StaggeredConcentricDiagram, { formatNum, type AlignedLabel } from './StaggeredConcentricDiagram';
 
@@ -89,8 +89,8 @@ function actTotal(acts: (Activity | undefined)[]) {
   }), { act: 0, part: 0, fof: 0 });
 }
 
-function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabelClick, highlighted, onSync, fromSheet, info }: {
-  label: string; value: string; onChange?: (v: string) => void; onBlur?: () => void; readonly?: boolean; type?: string; integer?: boolean;
+function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabelClick, highlighted, onSync, fromSheet, info, labelExtra }: {
+  label: string; labelExtra?: React.ReactNode; value: string; onChange?: (v: string) => void; onBlur?: () => void; readonly?: boolean; type?: string; integer?: boolean;
   onLabelClick?: () => void; highlighted?: boolean; onSync?: () => void; fromSheet?: boolean; info?: string;
 }) {
   const hasError = integer && !readonly && !isValidInt(value);
@@ -112,7 +112,7 @@ function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabe
             <span onClick={e => { lastLabelClickTime = e.timeStamp; onLabelClick(); }} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}><IcoList /></span>
           </label>
         )
-        : <label style={{ display: 'inline-flex', alignItems: 'center' }}>{label}{info && <InfoTip text={info} />}</label>
+        : <label style={{ display: 'inline-flex', alignItems: 'center' }}>{label}{labelExtra}{info && <InfoTip text={info} />}</label>
       }
       <div style={{ position: 'relative' }}>
         <input
@@ -882,6 +882,16 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     canCreateInCluster,
   });
   const srpOutOfStep = srpOutOfStepMessage(srpState, row.nucleus, detail.srp.srpName);
+  // SRP status shows as a dot beside the Location label (owner, 2026-11-18); Refresh sits beside it
+  // while a change is pending, and Push and the messages sit with the notes at the bottom of the card.
+  const srpLabelExtra = (
+    <>
+      <SrpDot state={srpState} action={detail.srp.action?.action} />
+      {srpState === 'PENDING' && (
+        <button type="button" onClick={onReload} aria-label="Refresh SRP status" title="Refresh" style={{ background: 'none', border: 'none', padding: '0 4px', color: '#3182ce', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>↻</button>
+      )}
+    </>
+  );
 
   async function pushToSrp() {
     if (pushMode === 'newNeighbourhood'
@@ -968,7 +978,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   any nucleus at once (a home nucleus's SRP rename follows); see canRenameNucleus. */}
               {permissions.canChangeIdentity && srpState !== 'IN_SRP' && !pendingLocks.location ? (
                 <div className="field">
-                  <label>Location</label>
+                  <label style={{ display: 'inline-flex', alignItems: 'center' }}>Location{srpLabelExtra}</label>
                   <select
                     value={form.locationName}
                     onChange={e => setAndSave('locationName', e.target.value, { identity: { location: e.target.value } }, 'Location', true)}
@@ -985,7 +995,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   </select>
                 </div>
               ) : (
-                <Field label="Location" value={form.locationName} readonly />
+                <Field label="Location" labelExtra={srpLabelExtra} value={form.locationName} readonly />
               )}
               <Field
                 label="Nucleus"
@@ -1055,24 +1065,6 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
               ) : (
                 <Field label="Parent Nucleus" value={form.parentNucleus} readonly />
               )}
-              {srpState && (
-                <div className="field">
-                  <label>SRP status</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minHeight: 32 }}>
-                    <SrpBadge state={srpState} action={detail.srp.action?.action} />
-                    {srpState === 'PENDING' && (
-                      <button type="button" onClick={onReload} aria-label="Refresh SRP status" title="Refresh" style={{ background: 'none', border: 'none', padding: '0 4px', color: '#3182ce', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>↻</button>
-                    )}
-                    {pushMode && (
-                      <button type="button" disabled={pushing} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #3182ce', background: '#3182ce', color: 'white', fontSize: 13, cursor: pushing ? 'default' : 'pointer', opacity: pushing ? 0.6 : 1 }} onClick={pushToSrp}>
-                        {pushing ? 'Sending…' : 'Push to SRP'}
-                      </button>
-                    )}
-                  </div>
-                  {srpMessage && <div style={{ fontSize: 12, color: '#c53030', marginTop: 6 }}>{srpMessage}</div>}
-                  {srpOutOfStep && <div style={{ fontSize: 12, color: '#718096', marginTop: 6 }}>{srpOutOfStep}</div>}
-                </div>
-              )}
             </div>
             {/* Confirmed with cluster-notebook directly, 2026-10-08: permissions
                 follow nesting, so a pocket's own location doesn't affect whether
@@ -1100,6 +1092,15 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
               <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>
                 Location can&apos;t be changed while this nucleus is in SRP.
               </p>
+            )}
+            {srpMessage && <p style={{ fontSize: 12, color: '#c53030', margin: '4px 0 0' }}>{srpMessage}</p>}
+            {srpOutOfStep && <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>{srpOutOfStep}</p>}
+            {pushMode && (
+              <div style={{ marginTop: 6 }}>
+                <button type="button" disabled={pushing} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #3182ce', background: '#3182ce', color: 'white', fontSize: 13, cursor: pushing ? 'default' : 'pointer', opacity: pushing ? 0.6 : 1 }} onClick={pushToSrp}>
+                  {pushing ? 'Sending…' : 'Push to SRP'}
+                </button>
+              </div>
             )}
             {locationWarning && (
               <p style={{ fontSize: 12, color: '#975a16', background: '#fffaf0', border: '1px solid #f6e05e', borderRadius: 6, padding: '6px 10px', margin: '4px 0 0' }}>

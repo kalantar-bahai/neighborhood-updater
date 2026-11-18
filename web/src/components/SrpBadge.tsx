@@ -27,3 +27,20 @@ export default function SrpBadge({ state, action }: { state: SrpState | null; ac
     </span>
   );
 }
+
+// Experiment (2026-11-18): a small coloured dot beside the Location label, as a
+// lighter alternative to the SRP status tag. Hover/long-press shows the words.
+const DOT = { green: '#38a169', amber: '#d69e2e', red: '#e53e3e', grey: '#a0aec0' } as const;
+
+export function SrpDot({ state, action }: { state: SrpState | null; action?: SrpAction['action'] }) {
+  if (!state) return null;
+  const { label, color } = srpBadge(state, action);
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: DOT[color], marginLeft: 6, flexShrink: 0 }}
+    />
+  );
+}
