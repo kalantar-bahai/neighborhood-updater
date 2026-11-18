@@ -105,11 +105,24 @@ export function effectivePermissions(
   state: SrpState | null,
   action?: SrpAction['action'],
 ): PermissionSet {
-  if (state !== 'PENDING') return p;
-  if (action === 'delete') {
+  // Only a pending delete locks the whole page (cluster-notebook refuses every edit then). A pending
+  // create or rename locks just the fields in pendingIdentityLocks, so e.g. parents can be set right
+  // after a batch of creates (owner, 2026-11-18).
+  if (state === 'PENDING' && action === 'delete') {
     return { ...p, canWrite: false, canChangeIdentity: false, canDelete: false, canAssignRoles: false };
   }
-  return { ...p, canChangeIdentity: false };
+  return p;
+}
+
+// Identity fields that stay locked while a create or rename waits for SRP. The name is locked by
+// canRenameNucleus. Location: cluster-notebook refuses moves while an action is open (SRP_ACTION_PENDING).
+// Type: switching a nucleus away from Neighborhood mid-create would leave SRP creating a neighbourhood for it.
+export function pendingIdentityLocks(
+  state: SrpState | null,
+  action?: SrpAction['action'],
+): { location: boolean; type: boolean } {
+  if (state !== 'PENDING') return { location: false, type: false };
+  return { location: true, type: action === 'create' };
 }
 
 export function createPayload(input: {
