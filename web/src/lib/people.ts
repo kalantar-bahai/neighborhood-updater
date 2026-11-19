@@ -157,3 +157,9 @@ export function rolesToClear(held: string[], editable: (role: string) => boolean
 export function isMoving(rows: PersonRow[]): boolean {
   return rows.some(r => r.placeSync?.status === 'pending' || r.placeSync?.status === 'in_flight');
 }
+
+// The roles the caller may change on a nucleus: known roles plus any held there, filtered by canEditRole.
+// Sent with /api/people so the card can ask about roles at someone's old nucleus.
+export function editableRoles(p: PermissionSet, rows: PersonRow[]): string[] {
+  return sortRoles([...KNOWN_ROLES, ...rows.flatMap(r => r.roles)]).filter(role => canEditRole(p, role));
+}

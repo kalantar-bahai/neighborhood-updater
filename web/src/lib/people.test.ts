@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
+import { editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
 import type { MoveContext, PermissionSet, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -220,3 +220,11 @@ describe('isMoving', () => {
   });
 });
 type PlaceSyncStatus = 'pending' | 'in_flight' | 'synced' | 'refused' | 'failed' | 'not_in_srp';
+
+describe('editableRoles', () => {
+  test('known and held roles the caller may change', () => {
+    const rows = [row('A', ['cso']), row('B', ['promoter'])];
+    expect(editableRoles(perms({ assignableRoles: ['accompanier', 'cso'] }), rows)).toEqual(['promoter', 'protagonist', 'accompanier', 'cso']);
+    expect(editableRoles(perms({ canAssignRoles: false }), rows)).toEqual([]);
+  });
+});

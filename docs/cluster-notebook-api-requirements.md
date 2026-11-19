@@ -202,3 +202,28 @@ Query.individuals(nucleusName: String!, search: String = null, limit: Int = null
 - `PersonSummary.id` is the id `updateNucleusWorkers.personIds` takes.
 - Breaking change: `individuals` returns `PersonSummary`, not `Individual`. We switched our selection to the name
   fields first (PR #48). `workers(role)` and `createIndividual` still return `Individual`.
+
+## People card moves, confirmed with cluster-notebook 2026-11-19
+
+Phase 2 of the People card (spec `docs/superpowers/specs/2026-11-19-people-card-moves-design.md`). Built on
+cluster-notebook branch `move-individuals`; SRP follows through srp-client `set_place`.
+
+- `Location.id: String!` on every Location (`PersonSummary.place`, `Nucleus.location`, ...). Moves always use it,
+  never a name: setting names repeat across localities (cluster-notebook #41).
+- `moveIndividuals(individualIds: [String!]!, locationId: String!, withHousehold: Boolean = false): [MoveResult!]!`
+  - `MoveResult { individual: PersonSummary  moved: Boolean!  code: String }`. Per-person codes `NOT_FOUND`,
+    `OTHER_CLUSTER`, `FORBIDDEN`, `ALREADY_THERE`; `individual` is null for the first three (privacy).
+  - Whole-call errors (`extensions.code`): `FORBIDDEN`, `LOCATION_NOT_FOUND`, `NOT_A_PLACE` (a Cluster, a Nucleus, or a
+    Setting not linked to an SRP FN).
+  - We always send `withHousehold: true` (owner, 2026-11-19: srp-client looks up the household contact, so a
+    household moves together).
+  - Permission: the caller can edit the home nucleus of the old place or the new one; where a side has no home
+    nucleus, editing any nucleus in the person's cluster counts.
+- `PersonSummary.placeSync: PlaceSync` (null if no change): `{ status code error household householdSize requestedAt }`.
+  We read `status` (`pending | in_flight | synced | refused | failed | not_in_srp`) and `code`, never `error` (#43).
+  Refusal codes: `FN_NOT_IN_LOCALITY`, `LOCATION_NOT_FOUND`, `NOT_IN_SRP_RECORDS`, `OUT_OF_SCOPE`, `INVALID`; a failed
+  write carries SRP's code (e.g. `O026`, record locked).
+- **Agreed, not yet built:** `Location.localityId` (the containing Locality's id for a SETTING, else null) and
+  `Location.homeNucleus` (the home nucleus name for an FN Setting, else null; may also be null when not visible to the
+  caller). `Nucleus.parentNucleus { inSrp location { … } }` exists today. Until these ship, move-out has no
+  destination and the move-in roles question is skipped.

@@ -35,6 +35,9 @@ const CODED_ERRORS: Record<string, { status: number; message: string | null }> =
   // live count decides); SRP_NOT_DEFAULT now means "not the home nucleus"; SRP_FN_HAS_NO_HOME is new.
   SRP_NOT_DEFAULT: { status: 409, message: "This nucleus isn't the home nucleus of its SRP neighbourhood, so it can't be changed in SRP from here." },
   SRP_FN_HAS_NO_HOME: { status: 409, message: 'This neighbourhood in SRP has no home nucleus. Ask an admin.' },
+  // Confirmed with cluster-notebook 2026-11-19 (moveIndividuals whole-call refusals).
+  LOCATION_NOT_FOUND: { status: 400, message: "That place doesn't exist any more. Reload and try again." },
+  NOT_A_PLACE: { status: 400, message: 'People can only be moved to a locality or a neighbourhood in SRP.' },
 };
 
 export function clusterNotebookErrorResponse(e: unknown): NextResponse {

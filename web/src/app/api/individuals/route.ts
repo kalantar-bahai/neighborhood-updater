@@ -24,7 +24,11 @@ export async function GET(req: NextRequest) {
   try {
     const { items, more } = limitResults(await searchIndividuals(nucleus, search, SEARCH_LIMIT + 1));
     return NextResponse.json({
-      individuals: items.map(ind => ({ id: ind.id, name: individualDisplayName(ind), place: placePath(ind.place) })),
+      individuals: items.map(ind => ({
+        id: ind.id, name: individualDisplayName(ind), place: placePath(ind.place),
+        // For a move in: their current place's home nucleus, to ask about their roles there.
+        homeNucleus: ind.place?.homeNucleus ?? null, placeId: ind.place?.id ?? null,
+      })),
       more,
     });
   } catch (e: unknown) {
