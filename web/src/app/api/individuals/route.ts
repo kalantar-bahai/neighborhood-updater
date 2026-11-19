@@ -3,10 +3,11 @@ import { auth } from '@clerk/nextjs/server';
 import { getNucleusPermissions } from '@/lib/access';
 import { searchIndividuals, createIndividual, individualDisplayName } from '@/lib/clusterNotebook';
 import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
+import { SEARCH_LIMIT, limitResults, placePath } from '@/lib/people';
 
-// Both routes require write access, matching /api/workers -- searching/creating
-// individuals only ever happens as part of editing a worker list, never a pure
-// read view.
+// Both routes require write access -- searching/creating individuals only happens while
+// adding someone to a nucleus. The search covers everyone placed in the cluster (owner,
+// 2026-11-18) and returns names and place only.
 export async function GET(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) {
@@ -21,9 +22,10 @@ export async function GET(req: NextRequest) {
   if (!permissions.canWrite) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
   try {
-    const individuals = await searchIndividuals(nucleus, search);
+    const { items, more } = limitResults(await searchIndividuals(nucleus, search, SEARCH_LIMIT + 1));
     return NextResponse.json({
-      individuals: individuals.map(ind => ({ id: ind.id, name: individualDisplayName(ind) })),
+      individuals: items.map(ind => ({ id: ind.id, name: individualDisplayName(ind), place: placePath(ind.place) })),
+      more,
     });
   } catch (e: unknown) {
     return clusterNotebookErrorResponse(e);

@@ -178,3 +178,27 @@ Given devotionals (§2/§3, one of four activity rollups) is done, natural next 
 **`nucleusType` — done, 2026-09-13.** You exposed `nucleusType` (query + patch); it always reads "Neighborhood" when `location` is set. Initially held this back over a miscategorization concern (our picker groups nuclei into Neighborhood/Network/Population cards by this field), but the user corrected the premise: Network/Population nuclei aren't location-bound by definition, so they'd never have a `location` set and would naturally take the settable path, keeping their real stored type. The override only ever fires for nuclei that are already location-bound Neighborhoods — not a data-corruption risk. Wired up on both the detail view and the picker (`/api/initial-data`, matching how locality/stage/devotionals are sourced there).
 
 No response needed by any deadline — this is context for whatever schema-design work you're already doing. Happy to answer follow-up questions about any field's exact current semantics.
+
+## People card, confirmed with cluster-notebook 2026-11-18 (phase 1, main eb96f9d)
+
+Design: `docs/superpowers/specs/2026-11-18-people-card-design.md`.
+
+```graphql
+type PersonSummary { id: String! firstName: String middleNames: String familyName: String nickname: String place: Location }
+type Location { name: String! type: PlaceType! locality: String cluster: String }  # locality only for a SETTING; cluster null for a CLUSTER
+type NucleusPerson { individual: PersonSummary! roles: [String!]! isResident: Boolean! }
+Nucleus.people: [NucleusPerson!]!
+Query.individuals(nucleusName: String!, search: String = null, limit: Int = null): [PersonSummary!]!
+```
+
+- `people`: current roles held on this nucleus itself (not at its Cluster or Locality), plus, on a home nucleus
+  only, everyone placed at its Setting (`isResident`). A parent's list doesn't include its children's people.
+  Ordered by family then first name. Readable wherever the nucleus is readable.
+- `individuals`: everyone placed in the nucleus's cluster, not only role holders. Needs WRITE on the nucleus (a
+  reader gets `[]`). We ask for `limit: 21` and show 20.
+- Owner's rulings (new read exposures, recorded in cluster-notebook's authorization rules): readers of a nucleus
+  see the names of its people, including residents with no role; editors can search everyone in the cluster.
+  Names and place only: `PersonSummary` has no phone, email, sex or age.
+- `PersonSummary.id` is the id `updateNucleusWorkers.personIds` takes.
+- Breaking change: `individuals` returns `PersonSummary`, not `Individual`. We switched our selection to the name
+  fields first (PR #48). `workers(role)` and `createIndividual` still return `Individual`.

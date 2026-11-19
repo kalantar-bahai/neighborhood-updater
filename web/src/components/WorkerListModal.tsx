@@ -43,7 +43,9 @@ function iconBtn(onClick: () => void, title: string, color: string, children: Re
 export default function WorkerListModal({ title, role, nucleus, workers, importWorkers, single, onChange, onClose }: Props) {
   const [list, setList] = useState<Worker[]>(workers);
   const [input, setInput] = useState('');
-  const [suggestions, setSuggestions] = useState<Worker[]>([]);
+  // place: the person's Cluster › Locality › Setting path, since names repeat across localities.
+  const [suggestions, setSuggestions] = useState<(Worker & { place?: string })[]>([]);
+  const [more, setMore] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -68,6 +70,7 @@ export default function WorkerListModal({ title, role, nucleus, workers, importW
         if (seq !== searchSeq.current) return;
         if (!res.ok) throw new Error(data.error || 'Search failed');
         setSuggestions(data.individuals);
+        setMore(Boolean(data.more));
         setHighlighted(0);
       } catch (e: unknown) {
         if (seq === searchSeq.current) setError(e instanceof Error ? e.message : String(e));
@@ -85,6 +88,7 @@ export default function WorkerListModal({ title, role, nucleus, workers, importW
     // from an earlier, shorter substring instead of the name just typed. That
     // silently added/re-added the wrong (often already-present) person.
     setSuggestions([]);
+    setMore(false);
     if (!value.trim()) {
       setSearching(false);
     }
@@ -251,9 +255,10 @@ export default function WorkerListModal({ title, role, nucleus, workers, importW
                   onMouseEnter={() => setHighlighted(i)}
                   style={{ padding: '8px 10px', fontSize: 14, cursor: 'pointer', background: i === highlighted ? '#ebf8ff' : 'white' }}
                 >
-                  {s.name}
+                  {s.name}{s.place && <span style={{ color: '#718096' }}> · {s.place}</span>}
                 </div>
               ))}
+              {more && <div style={{ padding: '6px 10px', fontSize: 12, color: '#718096' }}>Keep typing to narrow the list.</div>}
             </div>
           )}
         </div>
