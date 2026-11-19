@@ -202,7 +202,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
             <div key={r.id} style={{ borderBottom: '1px solid #f7fafc', padding: '6px 0' }}>
               <div
                 onClick={anyEditable ? () => (editing?.id === r.id ? setEditing(null) : startEdit({ ...r, isNew: false })) : undefined}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, cursor: anyEditable ? 'pointer' : 'default' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: anyEditable ? 'pointer' : 'default' }}
               >
                 <span style={{ fontSize: 14 }}>{r.name}</span>
                 <RoleMarks row={r} isHome={isHome} />
