@@ -555,10 +555,15 @@ export interface Individual {
 
 const INDIVIDUAL_SELECTION = 'id firstName familyName middleNames nickname sex phone email ageCategory';
 
+// The name fields only. Confirmed with cluster-notebook 2026-11-18: individuals() returns PersonSummary,
+// which has no sex, phone, email or ageCategory. These fields are valid on both Individual and PersonSummary.
+export type PersonName = Pick<Individual, 'id' | 'firstName' | 'familyName' | 'middleNames' | 'nickname'>;
+const PERSON_NAME_SELECTION = 'id firstName familyName middleNames nickname';
+
 // Simple display-name composition -- cluster-notebook's Individual already has
 // firstName/middleNames/familyName/nickname as separate fields (unlike SRP's own
 // single-string convention), so no parsing needed, just a readable join.
-export function individualDisplayName(ind: Individual): string {
+export function individualDisplayName(ind: PersonName): string {
   const parts = [ind.firstName, ind.middleNames, ind.familyName].filter(Boolean);
   const name = parts.join(' ') || '(unnamed)';
   return ind.nickname ? `${name} (${ind.nickname})` : name;
@@ -567,13 +572,13 @@ export function individualDisplayName(ind: Individual): string {
 // PII-scoped to the cluster containing nucleusName (via existing role assignments) --
 // never notebook-wide. `search` is optional token matching across name fields; pass
 // undefined/omit for no filter (still scoped to the cluster).
-export async function searchIndividuals(nucleusName: string, search?: string): Promise<Individual[]> {
+export async function searchIndividuals(nucleusName: string, search?: string): Promise<PersonName[]> {
   const query = `
     query SearchIndividuals($nucleusName: String!, $search: String) {
-      individuals(nucleusName: $nucleusName, search: $search) { ${INDIVIDUAL_SELECTION} }
+      individuals(nucleusName: $nucleusName, search: $search) { ${PERSON_NAME_SELECTION} }
     }
   `;
-  const data = await request<{ individuals: Individual[] }>(query, { nucleusName, search: search ?? null });
+  const data = await request<{ individuals: PersonName[] }>(query, { nucleusName, search: search ?? null });
   return data.individuals;
 }
 

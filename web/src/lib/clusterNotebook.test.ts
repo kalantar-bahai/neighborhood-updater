@@ -10,7 +10,7 @@ import {
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
   getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions,
 } from './clusterNotebook';
-import type { Individual } from './clusterNotebook';
+import type { Individual, PersonName } from './clusterNotebook';
 import { auth } from '@clerk/nextjs/server';
 
 const mockFetch = vi.fn();
@@ -702,7 +702,7 @@ describe('individualDisplayName', () => {
 
 describe('searchIndividuals', () => {
   test('sends the nucleusName and search term, scoped to that nucleus\'s cluster', async () => {
-    const alice: Individual = { id: '1', firstName: 'Alice', familyName: 'Smith', middleNames: null, nickname: null, sex: null, phone: null, email: null, ageCategory: 'Adult' };
+    const alice: PersonName = { id: '1', firstName: 'Alice', familyName: 'Smith', middleNames: null, nickname: null };
     mockFetch.mockResolvedValue(jsonResponse({ data: { individuals: [alice] } }));
 
     const result = await searchIndividuals('Alpha', 'Ali');
@@ -710,6 +710,18 @@ describe('searchIndividuals', () => {
     expect(result).toEqual([alice]);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables).toEqual({ nucleusName: 'Alpha', search: 'Ali' });
+  });
+
+  // Confirmed with cluster-notebook 2026-11-18: individuals() is about to return PersonSummary
+  // (names only; no sex, phone, email or ageCategory), so asking for those would fail validation.
+  test('asks only for id and name fields', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { individuals: [] } }));
+
+    await searchIndividuals('Alpha');
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    const selection = (body.query as string).match(/individuals\([^)]*\)\s*\{([^}]*)\}/)![1].trim().split(/\s+/).sort();
+    expect(selection).toEqual(['familyName', 'firstName', 'id', 'middleNames', 'nickname']);
   });
 
   test('sends null search when omitted', async () => {
