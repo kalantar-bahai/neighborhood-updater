@@ -96,13 +96,13 @@ describe('nextRoleIds', () => {
 describe('toPersonRow', () => {
   test('uses the display name and keeps roles and residency', () => {
     const r = toPersonRow({
-      individual: { id: '7', firstName: 'Ana', middleNames: null, familyName: 'Lopez', nickname: 'Annie', place: null },
+      individual: { id: '7', firstName: 'Ana', middleNames: null, familyName: 'Lopez', nickname: 'Annie', place: null, placeSync: null },
       roles: ['promoter'], isResident: true,
     });
     expect(r).toEqual({ id: '7', name: 'Ana Lopez (Annie)', familyFirst: 'Lopez, Ana (Annie)', roles: ['promoter'], isResident: true });
   });
   test('family-first name copes with missing parts', () => {
-    const ind = { id: '8', firstName: 'Ana', middleNames: 'Maria', familyName: 'Lopez', nickname: null, place: null };
+    const ind = { id: '8', firstName: 'Ana', middleNames: 'Maria', familyName: 'Lopez', nickname: null, place: null, placeSync: null };
     const person = (over: object) => toPersonRow({ individual: { ...ind, ...over }, roles: [], isResident: true }).familyFirst;
     expect(person({})).toBe('Lopez, Ana Maria');
     expect(person({ firstName: null, middleNames: null })).toBe('Lopez');

@@ -562,12 +562,26 @@ const PERSON_NAME_SELECTION = 'id firstName familyName middleNames nickname';
 
 // Confirmed with cluster-notebook 2026-11-18 (People card, phase 1): a person's place is a Cluster,
 // Locality or Setting. `locality` is set only for a SETTING; `cluster` is null for a CLUSTER.
-export interface PlaceSummary { name: string; type: PlaceType; locality: string | null; cluster: string | null }
-export interface PersonSummary extends PersonName { place: PlaceSummary | null }
+// Phase 2 (2026-11-19): `id` identifies the place for moves (never move by name: names repeat, #41).
+// `localityId` is the containing Locality's id for a SETTING, else null. `homeNucleus` is the name of
+// the home nucleus whose FN this Setting is, else null (null may also mean "not visible to you").
+// localityId and homeNucleus were agreed with cluster-notebook 2026-11-19 but not yet built.
+export interface PlaceSummary {
+  id: string; name: string; type: PlaceType; locality: string | null; cluster: string | null;
+  localityId: string | null; homeNucleus: string | null;
+}
+// Confirmed with cluster-notebook 2026-11-19: the person's latest place change, or null if none.
+// Key off `code`, never the raw `error` text (#43).
+export interface PlaceSync {
+  status: 'pending' | 'in_flight' | 'synced' | 'refused' | 'failed' | 'not_in_srp';
+  code: string | null;
+}
+export interface PersonSummary extends PersonName { place: PlaceSummary | null; placeSync: PlaceSync | null }
 // roles: those held on this nucleus itself (not at its Cluster or Locality). isResident: placed at this
 // nucleus's Setting, and only ever true on a home nucleus.
 export interface NucleusPerson { individual: PersonSummary; roles: string[]; isResident: boolean }
-const PERSON_SUMMARY_SELECTION = `${PERSON_NAME_SELECTION} place { name type locality cluster }`;
+const PLACE_SELECTION = 'id name type locality cluster localityId homeNucleus';
+const PERSON_SUMMARY_SELECTION = `${PERSON_NAME_SELECTION} place { ${PLACE_SELECTION} } placeSync { status code }`;
 
 // individualDisplayName lives in personName.ts so browser code can use it without importing this
 // server-only module; re-exported here for existing callers.
@@ -596,6 +610,40 @@ export async function getNucleusPeople(nucleusName: string): Promise<NucleusPers
   `;
   const data = await request<{ nucleus: { people: NucleusPerson[] } | null }>(query, { name: nucleusName });
   return data.nucleus?.people ?? null;
+}
+
+// Confirmed with cluster-notebook 2026-11-19: one result per person. `individual` is null for
+// NOT_FOUND, OTHER_CLUSTER and FORBIDDEN (privacy); `code` is null when moved. Whole-call refusals
+// (FORBIDDEN, LOCATION_NOT_FOUND, NOT_A_PLACE) come back as GraphQL errors.
+export interface MoveResult { individual: PersonSummary | null; moved: boolean; code: string | null }
+
+export async function moveIndividuals(individualIds: string[], locationId: string, withHousehold: boolean): Promise<MoveResult[]> {
+  const mutation = `
+    mutation MoveIndividuals($individualIds: [String!]!, $locationId: String!, $withHousehold: Boolean) {
+      moveIndividuals(individualIds: $individualIds, locationId: $locationId, withHousehold: $withHousehold) {
+        individual { ${PERSON_SUMMARY_SELECTION} } moved code
+      }
+    }
+  `;
+  const data = await request<{ moveIndividuals: MoveResult[] }>(mutation, { individualIds, locationId, withHousehold });
+  return data.moveIndividuals;
+}
+
+// Where a nucleus is, and its parent, to work out where "move out" goes. null when not found.
+export interface MoveContext { location: PlaceSummary | null; parent: { inSrp: boolean; location: PlaceSummary | null } | null }
+
+export async function getMoveContext(nucleusName: string): Promise<MoveContext | null> {
+  const query = `
+    query GetMoveContext($name: String!) {
+      nucleus(name: $name) {
+        location { ${PLACE_SELECTION} }
+        parentNucleus { inSrp location { ${PLACE_SELECTION} } }
+      }
+    }
+  `;
+  const data = await request<{ nucleus: { location: PlaceSummary | null; parentNucleus: MoveContext['parent'] } | null }>(query, { name: nucleusName });
+  if (!data.nucleus) return null;
+  return { location: data.nucleus.location, parent: data.nucleus.parentNucleus };
 }
 
 // Intentionally dumb on cluster-notebook's side: `name` becomes the entire

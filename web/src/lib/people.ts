@@ -21,7 +21,7 @@ export const KNOWN_ROLES = ROLES.map(r => r.role);
 export const RESIDENT = { label: 'Resident', icon: '🏠' };
 
 // Names like "Parkside" repeat across localities, so search results show the whole path.
-export function placePath(place: PlaceSummary | null): string {
+export function placePath(place: Pick<PlaceSummary, 'name' | 'type' | 'cluster' | 'locality'> | null): string {
   if (!place) return '';
   return [place.cluster, place.locality, place.name].filter(Boolean).join(' › ');
 }
