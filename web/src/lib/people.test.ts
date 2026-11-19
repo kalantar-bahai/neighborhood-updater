@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { placePath, roleLabel, canEditRole, peopleFilters, filterPeople, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
+import { sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
 import type { PermissionSet } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -7,7 +7,7 @@ const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
   assignableRoles: [], createableEntityTypes: [], ...over,
 });
 
-const row = (name: string, roles: string[], isResident = false): PersonRow => ({ id: name, name, roles, isResident });
+const row = (name: string, roles: string[], isResident = false): PersonRow => ({ id: name, name, familyFirst: name, roles, isResident });
 
 describe('placePath', () => {
   test('a Setting shows cluster, locality and setting', () => {
@@ -99,7 +99,14 @@ describe('toPersonRow', () => {
       individual: { id: '7', firstName: 'Ana', middleNames: null, familyName: 'Lopez', nickname: 'Annie', place: null },
       roles: ['promoter'], isResident: true,
     });
-    expect(r).toEqual({ id: '7', name: 'Ana Lopez (Annie)', roles: ['promoter'], isResident: true });
+    expect(r).toEqual({ id: '7', name: 'Ana Lopez (Annie)', familyFirst: 'Lopez, Ana (Annie)', roles: ['promoter'], isResident: true });
+  });
+  test('family-first name copes with missing parts', () => {
+    const ind = { id: '8', firstName: 'Ana', middleNames: 'Maria', familyName: 'Lopez', nickname: null, place: null };
+    const person = (over: object) => toPersonRow({ individual: { ...ind, ...over }, roles: [], isResident: true }).familyFirst;
+    expect(person({})).toBe('Lopez, Ana Maria');
+    expect(person({ firstName: null, middleNames: null })).toBe('Lopez');
+    expect(person({ familyName: null })).toBe('Ana Maria');
   });
 });
 
@@ -121,5 +128,16 @@ describe('people.ts stays browser-safe', () => {
     const src = readFileSync(new URL('./people.ts', import.meta.url), 'utf8');
     const imports = src.match(/^import .* from '\.\/clusterNotebook';$/gm) ?? [];
     expect(imports.every(line => line.startsWith('import type '))).toBe(true);
+  });
+});
+
+describe('sortPeople', () => {
+  const p = (name: string, familyFirst: string): PersonRow => ({ id: name, name, familyFirst, roles: [], isResident: true });
+  const rows = [p('carla Diaz', 'Diaz, carla'), p('Ben Okafor', 'Okafor, Ben'), p('Zoe Adams', 'Adams, Zoe')];
+  test('by first name, ignoring case', () => {
+    expect(sortPeople(rows, 'first').map(r => r.name)).toEqual(['Ben Okafor', 'carla Diaz', 'Zoe Adams']);
+  });
+  test('by family name', () => {
+    expect(sortPeople(rows, 'family').map(r => r.name)).toEqual(['Zoe Adams', 'carla Diaz', 'Ben Okafor']);
   });
 });

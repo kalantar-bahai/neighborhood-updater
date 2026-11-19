@@ -4,7 +4,9 @@ import type { NucleusPerson, PermissionSet, PlaceSummary } from './clusterNotebo
 import { individualDisplayName } from './personName';
 import { INFORMAL_WORKER_TYPES } from './config';
 
-export type PersonRow = { id: string; name: string; roles: string[]; isResident: boolean };
+// name: "Ana Lopez"; familyFirst: "Lopez, Ana", shown when the list is sorted by family name.
+export type PersonRow = { id: string; name: string; familyFirst: string; roles: string[]; isResident: boolean };
+export type PeopleSort = 'first' | 'family';
 
 export const SEARCH_LIMIT = 20;
 
@@ -68,10 +70,20 @@ export function nextRoleIds(current: string[], personId: string, on: boolean, si
 }
 
 export function toPersonRow(p: NucleusPerson): PersonRow {
-  return { id: p.individual.id, name: individualDisplayName(p.individual), roles: p.roles, isResident: p.isResident };
+  const ind = p.individual;
+  const given = [ind.firstName, ind.middleNames].filter(Boolean).join(' ');
+  const familyFirst = ind.familyName
+    ? (given ? `${ind.familyName}, ${given}` : ind.familyName) + (ind.nickname ? ` (${ind.nickname})` : '')
+    : individualDisplayName(ind);
+  return { id: ind.id, name: individualDisplayName(ind), familyFirst, roles: p.roles, isResident: p.isResident };
 }
 
 // Routes ask cluster-notebook for SEARCH_LIMIT + 1 people, so a full extra one means "there are more".
 export function limitResults<T>(items: T[]): { items: T[]; more: boolean } {
   return { items: items.slice(0, SEARCH_LIMIT), more: items.length > SEARCH_LIMIT };
+}
+
+export function sortPeople(rows: PersonRow[], by: PeopleSort): PersonRow[] {
+  const key = (r: PersonRow) => (by === 'family' ? r.familyFirst : r.name);
+  return [...rows].sort((a, b) => key(a).localeCompare(key(b), undefined, { sensitivity: 'base' }));
 }

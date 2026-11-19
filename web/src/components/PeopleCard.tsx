@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PermissionSet } from '@/lib/clusterNotebook';
 import {
-  KNOWN_ROLES, RESIDENT, canEditRole, filterPeople, nextRoleIds, peopleFilters, roleLabel, sortRoles,
-  type PersonRow,
+  KNOWN_ROLES, RESIDENT, canEditRole, filterPeople, sortPeople, nextRoleIds, peopleFilters, roleLabel, sortRoles,
+  type PeopleSort, type PersonRow,
 } from '@/lib/people';
 
 // People card, phase 1 (spec: docs/superpowers/specs/2026-11-18-people-card-design.md).
@@ -45,6 +45,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
   const [rows, setRows] = useState<PersonRow[] | null>(null);
   const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState('all');
+  const [sortBy, setSortBy] = useState<PeopleSort>('first');
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Editing | null>(null);
   const [ticked, setTicked] = useState<string[]>([]);
@@ -126,7 +127,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
 
   const filters = peopleFilters(rows, isHome);
   const activeFilter = filters.some(f => f.key === filter) ? filter : 'all';
-  const shown = filterPeople(rows, activeFilter, search);
+  const shown = sortPeople(filterPeople(rows, activeFilter, search), sortBy);
 
   const editor = (e: Editing) => (
     <div style={{ padding: '8px 0 4px', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -168,6 +169,10 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
         <select value={activeFilter} onChange={e => setFilter(e.target.value)} aria-label="Filter people" style={{ width: 'auto' }}>
           {filters.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
         </select>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value as PeopleSort)} aria-label="Sort people" style={{ width: 'auto' }}>
+          <option value="first">First name</option>
+          <option value="family">Family name</option>
+        </select>
         <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search names…" aria-label="Search names" style={{ flex: 1, minWidth: 120 }} />
         {canAdd && (
           <button type="button" onClick={() => { setAdding(a => !a); setEditing(null); }} style={btn('#3182ce', 'white')}>+ Add</button>
@@ -202,9 +207,9 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
             <div key={r.id} style={{ borderBottom: '1px solid #f7fafc', padding: '6px 0' }}>
               <div
                 onClick={anyEditable ? () => (editing?.id === r.id ? setEditing(null) : startEdit({ ...r, isNew: false })) : undefined}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: anyEditable ? 'pointer' : 'default' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: anyEditable ? 'pointer' : 'default' }}
               >
-                <span style={{ fontSize: 14 }}>{r.name}</span>
+                <span style={{ fontSize: 14 }}>{sortBy === 'family' ? r.familyFirst : r.name}</span>
                 <RoleMarks row={r} isHome={isHome} />
               </div>
               {editing && !editing.isNew && editing.id === r.id && editor(editing)}
