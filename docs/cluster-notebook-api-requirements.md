@@ -223,7 +223,9 @@ cluster-notebook branch `move-individuals`; SRP follows through srp-client `set_
   We read `status` (`pending | in_flight | synced | refused | failed | not_in_srp`) and `code`, never `error` (#43).
   Refusal codes: `FN_NOT_IN_LOCALITY`, `LOCATION_NOT_FOUND`, `NOT_IN_SRP_RECORDS`, `OUT_OF_SCOPE`, `INVALID`; a failed
   write carries SRP's code (e.g. `O026`, record locked).
-- **Agreed, not yet built:** `Location.localityId` (the containing Locality's id for a SETTING, else null) and
-  `Location.homeNucleus` (the home nucleus name for an FN Setting, else null; may also be null when not visible to the
-  caller). `Nucleus.parentNucleus { inSrp location { … } }` exists today. Until these ship, move-out has no
-  destination and the move-in roles question is skipped.
+- `Location.localityId` (the containing Locality's id for a SETTING, else null) and `Location.homeNucleus` (the home
+  nucleus name for an FN-linked Setting with a recorded home, else null; shown to anyone who sees the place, owner's
+  choice). Both are on every Location, including `Nucleus.location` and `parentNucleus { location }` (branch
+  `move-individuals`, b0f035e).
+- `withHousehold: true` always works: srp-client finds the household contact and moves the whole household, and
+  cluster-notebook moves the other members locally from its result.

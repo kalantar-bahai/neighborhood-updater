@@ -564,8 +564,7 @@ const PERSON_NAME_SELECTION = 'id firstName familyName middleNames nickname';
 // Locality or Setting. `locality` is set only for a SETTING; `cluster` is null for a CLUSTER.
 // Phase 2 (2026-11-19): `id` identifies the place for moves (never move by name: names repeat, #41).
 // `localityId` is the containing Locality's id for a SETTING, else null. `homeNucleus` is the name of
-// the home nucleus whose FN this Setting is, else null (null may also mean "not visible to you").
-// localityId and homeNucleus were agreed with cluster-notebook 2026-11-19 but not yet built.
+// the home nucleus whose FN this Setting is, else null (shown to anyone who sees the place).
 export interface PlaceSummary {
   id: string; name: string; type: PlaceType; locality: string | null; cluster: string | null;
   localityId: string | null; homeNucleus: string | null;
