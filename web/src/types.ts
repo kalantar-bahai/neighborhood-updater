@@ -119,7 +119,8 @@ export interface Worker {
 
 export interface NucleusDetail {
   row: NucleusRow;
-  srp: { state: SrpState | null; action: SrpAction | null; srpName: string | null };
+  // isHome: the home nucleus of an SRP neighbourhood (cluster-notebook inSrp), whatever its SRP state.
+  srp: { state: SrpState | null; action: SrpAction | null; srpName: string | null; isHome: boolean };
   accompanierNames: Worker[];
   protagonistNames: Worker[];
   abmAssistantNames: Worker[];

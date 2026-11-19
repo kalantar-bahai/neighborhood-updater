@@ -612,8 +612,6 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // just starting open instead of closed.
   const [overviewOpen, setOverviewOpen] = card('overview', true);
   const [peopleOpen, setPeopleOpen] = card('people', false);
-  // Bumped when a name list changes in a WorkerListModal, so the People card re-reads.
-  const [peopleRefresh, setPeopleRefresh] = useState(0);
   const [familiesOpen, setFamiliesOpen] = card('families', true);
   const [activitiesOpen, setActivitiesOpen] = card('activities', true);
   const [detailsOpen, setDetailsOpen] = card('details', true);
@@ -885,6 +883,20 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     settingLinked: locationSetting?.srpLinked,
     canCreateInCluster,
   });
+  // Bumped when a name list changes in a WorkerListModal, so the People card re-reads.
+  const [peopleRefresh, setPeopleRefresh] = useState(0);
+  // After the People card changes roles, re-read just those name lists (no page reload, so the
+  // card keeps its filter, search and any error message).
+  const roleListSetters: Record<string, (w: Worker[]) => void> = {
+    accompanier: setAccompanierNames, protagonist: setProtagonistNames, 'abm-assistant': setAbmAssistantNames,
+    contact: setContactNames, promoter: setPromoterNames,
+  };
+  async function refreshRoleLists(roles: string[]) {
+    await Promise.all(roles.filter(r => roleListSetters[r]).map(async role => {
+      const res = await fetch(`/api/workers?nucleus=${encodeURIComponent(row.nucleus)}&type=${encodeURIComponent(role)}`);
+      if (res.ok) roleListSetters[role]((await res.json()).workers);
+    }));
+  }
   const srpOutOfStep = srpOutOfStepMessage(srpState, row.nucleus, detail.srp.srpName);
   // SRP status shows as a dot beside the Location label (owner, 2026-11-18); Refresh sits beside it
   // while a change is pending, and Push and the messages sit with the notes at the bottom of the card.
@@ -1209,7 +1221,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             <span><span style={{ fontSize: 11, marginRight: 6 }}>{peopleOpen ? '▼' : '▶'}</span>People</span>
           </div>
           {peopleOpen && <div className="card-body">
-            <PeopleCard nucleus={row.nucleus} isHome={srpState === 'IN_SRP'} permissions={permissions} refreshKey={peopleRefresh} onRolesChanged={onReload} />
+            <PeopleCard nucleus={row.nucleus} isHome={detail.srp.isHome} permissions={permissions} refreshKey={peopleRefresh} onRolesChanged={refreshRoleLists} />
           </div>}
         </div>
 

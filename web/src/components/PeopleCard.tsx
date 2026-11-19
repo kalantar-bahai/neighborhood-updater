@@ -16,7 +16,9 @@ interface Props {
   isHome: boolean;
   permissions: PermissionSet;
   refreshKey: number;
-  onRolesChanged: () => void;
+  // Called with the roles that were written (even after a partial failure), so the page can
+  // re-read those name lists.
+  onRolesChanged: (roles: string[]) => void;
 }
 
 type Found = { id: string; name: string; place: string };
@@ -91,6 +93,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
 
     setSaving(true);
     setSaveError('');
+    const written: string[] = [];
     try {
       for (const role of changed) {
         const res = await fetch(`/api/workers?nucleus=${encodeURIComponent(nucleus)}&type=${encodeURIComponent(role)}`);
@@ -105,16 +108,16 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
         });
         const postData = await post.json();
         if (!post.ok) throw new Error(postData.error || `Failed to save ${roleLabel(role).label}`);
+        written.push(role);
       }
       setEditing(null);
-      setSaving(false);
-      // Re-read the whole nucleus so the card and the Overview lists both show what was saved.
-      onRolesChanged();
     } catch (e: unknown) {
-      // Keep the error on screen: re-read only this card (earlier roles may have saved).
       setSaveError(e instanceof Error ? e.message : String(e));
+    } finally {
       setSaving(false);
+      // Re-read this card, and the page's name lists for whatever did save.
       setReloads(n => n + 1);
+      if (written.length > 0) onRolesChanged(written);
     }
   }
 
@@ -176,6 +179,8 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
           nucleus={nucleus}
           onPick={p => {
             const existing = rows.find(r => r.id === p.id);
+            // Their row must be visible for its editor to show.
+            if (existing) { setFilter('all'); setSearch(''); }
             startEdit(existing
               ? { ...existing, isNew: false }
               : { id: p.id, name: p.name, roles: [], isResident: false, isNew: true });

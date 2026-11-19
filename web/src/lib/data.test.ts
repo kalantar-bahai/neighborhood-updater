@@ -125,6 +125,28 @@ describe('getRowData', () => {
 
     expect(result?.srp.state).toBe('REFUSED');
     expect(result?.srp.action?.error).toBe('Name taken');
+    expect(result?.srp.isHome).toBe(false);
+  });
+
+  // A home nucleus with a rename waiting is PENDING, but its residents still belong to it.
+  test('isHome follows inSrp even while an SRP change is pending', async () => {
+    mockGetNucleusFields.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: 'Neighborhood', parentNucleus: null,
+      cluster: { name: 'NC-1 Test', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null, location: null,
+      inSrp: true,
+      srpAction: { action: 'rename', status: 'pending', requestedAt: '2026-11-18T00:00:00Z', error: null, individuals: null, activities: null, srpChanged: false },
+    });
+
+    const result = await getRowData('Alpha');
+
+    expect(result?.srp.state).toBe('PENDING');
+    expect(result?.srp.isHome).toBe(true);
   });
 
   test('propagates a cluster-notebook read failure', async () => {
