@@ -34,6 +34,8 @@ describe('clusterNotebookErrorResponse', () => {
     ['SRP_IS_NEIGHBOURHOOD', 409, 'upstream: 3 groups in use'],
     ['SRP_NOT_DEFAULT', 409, "This nucleus isn't the home nucleus of its SRP neighbourhood, so it can't be changed in SRP from here."],
     ['SRP_FN_HAS_NO_HOME', 409, 'This neighbourhood in SRP has no home nucleus. Ask an admin.'],
+    ['LOCATION_NOT_FOUND', 400, "That place doesn't exist any more. Reload and try again."],
+    ['NOT_A_PLACE', 400, 'People can only be moved to a locality or a neighbourhood in SRP.'],
     ['SOMETHING_NEW', 502, 'cluster-notebook GraphQL error: upstream: 3 groups in use'],
   ])('maps coded error %s to status %i with { error, code }', async (code, status, error) => {
     const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('cluster-notebook GraphQL error: upstream: 3 groups in use', code, 'upstream: 3 groups in use'));

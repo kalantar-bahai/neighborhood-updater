@@ -8,9 +8,9 @@ import {
   getActivitySummaries, updateActivitySummary, getAllNuclei, getNucleusFields, updateNucleus,
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
-  getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople,
+  getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, moveIndividuals, getMoveContext,
 } from './clusterNotebook';
-import type { Individual, PersonSummary, NucleusPerson } from './clusterNotebook';
+import type { Individual, PersonSummary, NucleusPerson, MoveResult, MoveContext } from './clusterNotebook';
 import { auth } from '@clerk/nextjs/server';
 
 const mockFetch = vi.fn();
@@ -702,7 +702,7 @@ describe('individualDisplayName', () => {
 
 describe('searchIndividuals', () => {
   test('sends the nucleusName and search term, scoped to that nucleus\'s cluster', async () => {
-    const alice: PersonSummary = { id: '1', firstName: 'Alice', familyName: 'Smith', middleNames: null, nickname: null, place: null };
+    const alice: PersonSummary = { id: '1', firstName: 'Alice', familyName: 'Smith', middleNames: null, nickname: null, place: null, placeSync: null };
     mockFetch.mockResolvedValue(jsonResponse({ data: { individuals: [alice] } }));
 
     const result = await searchIndividuals('Alpha', 'Ali');
@@ -721,8 +721,9 @@ describe('searchIndividuals', () => {
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     const selection = (body.query as string).match(/individuals\([^)]*\)\s*\{([\s\S]*)\}\s*\}/)![1].replace(/\{[^}]*\}/g, '').trim().split(/\s+/).sort();
-    expect(selection).toEqual(['familyName', 'firstName', 'id', 'middleNames', 'nickname', 'place']);
-    expect(body.query).toContain('place { name type locality cluster }');
+    expect(selection).toEqual(['familyName', 'firstName', 'id', 'middleNames', 'nickname', 'place', 'placeSync']);
+    expect(body.query).toContain('place { id name type locality cluster localityId homeNucleus }');
+    expect(body.query).toContain('placeSync { status code }');
   });
 
   test('sends null search when omitted', async () => {
@@ -766,7 +767,7 @@ describe('createIndividual', () => {
 describe('getNucleusPeople', () => {
   test('returns the people connected to the nucleus', async () => {
     const person: NucleusPerson = {
-      individual: { id: '7', firstName: 'Ana', familyName: 'Lopez', middleNames: null, nickname: null, place: { name: 'Parkside', type: 'SETTING', locality: 'Chapelboro', cluster: 'Chapel Hill' } },
+      individual: { id: '7', firstName: 'Ana', familyName: 'Lopez', middleNames: null, nickname: null, place: { id: 'S1', name: 'Parkside', type: 'SETTING', locality: 'Chapelboro', cluster: 'Chapel Hill', localityId: 'L1', homeNucleus: 'Alpha' }, placeSync: { status: 'pending', code: null } },
       roles: ['promoter'], isResident: true,
     };
     mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { people: [person] } } }));
@@ -776,13 +777,47 @@ describe('getNucleusPeople', () => {
     expect(result).toEqual([person]);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables).toEqual({ name: 'Alpha' });
-    expect((body.query as string).replace(/\s+/g, ' ')).toContain('people { individual { id firstName familyName middleNames nickname place { name type locality cluster } } roles isResident }');
+    expect((body.query as string).replace(/\s+/g, ' ')).toContain('people { individual { id firstName familyName middleNames nickname place { id name type locality cluster localityId homeNucleus } placeSync { status code } } roles isResident }');
   });
 
   test('returns null when the nucleus is not found', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: null } }));
 
     expect(await getNucleusPeople('Nonexistent')).toBeNull();
+  });
+});
+
+describe('moveIndividuals', () => {
+  test('sends the ids, destination id and household flag, returns per-person results', async () => {
+    const results: MoveResult[] = [{ individual: null, moved: false, code: 'FORBIDDEN' }];
+    mockFetch.mockResolvedValue(jsonResponse({ data: { moveIndividuals: results } }));
+
+    expect(await moveIndividuals(['a'], 'L1', true)).toEqual(results);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ individualIds: ['a'], locationId: 'L1', withHousehold: true });
+    expect((body.query as string).replace(/\s+/g, ' ')).toContain('moved code');
+  });
+});
+
+describe('getMoveContext', () => {
+  test('reads the nucleus place and its parent', async () => {
+    const ctx: MoveContext = {
+      location: { id: 'S1', name: 'Parkside', type: 'SETTING', locality: 'Chapelboro', cluster: 'Chapel Hill', localityId: 'L1', homeNucleus: 'Alpha' },
+      parent: { inSrp: true, location: null },
+    };
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { location: ctx.location, parentNucleus: ctx.parent } } }));
+
+    expect(await getMoveContext('Alpha')).toEqual(ctx);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ name: 'Alpha' });
+    const q = (body.query as string).replace(/\s+/g, ' ');
+    expect(q).toContain('location { id name type locality cluster localityId homeNucleus }');
+    expect(q).toContain('parentNucleus { inSrp location { id name type locality cluster localityId homeNucleus } }');
+  });
+
+  test('returns null when the nucleus is not found', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: null } }));
+    expect(await getMoveContext('Nonexistent')).toBeNull();
   });
 });
 

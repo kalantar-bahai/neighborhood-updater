@@ -3,34 +3,47 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PermissionSet } from '@/lib/clusterNotebook';
 import {
-  KNOWN_ROLES, RESIDENT, canEditRole, filterPeople, sortPeople, nextRoleIds, peopleFilters, roleLabel, sortRoles,
-  type PeopleSort, type PersonRow,
+  KNOWN_ROLES, RESIDENT, canEditRole, filterPeople, isMoving, moveResultError, nextRoleIds, peopleFilters, placePath,
+  roleLabel, rolesToClear, sortPeople, sortRoles, syncNote, type MoveTarget, type PeopleSort, type PersonRow,
 } from '@/lib/people';
 
-// People card, phase 1 (spec: docs/superpowers/specs/2026-11-18-people-card-design.md).
-// Everyone connected to the nucleus: role holders here, plus residents on a home nucleus.
-// Residency is read-only until phase 2 can move people in SRP.
+// People card (specs: docs/superpowers/specs/2026-11-18-people-card-design.md, phase 1, and
+// 2026-11-19-people-card-moves-design.md, phase 2). Everyone connected to the nucleus: role holders
+// here, plus residents on a home nucleus. Ticking Resident moves someone here; unticking moves them out.
 
 interface Props {
   nucleus: string;
   isHome: boolean;
   permissions: PermissionSet;
   refreshKey: number;
-  // Called with the roles that were written (even after a partial failure), so the page can
+  // Called with the roles that were written here (even after a partial failure), so the page can
   // re-read those name lists.
   onRolesChanged: (roles: string[]) => void;
 }
 
-type Found = { id: string; name: string; place: string };
-// The person whose roles are being edited: an existing row, or someone just found or created.
-type Editing = { id: string; name: string; roles: string[]; isResident: boolean; isNew: boolean };
+type Found = { id: string; name: string; place: string; homeNucleus: string | null };
+// The person being edited: an existing row, or someone just found or created.
+type Editing = {
+  id: string; name: string; roles: string[]; isResident: boolean; isNew: boolean;
+  placePath: string; homeNucleus: string | null;
+};
+// A move waiting for the person to confirm it.
+type PendingMove = {
+  personId: string; kind: 'in' | 'out'; to: MoveTarget;
+  // The nucleus they are leaving, its roles they hold that the caller may clear, and whether to keep them.
+  oldNucleus: string | null; oldName: string; oldRoles: string[]; keep: boolean;
+};
+type Moves = { here: MoveTarget | null; out: MoveTarget | null };
 
 const SINGLE_ROLES = ['contact'];
+const POLL_MS = 10_000;
 
 function RoleMarks({ row, isHome }: { row: PersonRow; isHome: boolean }) {
+  const note = syncNote(row.placeSync);
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
       {isHome && row.isResident && <span role="img" aria-label={RESIDENT.label} title={RESIDENT.label}>{RESIDENT.icon}</span>}
+      {note?.tone === 'wait' && <span role="img" aria-label={note.text} title={note.text}>⏳</span>}
       {sortRoles(row.roles).map(role => {
         const { label, icon } = roleLabel(role);
         return icon
@@ -41,16 +54,50 @@ function RoleMarks({ row, isHome }: { row: PersonRow; isHome: boolean }) {
   );
 }
 
+// Set one person on or off a role's list at a nucleus (full-list replace, as /api/workers expects).
+async function writeRole(nucleus: string, role: string, personId: string, on: boolean) {
+  const res = await fetch(`/api/workers?nucleus=${encodeURIComponent(nucleus)}&type=${encodeURIComponent(role)}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Failed to load ${roleLabel(role).label}`);
+  const currentIds = (data.workers as { id: string }[]).map(w => w.id);
+  const personIds = nextRoleIds(currentIds, personId, on, SINGLE_ROLES.includes(role));
+  const post = await fetch('/api/workers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nucleus, type: role, personIds }),
+  });
+  const postData = await post.json();
+  if (!post.ok) throw new Error(postData.error || `Failed to save ${roleLabel(role).label}`);
+}
+
+// The roles a person holds at another nucleus that the caller may clear there. Empty when that
+// nucleus can't be read (the question is then skipped and their roles stay).
+async function rolesAt(nucleus: string, personId: string): Promise<string[]> {
+  try {
+    const res = await fetch(`/api/people?nucleus=${encodeURIComponent(nucleus)}`);
+    if (!res.ok) return [];
+    const data = await res.json() as { people: PersonRow[]; editableRoles: string[] };
+    const held = data.people.find(p => p.id === personId)?.roles ?? [];
+    return rolesToClear(held, r => data.editableRoles.includes(r), false);
+  } catch {
+    return [];
+  }
+}
+
 export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, onRolesChanged }: Props) {
   const [rows, setRows] = useState<PersonRow[] | null>(null);
+  const [moves, setMoves] = useState<Moves>({ here: null, out: null });
   const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState<PeopleSort>('first');
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Editing | null>(null);
   const [ticked, setTicked] = useState<string[]>([]);
+  const [resident, setResident] = useState(false);
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [cardError, setCardError] = useState('');
   const [adding, setAdding] = useState(false);
   const [reloads, setReloads] = useState(0);
 
@@ -60,60 +107,131 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
       .then(async res => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to load people');
-        if (live) { setRows(data.people); setLoadError(''); }
+        if (live) { setRows(data.people); setMoves(data.move ?? { here: null, out: null }); setLoadError(''); }
       })
       .catch((e: unknown) => { if (live) setLoadError(e instanceof Error ? e.message : String(e)); });
     return () => { live = false; };
   }, [nucleus, refreshKey, reloads]);
 
-  const anyEditable = permissions.canAssignRoles;
-  const canAdd = permissions.canWrite && permissions.canAssignRoles;
+  // While a move is on its way to SRP, re-read every 10 s until it lands (or the card closes).
+  const moving = rows ? isMoving(rows) : false;
+  useEffect(() => {
+    if (!moving) return;
+    const timer = setInterval(() => setReloads(n => n + 1), POLL_MS);
+    return () => clearInterval(timer);
+  }, [moving]);
+
+  const canMove = isHome && permissions.canWrite;
+  const rowsClickable = permissions.canAssignRoles || canMove;
+  const canAdd = permissions.canWrite && (permissions.canAssignRoles || canMove);
+
+  // The person whose editor is open, read by async work that must not land on someone else.
+  const editingId = useRef<string | null>(null);
 
   function startEdit(e: Editing) {
+    if (saving) return;
+    editingId.current = e.id;
     setEditing(e);
     setTicked(e.roles);
+    setResident(e.isResident);
+    setPendingMove(null);
     setSaveError('');
+    setCardError('');
     setAdding(false);
   }
+
+  const fromRow = (r: PersonRow): Editing => ({
+    id: r.id, name: r.name, roles: r.roles, isResident: r.isResident, isNew: false,
+    placePath: placePath(r.place), homeNucleus: r.place?.homeNucleus ?? null,
+  });
 
   // Roles offered in the editor: the known ones plus any this person already holds.
   function editorRoles(e: Editing): string[] {
     return sortRoles([...KNOWN_ROLES, ...e.roles]);
   }
 
-  async function save(target: Editing, nextRoles: string[]) {
+  // Resident can be ticked or unticked only where there is somewhere to move them.
+  function residentEnabled(e: Editing): boolean {
+    return canMove && Boolean(e.isResident ? moves.out : moves.here);
+  }
+
+  async function save(target: Editing) {
     const changed = editorRoles(target).filter(role =>
-      canEditRole(permissions, role) && target.roles.includes(role) !== nextRoles.includes(role));
-    if (changed.length === 0) { setEditing(null); return; }
+      canEditRole(permissions, role) && target.roles.includes(role) !== ticked.includes(role));
+    const moveWanted = resident !== target.isResident;
+    if (!moveWanted && changed.length === 0) { setEditing(null); return; }
 
     for (const role of changed) {
-      if (!SINGLE_ROLES.includes(role) || !nextRoles.includes(role)) continue;
+      if (!SINGLE_ROLES.includes(role) || !ticked.includes(role)) continue;
       const current = (rows ?? []).find(r => r.id !== target.id && r.roles.includes(role));
       if (current && !window.confirm(`This replaces ${current.name} as ${roleLabel(role).label.toLowerCase()}.`)) return;
     }
 
+    if (moveWanted) {
+      // Ask first: where they go, and whether they keep their roles where they are leaving.
+      setSaveError('');
+      if (target.isResident && moves.out) {
+        setPendingMove({
+          personId: target.id, kind: 'out', to: moves.out, oldNucleus: nucleus, oldName: moves.here?.name ?? nucleus,
+          oldRoles: ticked.filter(r => canEditRole(permissions, r)), keep: true,
+        });
+      } else if (!target.isResident && moves.here) {
+        const old = target.homeNucleus && target.homeNucleus !== nucleus ? target.homeNucleus : null;
+        setSaving(true);
+        const oldRoles = old ? await rolesAt(old, target.id) : [];
+        setSaving(false);
+        // Drop the answer if the person switched to someone else while we were asking.
+        if (editingId.current !== target.id) return;
+        setPendingMove({ personId: target.id, kind: 'in', to: moves.here, oldNucleus: old, oldName: old ?? '', oldRoles, keep: true });
+      }
+      return;
+    }
+    await finish(target, null);
+  }
+
+  // Move (if confirmed), then role changes. A move refused at once stops everything.
+  async function finish(target: Editing, move: PendingMove | null) {
     setSaving(true);
     setSaveError('');
     const written: string[] = [];
+    let moved = false;
     try {
-      for (const role of changed) {
-        const res = await fetch(`/api/workers?nucleus=${encodeURIComponent(nucleus)}&type=${encodeURIComponent(role)}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || `Failed to load ${roleLabel(role).label}`);
-        const currentIds = (data.workers as { id: string }[]).map(w => w.id);
-        const personIds = nextRoleIds(currentIds, target.id, nextRoles.includes(role), SINGLE_ROLES.includes(role));
-        const post = await fetch('/api/workers', {
+      let rolesHere = ticked;
+      if (move) {
+        const res = await fetch('/api/move', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nucleus, type: role, personIds }),
+          body: JSON.stringify({ nucleus, individualId: target.id, locationId: move.to.id }),
         });
-        const postData = await post.json();
-        if (!post.ok) throw new Error(postData.error || `Failed to save ${roleLabel(role).label}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'The move failed');
+        const refused = moveResultError(data.result);
+        if (refused) throw new Error(refused);
+        moved = true;
+        const clear = rolesToClear(move.oldRoles, () => true, move.keep);
+        if (move.kind === 'out') {
+          rolesHere = ticked.filter(r => !clear.includes(r));
+        } else if (move.oldNucleus) {
+          for (const role of clear) await writeRole(move.oldNucleus, role, target.id, false);
+        }
+      }
+      for (const role of editorRoles(target)) {
+        if (!canEditRole(permissions, role) || target.roles.includes(role) === rolesHere.includes(role)) continue;
+        await writeRole(nucleus, role, target.id, rolesHere.includes(role));
         written.push(role);
       }
       setEditing(null);
+      setPendingMove(null);
     } catch (e: unknown) {
-      setSaveError(e instanceof Error ? e.message : String(e));
+      const message = e instanceof Error ? e.message : String(e);
+      setPendingMove(null);
+      if (moved) {
+        // The editor no longer matches the person (they have moved); close it and say what didn't save.
+        setEditing(null);
+        setCardError(`${target.name} was moved, but a role change didn't save: ${message}`);
+      } else {
+        setSaveError(message);
+      }
     } finally {
       setSaving(false);
       // Re-read this card, and the page's name lists for whatever did save.
@@ -129,12 +247,36 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
   const activeFilter = filters.some(f => f.key === filter) ? filter : 'all';
   const shown = sortPeople(filterPeople(rows, activeFilter, search), sortBy);
 
+  const confirmMove = (e: Editing, m: PendingMove) => (
+    <div style={{ border: '1px solid #bee3f8', background: '#ebf8ff', borderRadius: 6, padding: 8, fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ fontWeight: 600 }}>{m.kind === 'in' ? `Move ${e.name} here?` : `Move ${e.name} out of ${m.oldName}?`}</div>
+      <div>{m.kind === 'in' ? `Lives in: ${e.placePath || 'not recorded'}` : `To: ${m.to.path}`}</div>
+      {m.oldRoles.length > 0 && (
+        <>
+          <div>
+            {e.name} is {m.oldRoles.map(r => `${roleLabel(r).label} ${roleLabel(r).icon ?? ''}`.trim()).join(' and ')}{' '}
+            {m.kind === 'in' ? `at ${m.oldName}.` : 'here.'}
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input type="checkbox" checked={m.keep} disabled={saving} onChange={ev => setPendingMove({ ...m, keep: ev.target.checked })} />
+            {m.kind === 'in' ? `Keep roles at ${m.oldName} (still working there)` : 'Keep roles here (still working in this nucleus)'}
+          </label>
+        </>
+      )}
+      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+        <button type="button" disabled={saving} onClick={() => finish(e, m)} style={btn('#3182ce', 'white')}>{saving ? 'Moving…' : 'Move'}</button>
+        <button type="button" disabled={saving} onClick={() => setPendingMove(null)} style={btn('white', '#4a5568', '#cbd5e0')}>Cancel</button>
+      </div>
+    </div>
+  );
+
   const editor = (e: Editing) => (
     <div style={{ padding: '8px 0 4px', display: 'flex', flexDirection: 'column', gap: 6 }}>
       {isHome && (
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#a0aec0' }}>
-          <input type="checkbox" checked={e.isResident} disabled readOnly />
-          {RESIDENT.icon} {RESIDENT.label} <span style={{ fontSize: 11 }}>(set in SRP for now)</span>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: residentEnabled(e) ? undefined : '#a0aec0' }}>
+          <input type="checkbox" checked={resident} disabled={!residentEnabled(e) || saving || Boolean(pendingMove)}
+            onChange={ev => setResident(ev.target.checked)} />
+          {RESIDENT.icon} {RESIDENT.label}
         </label>
       )}
       {editorRoles(e).map(role => {
@@ -145,7 +287,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
             <input
               type="checkbox"
               checked={ticked.includes(role)}
-              disabled={!editable || saving}
+              disabled={!editable || saving || Boolean(pendingMove)}
               onChange={ev => setTicked(t => ev.target.checked ? [...t, role] : t.filter(r => r !== role))}
             />
             {icon} {label}
@@ -153,13 +295,12 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
         );
       })}
       {saveError && <div style={{ fontSize: 12, color: '#c53030' }}>{saveError}</div>}
-      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-        <button type="button" disabled={saving} onClick={() => save(e, ticked)} style={btn('#3182ce', 'white')}>{saving ? 'Saving…' : 'Save'}</button>
-        {!e.isNew && e.roles.some(r => canEditRole(permissions, r)) && (
-          <button type="button" disabled={saving} onClick={() => save(e, e.roles.filter(r => !canEditRole(permissions, r)))} style={btn('white', '#c53030', '#feb2b2')}>Remove</button>
-        )}
-        <button type="button" disabled={saving} onClick={() => setEditing(null)} style={btn('white', '#4a5568', '#cbd5e0')}>Cancel</button>
-      </div>
+      {pendingMove?.personId === e.id ? confirmMove(e, pendingMove) : (
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <button type="button" disabled={saving} onClick={() => save(e)} style={btn('#3182ce', 'white')}>{saving ? 'Saving…' : 'Save'}</button>
+          <button type="button" disabled={saving} onClick={() => setEditing(null)} style={btn('white', '#4a5568', '#cbd5e0')}>Cancel</button>
+        </div>
+      )}
     </div>
   );
 
@@ -175,10 +316,11 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
         </select>
         <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search names…" aria-label="Search names" style={{ flex: 1, minWidth: 120 }} />
         {canAdd && (
-          <button type="button" onClick={() => { setAdding(a => !a); setEditing(null); }} style={btn('#3182ce', 'white')}>+ Add</button>
+          <button type="button" disabled={saving} onClick={() => { setAdding(a => !a); setEditing(null); }} style={btn('#3182ce', 'white')}>+ Add</button>
         )}
       </div>
 
+      {cardError && <div style={{ fontSize: 12, color: '#c53030', marginBottom: 6 }}>{cardError}</div>}
       {adding && (
         <AddPerson
           nucleus={nucleus}
@@ -187,14 +329,15 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
             // Their row must be visible for its editor to show.
             if (existing) { setFilter('all'); setSearch(''); }
             startEdit(existing
-              ? { ...existing, isNew: false }
-              : { id: p.id, name: p.name, roles: [], isResident: false, isNew: true });
+              ? fromRow(existing)
+              : { id: p.id, name: p.name, roles: [], isResident: false, isNew: true, placePath: p.place, homeNucleus: p.homeNucleus });
           }}
         />
       )}
       {editing?.isNew && (
         <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '6px 10px', marginBottom: 8 }}>
           <div style={{ fontWeight: 600, fontSize: 14 }}>{editing.name}</div>
+          {editing.placePath && <div style={{ fontSize: 12, color: '#718096' }}>{editing.placePath}</div>}
           {editor(editing)}
         </div>
       )}
@@ -203,18 +346,22 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
         <div style={{ fontSize: 13, color: '#718096' }}>No one is connected to this nucleus yet.</div>
       ) : (
         <div style={{ maxHeight: 360, overflowY: 'auto' }}>
-          {shown.map(r => (
-            <div key={r.id} style={{ borderBottom: '1px solid #f7fafc', padding: '6px 0' }}>
-              <div
-                onClick={anyEditable ? () => (editing?.id === r.id ? setEditing(null) : startEdit({ ...r, isNew: false })) : undefined}
-                style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: anyEditable ? 'pointer' : 'default' }}
-              >
-                <span style={{ fontSize: 14 }}>{sortBy === 'family' ? r.familyFirst : r.name}</span>
-                <RoleMarks row={r} isHome={isHome} />
+          {shown.map(r => {
+            const note = syncNote(r.placeSync);
+            return (
+              <div key={r.id} style={{ borderBottom: '1px solid #f7fafc', padding: '6px 0' }}>
+                <div
+                  onClick={rowsClickable && !saving ? () => (editing?.id === r.id ? setEditing(null) : startEdit(fromRow(r))) : undefined}
+                  style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: rowsClickable ? 'pointer' : 'default' }}
+                >
+                  <span style={{ fontSize: 14 }}>{sortBy === 'family' ? r.familyFirst : r.name}</span>
+                  <RoleMarks row={r} isHome={isHome} />
+                </div>
+                {note?.tone === 'error' && <div style={{ fontSize: 12, color: '#c53030' }}>{note.text}</div>}
+                {editing && !editing.isNew && editing.id === r.id && editor(editing)}
               </div>
-              {editing && !editing.isNew && editing.id === r.id && editor(editing)}
-            </div>
-          ))}
+            );
+          })}
           {shown.length === 0 && <div style={{ fontSize: 13, color: '#718096' }}>No matches.</div>}
         </div>
       )}
@@ -227,7 +374,7 @@ function btn(background: string, color: string, border = background): React.CSSP
 }
 
 // Search everyone in the cluster (name and place path), or create a new person.
-function AddPerson({ nucleus, onPick }: { nucleus: string; onPick: (p: { id: string; name: string }) => void }) {
+function AddPerson({ nucleus, onPick }: { nucleus: string; onPick: (p: Found) => void }) {
   const [input, setInput] = useState('');
   const [results, setResults] = useState<Found[]>([]);
   const [more, setMore] = useState(false);
@@ -267,7 +414,7 @@ function AddPerson({ nucleus, onPick }: { nucleus: string; onPick: (p: { id: str
       if (!res.ok) throw new Error(data.error || 'Create failed');
       setInput('');
       setResults([]);
-      onPick({ id: data.id, name: data.name });
+      onPick({ id: data.id, name: data.name, place: '', homeNucleus: null });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

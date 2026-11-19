@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getNucleusPermissions } from '@/lib/access';
-import { getNucleusPeople } from '@/lib/clusterNotebook';
+import { getMoveContext, getNucleusPeople } from '@/lib/clusterNotebook';
 import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
-import { toPersonRow } from '@/lib/people';
+import { editableRoles, moveTargets, toPersonRow } from '@/lib/people';
 
 // Everyone connected to a nucleus, for the People card. Readable by anyone who can read the
-// nucleus (owner, 2026-11-18): names, roles and residency only.
+// nucleus (owner, 2026-11-18): names, roles, residency, place and move state only.
 export async function GET(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) {
@@ -20,9 +20,12 @@ export async function GET(req: NextRequest) {
     const permissions = await getNucleusPermissions(nucleus);
     if (!permissions.canRead) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
-    const people = await getNucleusPeople(nucleus);
-    if (people === null) return NextResponse.json({ error: 'Nucleus not found' }, { status: 404 });
-    return NextResponse.json({ people: people.map(toPersonRow) });
+    const [people, ctx] = await Promise.all([getNucleusPeople(nucleus), getMoveContext(nucleus)]);
+    if (people === null || ctx === null) return NextResponse.json({ error: 'Nucleus not found' }, { status: 404 });
+    const rows = people.map(toPersonRow);
+    // move: where moving in and out go (phase 2). editableRoles: lets the card ask about someone's
+    // roles here when they move away from this nucleus via another nucleus's "+ Add".
+    return NextResponse.json({ people: rows, move: moveTargets(ctx), editableRoles: editableRoles(permissions, rows) });
   } catch (e: unknown) {
     return clusterNotebookErrorResponse(e);
   }

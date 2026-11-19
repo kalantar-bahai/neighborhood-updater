@@ -1,13 +1,13 @@
 import { describe, test, expect } from 'vitest';
-import { sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
-import type { PermissionSet } from './clusterNotebook';
+import { editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
+import type { MoveContext, PermissionSet, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
   canRead: true, canWrite: true, canChangeIdentity: false, canDelete: false, canAssignRoles: true,
   assignableRoles: [], createableEntityTypes: [], ...over,
 });
 
-const row = (name: string, roles: string[], isResident = false): PersonRow => ({ id: name, name, familyFirst: name, roles, isResident });
+const row = (name: string, roles: string[], isResident = false): PersonRow => ({ id: name, name, familyFirst: name, roles, isResident, place: null, placeSync: null });
 
 describe('placePath', () => {
   test('a Setting shows cluster, locality and setting', () => {
@@ -96,13 +96,13 @@ describe('nextRoleIds', () => {
 describe('toPersonRow', () => {
   test('uses the display name and keeps roles and residency', () => {
     const r = toPersonRow({
-      individual: { id: '7', firstName: 'Ana', middleNames: null, familyName: 'Lopez', nickname: 'Annie', place: null },
+      individual: { id: '7', firstName: 'Ana', middleNames: null, familyName: 'Lopez', nickname: 'Annie', place: null, placeSync: null },
       roles: ['promoter'], isResident: true,
     });
-    expect(r).toEqual({ id: '7', name: 'Ana Lopez (Annie)', familyFirst: 'Lopez, Ana (Annie)', roles: ['promoter'], isResident: true });
+    expect(r).toEqual({ id: '7', name: 'Ana Lopez (Annie)', familyFirst: 'Lopez, Ana (Annie)', roles: ['promoter'], isResident: true, place: null, placeSync: null });
   });
   test('family-first name copes with missing parts', () => {
-    const ind = { id: '8', firstName: 'Ana', middleNames: 'Maria', familyName: 'Lopez', nickname: null, place: null };
+    const ind = { id: '8', firstName: 'Ana', middleNames: 'Maria', familyName: 'Lopez', nickname: null, place: null, placeSync: null };
     const person = (over: object) => toPersonRow({ individual: { ...ind, ...over }, roles: [], isResident: true }).familyFirst;
     expect(person({})).toBe('Lopez, Ana Maria');
     expect(person({ firstName: null, middleNames: null })).toBe('Lopez');
@@ -132,12 +132,99 @@ describe('people.ts stays browser-safe', () => {
 });
 
 describe('sortPeople', () => {
-  const p = (name: string, familyFirst: string): PersonRow => ({ id: name, name, familyFirst, roles: [], isResident: true });
+  const p = (name: string, familyFirst: string): PersonRow => ({ id: name, name, familyFirst, roles: [], isResident: true, place: null, placeSync: null });
   const rows = [p('carla Diaz', 'Diaz, carla'), p('Ben Okafor', 'Okafor, Ben'), p('Zoe Adams', 'Adams, Zoe')];
   test('by first name, ignoring case', () => {
     expect(sortPeople(rows, 'first').map(r => r.name)).toEqual(['Ben Okafor', 'carla Diaz', 'Zoe Adams']);
   });
   test('by family name', () => {
     expect(sortPeople(rows, 'family').map(r => r.name)).toEqual(['Zoe Adams', 'carla Diaz', 'Ben Okafor']);
+  });
+});
+
+const setting = (id: string, name: string, localityId: string, locality = 'Chapelboro'): PlaceSummary =>
+  ({ id, name, type: 'SETTING', locality, cluster: 'Chapel Hill', localityId, homeNucleus: null });
+
+describe('moveTargets', () => {
+  const here = setting('S1', 'Parkside', 'LOC1');
+  const ctx = (parent: MoveContext['parent'], location: PlaceSummary | null = here): MoveContext => ({ location, parent });
+  test('here is this nucleus\'s Setting', () => {
+    expect(moveTargets(ctx(null)).here).toEqual({ id: 'S1', name: 'Parkside', path: 'Chapel Hill › Chapelboro › Parkside' });
+  });
+  test('out goes to a home parent\'s Setting in the same locality', () => {
+    expect(moveTargets(ctx({ inSrp: true, location: setting('S2', 'Northside', 'LOC1') })).out?.id).toBe('S2');
+  });
+  test('out goes to the Locality otherwise', () => {
+    const toLocality = { id: 'LOC1', name: 'Chapelboro', path: 'Chapel Hill › Chapelboro' };
+    expect(moveTargets(ctx({ inSrp: false, location: setting('S2', 'Northside', 'LOC1') })).out).toEqual(toLocality);
+    expect(moveTargets(ctx({ inSrp: true, location: setting('S3', 'Eastside', 'LOC2', 'Carrboro') })).out).toEqual(toLocality);
+    expect(moveTargets(ctx(null)).out).toEqual(toLocality);
+  });
+  test('no targets when this nucleus is not at a Setting', () => {
+    const loc: PlaceSummary = { id: 'LOC1', name: 'Chapelboro', type: 'LOCALITY', locality: null, cluster: 'Chapel Hill', localityId: null, homeNucleus: null };
+    expect(moveTargets(ctx(null, loc))).toEqual({ here: null, out: null });
+    expect(moveTargets(ctx(null, null))).toEqual({ here: null, out: null });
+  });
+  test('no out target when the Setting has no locality id', () => {
+    expect(moveTargets(ctx(null, { ...here, localityId: null })).out).toBeNull();
+  });
+});
+
+describe('syncNote', () => {
+  test('on its way', () => {
+    expect(syncNote({ status: 'pending', code: null })).toEqual({ tone: 'wait', text: 'On its way to SRP' });
+    expect(syncNote({ status: 'in_flight', code: null })).toEqual({ tone: 'wait', text: 'On its way to SRP' });
+  });
+  test('refusals in plain words', () => {
+    expect(syncNote({ status: 'refused', code: 'FN_NOT_IN_LOCALITY' })).toEqual({ tone: 'error', text: "That neighbourhood isn't in their locality. The move was undone." });
+    expect(syncNote({ status: 'refused', code: 'OUT_OF_SCOPE' })?.text).toBe("SRP doesn't let us change this person. The move was undone.");
+    expect(syncNote({ status: 'refused', code: 'NOT_IN_SRP_RECORDS' })?.text).toBe("SRP doesn't have this person. The move was undone.");
+    expect(syncNote({ status: 'refused', code: 'XYZ' })?.text).toBe('SRP refused the move (XYZ). The move was undone.');
+  });
+  test('failed', () => {
+    expect(syncNote({ status: 'failed', code: 'O026' })).toEqual({ tone: 'error', text: "Couldn't reach SRP: O026" });
+  });
+  test('nothing to show', () => {
+    expect(syncNote({ status: 'synced', code: null })).toBeNull();
+    expect(syncNote({ status: 'not_in_srp', code: null })).toBeNull();
+    expect(syncNote(null)).toBeNull();
+  });
+});
+
+describe('moveResultError', () => {
+  test('copy for each refusal', () => {
+    expect(moveResultError({ individual: null, moved: false, code: 'FORBIDDEN' })).toBe("You can't move this person");
+    expect(moveResultError({ individual: null, moved: false, code: 'OTHER_CLUSTER' })).toBe('This person is in another cluster');
+    expect(moveResultError({ individual: null, moved: false, code: 'NOT_FOUND' })).toBe('Person not found');
+  });
+  test('moved or already there is fine', () => {
+    expect(moveResultError({ individual: null, moved: false, code: 'ALREADY_THERE' })).toBeNull();
+    expect(moveResultError({ individual: null, moved: true, code: null })).toBeNull();
+  });
+});
+
+describe('rolesToClear', () => {
+  const editable = (r: string) => r === 'promoter';
+  test('clears the editable roles held unless kept', () => {
+    expect(rolesToClear(['promoter', 'accompanier'], editable, false)).toEqual(['promoter']);
+    expect(rolesToClear(['promoter', 'accompanier'], editable, true)).toEqual([]);
+    expect(rolesToClear([], editable, false)).toEqual([]);
+  });
+});
+
+describe('isMoving', () => {
+  const r = (status: PlaceSyncStatus | null): PersonRow => ({ ...row('A', []), placeSync: status ? { status, code: null } : null });
+  test('true only while a move is on its way', () => {
+    expect(isMoving([r('synced'), r('in_flight')])).toBe(true);
+    expect(isMoving([r('synced'), r('refused'), r(null)])).toBe(false);
+  });
+});
+type PlaceSyncStatus = 'pending' | 'in_flight' | 'synced' | 'refused' | 'failed' | 'not_in_srp';
+
+describe('editableRoles', () => {
+  test('known and held roles the caller may change', () => {
+    const rows = [row('A', ['cso']), row('B', ['promoter'])];
+    expect(editableRoles(perms({ assignableRoles: ['accompanier', 'cso'] }), rows)).toEqual(['promoter', 'protagonist', 'accompanier', 'cso']);
+    expect(editableRoles(perms({ canAssignRoles: false }), rows)).toEqual([]);
   });
 });
