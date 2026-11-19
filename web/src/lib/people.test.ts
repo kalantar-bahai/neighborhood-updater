@@ -112,3 +112,14 @@ describe('limitResults', () => {
     expect(limitResults(n(SEARCH_LIMIT))).toEqual({ items: n(SEARCH_LIMIT), more: false });
   });
 });
+
+// people.ts is used by the PeopleCard client component. clusterNotebook.ts imports Clerk's server
+// auth, so any value import from it would pull server-only code into the browser bundle.
+describe('people.ts stays browser-safe', () => {
+  test('imports only types from clusterNotebook', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(new URL('./people.ts', import.meta.url), 'utf8');
+    const imports = src.match(/^import .* from '\.\/clusterNotebook';$/gm) ?? [];
+    expect(imports.every(line => line.startsWith('import type '))).toBe(true);
+  });
+});

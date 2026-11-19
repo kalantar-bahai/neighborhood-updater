@@ -1,6 +1,7 @@
 // People card (phase 1): pure decisions, tested in people.test.ts.
 // Spec: docs/superpowers/specs/2026-11-18-people-card-design.md
-import { individualDisplayName, type NucleusPerson, type PermissionSet, type PlaceSummary } from './clusterNotebook';
+import type { NucleusPerson, PermissionSet, PlaceSummary } from './clusterNotebook';
+import { individualDisplayName } from './personName';
 import { INFORMAL_WORKER_TYPES } from './config';
 
 export type PersonRow = { id: string; name: string; roles: string[]; isResident: boolean };

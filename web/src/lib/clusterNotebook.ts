@@ -569,14 +569,9 @@ export interface PersonSummary extends PersonName { place: PlaceSummary | null }
 export interface NucleusPerson { individual: PersonSummary; roles: string[]; isResident: boolean }
 const PERSON_SUMMARY_SELECTION = `${PERSON_NAME_SELECTION} place { name type locality cluster }`;
 
-// Simple display-name composition -- cluster-notebook's Individual already has
-// firstName/middleNames/familyName/nickname as separate fields (unlike SRP's own
-// single-string convention), so no parsing needed, just a readable join.
-export function individualDisplayName(ind: PersonName): string {
-  const parts = [ind.firstName, ind.middleNames, ind.familyName].filter(Boolean);
-  const name = parts.join(' ') || '(unnamed)';
-  return ind.nickname ? `${name} (${ind.nickname})` : name;
-}
+// individualDisplayName lives in personName.ts so browser code can use it without importing this
+// server-only module; re-exported here for existing callers.
+export { individualDisplayName } from './personName';
 
 // Everyone placed in the cluster containing nucleusName (needs WRITE on the nucleus; a reader
 // gets []), ordered by family then first name -- confirmed with cluster-notebook 2026-11-18. Never
