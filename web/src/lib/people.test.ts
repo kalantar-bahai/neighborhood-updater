@@ -55,10 +55,13 @@ describe('canEditRole', () => {
 describe('peopleFilters', () => {
   const rows = [row('Ana', ['contact']), row('Ben', ['promoter', 'cso']), row('Cy', [], true)];
   test('home nucleus: all, resident, then roles in label order, unknown last', () => {
-    expect(peopleFilters(rows, true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'contact', 'cso']);
+    expect(peopleFilters(rows, true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'protagonist', 'accompanier', 'contact', 'cso']);
   });
   test('non-home nucleus has no resident filter', () => {
-    expect(peopleFilters(rows, false).map(f => f.key)).toEqual(['all', 'promoter', 'contact', 'cso']);
+    expect(peopleFilters(rows, false).map(f => f.key)).toEqual(['all', 'promoter', 'protagonist', 'accompanier', 'contact', 'cso']);
+  });
+  test('every known role shows even when nobody holds it', () => {
+    expect(peopleFilters([], true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'protagonist', 'accompanier', 'contact']);
   });
   test('labels', () => {
     expect(peopleFilters(rows, true).slice(0, 3).map(f => f.label)).toEqual(['All', 'Resident', 'Promoting']);
