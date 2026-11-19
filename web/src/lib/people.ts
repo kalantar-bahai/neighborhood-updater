@@ -48,8 +48,10 @@ export function sortRoles(roles: string[]): string[] {
   return [...known, ...other];
 }
 
+// Every known role always shows, so the filter list doesn't change from nucleus to nucleus; other roles
+// show when someone holds them.
 export function peopleFilters(rows: PersonRow[], isHome: boolean): { key: string; label: string }[] {
-  const held = sortRoles(rows.flatMap(r => r.roles));
+  const held = sortRoles([...KNOWN_ROLES, ...rows.flatMap(r => r.roles)]);
   return [
     { key: 'all', label: 'All' },
     ...(isHome ? [{ key: 'resident', label: RESIDENT.label }] : []),
