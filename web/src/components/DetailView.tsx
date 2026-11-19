@@ -7,6 +7,7 @@ import type { Worker } from '@/types';
 import type { PermissionSet } from '@/lib/access';
 import type { LastUpdated, LocalityOption } from '@/lib/clusterNotebook';
 import WorkerListModal from './WorkerListModal';
+import PeopleCard from './PeopleCard';
 import ManageAccessCard from './ManageAccessCard';
 import { SrpDot } from './SrpBadge';
 import { canRenameNucleus, deleteNotice, pendingIdentityLocks, nextNameAfterRename, pushToSrpMode, srpDetailMessage, srpOutOfStepMessage } from '@/lib/srp';
@@ -610,6 +611,9 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // no way to collapse them at all; now they're collapsible like every other card,
   // just starting open instead of closed.
   const [overviewOpen, setOverviewOpen] = card('overview', true);
+  const [peopleOpen, setPeopleOpen] = card('people', false);
+  // Bumped when a name list changes in a WorkerListModal, so the People card re-reads.
+  const [peopleRefresh, setPeopleRefresh] = useState(0);
   const [familiesOpen, setFamiliesOpen] = card('families', true);
   const [activitiesOpen, setActivitiesOpen] = card('activities', true);
   const [detailsOpen, setDetailsOpen] = card('details', true);
@@ -1194,6 +1198,21 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           </div>}
         </div>
 
+        {/* People (2026-11-18): everyone connected to this nucleus -- role holders here, plus
+            residents on a home nucleus. Spec: docs/superpowers/specs/2026-11-18-people-card-design.md */}
+        <div className="card">
+          <div
+            className="card-header"
+            onClick={() => setPeopleOpen(o => !o)}
+            style={{ cursor: 'pointer', userSelect: 'none' }}
+          >
+            <span><span style={{ fontSize: 11, marginRight: 6 }}>{peopleOpen ? '▼' : '▶'}</span>People</span>
+          </div>
+          {peopleOpen && <div className="card-body">
+            <PeopleCard nucleus={row.nucleus} isHome={srpState === 'IN_SRP'} permissions={permissions} refreshKey={peopleRefresh} onRolesChanged={onReload} />
+          </div>}
+        </div>
+
         {/* Families (formerly "Population" -- now households only, 2026-10-08:
             Individuals Connected removed, Total Population and Makeup of Population
             moved to the Overview card) */}
@@ -1438,7 +1457,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           role="accompanier"
           nucleus={row.nucleus}
           workers={accompanierNames}
-          onChange={workers => setAccompanierNames(workers)}
+          onChange={workers => { setAccompanierNames(workers); setPeopleRefresh(n => n + 1); }}
           onClose={() => setShowAccompaniersModal(false)}
         />
       )}
@@ -1450,7 +1469,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           nucleus={row.nucleus}
           workers={protagonistNames}
           importWorkers={accompanierNames}
-          onChange={workers => setProtagonistNames(workers)}
+          onChange={workers => { setProtagonistNames(workers); setPeopleRefresh(n => n + 1); }}
           onClose={() => setShowProtagonistsModal(false)}
         />
       )}
@@ -1461,7 +1480,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           role="abm-assistant"
           nucleus={row.nucleus}
           workers={abmAssistantNames}
-          onChange={workers => setAbmAssistantNames(workers)}
+          onChange={workers => { setAbmAssistantNames(workers); setPeopleRefresh(n => n + 1); }}
           onClose={() => setShowAbmAssistantModal(false)}
         />
       )}
@@ -1473,7 +1492,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           nucleus={row.nucleus}
           workers={contactNames}
           single
-          onChange={workers => setContactNames(workers)}
+          onChange={workers => { setContactNames(workers); setPeopleRefresh(n => n + 1); }}
           onClose={() => setShowContactModal(false)}
         />
       )}
@@ -1484,7 +1503,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           role="promoter"
           nucleus={row.nucleus}
           workers={promoterNames}
-          onChange={workers => setPromoterNames(workers)}
+          onChange={workers => { setPromoterNames(workers); setPeopleRefresh(n => n + 1); }}
           onClose={() => setShowPromotersModal(false)}
         />
       )}
