@@ -129,7 +129,7 @@ export function syncNote(sync: PlaceSync | null): { tone: 'wait' | 'error'; text
     case 'in_flight':
       return { tone: 'wait', text: 'On its way to SRP' };
     case 'refused':
-      return { tone: 'error', text: REFUSALS[sync.code ?? ''] ?? `SRP refused the move (${sync.code ?? 'no reason given'})` };
+      return { tone: 'error', text: `${REFUSALS[sync.code ?? ''] ?? `SRP refused the move (${sync.code ?? 'no reason given'})`}. The move was undone.` };
     case 'failed':
       return { tone: 'error', text: `Couldn't reach SRP: ${sync.code ?? 'unknown error'}` };
     default:

@@ -29,7 +29,7 @@ type Editing = {
 };
 // A move waiting for the person to confirm it.
 type PendingMove = {
-  kind: 'in' | 'out'; to: MoveTarget;
+  personId: string; kind: 'in' | 'out'; to: MoveTarget;
   // The nucleus they are leaving, its roles they hold that the caller may clear, and whether to keep them.
   oldNucleus: string | null; oldName: string; oldRoles: string[]; keep: boolean;
 };
@@ -97,6 +97,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [cardError, setCardError] = useState('');
   const [adding, setAdding] = useState(false);
   const [reloads, setReloads] = useState(0);
 
@@ -124,12 +125,18 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
   const rowsClickable = permissions.canAssignRoles || canMove;
   const canAdd = permissions.canWrite && (permissions.canAssignRoles || canMove);
 
+  // The person whose editor is open, read by async work that must not land on someone else.
+  const editingId = useRef<string | null>(null);
+
   function startEdit(e: Editing) {
+    if (saving) return;
+    editingId.current = e.id;
     setEditing(e);
     setTicked(e.roles);
     setResident(e.isResident);
     setPendingMove(null);
     setSaveError('');
+    setCardError('');
     setAdding(false);
   }
 
@@ -165,7 +172,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
       setSaveError('');
       if (target.isResident && moves.out) {
         setPendingMove({
-          kind: 'out', to: moves.out, oldNucleus: nucleus, oldName: moves.here?.name ?? nucleus,
+          personId: target.id, kind: 'out', to: moves.out, oldNucleus: nucleus, oldName: moves.here?.name ?? nucleus,
           oldRoles: ticked.filter(r => canEditRole(permissions, r)), keep: true,
         });
       } else if (!target.isResident && moves.here) {
@@ -173,7 +180,9 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
         setSaving(true);
         const oldRoles = old ? await rolesAt(old, target.id) : [];
         setSaving(false);
-        setPendingMove({ kind: 'in', to: moves.here, oldNucleus: old, oldName: old ?? '', oldRoles, keep: true });
+        // Drop the answer if the person switched to someone else while we were asking.
+        if (editingId.current !== target.id) return;
+        setPendingMove({ personId: target.id, kind: 'in', to: moves.here, oldNucleus: old, oldName: old ?? '', oldRoles, keep: true });
       }
       return;
     }
@@ -185,6 +194,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     setSaving(true);
     setSaveError('');
     const written: string[] = [];
+    let moved = false;
     try {
       let rolesHere = ticked;
       if (move) {
@@ -197,6 +207,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
         if (!res.ok) throw new Error(data.error || 'The move failed');
         const refused = moveResultError(data.result);
         if (refused) throw new Error(refused);
+        moved = true;
         const clear = rolesToClear(move.oldRoles, () => true, move.keep);
         if (move.kind === 'out') {
           rolesHere = ticked.filter(r => !clear.includes(r));
@@ -212,8 +223,15 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
       setEditing(null);
       setPendingMove(null);
     } catch (e: unknown) {
-      setSaveError(e instanceof Error ? e.message : String(e));
+      const message = e instanceof Error ? e.message : String(e);
       setPendingMove(null);
+      if (moved) {
+        // The editor no longer matches the person (they have moved); close it and say what didn't save.
+        setEditing(null);
+        setCardError(`${target.name} was moved, but a role change didn't save: ${message}`);
+      } else {
+        setSaveError(message);
+      }
     } finally {
       setSaving(false);
       // Re-read this card, and the page's name lists for whatever did save.
@@ -277,7 +295,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
         );
       })}
       {saveError && <div style={{ fontSize: 12, color: '#c53030' }}>{saveError}</div>}
-      {pendingMove ? confirmMove(e, pendingMove) : (
+      {pendingMove?.personId === e.id ? confirmMove(e, pendingMove) : (
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
           <button type="button" disabled={saving} onClick={() => save(e)} style={btn('#3182ce', 'white')}>{saving ? 'Saving…' : 'Save'}</button>
           <button type="button" disabled={saving} onClick={() => setEditing(null)} style={btn('white', '#4a5568', '#cbd5e0')}>Cancel</button>
@@ -298,10 +316,11 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
         </select>
         <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search names…" aria-label="Search names" style={{ flex: 1, minWidth: 120 }} />
         {canAdd && (
-          <button type="button" onClick={() => { setAdding(a => !a); setEditing(null); }} style={btn('#3182ce', 'white')}>+ Add</button>
+          <button type="button" disabled={saving} onClick={() => { setAdding(a => !a); setEditing(null); }} style={btn('#3182ce', 'white')}>+ Add</button>
         )}
       </div>
 
+      {cardError && <div style={{ fontSize: 12, color: '#c53030', marginBottom: 6 }}>{cardError}</div>}
       {adding && (
         <AddPerson
           nucleus={nucleus}
@@ -332,7 +351,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
             return (
               <div key={r.id} style={{ borderBottom: '1px solid #f7fafc', padding: '6px 0' }}>
                 <div
-                  onClick={rowsClickable ? () => (editing?.id === r.id ? setEditing(null) : startEdit(fromRow(r))) : undefined}
+                  onClick={rowsClickable && !saving ? () => (editing?.id === r.id ? setEditing(null) : startEdit(fromRow(r))) : undefined}
                   style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: rowsClickable ? 'pointer' : 'default' }}
                 >
                   <span style={{ fontSize: 14 }}>{sortBy === 'family' ? r.familyFirst : r.name}</span>

@@ -68,12 +68,11 @@ Move Ana Lopez out of Lloyd Farm?
 | failed | red note "Couldn't reach SRP: <code>"; SRP's place returns on the next read |
 | not_in_srp | nothing (created here; nothing to send) |
 
-- **Household refusal** (`HOUSEHOLD_MOVES_TOGETHER`): the row offers "Ana Lopez lives with N others in SRP
-  (contact first: …). Move them all?". Yes resends the same move with `withHousehold: true`. N is `householdSize - 1`;
-  names come from `household` (only those the caller may see).
+- **Households move together** (owner, 2026-11-19): every move sends `withHousehold: true`. srp-client finds the
+  household contact and moves the whole household, so there is no household prompt.
 - Refusal codes get plain-language text: `FN_NOT_IN_LOCALITY` "That neighbourhood isn't in their locality",
   `OUT_OF_SCOPE` "SRP doesn't let us change this person", `NOT_IN_SRP_RECORDS` "SRP doesn't have this person",
-  anything else "SRP refused the move (<code>)". Key off `code`, never `error`.
+  anything else "SRP refused the move (<code>)"; each ends "The move was undone." Key off `code`, never `error`.
 - Per-person results from `moveIndividuals`: `FORBIDDEN` "You can't move this person", `OTHER_CLUSTER`
   "This person is in another cluster", `NOT_FOUND` "Person not found", `ALREADY_THERE` treated as success.
 - The move state survives reloads (it comes from the server), so a slow SRP is visible for as long as it takes.
