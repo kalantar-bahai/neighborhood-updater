@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { placePath, roleLabel, canEditRole, peopleFilters, filterPeople, nextRoleIds, type PersonRow } from './people';
+import { placePath, roleLabel, canEditRole, peopleFilters, filterPeople, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
 import type { PermissionSet } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -90,5 +90,25 @@ describe('nextRoleIds', () => {
   });
   test('removes', () => {
     expect(nextRoleIds(['a', 'b'], 'a', false, false)).toEqual(['b']);
+  });
+});
+
+describe('toPersonRow', () => {
+  test('uses the display name and keeps roles and residency', () => {
+    const r = toPersonRow({
+      individual: { id: '7', firstName: 'Ana', middleNames: null, familyName: 'Lopez', nickname: 'Annie', place: null },
+      roles: ['promoter'], isResident: true,
+    });
+    expect(r).toEqual({ id: '7', name: 'Ana Lopez (Annie)', roles: ['promoter'], isResident: true });
+  });
+});
+
+describe('limitResults', () => {
+  const n = (k: number) => Array.from({ length: k }, (_, i) => i);
+  test('one more than the limit means there are more', () => {
+    expect(limitResults(n(SEARCH_LIMIT + 1))).toEqual({ items: n(SEARCH_LIMIT), more: true });
+  });
+  test('exactly the limit means no more', () => {
+    expect(limitResults(n(SEARCH_LIMIT))).toEqual({ items: n(SEARCH_LIMIT), more: false });
   });
 });

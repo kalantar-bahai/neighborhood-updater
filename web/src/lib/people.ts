@@ -1,6 +1,6 @@
 // People card (phase 1): pure decisions, tested in people.test.ts.
 // Spec: docs/superpowers/specs/2026-11-18-people-card-design.md
-import type { PermissionSet, PlaceSummary } from './clusterNotebook';
+import { individualDisplayName, type NucleusPerson, type PermissionSet, type PlaceSummary } from './clusterNotebook';
 import { INFORMAL_WORKER_TYPES } from './config';
 
 export type PersonRow = { id: string; name: string; roles: string[]; isResident: boolean };
@@ -64,4 +64,13 @@ export function nextRoleIds(current: string[], personId: string, on: boolean, si
   if (!on) return current.filter(id => id !== personId);
   if (single) return [personId];
   return current.includes(personId) ? current : [...current, personId];
+}
+
+export function toPersonRow(p: NucleusPerson): PersonRow {
+  return { id: p.individual.id, name: individualDisplayName(p.individual), roles: p.roles, isResident: p.isResident };
+}
+
+// Routes ask cluster-notebook for SEARCH_LIMIT + 1 people, so a full extra one means "there are more".
+export function limitResults<T>(items: T[]): { items: T[]; more: boolean } {
+  return { items: items.slice(0, SEARCH_LIMIT), more: items.length > SEARCH_LIMIT };
 }
