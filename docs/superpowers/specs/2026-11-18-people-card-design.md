@@ -127,8 +127,9 @@ People                                         [+ Add]
   one call fails, show the error and re-read the card; no optimistic rollback.
 - **Contact stays one person:** ticking Contact on someone confirms first ("This replaces Ana Lopez as contact."),
   as the Contact picker does today.
-- **All roles held here show,** including Accompanying, Contact, ABm Assistant and cluster roles (ATC, CSO, ...).
-  Cluster roles get a generic badge with the role's name. Manage Access keeps its own exclusions.
+- **All roles held on this nucleus itself show,** including Accompanying, Contact, ABm Assistant and any other role
+  assigned here, as a generic badge with the role's name. Roles held at the Cluster or Locality are not included
+  (confirmed with cluster-notebook 2026-11-18). Manage Access keeps its own exclusions.
 - **Home nucleus:** taken from the existing SRP state (`IN_SRP` = home). The Resident filter and 🏠 icon show only
   then; `isResident` is false elsewhere anyway.
 - **Search:** server-side, debounced, limited to the first 20 matches, with "keep typing to narrow" when more exist.
