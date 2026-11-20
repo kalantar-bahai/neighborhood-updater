@@ -32,6 +32,20 @@ export default function SrpBadge({ state, action }: { state: SrpState | null; ac
 // lighter alternative to the SRP status tag. Hover/long-press shows the words.
 const DOT = { green: '#38a169', amber: '#d69e2e', red: '#e53e3e', grey: '#a0aec0' } as const;
 
+// A person's dot on the People card: green if SRP has them, red if they exist only in Nucleus Assistant.
+// Red means not linked to SRP, not proof SRP lacks them (cluster-notebook 2026-11-19).
+export function PersonSrpDot({ inSrp }: { inSrp: boolean }) {
+  const label = inSrp ? 'In SRP' : 'Not linked to SRP (only in Nucleus Assistant)';
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: inSrp ? DOT.green : DOT.red, marginLeft: 4, verticalAlign: 'middle', flexShrink: 0 }}
+    />
+  );
+}
+
 export function SrpDot({ state, action }: { state: SrpState | null; action?: SrpAction['action'] }) {
   if (!state) return null;
   const { label, color } = srpBadge(state, action);

@@ -575,12 +575,15 @@ export interface PlaceSync {
   status: 'pending' | 'in_flight' | 'synced' | 'refused' | 'failed' | 'not_in_srp';
   code: string | null;
 }
-export interface PersonSummary extends PersonName { place: PlaceSummary | null; placeSync: PlaceSync | null }
+// Confirmed with cluster-notebook 2026-11-19 (PR #45): inSrp is true if SRP has given us this person, false if
+// they exist only here (createIndividual never creates anyone in SRP). False doesn't prove SRP lacks them: someone
+// typed in here may duplicate a person SRP holds.
+export interface PersonSummary extends PersonName { place: PlaceSummary | null; placeSync: PlaceSync | null; inSrp: boolean }
 // roles: those held on this nucleus itself (not at its Cluster or Locality). isResident: placed at this
 // nucleus's Setting, and only ever true on a home nucleus.
 export interface NucleusPerson { individual: PersonSummary; roles: string[]; isResident: boolean }
 const PLACE_SELECTION = 'id name type locality cluster localityId homeNucleus';
-const PERSON_SUMMARY_SELECTION = `${PERSON_NAME_SELECTION} place { ${PLACE_SELECTION} } placeSync { status code }`;
+const PERSON_SUMMARY_SELECTION = `${PERSON_NAME_SELECTION} inSrp place { ${PLACE_SELECTION} } placeSync { status code }`;
 
 // individualDisplayName lives in personName.ts so browser code can use it without importing this
 // server-only module; re-exported here for existing callers.

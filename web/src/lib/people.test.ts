@@ -7,7 +7,7 @@ const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
   assignableRoles: [], createableEntityTypes: [], ...over,
 });
 
-const row = (name: string, roles: string[], isResident = false): PersonRow => ({ id: name, name, familyFirst: name, roles, isResident, place: null, placeSync: null });
+const row = (name: string, roles: string[], isResident = false): PersonRow => ({ id: name, name, familyFirst: name, roles, isResident, place: null, placeSync: null, inSrp: true });
 
 describe('placePath', () => {
   test('a Setting shows cluster, locality and setting', () => {
@@ -99,13 +99,17 @@ describe('nextRoleIds', () => {
 describe('toPersonRow', () => {
   test('uses the display name and keeps roles and residency', () => {
     const r = toPersonRow({
-      individual: { id: '7', firstName: 'Ana', middleNames: null, familyName: 'Lopez', nickname: 'Annie', place: null, placeSync: null },
+      individual: { id: '7', firstName: 'Ana', middleNames: null, familyName: 'Lopez', nickname: 'Annie', place: null, placeSync: null, inSrp: true },
       roles: ['promoter'], isResident: true,
     });
-    expect(r).toEqual({ id: '7', name: 'Ana Lopez (Annie)', familyFirst: 'Lopez, Ana (Annie)', roles: ['promoter'], isResident: true, place: null, placeSync: null });
+    expect(r).toEqual({ id: '7', name: 'Ana Lopez (Annie)', familyFirst: 'Lopez, Ana (Annie)', roles: ['promoter'], isResident: true, place: null, placeSync: null, inSrp: true });
+  });
+  test('inSrp passes through', () => {
+    const ind = { id: '9', firstName: 'Ben', middleNames: null, familyName: null, nickname: null, place: null, placeSync: null };
+    expect(toPersonRow({ individual: { ...ind, inSrp: false }, roles: [], isResident: false }).inSrp).toBe(false);
   });
   test('family-first name copes with missing parts', () => {
-    const ind = { id: '8', firstName: 'Ana', middleNames: 'Maria', familyName: 'Lopez', nickname: null, place: null, placeSync: null };
+    const ind = { id: '8', firstName: 'Ana', middleNames: 'Maria', familyName: 'Lopez', nickname: null, place: null, placeSync: null, inSrp: true };
     const person = (over: object) => toPersonRow({ individual: { ...ind, ...over }, roles: [], isResident: true }).familyFirst;
     expect(person({})).toBe('Lopez, Ana Maria');
     expect(person({ firstName: null, middleNames: null })).toBe('Lopez');
@@ -135,7 +139,7 @@ describe('people.ts stays browser-safe', () => {
 });
 
 describe('sortPeople', () => {
-  const p = (name: string, familyFirst: string): PersonRow => ({ id: name, name, familyFirst, roles: [], isResident: true, place: null, placeSync: null });
+  const p = (name: string, familyFirst: string): PersonRow => ({ id: name, name, familyFirst, roles: [], isResident: true, place: null, placeSync: null, inSrp: true });
   const rows = [p('carla Diaz', 'Diaz, carla'), p('Ben Okafor', 'Okafor, Ben'), p('Zoe Adams', 'Adams, Zoe')];
   test('by first name, ignoring case', () => {
     expect(sortPeople(rows, 'first').map(r => r.name)).toEqual(['Ben Okafor', 'carla Diaz', 'Zoe Adams']);

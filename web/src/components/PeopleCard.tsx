@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { PersonSrpDot } from './SrpBadge';
 import type { PermissionSet } from '@/lib/clusterNotebook';
 import {
   KNOWN_ROLES, RESIDENT, canEditRole, filterPeople, isMoving, moveResultError, nextRoleIds, peopleFilters, placePath,
@@ -354,7 +355,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
                   onClick={rowsClickable && !saving ? () => (editing?.id === r.id ? setEditing(null) : startEdit(fromRow(r))) : undefined}
                   style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: rowsClickable ? 'pointer' : 'default' }}
                 >
-                  <span style={{ fontSize: 14 }}>{sortBy === 'family' ? r.familyFirst : r.name}</span>
+                  <span style={{ fontSize: 14 }}>{sortBy === 'family' ? r.familyFirst : r.name}<PersonSrpDot inSrp={r.inSrp} /></span>
                   <RoleMarks row={r} isHome={isHome} />
                 </div>
                 {note?.tone === 'error' && <div style={{ fontSize: 12, color: '#c53030' }}>{note.text}</div>}

@@ -229,3 +229,11 @@ cluster-notebook branch `move-individuals`; SRP follows through srp-client `set_
   `move-individuals`, b0f035e).
 - `withHousehold: true` always works: srp-client finds the household contact and moves the whole household, and
   cluster-notebook moves the other members locally from its result.
+
+## Person in SRP, confirmed with cluster-notebook 2026-11-19
+
+- `PersonSummary.inSrp: Boolean!` (cluster-notebook PR #45), on every PersonSummary (`Nucleus.people[].individual`,
+  `individuals(...)`, `placeSync.household`). True if SRP has given us this person; false if they exist only here
+  (`createIndividual` never creates anyone in SRP). False doesn't prove SRP lacks them: someone typed in here may
+  duplicate a person SRP holds. No pending or unknown state.
+- The People card shows it as a dot after each name: green "In SRP", red "Not linked to SRP (only in Nucleus Assistant)".

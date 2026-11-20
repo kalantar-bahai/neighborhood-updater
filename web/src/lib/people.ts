@@ -7,7 +7,7 @@ import { INFORMAL_WORKER_TYPES } from './config';
 // name: "Ana Lopez"; familyFirst: "Lopez, Ana", shown when the list is sorted by family name.
 export type PersonRow = {
   id: string; name: string; familyFirst: string; roles: string[]; isResident: boolean;
-  place: PlaceSummary | null; placeSync: PlaceSync | null;
+  place: PlaceSummary | null; placeSync: PlaceSync | null; inSrp: boolean;
 };
 export type PeopleSort = 'first' | 'family';
 
@@ -82,7 +82,7 @@ export function toPersonRow(p: NucleusPerson): PersonRow {
     : individualDisplayName(ind);
   return {
     id: ind.id, name: individualDisplayName(ind), familyFirst, roles: p.roles, isResident: p.isResident,
-    place: ind.place, placeSync: ind.placeSync,
+    place: ind.place, placeSync: ind.placeSync, inSrp: ind.inSrp,
   };
 }
 
