@@ -62,7 +62,7 @@ too), then the age category as a small grey tag ("Youth"). These icons are the b
 SRP gives them; "(completed)" when the study item is completed. "No activities in SRP" when the list is empty.
 
 **Details section** (only when `personDetails` is non-null):
-- "Not in SRP; nothing synced" when `srpReadAt` is null (an app-created person).
+- "Not in SRP; nothing synced" when `individual.inSrp` is false (an app-created person).
 - Otherwise each value, or "—" when SRP has none. Phones and emails are listed as given.
 - Checks only when `checks` is non-null. Background check: "expires <date>", in red when past. Motor vehicle:
   "cleared", "not cleared" or "—".
@@ -75,7 +75,7 @@ Adult (only the age categories someone in the list has). Still one filter at a t
 **Loading:** row fields come with the list (`/api/people`). Details are read when the panel opens (one call per
 open), so restricted fields never travel with the list.
 
-## What we need from cluster-notebook (SDL as proposed 2026-11-20)
+## What we need from cluster-notebook (phase A live 2026-11-20, PR #46; phase B proposed)
 
 ```graphql
 enum AgeCategory { CHILD JUNIOR_YOUTH YOUTH ADULT }
@@ -93,16 +93,21 @@ type NucleusPerson {
 type Participation { activityId activityName activityType role studyItem startDate endDate completed current }
 type Query { personDetails(individualId: String!, nucleusName: String!): PersonDetails }   # A
 type PersonDetails {
-  individual: PersonSummary!  srpReadAt: DateTime  estimatedAge: Int  isRegistered: Boolean
+  individual: PersonSummary!  estimatedAge: Int  isRegistered: Boolean
   registrationDate: Date  address: String  phones: [String!]!  emails: [String!]!  srpComments: String
   checks: PersonChecks                 # null unless tier 2
 }
-type PersonChecks { backgroundCheckExpiration: Date  motorVehicleClearance: Boolean }
+type PersonChecks { backgroundCheckExpiration: Date  motorVehicleClearance: Boolean }   # true cleared, false not, null unknown
 ```
 
 - `personDetails` null means not permitted, or not one of this nucleus's people. No error codes.
 - Row fields are on `NucleusPerson`, not `PersonSummary`, so they don't reach the cluster-wide "+ Add" search.
-- Values fill in on the next SRP read of each locality after phase A deploys; until then most are null.
+- Values fill in on the owner's re-read of each locality after phase A deployed; until then most are null.
+- Tiers as built (cluster-notebook 2026-11-20): tier 1 is anyone who can edit the nucleus (its contacts and
+  accompaniers, those of a parent nucleus, and cluster roles ATC/CSO/CIC and their collaborators). Tier 2 is an
+  accompanier on the nucleus itself or one of those cluster roles; a contact alone never sees checks.
+- Side effect: `Individual.phone`/`email` on `workers(role)` are now null unless the caller is tier 1 on that
+  nucleus, so the Identity card's "Contact Email" is blank for other readers.
 
 ## Phasing here
 
