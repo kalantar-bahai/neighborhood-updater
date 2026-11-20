@@ -11,7 +11,8 @@ import PeopleCard from './PeopleCard';
 import ManageAccessCard from './ManageAccessCard';
 import { SrpDot } from './SrpBadge';
 import { canRenameNucleus, deleteNotice, pendingIdentityLocks, nextNameAfterRename, pushToSrpMode, srpDetailMessage, srpOutOfStepMessage } from '@/lib/srp';
-import StaggeredConcentricDiagram, { formatNum, type AlignedLabel } from './StaggeredConcentricDiagram';
+import StaggeredConcentricDiagram, { formatValue, type AlignedLabel } from './StaggeredConcentricDiagram';
+import { namedToShow } from '@/lib/people';
 
 interface Props {
   detail: NucleusDetail;
@@ -90,11 +91,14 @@ function actTotal(acts: (Activity | undefined)[]) {
   }), { act: 0, part: 0, fof: 0 });
 }
 
-function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabelClick, highlighted, onSync, fromSheet, info, labelExtra }: {
+function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabelClick, highlighted, onSync, fromSheet, info, labelExtra, named }: {
+  // named: people named in this figure's role list, shown after the number as "(4)" (owner, 2026-11-19).
+  named?: number;
   label: string; labelExtra?: React.ReactNode; value: string; onChange?: (v: string) => void; onBlur?: () => void; readonly?: boolean; type?: string; integer?: boolean;
   onLabelClick?: () => void; highlighted?: boolean; onSync?: () => void; fromSheet?: boolean; info?: string;
 }) {
   const hasError = integer && !readonly && !isValidInt(value);
+  const shownNamed = namedToShow(value || '', named);
   const cls = [readonly ? 'ro' : '', hasError ? 'error' : '', highlighted ? 'overridden' : ''].filter(Boolean).join(' ');
   return (
     <div className={`field${fromSheet ? ' from-sheet' : ''}`}>
@@ -129,6 +133,12 @@ function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabe
           onBlur={onBlur}
           onKeyDown={onBlur ? (e => { if (e.key === 'Enter') e.currentTarget.blur(); }) : undefined}
         />
+        {shownNamed !== undefined && (
+          // Sits just after the typed number: 11px is the input's border plus padding, and digits are about 1ch wide.
+          <span title={`${shownNamed} named`} style={{ position: 'absolute', left: `calc(11px + ${(value || '').length}ch + 4px)`, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#718096', pointerEvents: 'none' }}>
+            ({shownNamed})
+          </span>
+        )}
         {highlighted && onSync && (
           <button onClick={onSync} title="Sync to list count" style={{ position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#d97706', display: 'flex', alignItems: 'center' }}>
             <IcoSync />
@@ -440,7 +450,7 @@ function ConcentricDiagram({ data }: { data: { label: string; value: string; onC
           style={data[i].onClick ? { cursor: 'pointer' } : undefined}
           textDecoration={data[i].onClick ? 'underline' : undefined}
         >
-          <tspan fontWeight={700}>{formatNum(data[i].value)}</tspan> {data[i].label}
+          <tspan fontWeight={700}>{formatValue(data[i])}</tspan> {data[i].label}
         </text>
       ))}
     </svg>
@@ -480,7 +490,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 
       {/* Residing — outside all circles */}
       <text x={cx} y={28} textAnchor="middle" fontSize={13} fontWeight={400} fill="#2d3748">
-        <tspan fontWeight={700}>{formatNum(residing.value)}</tspan> {residing.label}
+        <tspan fontWeight={700}>{formatValue(residing)}</tspan> {residing.label}
       </text>
 
       <defs>
@@ -491,7 +501,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
       {rings[0]?.single && (
         <text fontSize={12} fontWeight={400} fill={ARINGS[0].textFill} dominantBaseline="middle">
           <textPath href="#aligned-arc-outer" startOffset="50%" textAnchor="middle">
-            <tspan fontWeight={700}>{formatNum(rings[0].single.value)}</tspan> {rings[0].single.label}
+            <tspan fontWeight={700}>{formatValue(rings[0].single)}</tspan> {rings[0].single.label}
           </textPath>
         </text>
       )}
@@ -515,13 +525,13 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
             {ring.right && (
               <text fontSize={11} fontWeight={400} fill={ARINGS[i].textFill} dominantBaseline="middle"
                 onClick={ring.right.onClick} style={ring.right.onClick ? { cursor: 'pointer' } : undefined}>
-                <textPath href={`#${idR}`} startOffset="50%" textAnchor="middle"><tspan fontWeight={700}>{formatNum(ring.right.value)}</tspan> {ring.right.label}</textPath>
+                <textPath href={`#${idR}`} startOffset="50%" textAnchor="middle"><tspan fontWeight={700}>{formatValue(ring.right)}</tspan> {ring.right.label}</textPath>
               </text>
             )}
             {ring.left && (
               <text fontSize={11} fontWeight={400} fill={ARINGS[i].textFill} dominantBaseline="middle"
                 onClick={ring.left.onClick} style={ring.left.onClick ? { cursor: 'pointer' } : undefined}>
-                <textPath href={`#${idL}`} startOffset="50%" textAnchor="middle"><tspan fontWeight={700}>{formatNum(ring.left.value)}</tspan> {ring.left.label}</textPath>
+                <textPath href={`#${idL}`} startOffset="50%" textAnchor="middle"><tspan fontWeight={700}>{formatValue(ring.left)}</tspan> {ring.left.label}</textPath>
               </text>
             )}
           </g>
@@ -538,7 +548,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
               <g transform={`rotate(-90 ${cx + vx} ${cy})`} onClick={ring.right.onClick} style={ring.right.onClick ? { cursor: 'pointer' } : undefined}>
                 <text x={cx + vx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={11} fontWeight={400} fill={ARINGS[3].textFill}
                   textDecoration={ring.right.onClick ? 'underline' : undefined}>
-                  <tspan fontWeight={700}>{formatNum(ring.right.value)}</tspan> {ring.right.label}
+                  <tspan fontWeight={700}>{formatValue(ring.right)}</tspan> {ring.right.label}
                 </text>
               </g>
             )}
@@ -546,7 +556,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
               <g transform={`rotate(-90 ${cx - vx} ${cy})`} onClick={ring.left.onClick} style={ring.left.onClick ? { cursor: 'pointer' } : undefined}>
                 <text x={cx - vx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={11} fontWeight={400} fill={ARINGS[3].textFill}
                   textDecoration={ring.left.onClick ? 'underline' : undefined}>
-                  <tspan fontWeight={700}>{formatNum(ring.left.value)}</tspan> {ring.left.label}
+                  <tspan fontWeight={700}>{formatValue(ring.left)}</tspan> {ring.left.label}
                 </text>
               </g>
             )}
@@ -819,8 +829,8 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     { label: 'Residing',      value: form.totalPop },
     { label: 'Connected',     value: form.inConversation },
     { label: 'Participating', value: form.inCommunityActivities },
-    { label: 'Helping Others', value: form.helpingOthers, onClick: () => setShowProtagonistsModal(true) },
-    { label: 'Accompanying',  value: form.accompanying, onClick: () => setShowAccompaniersModal(true) },
+    { label: 'Helping Others', value: form.helpingOthers, named: protagonistNames.length, onClick: () => setShowProtagonistsModal(true) },
+    { label: 'Accompanying',  value: form.accompanying, named: accompanierNames.length, onClick: () => setShowAccompaniersModal(true) },
   ];
 
   const alignedResiding = { label: 'Residing', value: form.totalPop };
@@ -832,11 +842,11 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     },
     {
       right: { label: 'Facilitating', value: form.educationalFacilitators },
-      left:  { label: 'Promoting',    value: form.protagonists, onClick: () => setShowPromotersModal(true) },
+      left:  { label: 'Promoting',    value: form.protagonists, named: promoterNames.length, onClick: () => setShowPromotersModal(true) },
     },
     {
-      right: { label: 'Accompanying', value: form.accompanying, onClick: () => setShowAccompaniersModal(true) },
-      left:  { label: 'Helping Others', value: form.helpingOthers, onClick: () => setShowProtagonistsModal(true) },
+      right: { label: 'Accompanying', value: form.accompanying, named: accompanierNames.length, onClick: () => setShowAccompaniersModal(true) },
+      left:  { label: 'Helping Others', value: form.helpingOthers, named: protagonistNames.length, onClick: () => setShowProtagonistsModal(true) },
     },
   ];
 
@@ -844,12 +854,12 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // Devotional Meetings/Gatherings has a real mapping now (devotionalHosts,
   // 2026-10-07) -- was always blank before, no field existed for it yet.
   const staggeredLabels: AlignedLabel[] = [
-    { label: 'Accompanying',                           value: form.accompanying, onClick: () => setShowAccompaniersModal(true) },
-    { label: 'Helping Others',                          value: form.helpingOthers, onClick: () => setShowProtagonistsModal(true) },
+    { label: 'Accompanying',                           value: form.accompanying, named: accompanierNames.length, onClick: () => setShowAccompaniersModal(true) },
+    { label: 'Helping Others',                          value: form.helpingOthers, named: protagonistNames.length, onClick: () => setShowProtagonistsModal(true) },
     { label: 'Facilitating Ed. Act.',                   value: form.educationalFacilitators },
     { label: 'Participating in Ed. Act.',               value: form.inEducationalActivities },
     { label: 'Hosting Devotional Meetings/Gatherings',  value: form.devotionalHosts },
-    { label: 'Protagonists/Promoting',                  value: form.protagonists, onClick: () => setShowPromotersModal(true) },
+    { label: 'Protagonists/Promoting',                  value: form.protagonists, named: promoterNames.length, onClick: () => setShowPromotersModal(true) },
     { label: 'Participating',                           value: form.inCommunityActivities },
     { label: 'In Conversation',                         value: form.inConversation },
     { label: 'Population/Residing',                     value: form.totalPop },
@@ -1168,7 +1178,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   of the number itself now -- see this card's own comment above. */}
               <Field
                 label="Promoting"
-                value={form.protagonists} onChange={v => set('protagonists', v)} onBlur={() => commitField('protagonists', 'Promoting', true)} readonly={!canWrite} integer
+                value={form.protagonists} onChange={v => set('protagonists', v)} onBlur={() => commitField('protagonists', 'Promoting', true)} readonly={!canWrite} integer named={promoterNames.length}
                 onLabelClick={permissions.canAssignRoles ? () => setShowPromotersModal(true) : undefined}
                 info="Estimated number of individuals promoting various aspects of community life such as parents encouraging participation, junior youth bringing friends, or youth inviting peers. It also includes promoting collective spaces such as festivals, Summer of Service, family gatherings, and various logistical assistance such as providing food, giving rides, serving others, etc."
               />
@@ -1191,13 +1201,13 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
               />
               <Field
                 label="Helping Others"
-                value={form.helpingOthers} onChange={v => set('helpingOthers', v)} onBlur={() => commitField('helpingOthers', 'Helping Others', true)} readonly={!canWrite} integer
+                value={form.helpingOthers} onChange={v => set('helpingOthers', v)} onBlur={() => commitField('helpingOthers', 'Helping Others', true)} readonly={!canWrite} integer named={protagonistNames.length}
                 onLabelClick={permissions.canAssignRoles ? () => setShowProtagonistsModal(true) : undefined}
                 info="Estimated number of individuals who assist others in taking initial steps in serving others. For example, one may walk with another to do home visits, to share a prayer, to learn a quotation, to introduce the institute’s programs, or other acts of service."
               />
               <Field
                 label="Accompanying"
-                value={form.accompanying} onChange={v => set('accompanying', v)} onBlur={() => commitField('accompanying', 'Accompanying', true)} readonly={!canWrite} integer
+                value={form.accompanying} onChange={v => set('accompanying', v)} onBlur={() => commitField('accompanying', 'Accompanying', true)} readonly={!canWrite} integer named={accompanierNames.length}
                 onLabelClick={permissions.canAssignRoles && permissions.assignableRoles.includes('accompanier') ? () => setShowAccompaniersModal(true) : undefined}
                 info="Estimated number of individuals who have gained a measure of experience from the institute’s courses alongside acts of service, whose actions are motivated by a desire to see capacity develop in others and to foster friendships founded on cooperation and reciprocity."
               />

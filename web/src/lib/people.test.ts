@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
+import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
 import type { MoveContext, PermissionSet, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -233,5 +233,19 @@ describe('editableRoles', () => {
     const rows = [row('A', ['cso']), row('B', ['promoter'])];
     expect(editableRoles(perms({ assignableRoles: ['accompanier', 'cso'] }), rows)).toEqual(['promoter', 'protagonist', 'accompanier', 'cso']);
     expect(editableRoles(perms({ canAssignRoles: false }), rows)).toEqual([]);
+  });
+});
+
+describe('namedToShow', () => {
+  test('shown when the named count differs from the estimate', () => {
+    expect(namedToShow('12', 4)).toBe(4);
+    expect(namedToShow('', 3)).toBe(3);
+    expect(namedToShow('5', 0)).toBe(0);
+  });
+  test('hidden when they match, when nothing is recorded and no one is named, or with no list', () => {
+    expect(namedToShow('4', 4)).toBeUndefined();
+    expect(namedToShow(' 4 ', 4)).toBeUndefined();
+    expect(namedToShow('', 0)).toBeUndefined();
+    expect(namedToShow('12', undefined)).toBeUndefined();
   });
 });

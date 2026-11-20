@@ -5,6 +5,8 @@
 // (ConcentricDiagram/AlignedConcentricDiagram, which did not move here) still need
 // both.
 
+import { namedToShow } from '@/lib/people';
+
 export function formatNum(v: string): string {
   const n = parseInt(v, 10);
   if (!v || isNaN(n)) return '____';
@@ -16,7 +18,14 @@ export function formatNum(v: string): string {
   return Math.round(n / 1000) + 'k';
 }
 
-export type AlignedLabel = { label: string; value: string; onClick?: () => void };
+// named: how many people are named in that role's list, shown after the estimate as "12 (4)" (owner,
+// 2026-11-19) so the two can be compared. Undefined where the figure has no name list.
+export type AlignedLabel = { label: string; value: string; named?: number; onClick?: () => void };
+
+export function formatValue(l: AlignedLabel): string {
+  const named = namedToShow(l.value, l.named);
+  return formatNum(l.value) + (named === undefined ? '' : ` (${named})`);
+}
 
 // 9 concentric circles sharing one center, ordered inner -> outer to match the
 // labels passed in. Each label is left-aligned and anchored in the middle of its
@@ -74,7 +83,7 @@ export default function StaggeredConcentricDiagram({ labels, compact }: { labels
         // threshold shifted from 4 to 5 rather than staying put.
         const dark = i < 5;
         const x = SCX + mid * cos45, y = SCY - mid * cos45;
-        const content = <><tspan fontWeight={700}>{formatNum(l.value)}</tspan> {l.label}</>;
+        const content = <><tspan fontWeight={700}>{formatValue(l)}</tspan> {l.label}</>;
         return (
           <g key={i} onClick={l.onClick} style={l.onClick ? { cursor: 'pointer' } : undefined}>
             <text x={x} y={y} dominantBaseline="middle" fontSize={11} fontWeight={400}

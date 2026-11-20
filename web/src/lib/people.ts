@@ -165,3 +165,12 @@ export function isMoving(rows: PersonRow[]): boolean {
 export function editableRoles(p: PermissionSet, rows: PersonRow[]): string[] {
   return sortRoles([...KNOWN_ROLES, ...rows.flatMap(r => r.roles)]).filter(role => canEditRole(p, role));
 }
+
+// Overview (owner, 2026-11-19): the count of named people shows beside an estimate only when it tells
+// you something: when it differs from the typed number. Nothing typed and no one named shows nothing.
+export function namedToShow(estimate: string, named: number | undefined): number | undefined {
+  if (named === undefined) return undefined;
+  const typed = estimate.trim();
+  if (typed === '' ? named === 0 : Number(typed) === named) return undefined;
+  return named;
+}
