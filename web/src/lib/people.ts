@@ -1,6 +1,7 @@
 // People card (phase 1): pure decisions, tested in people.test.ts.
 // Spec: docs/superpowers/specs/2026-11-18-people-card-design.md
-import type { MoveContext, MoveResult, NucleusPerson, PermissionSet, PlaceSummary, PlaceSync } from './clusterNotebook';
+// Age, devotional host and details (phase A): the People card details spec (phase 3) in docs/superpowers/specs/.
+import type { AgeCategory, DevotionalHostRole, MoveContext, MoveResult, NucleusPerson, PermissionSet, PersonDetails, PlaceSummary, PlaceSync } from './clusterNotebook';
 import { individualDisplayName } from './personName';
 import { INFORMAL_WORKER_TYPES } from './config';
 
@@ -8,6 +9,7 @@ import { INFORMAL_WORKER_TYPES } from './config';
 export type PersonRow = {
   id: string; name: string; familyFirst: string; roles: string[]; isResident: boolean;
   place: PlaceSummary | null; placeSync: PlaceSync | null; inSrp: boolean;
+  ageCategory: AgeCategory | null; devotionalHost: DevotionalHostRole | null;
 };
 export type PeopleSort = 'first' | 'family';
 
@@ -22,6 +24,10 @@ const ROLES: { role: string; label: string; icon: string }[] = [
 ];
 export const KNOWN_ROLES = ROLES.map(r => r.role);
 export const RESIDENT = { label: 'Resident', icon: '🏠' };
+export const DEVOTIONAL_HOST = { label: 'Devotional host', icon: '🕯' };
+export const AGE_LABELS: Record<AgeCategory, string> = {
+  CHILD: 'Child', JUNIOR_YOUTH: 'Junior Youth', YOUTH: 'Youth', ADULT: 'Adult',
+};
 
 // Names like "Parkside" repeat across localities, so search results show the whole path.
 export function placePath(place: Pick<PlaceSummary, 'name' | 'type' | 'cluster' | 'locality'> | null): string {
@@ -56,13 +62,25 @@ export function peopleFilters(rows: PersonRow[], isHome: boolean): { key: string
     { key: 'all', label: 'All' },
     ...(isHome ? [{ key: 'resident', label: RESIDENT.label }] : []),
     ...held.map(role => ({ key: role, label: roleLabel(role).label })),
+    { key: 'devotional-host', label: DEVOTIONAL_HOST.label },
+    ...(Object.keys(AGE_LABELS) as AgeCategory[])
+      .filter(a => rows.some(r => r.ageCategory === a))
+      .map(a => ({ key: `age:${a}`, label: AGE_LABELS[a] })),
   ];
+}
+
+function matchesFilter(r: PersonRow, filter: string): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'resident') return r.isResident;
+  if (filter === 'devotional-host') return r.devotionalHost !== null;
+  if (filter.startsWith('age:')) return r.ageCategory === filter.slice(4);
+  return r.roles.includes(filter);
 }
 
 export function filterPeople(rows: PersonRow[], filter: string, search: string): PersonRow[] {
   const q = search.trim().toLowerCase();
   return rows.filter(r =>
-    (filter === 'all' || (filter === 'resident' ? r.isResident : r.roles.includes(filter))) &&
+    matchesFilter(r, filter) &&
     (!q || r.name.toLowerCase().includes(q)));
 }
 
@@ -83,6 +101,7 @@ export function toPersonRow(p: NucleusPerson): PersonRow {
   return {
     id: ind.id, name: individualDisplayName(ind), familyFirst, roles: p.roles, isResident: p.isResident,
     place: ind.place, placeSync: ind.placeSync, inSrp: ind.inSrp,
+    ageCategory: p.ageCategory, devotionalHost: p.devotionalHost,
   };
 }
 
@@ -173,4 +192,60 @@ export function namedToShow(estimate: string, named: number | undefined): number
   const typed = estimate.trim();
   if (typed === '' ? named === 0 : Number(typed) === named) return undefined;
   return named;
+}
+
+// ---- Phase A: person details ----
+
+export type DetailsView =
+  | { inSrp: false }
+  | { inSrp: true; age: string; registration: string; address: string; phones: string; emails: string;
+      comments: string | null;
+      checks: { background: string; backgroundExpired: boolean; motorVehicle: string } | null };
+
+const DASH = '—';
+
+// What the details panel shows. Dates are ISO strings, so plain string comparison decides "expired".
+export function detailsView(d: PersonDetails, today: string): DetailsView {
+  if (!d.individual.inSrp) return { inSrp: false };
+  const registration = d.isRegistered === null ? DASH
+    : !d.isRegistered ? 'Not registered'
+    : d.registrationDate ? `Registered since ${d.registrationDate}` : 'Registered';
+  const exp = d.checks?.backgroundCheckExpiration ?? null;
+  const mv = d.checks?.motorVehicleClearance ?? null;
+  return {
+    inSrp: true,
+    age: d.estimatedAge === null ? DASH : String(d.estimatedAge),
+    registration,
+    address: d.address?.trim() ? d.address : DASH,
+    phones: d.phones.length ? d.phones.join(', ') : DASH,
+    emails: d.emails.length ? d.emails.join(', ') : DASH,
+    comments: d.srpComments?.trim() ? d.srpComments : null,
+    checks: d.checks ? {
+      background: exp ? `expires ${exp}` : DASH,
+      backgroundExpired: exp !== null && exp < today,
+      motorVehicle: mv === null ? DASH : mv ? 'cleared' : 'not cleared',
+    } : null,
+  };
+}
+
+// One segment of a details line; `danger` shows it in red (an expired background check).
+export type DetailPart = { text: string; danger?: boolean };
+
+// What the panel renders: only values SRP has (no unlabeled dashes), one line per group in the spec's
+// order, each line's parts joined with " · ". Comments are kept apart so they can render with line breaks.
+export function detailLines(v: Extract<DetailsView, { inSrp: true }>): { lines: DetailPart[][]; comments: string | null } {
+  const has = (s: string) => s !== DASH;
+  const part = (text: string, danger?: boolean): DetailPart => (danger ? { text, danger } : { text });
+  const groups: DetailPart[][] = [
+    [...(has(v.age) ? [part(`Age ${v.age}`)] : []), ...(has(v.registration) ? [part(v.registration)] : [])],
+    has(v.address) ? [part(v.address)] : [],
+    [v.phones, v.emails].filter(has).map(t => part(t)),
+    v.checks ? [
+      ...(has(v.checks.background) ? [part(`Background check ${v.checks.background}`, v.checks.backgroundExpired)] : []),
+      ...(has(v.checks.motorVehicle) ? [part(`Motor vehicle: ${v.checks.motorVehicle}`)] : []),
+    ] : [],
+  ];
+  const lines = groups.filter(g => g.length > 0);
+  if (lines.length === 0 && v.comments === null) return { lines: [[{ text: 'Nothing recorded in SRP' }]], comments: null };
+  return { lines, comments: v.comments };
 }
