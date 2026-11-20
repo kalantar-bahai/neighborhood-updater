@@ -2,15 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { PersonSrpDot } from './SrpBadge';
-import type { PermissionSet } from '@/lib/clusterNotebook';
+import type { PermissionSet, PersonDetails } from '@/lib/clusterNotebook';
 import {
-  KNOWN_ROLES, RESIDENT, canEditRole, filterPeople, isMoving, moveResultError, nextRoleIds, peopleFilters, placePath,
-  roleLabel, rolesToClear, sortPeople, sortRoles, syncNote, type MoveTarget, type PeopleSort, type PersonRow,
+  AGE_LABELS, DEVOTIONAL_HOST, KNOWN_ROLES, RESIDENT, canEditRole, detailsView, filterPeople, isMoving, moveResultError,
+  nextRoleIds, peopleFilters, placePath, roleLabel, rolesToClear, sortPeople, sortRoles, syncNote, type MoveTarget,
+  type PeopleSort, type PersonRow,
 } from '@/lib/people';
 
 // People card (specs: docs/superpowers/specs/2026-11-18-people-card-design.md, phase 1, and
 // 2026-11-19-people-card-moves-design.md, phase 2). Everyone connected to the nucleus: role holders
 // here, plus residents on a home nucleus. Ticking Resident moves someone here; unticking moves them out.
+// Phase A (2026-11-20-people-card-details-design.md): age and devotional host marks, and a panel any reader
+// can open, with the person's details when cluster-notebook lets the caller see them.
 
 interface Props {
   nucleus: string;
@@ -35,9 +38,18 @@ type PendingMove = {
   oldNucleus: string | null; oldName: string; oldRoles: string[]; keep: boolean;
 };
 type Moves = { here: MoveTarget | null; out: MoveTarget | null };
+// The open person's details. 'none' (a 404: not permitted, or not one of this nucleus's people) shows nothing.
+type Details = { personId: string; status: 'loading' | 'none' | 'error' | 'ok'; details?: PersonDetails; error?: string };
 
 const SINGLE_ROLES = ['contact'];
 const POLL_MS = 10_000;
+const TAG: React.CSSProperties = { fontSize: 11, color: '#4a5568', background: '#edf2f7', borderRadius: 8, padding: '1px 6px' };
+
+// Today's local date as YYYY-MM-DD, to compare with SRP's ISO dates.
+function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function RoleMarks({ row, isHome }: { row: PersonRow; isHome: boolean }) {
   const note = syncNote(row.placeSync);
@@ -49,8 +61,13 @@ function RoleMarks({ row, isHome }: { row: PersonRow; isHome: boolean }) {
         const { label, icon } = roleLabel(role);
         return icon
           ? <span key={role} role="img" aria-label={label} title={label}>{icon}</span>
-          : <span key={role} title={label} style={{ fontSize: 11, color: '#4a5568', background: '#edf2f7', borderRadius: 8, padding: '1px 6px' }}>{label}</span>;
+          : <span key={role} title={label} style={TAG}>{label}</span>;
       })}
+      {row.devotionalHost && (() => {
+        const label = row.devotionalHost === 'CO_HOST' ? 'Devotional co-host' : DEVOTIONAL_HOST.label;
+        return <span role="img" aria-label={label} title={label}>{DEVOTIONAL_HOST.icon}</span>;
+      })()}
+      {row.ageCategory && <span title={AGE_LABELS[row.ageCategory]} style={TAG}>{AGE_LABELS[row.ageCategory]}</span>}
     </span>
   );
 }
@@ -101,6 +118,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
   const [cardError, setCardError] = useState('');
   const [adding, setAdding] = useState(false);
   const [reloads, setReloads] = useState(0);
+  const [details, setDetails] = useState<Details | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -123,8 +141,9 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
   }, [moving]);
 
   const canMove = isHome && permissions.canWrite;
-  const rowsClickable = permissions.canAssignRoles || canMove;
-  const canAdd = permissions.canWrite && (permissions.canAssignRoles || canMove);
+  // Every reader can open a person's panel; only these callers get the Resident and roles editor in it.
+  const canEditPerson = permissions.canAssignRoles || canMove;
+  const canAdd = permissions.canWrite && canEditPerson;
 
   // The person whose editor is open, read by async work that must not land on someone else.
   const editingId = useRef<string | null>(null);
@@ -139,6 +158,34 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     setSaveError('');
     setCardError('');
     setAdding(false);
+    // Read details on each open; a new person isn't one of this nucleus's people yet, so has none here.
+    if (e.isNew) { setDetails(null); return; }
+    setDetails({ personId: e.id, status: 'loading' });
+    loadDetails(e.id);
+  }
+
+  async function loadDetails(personId: string) {
+    let next: Details;
+    try {
+      const res = await fetch(`/api/person-details?nucleus=${encodeURIComponent(nucleus)}&individualId=${encodeURIComponent(personId)}`);
+      if (res.status === 404) {
+        next = { personId, status: 'none' };
+      } else {
+        const data = await res.json();
+        next = res.ok
+          ? { personId, status: 'ok', details: data.details }
+          : { personId, status: 'error', error: data.error || "Couldn't load details" };
+      }
+    } catch (e: unknown) {
+      next = { personId, status: 'error', error: e instanceof Error ? e.message : String(e) };
+    }
+    // Drop the answer if the panel has closed or switched to someone else meanwhile.
+    if (editingId.current === personId) setDetails(next);
+  }
+
+  function close() {
+    editingId.current = null;
+    setEditing(null);
   }
 
   const fromRow = (r: PersonRow): Editing => ({
@@ -299,7 +346,54 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
       {pendingMove?.personId === e.id ? confirmMove(e, pendingMove) : (
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
           <button type="button" disabled={saving} onClick={() => save(e)} style={btn('#3182ce', 'white')}>{saving ? 'Saving…' : 'Save'}</button>
-          <button type="button" disabled={saving} onClick={() => setEditing(null)} style={btn('white', '#4a5568', '#cbd5e0')}>Cancel</button>
+          <button type="button" disabled={saving} onClick={close} style={btn('white', '#4a5568', '#cbd5e0')}>Cancel</button>
+        </div>
+      )}
+    </div>
+  );
+
+  const detailsSection = (personId: string) => {
+    if (!details || details.personId !== personId || details.status === 'none') return null;
+    const line = (children: React.ReactNode) => <div style={{ fontSize: 13 }}>{children}</div>;
+    let body: React.ReactNode;
+    if (details.status === 'loading') {
+      body = <div style={{ fontSize: 13, color: '#718096' }}>Loading details…</div>;
+    } else if (details.status === 'error' || !details.details) {
+      body = <div style={{ fontSize: 12, color: '#c53030' }}>{details.error || "Couldn't load details"}</div>;
+    } else {
+      const v = detailsView(details.details, localToday());
+      body = !v.inSrp ? <div style={{ fontSize: 13, color: '#718096' }}>Not in SRP; nothing synced</div> : (
+        <>
+          {line(<>Age {v.age} · {v.registration}</>)}
+          {line(v.address)}
+          {line(<>{v.phones} · {v.emails}</>)}
+          {v.checks && line(<>
+            Background check <span style={v.checks.backgroundExpired ? { color: '#c53030' } : undefined}>{v.checks.background}</span>
+            {' · '}Motor vehicle: {v.checks.motorVehicle}
+          </>)}
+          {v.comments && <div style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>SRP comments: {v.comments}</div>}
+        </>
+      );
+    }
+    return (
+      <div style={{ padding: '6px 0 2px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#4a5568' }}>Details</div>
+        {body}
+      </div>
+    );
+  };
+
+  // The panel under an existing person's row: details for every reader, then the editor or a Close button.
+  const panel = (e: Editing) => (
+    <div>
+      {detailsSection(e.id)}
+      {canEditPerson ? (
+        <div style={{ borderTop: details?.personId === e.id && details.status !== 'none' ? '1px solid #e2e8f0' : undefined, marginTop: 4 }}>
+          {editor(e)}
+        </div>
+      ) : (
+        <div style={{ marginTop: 6 }}>
+          <button type="button" onClick={close} style={btn('white', '#4a5568', '#cbd5e0')}>Close</button>
         </div>
       )}
     </div>
@@ -317,7 +411,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
         </select>
         <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search names…" aria-label="Search names" style={{ flex: 1, minWidth: 120 }} />
         {canAdd && (
-          <button type="button" disabled={saving} onClick={() => { setAdding(a => !a); setEditing(null); }} style={btn('#3182ce', 'white')}>+ Add</button>
+          <button type="button" disabled={saving} onClick={() => { setAdding(a => !a); close(); }} style={btn('#3182ce', 'white')}>+ Add</button>
         )}
       </div>
 
@@ -352,14 +446,14 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
             return (
               <div key={r.id} style={{ borderBottom: '1px solid #f7fafc', padding: '6px 0' }}>
                 <div
-                  onClick={rowsClickable && !saving ? () => (editing?.id === r.id ? setEditing(null) : startEdit(fromRow(r))) : undefined}
-                  style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: rowsClickable ? 'pointer' : 'default' }}
+                  onClick={saving ? undefined : () => (editing?.id === r.id ? close() : startEdit(fromRow(r)))}
+                  style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
                 >
                   <span style={{ fontSize: 14 }}>{sortBy === 'family' ? r.familyFirst : r.name}<PersonSrpDot inSrp={r.inSrp} /></span>
                   <RoleMarks row={r} isHome={isHome} />
                 </div>
                 {note?.tone === 'error' && <div style={{ fontSize: 12, color: '#c53030' }}>{note.text}</div>}
-                {editing && !editing.isNew && editing.id === r.id && editor(editing)}
+                {editing && !editing.isNew && editing.id === r.id && panel(editing)}
               </div>
             );
           })}

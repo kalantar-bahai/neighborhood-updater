@@ -237,3 +237,28 @@ cluster-notebook branch `move-individuals`; SRP follows through srp-client `set_
   (`createIndividual` never creates anyone in SRP). False doesn't prove SRP lacks them: someone typed in here may
   duplicate a person SRP holds. No pending or unknown state.
 - The People card shows it as a dot after each name: green "In SRP", red "Not linked to SRP (only in Nucleus Assistant)".
+
+## People card details, confirmed with cluster-notebook 2026-11-20
+
+Phase A (cluster-notebook PR #46). Spec: `docs/superpowers/specs/2026-11-20-people-card-details-design.md`.
+
+- `NucleusPerson.ageCategory: AgeCategory` (`CHILD | JUNIOR_YOUTH | YOUTH | ADULT`; null when SRP hasn't given us the
+  person) and `NucleusPerson.devotionalHost: DevotionalHostRole` (`HOST | CO_HOST`; null = not a host, or not known).
+  They are on `NucleusPerson`, not `PersonSummary`, so they don't reach the cluster-wide "+ Add" search. The People
+  card shows them as row marks (🕯, a grey age tag) and filters.
+- `Query.personDetails(individualId: String!, nucleusName: String!): PersonDetails`
+  - `PersonDetails { individual: PersonSummary!  estimatedAge: Int  isRegistered: Boolean  registrationDate: Date
+    address: String  phones: [String!]!  emails: [String!]!  srpComments: String  checks: PersonChecks }`
+  - `PersonChecks { backgroundCheckExpiration: Date  motorVehicleClearance: Boolean }` (true cleared, false not
+    cleared, null unknown).
+  - Null means not permitted, an unknown nucleus, or the person isn't one of that nucleus's people. No error codes.
+    `/api/person-details` turns null into a 404, and the card then shows no Details section and no hint.
+  - `individual.inSrp` false means an app-created person: the card shows "Not in SRP; nothing synced".
+  - These restricted fields are read only through `/api/person-details`, one call per panel open, never with a list.
+- Tiers:
+  - Tier 1 (`personDetails` non-null): anyone who can edit the nucleus: its contacts and accompaniers, those of a
+    parent nucleus, and the cluster roles ATC, CSO and CIC and their collaborators.
+  - Tier 2 (`checks` non-null): an accompanier on the nucleus itself, or one of those cluster roles. A contact alone
+    never sees checks.
+- Side effect: `Individual.phone` / `email` on `workers(role)` are now null unless the caller is tier 1 on that
+  nucleus, so the Identity card's "Contact Email" is blank for other readers.
