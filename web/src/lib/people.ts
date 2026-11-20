@@ -26,7 +26,7 @@ export const KNOWN_ROLES = ROLES.map(r => r.role);
 export const RESIDENT = { label: 'Resident', icon: '🏠' };
 export const DEVOTIONAL_HOST = { label: 'Devotional host', icon: '🕯' };
 export const AGE_LABELS: Record<AgeCategory, string> = {
-  CHILD: 'Child', JUNIOR_YOUTH: 'Junior youth', YOUTH: 'Youth', ADULT: 'Adult',
+  CHILD: 'Child', JUNIOR_YOUTH: 'Junior Youth', YOUTH: 'Youth', ADULT: 'Adult',
 };
 
 // Names like "Parkside" repeat across localities, so search results show the whole path.

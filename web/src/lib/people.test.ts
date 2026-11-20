@@ -89,6 +89,9 @@ describe('age and devotional host filters', () => {
     expect(f.find(x => x.key === 'devotional-host')?.label).toBe('Devotional host');
     expect(f.find(x => x.key === 'age:YOUTH')?.label).toBe('Youth');
   });
+  test('junior youth label uses the owner\'s casing', () => {
+    expect(peopleFilters([r('A', 'JUNIOR_YOUTH')], true).find(x => x.key === 'age:JUNIOR_YOUTH')?.label).toBe('Junior Youth');
+  });
   test('devotional-host keeps hosts and co-hosts', () => {
     const rows = [r('A', null, 'HOST'), r('B', null, 'CO_HOST'), r('C', null)];
     expect(filterPeople(rows, 'devotional-host', '').map(x => x.name)).toEqual(['A', 'B']);
