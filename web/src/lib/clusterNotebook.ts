@@ -581,7 +581,12 @@ export interface PlaceSync {
 export interface PersonSummary extends PersonName { place: PlaceSummary | null; placeSync: PlaceSync | null; inSrp: boolean }
 // roles: those held on this nucleus itself (not at its Cluster or Locality). isResident: placed at this
 // nucleus's Setting, and only ever true on a home nucleus.
-export interface NucleusPerson { individual: PersonSummary; roles: string[]; isResident: boolean }
+export type AgeCategory = 'CHILD' | 'JUNIOR_YOUTH' | 'YOUTH' | 'ADULT';
+export type DevotionalHostRole = 'HOST' | 'CO_HOST';
+export interface NucleusPerson {
+  individual: PersonSummary; roles: string[]; isResident: boolean;
+  ageCategory: AgeCategory | null; devotionalHost: DevotionalHostRole | null;
+}
 const PLACE_SELECTION = 'id name type locality cluster localityId homeNucleus';
 const PERSON_SUMMARY_SELECTION = `${PERSON_NAME_SELECTION} inSrp place { ${PLACE_SELECTION} } placeSync { status code }`;
 
@@ -607,11 +612,32 @@ export async function searchIndividuals(nucleusName: string, search?: string, li
 export async function getNucleusPeople(nucleusName: string): Promise<NucleusPerson[] | null> {
   const query = `
     query GetNucleusPeople($name: String!) {
-      nucleus(name: $name) { people { individual { ${PERSON_SUMMARY_SELECTION} } roles isResident } }
+      nucleus(name: $name) { people { individual { ${PERSON_SUMMARY_SELECTION} } roles isResident ageCategory devotionalHost } }
     }
   `;
   const data = await request<{ nucleus: { people: NucleusPerson[] } | null }>(query, { name: nucleusName });
   return data.nucleus?.people ?? null;
+}
+
+export interface PersonChecks { backgroundCheckExpiration: string | null; motorVehicleClearance: boolean | null }
+export interface PersonDetails {
+  individual: PersonSummary; estimatedAge: number | null; isRegistered: boolean | null; registrationDate: string | null;
+  address: string | null; phones: string[]; emails: string[]; srpComments: string | null; checks: PersonChecks | null;
+}
+
+// Confirmed with cluster-notebook 2026-11-20 (PR #46): null means not permitted, unknown nucleus, or the
+// person isn't one of that nucleus's people. `checks` is null unless the caller has tier 2.
+export async function getPersonDetails(individualId: string, nucleusName: string): Promise<PersonDetails | null> {
+  const query = `
+    query GetPersonDetails($individualId: String!, $nucleusName: String!) {
+      personDetails(individualId: $individualId, nucleusName: $nucleusName) {
+        individual { ${PERSON_SUMMARY_SELECTION} } estimatedAge isRegistered registrationDate address phones emails srpComments
+        checks { backgroundCheckExpiration motorVehicleClearance }
+      }
+    }
+  `;
+  const data = await request<{ personDetails: PersonDetails | null }>(query, { individualId, nucleusName });
+  return data.personDetails;
 }
 
 // Confirmed with cluster-notebook 2026-11-19: one result per person. `individual` is null for
