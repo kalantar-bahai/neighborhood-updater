@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PersonSrpDot } from './SrpBadge';
 import type { PermissionSet, PersonDetails } from '@/lib/clusterNotebook';
 import {
-  AGE_LABELS, DEVOTIONAL_HOST, KNOWN_ROLES, RESIDENT, canEditRole, detailsView, filterPeople, isMoving, moveResultError,
+  AGE_LABELS, DEVOTIONAL_HOST, KNOWN_ROLES, RESIDENT, canEditRole, detailLines, detailsView, filterPeople, isMoving, moveResultError,
   nextRoleIds, peopleFilters, placePath, roleLabel, rolesToClear, sortPeople, sortRoles, syncNote, type MoveTarget,
   type PeopleSort, type PersonRow,
 } from '@/lib/people';
@@ -141,8 +141,11 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
   }, [moving]);
 
   const canMove = isHome && permissions.canWrite;
-  // Every reader can open a person's panel; only these callers get the Resident and roles editor in it.
+  // Only these callers get the Resident and roles editor in a person's panel.
   const canEditPerson = permissions.canAssignRoles || canMove;
+  // Phase A: details are tier 1 (anyone who can edit the nucleus), so a plain reader's panel would be empty.
+  // Phase B opens the panel to every reader, with Activities.
+  const rowsClickable = canEditPerson || permissions.canWrite;
   const canAdd = permissions.canWrite && canEditPerson;
 
   // The person whose editor is open, read by async work that must not land on someone else.
@@ -170,11 +173,11 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
       const res = await fetch(`/api/person-details?nucleus=${encodeURIComponent(nucleus)}&individualId=${encodeURIComponent(personId)}`);
       if (res.status === 404) {
         next = { personId, status: 'none' };
+      } else if (res.ok) {
+        next = { personId, status: 'ok', details: (await res.json()).details };
       } else {
-        const data = await res.json();
-        next = res.ok
-          ? { personId, status: 'ok', details: data.details }
-          : { personId, status: 'error', error: data.error || "Couldn't load details" };
+        const data = await res.json().catch(() => ({}));
+        next = { personId, status: 'error', error: data.error || "Couldn't load details" };
       }
     } catch (e: unknown) {
       next = { personId, status: 'error', error: e instanceof Error ? e.message : String(e) };
@@ -207,7 +210,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     const changed = editorRoles(target).filter(role =>
       canEditRole(permissions, role) && target.roles.includes(role) !== ticked.includes(role));
     const moveWanted = resident !== target.isResident;
-    if (!moveWanted && changed.length === 0) { setEditing(null); return; }
+    if (!moveWanted && changed.length === 0) { close(); return; }
 
     for (const role of changed) {
       if (!SINGLE_ROLES.includes(role) || !ticked.includes(role)) continue;
@@ -268,14 +271,14 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
         await writeRole(nucleus, role, target.id, rolesHere.includes(role));
         written.push(role);
       }
-      setEditing(null);
+      close();
       setPendingMove(null);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e);
       setPendingMove(null);
       if (moved) {
         // The editor no longer matches the person (they have moved); close it and say what didn't save.
-        setEditing(null);
+        close();
         setCardError(`${target.name} was moved, but a role change didn't save: ${message}`);
       } else {
         setSaveError(message);
@@ -352,26 +355,32 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     </div>
   );
 
+  // Nothing (not even a heading) until details arrive; a 404 stays silent.
   const detailsSection = (personId: string) => {
     if (!details || details.personId !== personId || details.status === 'none') return null;
-    const line = (children: React.ReactNode) => <div style={{ fontSize: 13 }}>{children}</div>;
+    if (details.status === 'loading') return <div style={{ fontSize: 12, color: '#718096', paddingTop: 6 }}>Loading…</div>;
+    if (details.status === 'error' || !details.details) {
+      return <div style={{ fontSize: 12, color: '#c53030', paddingTop: 6 }}>{details.error || "Couldn't load details"}</div>;
+    }
+    const v = detailsView(details.details, localToday());
     let body: React.ReactNode;
-    if (details.status === 'loading') {
-      body = <div style={{ fontSize: 13, color: '#718096' }}>Loading details…</div>;
-    } else if (details.status === 'error' || !details.details) {
-      body = <div style={{ fontSize: 12, color: '#c53030' }}>{details.error || "Couldn't load details"}</div>;
+    if (!v.inSrp) {
+      body = <div style={{ fontSize: 13, color: '#718096' }}>Not in SRP; nothing synced</div>;
     } else {
-      const v = detailsView(details.details, localToday());
-      body = !v.inSrp ? <div style={{ fontSize: 13, color: '#718096' }}>Not in SRP; nothing synced</div> : (
+      const { lines, comments } = detailLines(v);
+      body = (
         <>
-          {line(<>Age {v.age} · {v.registration}</>)}
-          {line(v.address)}
-          {line(<>{v.phones} · {v.emails}</>)}
-          {v.checks && line(<>
-            Background check <span style={v.checks.backgroundExpired ? { color: '#c53030' } : undefined}>{v.checks.background}</span>
-            {' · '}Motor vehicle: {v.checks.motorVehicle}
-          </>)}
-          {v.comments && <div style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>SRP comments: {v.comments}</div>}
+          {lines.map((parts, i) => (
+            <div key={i} style={{ fontSize: 13 }}>
+              {parts.map((p, j) => (
+                <span key={j}>
+                  {j > 0 && ' · '}
+                  <span style={p.danger ? { color: '#c53030' } : undefined}>{p.text}</span>
+                </span>
+              ))}
+            </div>
+          ))}
+          {comments && <div style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>SRP comments: {comments}</div>}
         </>
       );
     }
@@ -383,7 +392,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     );
   };
 
-  // The panel under an existing person's row: details for every reader, then the editor or a Close button.
+  // The panel under an existing person's row: details when permitted, then the editor or a Close button.
   const panel = (e: Editing) => (
     <div>
       {detailsSection(e.id)}
@@ -446,8 +455,8 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
             return (
               <div key={r.id} style={{ borderBottom: '1px solid #f7fafc', padding: '6px 0' }}>
                 <div
-                  onClick={saving ? undefined : () => (editing?.id === r.id ? close() : startEdit(fromRow(r)))}
-                  style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
+                  onClick={rowsClickable && !saving ? () => (editing?.id === r.id ? close() : startEdit(fromRow(r))) : undefined}
+                  style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: rowsClickable ? 'pointer' : 'default' }}
                 >
                   <span style={{ fontSize: 14 }}>{sortBy === 'family' ? r.familyFirst : r.name}<PersonSrpDot inSrp={r.inSrp} /></span>
                   <RoleMarks row={r} isHome={isHome} />

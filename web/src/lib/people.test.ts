@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
+import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
 import type { AgeCategory, DevotionalHostRole, MoveContext, PermissionSet, PersonDetails, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -147,6 +147,43 @@ describe('detailsView', () => {
     expect(c('2027-03-01', null)).toEqual({ background: 'expires 2027-03-01', backgroundExpired: false, motorVehicle: '—' });
     expect(c('2026-11-19', true)).toEqual({ background: 'expires 2026-11-19', backgroundExpired: true, motorVehicle: 'cleared' });
     expect(c(null, false)).toEqual({ background: '—', backgroundExpired: false, motorVehicle: 'not cleared' });
+  });
+});
+
+describe('detailLines', () => {
+  type V = Extract<DetailsView, { inSrp: true }>;
+  const v = (over: Partial<V> = {}): V => ({
+    inSrp: true, age: '—', registration: '—', address: '—', phones: '—', emails: '—', comments: null, checks: null, ...over,
+  });
+  const text = (x: V) => detailLines(x).lines.map(l => l.map(p => p.text).join(' · '));
+  test('nothing at all says so', () => {
+    expect(detailLines(v())).toEqual({ lines: [[{ text: 'Nothing recorded in SRP' }]], comments: null });
+  });
+  test('comments alone are enough', () => {
+    expect(detailLines(v({ comments: 'a\nb' }))).toEqual({ lines: [], comments: 'a\nb' });
+  });
+  test('age and registration keep only present parts', () => {
+    expect(text(v({ age: '17', registration: 'Registered since 2019-03-02' }))).toEqual(['Age 17 · Registered since 2019-03-02']);
+    expect(text(v({ age: '17' }))).toEqual(['Age 17']);
+    expect(text(v({ registration: 'Not registered' }))).toEqual(['Not registered']);
+  });
+  test('address line only when present', () => {
+    expect(text(v({ address: '12 Elm St', age: '17' }))).toEqual(['Age 17', '12 Elm St']);
+  });
+  test('phones and emails keep only present parts', () => {
+    expect(text(v({ phones: '555-0100', emails: 'a@example.org' }))).toEqual(['555-0100 · a@example.org']);
+    expect(text(v({ emails: 'a@example.org' }))).toEqual(['a@example.org']);
+  });
+  test('checks drop missing parts, flag expired, and vanish when both missing', () => {
+    expect(detailLines(v({ checks: { background: 'expires 2026-11-19', backgroundExpired: true, motorVehicle: 'cleared' } })).lines)
+      .toEqual([[{ text: 'Background check expires 2026-11-19', danger: true }, { text: 'Motor vehicle: cleared' }]]);
+    expect(text(v({ checks: { background: '—', backgroundExpired: false, motorVehicle: 'not cleared' } }))).toEqual(['Motor vehicle: not cleared']);
+    expect(text(v({ age: '17', checks: { background: '—', backgroundExpired: false, motorVehicle: '—' } }))).toEqual(['Age 17']);
+  });
+  test('lines in the sketch order', () => {
+    expect(text(v({ age: '17', address: '12 Elm St', phones: '555-0100',
+      checks: { background: 'expires 2027-03-01', backgroundExpired: false, motorVehicle: '—' } })))
+      .toEqual(['Age 17', '12 Elm St', '555-0100', 'Background check expires 2027-03-01']);
   });
 });
 

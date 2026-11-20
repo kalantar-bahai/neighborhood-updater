@@ -227,3 +227,25 @@ export function detailsView(d: PersonDetails, today: string): DetailsView {
     } : null,
   };
 }
+
+// One segment of a details line; `danger` shows it in red (an expired background check).
+export type DetailPart = { text: string; danger?: boolean };
+
+// What the panel renders: only values SRP has (no unlabeled dashes), one line per group in the spec's
+// order, each line's parts joined with " · ". Comments are kept apart so they can render with line breaks.
+export function detailLines(v: Extract<DetailsView, { inSrp: true }>): { lines: DetailPart[][]; comments: string | null } {
+  const has = (s: string) => s !== DASH;
+  const part = (text: string, danger?: boolean): DetailPart => (danger ? { text, danger } : { text });
+  const groups: DetailPart[][] = [
+    [...(has(v.age) ? [part(`Age ${v.age}`)] : []), ...(has(v.registration) ? [part(v.registration)] : [])],
+    has(v.address) ? [part(v.address)] : [],
+    [v.phones, v.emails].filter(has).map(t => part(t)),
+    v.checks ? [
+      ...(has(v.checks.background) ? [part(`Background check ${v.checks.background}`, v.checks.backgroundExpired)] : []),
+      ...(has(v.checks.motorVehicle) ? [part(`Motor vehicle: ${v.checks.motorVehicle}`)] : []),
+    ] : [],
+  ];
+  const lines = groups.filter(g => g.length > 0);
+  if (lines.length === 0 && v.comments === null) return { lines: [[{ text: 'Nothing recorded in SRP' }]], comments: null };
+  return { lines, comments: v.comments };
+}
