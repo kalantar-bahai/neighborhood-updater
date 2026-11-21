@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, activityLines, countPeople, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
+import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, activityLines, countPeople, AGE_FILTERS, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
 import type { Participation, AgeCategory, DevotionalHostRole, MoveContext, PermissionSet, PersonDetails, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -54,14 +54,14 @@ describe('canEditRole', () => {
 
 describe('peopleFilters', () => {
   const rows = [row('Ana', ['contact']), row('Ben', ['promoter', 'cso']), row('Cy', [], true)];
-  test('home nucleus: all, resident, then roles in label order, unknown last', () => {
-    expect(peopleFilters(rows, true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'protagonist', 'accompanier', 'contact', 'cso', 'participating', 'facilitating', 'devotional-host']);
+  test('home nucleus: the Overview card\'s order, then contact, unknown roles last', () => {
+    expect(peopleFilters(rows, true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'cso']);
   });
   test('non-home nucleus has no resident filter', () => {
-    expect(peopleFilters(rows, false).map(f => f.key)).toEqual(['all', 'promoter', 'protagonist', 'accompanier', 'contact', 'cso', 'participating', 'facilitating', 'devotional-host']);
+    expect(peopleFilters(rows, false).map(f => f.key)).toEqual(['all', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'cso']);
   });
   test('every known role shows even when nobody holds it', () => {
-    expect(peopleFilters([], true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'protagonist', 'accompanier', 'contact', 'participating', 'facilitating', 'devotional-host']);
+    expect(peopleFilters([], true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact']);
   });
   test('labels', () => {
     expect(peopleFilters(rows, true).slice(0, 3).map(f => f.label)).toEqual(['All', 'Resident', 'Promoting']);
@@ -83,14 +83,16 @@ describe('filterPeople', () => {
 
 describe('age and devotional host filters', () => {
   const r = (name: string, ageCategory: AgeCategory | null, devotionalHost: DevotionalHostRole | null = null): PersonRow => ({ ...row(name, []), ageCategory, devotionalHost });
-  test('keys and labels', () => {
-    const f = peopleFilters([r('A', 'YOUTH'), r('B', 'ADULT')], true);
-    expect(f.map(x => x.key)).toEqual(['all', 'resident', 'promoter', 'protagonist', 'accompanier', 'contact', 'participating', 'facilitating', 'devotional-host', 'age:YOUTH', 'age:ADULT']);
+  test('devotional host label; ages are not in the main filter', () => {
+    const f = peopleFilters([r('A', 'YOUTH')], true);
     expect(f.find(x => x.key === 'devotional-host')?.label).toBe('Devotional host');
-    expect(f.find(x => x.key === 'age:YOUTH')?.label).toBe('Youth');
+    expect(f.some(x => x.key.startsWith('age'))).toBe(false);
   });
-  test('junior youth label uses the owner\'s casing', () => {
-    expect(peopleFilters([r('A', 'JUNIOR_YOUTH')], true).find(x => x.key === 'age:JUNIOR_YOUTH')?.label).toBe('Junior Youth');
+  test('age filter always lists every category, youngest first', () => {
+    expect(AGE_FILTERS).toEqual([
+      { key: 'all', label: 'All ages' }, { key: 'CHILD', label: 'Child' }, { key: 'JUNIOR_YOUTH', label: 'Junior Youth' },
+      { key: 'YOUTH', label: 'Youth' }, { key: 'ADULT', label: 'Adult' },
+    ]);
   });
   test('devotional-host keeps hosts and co-hosts', () => {
     const rows = [r('A', null, 'HOST'), r('B', null, 'CO_HOST'), r('C', null)];
@@ -98,7 +100,13 @@ describe('age and devotional host filters', () => {
   });
   test('age filter keeps that category only', () => {
     const rows = [r('A', 'CHILD'), r('B', 'ADULT'), r('C', null)];
-    expect(filterPeople(rows, 'age:CHILD', '').map(x => x.name)).toEqual(['A']);
+    expect(filterPeople(rows, 'all', '', 'CHILD').map(x => x.name)).toEqual(['A']);
+    expect(filterPeople(rows, 'all', '', 'all').map(x => x.name)).toEqual(['A', 'B', 'C']);
+  });
+  test('age combines with the main filter and the search', () => {
+    const rows = [{ ...r('Ana', 'ADULT', 'HOST') }, r('Ben', 'ADULT'), r('Ada', 'YOUTH', 'HOST')];
+    expect(filterPeople(rows, 'devotional-host', '', 'ADULT').map(x => x.name)).toEqual(['Ana']);
+    expect(filterPeople(rows, 'all', 'a', 'YOUTH').map(x => x.name)).toEqual(['Ada']);
   });
 });
 
@@ -377,8 +385,8 @@ function act(over: Partial<Participation>): Participation {
 describe('activity filters', () => {
   const r = (name: string, participates: boolean, facilitates: boolean): PersonRow => ({ ...row(name, []), participates, facilitates });
   const rows = [r('A', true, false), r('B', false, true), r('C', true, true), r('D', false, false)];
-  test('come before devotional host, always listed', () => {
-    expect(peopleFilters([], false).map(f => f.key).slice(-3)).toEqual(['participating', 'facilitating', 'devotional-host']);
+  test('follow devotional host, always listed', () => {
+    expect(peopleFilters([], false).map(f => f.key).slice(2, 5)).toEqual(['devotional-host', 'participating', 'facilitating']);
     expect(peopleFilters([], false).find(f => f.key === 'facilitating')?.label).toBe('Facilitating');
   });
   test('keep those taking part or facilitating', () => {

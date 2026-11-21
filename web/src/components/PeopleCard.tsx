@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { PersonSrpDot } from './SrpBadge';
-import type { PermissionSet, PersonDetails } from '@/lib/clusterNotebook';
+import type { AgeCategory, PermissionSet, PersonDetails } from '@/lib/clusterNotebook';
 import {
-  AGE_LABELS, DEVOTIONAL_HOST, FACILITATES, KNOWN_ROLES, PARTICIPATES, activityLines, RESIDENT, canEditRole, detailLines, detailsView, filterPeople, isMoving, moveResultError,
+  AGE_FILTERS, AGE_LABELS, DEVOTIONAL_HOST, FACILITATES, KNOWN_ROLES, PARTICIPATES, activityLines, RESIDENT, canEditRole, detailLines, detailsView, filterPeople, isMoving, moveResultError,
   nextRoleIds, peopleFilters, placePath, roleLabel, rolesToClear, sortPeople, sortRoles, syncNote, type MoveTarget,
-  type PeopleSort, type PersonRow,
+  type PersonRow,
 } from '@/lib/people';
 
 // People card (specs: docs/superpowers/specs/2026-11-18-people-card-design.md, phase 1, and
@@ -109,7 +109,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
   const [moves, setMoves] = useState<Moves>({ here: null, out: null });
   const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState('all');
-  const [sortBy, setSortBy] = useState<PeopleSort>('first');
+  const [age, setAge] = useState<'all' | AgeCategory>('all');
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Editing | null>(null);
   const [ticked, setTicked] = useState<string[]>([]);
@@ -295,7 +295,8 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
 
   const filters = peopleFilters(rows, isHome);
   const activeFilter = filters.some(f => f.key === filter) ? filter : 'all';
-  const shown = sortPeople(filterPeople(rows, activeFilter, search), sortBy);
+  // Sorting by first name until the owner decides what sort they want (2026-11-21).
+  const shown = sortPeople(filterPeople(rows, activeFilter, search, age), 'first');
 
   const confirmMove = (e: Editing, m: PendingMove) => (
     <div style={{ border: '1px solid #bee3f8', background: '#ebf8ff', borderRadius: 6, padding: 8, fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -434,9 +435,8 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
         <select value={activeFilter} onChange={e => setFilter(e.target.value)} aria-label="Filter people" style={{ width: 'auto' }}>
           {filters.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
         </select>
-        <select value={sortBy} onChange={e => setSortBy(e.target.value as PeopleSort)} aria-label="Sort people" style={{ width: 'auto' }}>
-          <option value="first">First name</option>
-          <option value="family">Family name</option>
+        <select value={age} onChange={e => setAge(e.target.value as 'all' | AgeCategory)} aria-label="Filter by age" style={{ width: 'auto' }}>
+          {AGE_FILTERS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
         </select>
         <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search names…" aria-label="Search names" style={{ flex: 1, minWidth: 120 }} />
         {canAdd && (
@@ -451,7 +451,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
           onPick={p => {
             const existing = rows.find(r => r.id === p.id);
             // Their row must be visible for its editor to show.
-            if (existing) { setFilter('all'); setSearch(''); }
+            if (existing) { setFilter('all'); setAge('all'); setSearch(''); }
             startEdit(existing
               ? fromRow(existing)
               : { id: p.id, name: p.name, roles: [], isResident: false, isNew: true, placePath: p.place, homeNucleus: p.homeNucleus });
@@ -478,7 +478,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
                   onClick={!saving ? () => (editing?.id === r.id ? close() : startEdit(fromRow(r))) : undefined}
                   style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
                 >
-                  <span style={{ fontSize: 14 }}>{sortBy === 'family' ? r.familyFirst : r.name}<PersonSrpDot inSrp={r.inSrp} /></span>
+                  <span style={{ fontSize: 14 }}>{r.name}<PersonSrpDot inSrp={r.inSrp} /></span>
                   <RoleMarks row={r} isHome={isHome} />
                 </div>
                 {note?.tone === 'error' && <div style={{ fontSize: 12, color: '#c53030' }}>{note.text}</div>}

@@ -58,22 +58,33 @@ export function sortRoles(roles: string[]): string[] {
   return [...known, ...other];
 }
 
-// Every known role always shows, so the filter list doesn't change from nucleus to nucleus; other roles
-// show when someone holds them.
+// The main filter follows the Overview card's order (owner, 2026-11-21): Promoting, Devotional host,
+// Participating, Facilitating, Helping Others, Accompanying; then Contact and any other role someone holds.
+// Every one of these always shows, so the list doesn't change from nucleus to nucleus.
+const PRIMARY_FILTERS: { key: string; label: string }[] = [
+  { key: 'promoter', label: roleLabel('promoter').label },
+  { key: 'devotional-host', label: DEVOTIONAL_HOST.label },
+  { key: 'participating', label: PARTICIPATES.label },
+  { key: 'facilitating', label: FACILITATES.label },
+  { key: 'protagonist', label: roleLabel('protagonist').label },
+  { key: 'accompanier', label: roleLabel('accompanier').label },
+];
 export function peopleFilters(rows: PersonRow[], isHome: boolean): { key: string; label: string }[] {
-  const held = sortRoles([...KNOWN_ROLES, ...rows.flatMap(r => r.roles)]);
+  const listed = PRIMARY_FILTERS.map(f => f.key);
+  const rest = sortRoles([...KNOWN_ROLES, ...rows.flatMap(r => r.roles)]).filter(role => !listed.includes(role));
   return [
     { key: 'all', label: 'All' },
     ...(isHome ? [{ key: 'resident', label: RESIDENT.label }] : []),
-    ...held.map(role => ({ key: role, label: roleLabel(role).label })),
-    { key: 'participating', label: PARTICIPATES.label },
-    { key: 'facilitating', label: FACILITATES.label },
-    { key: 'devotional-host', label: DEVOTIONAL_HOST.label },
-    ...(Object.keys(AGE_LABELS) as AgeCategory[])
-      .filter(a => rows.some(r => r.ageCategory === a))
-      .map(a => ({ key: `age:${a}`, label: AGE_LABELS[a] })),
+    ...PRIMARY_FILTERS,
+    ...rest.map(role => ({ key: role, label: roleLabel(role).label })),
   ];
 }
+
+// The second filter: age category, every one always listed, youngest first.
+export const AGE_FILTERS: { key: 'all' | AgeCategory; label: string }[] = [
+  { key: 'all', label: 'All ages' },
+  ...(Object.keys(AGE_LABELS) as AgeCategory[]).map(a => ({ key: a, label: AGE_LABELS[a] })),
+];
 
 function matchesFilter(r: PersonRow, filter: string): boolean {
   if (filter === 'all') return true;
@@ -81,14 +92,14 @@ function matchesFilter(r: PersonRow, filter: string): boolean {
   if (filter === 'participating') return r.participates;
   if (filter === 'facilitating') return r.facilitates;
   if (filter === 'devotional-host') return r.devotionalHost !== null;
-  if (filter.startsWith('age:')) return r.ageCategory === filter.slice(4);
   return r.roles.includes(filter);
 }
 
-export function filterPeople(rows: PersonRow[], filter: string, search: string): PersonRow[] {
+export function filterPeople(rows: PersonRow[], filter: string, search: string, age: 'all' | AgeCategory = 'all'): PersonRow[] {
   const q = search.trim().toLowerCase();
   return rows.filter(r =>
     matchesFilter(r, filter) &&
+    (age === 'all' || r.ageCategory === age) &&
     (!q || r.name.toLowerCase().includes(q)));
 }
 
