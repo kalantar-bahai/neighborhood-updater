@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, activityLines, countPeople, AGE_FILTERS, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
+import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, activityLines, countPeople, AGE_FILTERS, peopleCountLabel, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
 import type { Participation, AgeCategory, DevotionalHostRole, MoveContext, PermissionSet, PersonDetails, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -431,5 +431,15 @@ describe('countPeople', () => {
       { devotionalHost: null, participates: true, facilitates: true },
     ])).toEqual({ devotionalHosts: 2, participating: 2, facilitating: 2 });
     expect(countPeople([])).toEqual({ devotionalHosts: 0, participating: 0, facilitating: 0 });
+  });
+});
+
+describe('peopleCountLabel', () => {
+  test('whole list, narrowed list, one person', () => {
+    expect(peopleCountLabel(85, 85)).toBe('85 people');
+    expect(peopleCountLabel(12, 85)).toBe('12 of 85 people');
+    expect(peopleCountLabel(0, 85)).toBe('0 of 85 people');
+    expect(peopleCountLabel(1, 1)).toBe('1 person');
+    expect(peopleCountLabel(0, 1)).toBe('0 of 1 person');
   });
 });

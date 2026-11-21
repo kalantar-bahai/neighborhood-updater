@@ -103,6 +103,12 @@ export function filterPeople(rows: PersonRow[], filter: string, search: string, 
     (!q || r.name.toLowerCase().includes(q)));
 }
 
+// The total line under the list: "85 people", or "12 of 85 people" while a filter or search narrows it.
+export function peopleCountLabel(shown: number, total: number): string {
+  const noun = total === 1 ? 'person' : 'people';
+  return shown === total ? `${total} ${noun}` : `${shown} of ${total} ${noun}`;
+}
+
 // The new ordered id list for one role after ticking (on) or unticking a person.
 // A single-person role (contact) is replaced rather than appended to.
 export function nextRoleIds(current: string[], personId: string, on: boolean, single: boolean): string[] {

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PersonSrpDot } from './SrpBadge';
 import type { AgeCategory, PermissionSet, PersonDetails } from '@/lib/clusterNotebook';
 import {
-  AGE_FILTERS, AGE_LABELS, DEVOTIONAL_HOST, FACILITATES, KNOWN_ROLES, PARTICIPATES, activityLines, RESIDENT, canEditRole, detailLines, detailsView, filterPeople, isMoving, moveResultError,
+  AGE_FILTERS, AGE_LABELS, DEVOTIONAL_HOST, FACILITATES, KNOWN_ROLES, PARTICIPATES, activityLines, peopleCountLabel, RESIDENT, canEditRole, detailLines, detailsView, filterPeople, isMoving, moveResultError,
   nextRoleIds, peopleFilters, placePath, roleLabel, rolesToClear, sortPeople, sortRoles, syncNote, type MoveTarget,
   type PersonRow,
 } from '@/lib/people';
@@ -412,11 +412,11 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     );
   };
 
-  // The panel under an existing person's row: activities, details when permitted, then the editor or a Close button.
+  // The panel under an existing person's row: details when permitted, activities, then the editor or a Close button.
   const panel = (e: Editing) => (
     <div>
-      {activitiesSection(e.id)}
       {detailsSection(e.id)}
+      {activitiesSection(e.id)}
       {canEditPerson ? (
         <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 4 }}>
           {editor(e)}
@@ -476,7 +476,12 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
               <div key={r.id} style={{ borderBottom: '1px solid #f7fafc', padding: '6px 0' }}>
                 <div
                   onClick={!saving ? () => (editing?.id === r.id ? close() : startEdit(fromRow(r))) : undefined}
-                  style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
+                  // The open person's name sticks to the top of the list while their panel scrolls, so a
+                  // click on it can always close the panel (owner, 2026-11-21).
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer',
+                    ...(editing?.id === r.id ? { position: 'sticky', top: 0, zIndex: 1, background: 'white', padding: '4px 0', borderBottom: '1px solid #e2e8f0' } : {}),
+                  }}
                 >
                   <span style={{ fontSize: 14 }}>{r.name}<PersonSrpDot inSrp={r.inSrp} /></span>
                   <RoleMarks row={r} isHome={isHome} />
@@ -487,6 +492,12 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
             );
           })}
           {shown.length === 0 && <div style={{ fontSize: 13, color: '#718096' }}>No matches.</div>}
+        </div>
+      )}
+      {/* Outside the scrolling list, so it stays put (owner, 2026-11-21). */}
+      {rows.length > 0 && (
+        <div style={{ fontSize: 12, color: '#718096', borderTop: '1px solid #e2e8f0', paddingTop: 4, marginTop: 2 }}>
+          {peopleCountLabel(shown.length, rows.length)}
         </div>
       )}
     </div>
