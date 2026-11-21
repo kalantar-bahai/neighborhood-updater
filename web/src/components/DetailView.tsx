@@ -135,7 +135,7 @@ function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabe
         />
         {shownNamed !== undefined && (
           // Sits just after the typed number: 11px is the input's border plus padding, and digits are about 1ch wide.
-          <span title={`${shownNamed} named`} style={{ position: 'absolute', left: `calc(11px + ${(value || '').length}ch + 4px)`, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#718096', pointerEvents: 'none' }}>
+          <span title={`${shownNamed} in the People list`} style={{ position: 'absolute', left: `calc(11px + ${(value || '').length}ch + 4px)`, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#718096', pointerEvents: 'none' }}>
             ({shownNamed})
           </span>
         )}
@@ -605,6 +605,8 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const [contactNames, setContactNames] = useState<Worker[]>(() => detail.contactNames);
   const [showContactModal, setShowContactModal] = useState(false);
   const [promoterNames, setPromoterNames] = useState<Worker[]>(() => detail.promoterNames);
+  // People SRP shows hosting devotionals, taking part in and facilitating activities: the "(x)" on those estimates.
+  const counts = detail.peopleCounts;
   const [showPromotersModal, setShowPromotersModal] = useState(false);
   // Which cards are open lives in AppClient, so an in-place reload (Refresh, Push, Location
   // save), which remounts this view, keeps the cards the user had open.
@@ -837,11 +839,11 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const alignedRings: AlignedRingContent[] = [
     { single: { label: 'In conversation', value: form.inConversation } },
     {
-      right: { label: 'In core activity', value: form.inEducationalActivities },
+      right: { label: 'In core activity', value: form.inEducationalActivities, named: counts.participating },
       left:  { label: 'Participating',    value: form.inCommunityActivities },
     },
     {
-      right: { label: 'Facilitating', value: form.educationalFacilitators },
+      right: { label: 'Facilitating', value: form.educationalFacilitators, named: counts.facilitating },
       left:  { label: 'Promoting',    value: form.protagonists, named: promoterNames.length, onClick: () => setShowPromotersModal(true) },
     },
     {
@@ -856,9 +858,9 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const staggeredLabels: AlignedLabel[] = [
     { label: 'Accompanying',                           value: form.accompanying, named: accompanierNames.length, onClick: () => setShowAccompaniersModal(true) },
     { label: 'Helping Others',                          value: form.helpingOthers, named: protagonistNames.length, onClick: () => setShowProtagonistsModal(true) },
-    { label: 'Facilitating Ed. Act.',                   value: form.educationalFacilitators },
-    { label: 'Participating in Ed. Act.',               value: form.inEducationalActivities },
-    { label: 'Hosting Devotional Meetings/Gatherings',  value: form.devotionalHosts },
+    { label: 'Facilitating Ed. Act.',                   value: form.educationalFacilitators, named: counts.facilitating },
+    { label: 'Participating in Ed. Act.',               value: form.inEducationalActivities, named: counts.participating },
+    { label: 'Hosting Devotional Meetings/Gatherings',  value: form.devotionalHosts, named: counts.devotionalHosts },
     { label: 'Protagonists/Promoting',                  value: form.protagonists, named: promoterNames.length, onClick: () => setShowPromotersModal(true) },
     { label: 'Participating',                           value: form.inCommunityActivities },
     { label: 'In Conversation',                         value: form.inConversation },
@@ -1184,19 +1186,19 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
               />
               <Field
                 label="Hosting Devotional Gatherings"
-                value={form.devotionalHosts} onChange={v => set('devotionalHosts', v)} onBlur={() => commitField('devotionalHosts', 'Hosting Devotional Gatherings', true)} readonly={!canWrite} integer
+                value={form.devotionalHosts} onChange={v => set('devotionalHosts', v)} onBlur={() => commitField('devotionalHosts', 'Hosting Devotional Gatherings', true)} readonly={!canWrite} integer named={counts.devotionalHosts}
                 info="Estimated number of individuals who are sharing prayers with others, with family members, and inviting others to attend devotional meetings or gatherings. Examples include where prayers are shared in home visits, community gatherings, festivals, and educational activities."
               />
               <Field
                 label="In Educational Activity"
-                value={form.inEducationalActivities} onChange={v => set('inEducationalActivities', v)} onBlur={() => commitField('inEducationalActivities', 'In Educational Activity', true)} readonly={!canWrite} integer
+                value={form.inEducationalActivities} onChange={v => set('inEducationalActivities', v)} onBlur={() => commitField('inEducationalActivities', 'In Educational Activity', true)} readonly={!canWrite} integer named={counts.participating}
                 info="Estimated number of children, junior youth, youth, and adults participating in educational activities in various modalities and forms: children’s classes, junior youth groups, and study circles."
               />
             </div>
             <div className="field-grid-3">
               <Field
                 label="Facilitating Educational Activity"
-                value={form.educationalFacilitators} onChange={v => set('educationalFacilitators', v)} onBlur={() => commitField('educationalFacilitators', 'Facilitating Educational Activity', true)} readonly={!canWrite} integer
+                value={form.educationalFacilitators} onChange={v => set('educationalFacilitators', v)} onBlur={() => commitField('educationalFacilitators', 'Facilitating Educational Activity', true)} readonly={!canWrite} integer named={counts.facilitating}
                 info="Estimated number of individuals who facilitate or share the content of the institute’s educational programs, in various forms, approaches, methods, and modalities, to all ages in the neighborhood."
               />
               <Field

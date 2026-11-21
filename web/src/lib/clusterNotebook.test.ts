@@ -8,7 +8,7 @@ import {
   getActivitySummaries, updateActivitySummary, getAllNuclei, getNucleusFields, updateNucleus,
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
-  getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getPersonDetails, moveIndividuals, getMoveContext,
+  getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusPeopleFlags, getPersonDetails, moveIndividuals, getMoveContext,
 } from './clusterNotebook';
 import type { Individual, PersonSummary, NucleusPerson, MoveResult, MoveContext, PersonDetails } from './clusterNotebook';
 import { auth } from '@clerk/nextjs/server';
@@ -761,6 +761,21 @@ describe('createIndividual', () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { createIndividual: null } }));
 
     await expect(createIndividual('New Person', 'Nonexistent')).rejects.toThrow('cluster-notebook has no nucleus named "Nonexistent"');
+  });
+});
+
+describe('getNucleusPeopleFlags', () => {
+  test('selects only the three flags and returns them', async () => {
+    const people = [{ devotionalHost: 'HOST', participates: true, facilitates: false }];
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { people } } }));
+    expect(await getNucleusPeopleFlags('Alpha')).toEqual(people);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ name: 'Alpha' });
+    expect((body.query as string).replace(/\s+/g, ' ')).toContain('nucleus(name: $name) { people { devotionalHost participates facilitates } }');
+  });
+  test('null when the nucleus is not found', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: null } }));
+    expect(await getNucleusPeopleFlags('Nonexistent')).toBeNull();
   });
 });
 

@@ -196,6 +196,17 @@ export function editableRoles(p: PermissionSet, rows: PersonRow[]): string[] {
 
 // Overview (owner, 2026-11-19): the count of named people shows beside an estimate only when it tells
 // you something: when it differs from the typed number. Nothing typed and no one named shows nothing.
+// How many of the nucleus's people SRP shows hosting a devotional gathering (hosts and co-hosts), taking part in
+// and facilitating an activity: the "(x)" after those Overview estimates.
+export type PeopleCounts = { devotionalHosts: number; participating: number; facilitating: number };
+export function countPeople(people: Pick<NucleusPerson, 'devotionalHost' | 'participates' | 'facilitates'>[]): PeopleCounts {
+  return {
+    devotionalHosts: people.filter(p => p.devotionalHost !== null).length,
+    participating: people.filter(p => p.participates).length,
+    facilitating: people.filter(p => p.facilitates).length,
+  };
+}
+
 export function namedToShow(estimate: string, named: number | undefined): number | undefined {
   if (named === undefined) return undefined;
   const typed = estimate.trim();

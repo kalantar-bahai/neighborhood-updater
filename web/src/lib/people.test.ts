@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, activityLines, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
+import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, activityLines, countPeople, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
 import type { Participation, AgeCategory, DevotionalHostRole, MoveContext, PermissionSet, PersonDetails, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -412,5 +412,16 @@ describe('activityLines', () => {
   });
   test('nothing in, nothing out', () => {
     expect(activityLines([])).toEqual([]);
+  });
+});
+
+describe('countPeople', () => {
+  test('hosts and co-hosts, participants, facilitators', () => {
+    expect(countPeople([
+      { devotionalHost: 'HOST', participates: true, facilitates: false },
+      { devotionalHost: 'CO_HOST', participates: false, facilitates: true },
+      { devotionalHost: null, participates: true, facilitates: true },
+    ])).toEqual({ devotionalHosts: 2, participating: 2, facilitating: 2 });
+    expect(countPeople([])).toEqual({ devotionalHosts: 0, participating: 0, facilitating: 0 });
   });
 });

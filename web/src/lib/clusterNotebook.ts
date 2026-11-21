@@ -621,6 +621,18 @@ export async function searchIndividuals(nucleusName: string, search?: string, li
   return data.individuals;
 }
 
+// Just the flags the Overview counts, for the same people as getNucleusPeople (no names, no activity lists).
+// null when the nucleus isn't found.
+export async function getNucleusPeopleFlags(nucleusName: string): Promise<Pick<NucleusPerson, 'devotionalHost' | 'participates' | 'facilitates'>[] | null> {
+  const query = `
+    query NucleusPeopleFlags($name: String!) {
+      nucleus(name: $name) { people { devotionalHost participates facilitates } }
+    }
+  `;
+  const data = await request<{ nucleus: { people: Pick<NucleusPerson, 'devotionalHost' | 'participates' | 'facilitates'>[] } | null }>(query, { name: nucleusName });
+  return data.nucleus?.people ?? null;
+}
+
 // Everyone connected to the nucleus: role holders here, plus residents on a home nucleus.
 // null when the nucleus isn't found.
 export async function getNucleusPeople(nucleusName: string): Promise<NucleusPerson[] | null> {

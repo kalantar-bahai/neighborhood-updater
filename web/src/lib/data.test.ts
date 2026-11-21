@@ -10,6 +10,7 @@ vi.mock('./clusterNotebook', async (importOriginal) => ({
   getNucleusFields: vi.fn(),
   updateNucleus: vi.fn(),
   getNucleusWorkers: vi.fn(),
+  getNucleusPeopleFlags: vi.fn(),
   createNucleus: vi.fn(),
   deleteNucleus: vi.fn(),
   getLocationOptions: vi.fn(),
@@ -17,7 +18,7 @@ vi.mock('./clusterNotebook', async (importOriginal) => ({
 }));
 
 import {
-  getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus, getNucleusWorkers, createNucleus, deleteNucleus,
+  getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus, getNucleusWorkers, getNucleusPeopleFlags, createNucleus, deleteNucleus,
   getLocationOptions, ClusterNotebookCodedError,
 } from './clusterNotebook';
 import { getRowData, saveRowData, createRowData, deleteRowData } from './data';
@@ -27,6 +28,7 @@ const mockUpdateActivitySummary = vi.mocked(updateActivitySummary);
 const mockGetNucleusFields = vi.mocked(getNucleusFields);
 const mockUpdateNucleus = vi.mocked(updateNucleus);
 const mockGetNucleusWorkers = vi.mocked(getNucleusWorkers);
+const mockGetNucleusPeopleFlags = vi.mocked(getNucleusPeopleFlags);
 const mockCreateNucleus = vi.mocked(createNucleus);
 const mockDeleteNucleus = vi.mocked(deleteNucleus);
 const mockGetLocationOptions = vi.mocked(getLocationOptions);
@@ -36,6 +38,7 @@ describe('getRowData', () => {
     vi.clearAllMocks();
     // Default: no workers, for tests that don't care about the worker lists specifically.
     mockGetNucleusWorkers.mockResolvedValue([]);
+    mockGetNucleusPeopleFlags.mockResolvedValue([]);
     // Default: no location options, for tests that don't care about the location
     // picker specifically.
     mockGetLocationOptions.mockResolvedValue([]);
@@ -339,6 +342,11 @@ describe('getRowData', () => {
       if (role === 'promoter') return [{ id: '5', firstName: 'Erin', email: null, ...blank }];
       return [];
     });
+    mockGetNucleusPeopleFlags.mockResolvedValue([
+      { devotionalHost: 'HOST', participates: true, facilitates: false },
+      { devotionalHost: 'CO_HOST', participates: true, facilitates: true },
+      { devotionalHost: null, participates: false, facilitates: false },
+    ]);
 
     const result = await getRowData('Alpha');
 
@@ -352,6 +360,8 @@ describe('getRowData', () => {
     expect(result?.abmAssistantNames).toEqual([{ id: '3', name: 'Carol', email: null }]);
     expect(result?.contactNames).toEqual([{ id: '4', name: 'Dave', email: 'dave@x.com' }]);
     expect(result?.promoterNames).toEqual([{ id: '5', name: 'Erin', email: null }]);
+    expect(mockGetNucleusPeopleFlags).toHaveBeenCalledWith('Alpha');
+    expect(result?.peopleCounts).toEqual({ devotionalHosts: 2, participating: 2, facilitating: 1 });
   });
 
   test('passes through lastUpdated from cluster-notebook', async () => {
