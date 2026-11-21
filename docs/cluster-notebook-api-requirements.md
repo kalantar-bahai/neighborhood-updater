@@ -262,3 +262,20 @@ Phase A (cluster-notebook PR #46). Spec: `docs/superpowers/specs/2026-11-20-peop
     never sees checks.
 - Side effect: `Individual.phone` / `email` on `workers(role)` are now null unless the caller is tier 1 on that
   nucleus, so the Identity card's "Contact Email" is blank for other readers.
+
+### Phase B, confirmed with cluster-notebook 2026-11-21 (deployed)
+
+- `NucleusPerson.participates: Boolean!`: a participant on the roster of an activity that is not completed.
+- `NucleusPerson.facilitates: Boolean!`: a current facilitator on the roster of an activity that is not completed.
+- `NucleusPerson.participation: [Participation!]!`, newest first, visible to anyone who can read the nucleus.
+  - `Participation { activityId: String!  activityType: String!  heldAt: String  role: ActivityRole!
+    studyItem: String  studyItemTitle: String  startDate: Date  endDate: Date  completed: Boolean!  current: Boolean! }`,
+    `enum ActivityRole { PARTICIPANT FACILITATOR }`.
+  - `activityType` is `cc`, `jyg` or `sc` (shown as Children's class, Junior youth group, Study circle).
+  - SRP activities have no name, so `heldAt` (the name of the activity's nucleus, Setting or Locality) replaced
+    the proposed `activityName`.
+  - One entry per study item (book, grade or text) the person was on, plus one per activity with no study item at
+    all (`studyItem` null, the activity's own dates). `participates` / `facilitates` cover both.
+- Rosters are read with each locality read request (srp-client `activity-rosters`), not live.
+- The People card shows 🎓 (facilitating) and 📖 (participating) on rows, "Participating" and "Facilitating" filters, and
+  an Activities section in every reader's panel: current entries first, then the server's order.

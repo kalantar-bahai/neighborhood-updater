@@ -1,7 +1,7 @@
 // People card (phase 1): pure decisions, tested in people.test.ts.
 // Spec: docs/superpowers/specs/2026-11-18-people-card-design.md
-// Age, devotional host and details (phase A): the People card details spec (phase 3) in docs/superpowers/specs/.
-import type { AgeCategory, DevotionalHostRole, MoveContext, MoveResult, NucleusPerson, PermissionSet, PersonDetails, PlaceSummary, PlaceSync } from './clusterNotebook';
+// Age, devotional host, details (phase A) and activities (phase B): docs/superpowers/specs/2026-11-20-people-card-details-design.md.
+import type { AgeCategory, DevotionalHostRole, MoveContext, Participation, MoveResult, NucleusPerson, PermissionSet, PersonDetails, PlaceSummary, PlaceSync } from './clusterNotebook';
 import { individualDisplayName } from './personName';
 import { INFORMAL_WORKER_TYPES } from './config';
 
@@ -10,6 +10,7 @@ export type PersonRow = {
   id: string; name: string; familyFirst: string; roles: string[]; isResident: boolean;
   place: PlaceSummary | null; placeSync: PlaceSync | null; inSrp: boolean;
   ageCategory: AgeCategory | null; devotionalHost: DevotionalHostRole | null;
+  participates: boolean; facilitates: boolean; participation: Participation[];
 };
 export type PeopleSort = 'first' | 'family';
 
@@ -25,6 +26,9 @@ const ROLES: { role: string; label: string; icon: string }[] = [
 export const KNOWN_ROLES = ROLES.map(r => r.role);
 export const RESIDENT = { label: 'Resident', icon: '🏠' };
 export const DEVOTIONAL_HOST = { label: 'Devotional host', icon: '🕯' };
+export const FACILITATES = { label: 'Facilitating', icon: '🎓' };
+export const PARTICIPATES = { label: 'Participating', icon: '📖' };
+const ACTIVITY_TYPES: Record<string, string> = { cc: "Children's class", jyg: 'Junior youth group', sc: 'Study circle' };
 export const AGE_LABELS: Record<AgeCategory, string> = {
   CHILD: 'Child', JUNIOR_YOUTH: 'Junior Youth', YOUTH: 'Youth', ADULT: 'Adult',
 };
@@ -62,6 +66,8 @@ export function peopleFilters(rows: PersonRow[], isHome: boolean): { key: string
     { key: 'all', label: 'All' },
     ...(isHome ? [{ key: 'resident', label: RESIDENT.label }] : []),
     ...held.map(role => ({ key: role, label: roleLabel(role).label })),
+    { key: 'participating', label: PARTICIPATES.label },
+    { key: 'facilitating', label: FACILITATES.label },
     { key: 'devotional-host', label: DEVOTIONAL_HOST.label },
     ...(Object.keys(AGE_LABELS) as AgeCategory[])
       .filter(a => rows.some(r => r.ageCategory === a))
@@ -72,6 +78,8 @@ export function peopleFilters(rows: PersonRow[], isHome: boolean): { key: string
 function matchesFilter(r: PersonRow, filter: string): boolean {
   if (filter === 'all') return true;
   if (filter === 'resident') return r.isResident;
+  if (filter === 'participating') return r.participates;
+  if (filter === 'facilitating') return r.facilitates;
   if (filter === 'devotional-host') return r.devotionalHost !== null;
   if (filter.startsWith('age:')) return r.ageCategory === filter.slice(4);
   return r.roles.includes(filter);
@@ -102,6 +110,7 @@ export function toPersonRow(p: NucleusPerson): PersonRow {
     id: ind.id, name: individualDisplayName(ind), familyFirst, roles: p.roles, isResident: p.isResident,
     place: ind.place, placeSync: ind.placeSync, inSrp: ind.inSrp,
     ageCategory: p.ageCategory, devotionalHost: p.devotionalHost,
+    participates: p.participates, facilitates: p.facilitates, participation: p.participation,
   };
 }
 
@@ -248,4 +257,24 @@ export function detailLines(v: Extract<DetailsView, { inSrp: true }>): { lines: 
   const lines = groups.filter(g => g.length > 0);
   if (lines.length === 0 && v.comments === null) return { lines: [[{ text: 'Nothing recorded in SRP' }]], comments: null };
   return { lines, comments: v.comments };
+}
+
+// One line pair per entry in the Activities section. Current entries first, then the rest, each in the server's
+// newest-first order. title: "Facilitator · Junior youth group, Lloyd Farm"; detail: study item, its title and dates.
+export type ActivityLine = { key: string; icon: string; title: string; detail: string };
+export function activityLines(participation: Participation[]): ActivityLine[] {
+  const ordered = [...participation.filter(p => p.current), ...participation.filter(p => !p.current)];
+  return ordered.map((p, i) => {
+    const facilitator = p.role === 'FACILITATOR';
+    const what = [ACTIVITY_TYPES[p.activityType] ?? p.activityType, p.heldAt].filter(Boolean).join(', ');
+    const dates = p.startDate || p.endDate || p.current
+      ? `${p.startDate ?? '?'} → ${p.current ? 'now' : p.endDate ?? '?'}`
+      : null;
+    return {
+      key: `${p.activityId}:${p.role}:${p.studyItem ?? ''}:${i}`,
+      icon: facilitator ? FACILITATES.icon : PARTICIPATES.icon,
+      title: `${facilitator ? 'Facilitator' : 'Participant'} · ${what}`,
+      detail: [p.studyItem, p.studyItemTitle, dates && (p.completed ? `${dates} (completed)` : dates)].filter(Boolean).join(' · '),
+    };
+  });
 }
