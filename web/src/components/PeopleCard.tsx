@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PersonSrpDot } from './SrpBadge';
 import type { PermissionSet, PersonDetails } from '@/lib/clusterNotebook';
 import {
-  AGE_LABELS, DEVOTIONAL_HOST, KNOWN_ROLES, RESIDENT, canEditRole, detailLines, detailsView, filterPeople, isMoving, moveResultError,
+  AGE_LABELS, DEVOTIONAL_HOST, FACILITATES, KNOWN_ROLES, PARTICIPATES, activityLines, RESIDENT, canEditRole, detailLines, detailsView, filterPeople, isMoving, moveResultError,
   nextRoleIds, peopleFilters, placePath, roleLabel, rolesToClear, sortPeople, sortRoles, syncNote, type MoveTarget,
   type PeopleSort, type PersonRow,
 } from '@/lib/people';
@@ -12,8 +12,8 @@ import {
 // People card (specs: docs/superpowers/specs/2026-11-18-people-card-design.md, phase 1, and
 // 2026-11-19-people-card-moves-design.md, phase 2). Everyone connected to the nucleus: role holders
 // here, plus residents on a home nucleus. Ticking Resident moves someone here; unticking moves them out.
-// Phase A (2026-11-20-people-card-details-design.md): age and devotional host marks, and a panel any reader
-// can open, with the person's details when cluster-notebook lets the caller see them.
+// Phases A and B (2026-11-20-people-card-details-design.md): activity, devotional host and age marks, and a panel
+// any reader can open: the person's activities, then their details when cluster-notebook lets the caller see them.
 
 interface Props {
   nucleus: string;
@@ -63,6 +63,8 @@ function RoleMarks({ row, isHome }: { row: PersonRow; isHome: boolean }) {
           ? <span key={role} role="img" aria-label={label} title={label}>{icon}</span>
           : <span key={role} title={label} style={TAG}>{label}</span>;
       })}
+      {row.facilitates && <span role="img" aria-label={FACILITATES.label} title={FACILITATES.label}>{FACILITATES.icon}</span>}
+      {row.participates && <span role="img" aria-label={PARTICIPATES.label} title={PARTICIPATES.label}>{PARTICIPATES.icon}</span>}
       {row.devotionalHost && (() => {
         const label = row.devotionalHost === 'CO_HOST' ? 'Devotional co-host' : DEVOTIONAL_HOST.label;
         return <span role="img" aria-label={label} title={label}>{DEVOTIONAL_HOST.icon}</span>;
@@ -143,9 +145,6 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
   const canMove = isHome && permissions.canWrite;
   // Only these callers get the Resident and roles editor in a person's panel.
   const canEditPerson = permissions.canAssignRoles || canMove;
-  // Phase A: details are tier 1 (anyone who can edit the nucleus), so a plain reader's panel would be empty.
-  // Phase B opens the panel to every reader, with Activities.
-  const rowsClickable = canEditPerson || permissions.canWrite;
   const canAdd = permissions.canWrite && canEditPerson;
 
   // The person whose editor is open, read by async work that must not land on someone else.
@@ -392,12 +391,33 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     );
   };
 
-  // The panel under an existing person's row: details when permitted, then the editor or a Close button.
+  // Activities come with the list, so they show at once.
+  const activitiesSection = (personId: string) => {
+    const lines = activityLines(rows?.find(r => r.id === personId)?.participation ?? []);
+    return (
+      <div style={{ padding: '6px 0 2px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#4a5568' }}>Activities</div>
+        {lines.length === 0 && <div style={{ fontSize: 13, color: '#718096' }}>No activities in SRP</div>}
+        {lines.map(l => (
+          <div key={l.key} style={{ display: 'flex', gap: 6, fontSize: 13 }}>
+            <span aria-hidden="true">{l.icon}</span>
+            <div>
+              <div>{l.title}</div>
+              {l.detail && <div style={{ fontSize: 12, color: '#718096' }}>{l.detail}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // The panel under an existing person's row: activities, details when permitted, then the editor or a Close button.
   const panel = (e: Editing) => (
     <div>
+      {activitiesSection(e.id)}
       {detailsSection(e.id)}
       {canEditPerson ? (
-        <div style={{ borderTop: details?.personId === e.id && details.status !== 'none' ? '1px solid #e2e8f0' : undefined, marginTop: 4 }}>
+        <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 4 }}>
           {editor(e)}
         </div>
       ) : (
@@ -455,8 +475,8 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
             return (
               <div key={r.id} style={{ borderBottom: '1px solid #f7fafc', padding: '6px 0' }}>
                 <div
-                  onClick={rowsClickable && !saving ? () => (editing?.id === r.id ? close() : startEdit(fromRow(r))) : undefined}
-                  style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: rowsClickable ? 'pointer' : 'default' }}
+                  onClick={!saving ? () => (editing?.id === r.id ? close() : startEdit(fromRow(r))) : undefined}
+                  style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
                 >
                   <span style={{ fontSize: 14 }}>{sortBy === 'family' ? r.familyFirst : r.name}<PersonSrpDot inSrp={r.inSrp} /></span>
                   <RoleMarks row={r} isHome={isHome} />

@@ -114,6 +114,8 @@ type PersonChecks { backgroundCheckExpiration: Date  motorVehicleClearance: Bool
 - **Phase A** (after cluster-notebook phase A deploys): age tag, 🕯, their filters, the person panel with the
   Details section, and rows clickable for every reader.
 - **Phase B** (after cluster-notebook phase B deploys): 🎓 and 📖, their filters, and the Activities section.
+  Built 2026-11-21 on the deployed shape, which differs from the sketch above: no activity name (`heldAt`, where it
+  is held, instead), a `studyItemTitle`, and one entry per study item. See `docs/cluster-notebook-api-requirements.md`.
 - Each phase queries only fields that are deployed (an unknown field breaks the whole People card).
 
 ## Approaches

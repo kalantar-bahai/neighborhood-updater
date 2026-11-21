@@ -583,10 +583,24 @@ export interface PersonSummary extends PersonName { place: PlaceSummary | null; 
 // nucleus's Setting, and only ever true on a home nucleus.
 export type AgeCategory = 'CHILD' | 'JUNIOR_YOUTH' | 'YOUTH' | 'ADULT';
 export type DevotionalHostRole = 'HOST' | 'CO_HOST';
+// Confirmed with cluster-notebook 2026-11-21 (phase B, deployed): participates / facilitates come from the roster of
+// an activity that is not completed (facilitates: a current facilitator). participation is newest first and visible
+// to anyone who can read the nucleus: one entry per study item (book, grade or text) the person was on, plus one per
+// activity with no study item (studyItem null, the activity's own dates). SRP activities have no name; heldAt is
+// the name of the activity's nucleus, Setting or Locality. activityType is cc, jyg or sc. Rosters are read with
+// each locality read, not live.
+export type ActivityRole = 'PARTICIPANT' | 'FACILITATOR';
+export interface Participation {
+  activityId: string; activityType: string; heldAt: string | null; role: ActivityRole;
+  studyItem: string | null; studyItemTitle: string | null;
+  startDate: string | null; endDate: string | null; completed: boolean; current: boolean;
+}
 export interface NucleusPerson {
   individual: PersonSummary; roles: string[]; isResident: boolean;
   ageCategory: AgeCategory | null; devotionalHost: DevotionalHostRole | null;
+  participates: boolean; facilitates: boolean; participation: Participation[];
 }
+const PARTICIPATION_SELECTION = 'activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current';
 const PLACE_SELECTION = 'id name type locality cluster localityId homeNucleus';
 const PERSON_SUMMARY_SELECTION = `${PERSON_NAME_SELECTION} inSrp place { ${PLACE_SELECTION} } placeSync { status code }`;
 
@@ -612,7 +626,7 @@ export async function searchIndividuals(nucleusName: string, search?: string, li
 export async function getNucleusPeople(nucleusName: string): Promise<NucleusPerson[] | null> {
   const query = `
     query GetNucleusPeople($name: String!) {
-      nucleus(name: $name) { people { individual { ${PERSON_SUMMARY_SELECTION} } roles isResident ageCategory devotionalHost } }
+      nucleus(name: $name) { people { individual { ${PERSON_SUMMARY_SELECTION} } roles isResident ageCategory devotionalHost participates facilitates participation { ${PARTICIPATION_SELECTION} } } }
     }
   `;
   const data = await request<{ nucleus: { people: NucleusPerson[] } | null }>(query, { name: nucleusName });

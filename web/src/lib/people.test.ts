@@ -1,13 +1,13 @@
 import { describe, test, expect } from 'vitest';
-import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
-import type { AgeCategory, DevotionalHostRole, MoveContext, PermissionSet, PersonDetails, PlaceSummary } from './clusterNotebook';
+import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, activityLines, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
+import type { Participation, AgeCategory, DevotionalHostRole, MoveContext, PermissionSet, PersonDetails, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
   canRead: true, canWrite: true, canChangeIdentity: false, canDelete: false, canAssignRoles: true,
   assignableRoles: [], createableEntityTypes: [], ...over,
 });
 
-const row = (name: string, roles: string[], isResident = false): PersonRow => ({ id: name, name, familyFirst: name, roles, isResident, place: null, placeSync: null, inSrp: true, ageCategory: null, devotionalHost: null });
+const row = (name: string, roles: string[], isResident = false): PersonRow => ({ id: name, name, familyFirst: name, roles, isResident, place: null, placeSync: null, inSrp: true, ageCategory: null, devotionalHost: null, participates: false, facilitates: false, participation: [] });
 
 describe('placePath', () => {
   test('a Setting shows cluster, locality and setting', () => {
@@ -55,13 +55,13 @@ describe('canEditRole', () => {
 describe('peopleFilters', () => {
   const rows = [row('Ana', ['contact']), row('Ben', ['promoter', 'cso']), row('Cy', [], true)];
   test('home nucleus: all, resident, then roles in label order, unknown last', () => {
-    expect(peopleFilters(rows, true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'protagonist', 'accompanier', 'contact', 'cso', 'devotional-host']);
+    expect(peopleFilters(rows, true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'protagonist', 'accompanier', 'contact', 'cso', 'participating', 'facilitating', 'devotional-host']);
   });
   test('non-home nucleus has no resident filter', () => {
-    expect(peopleFilters(rows, false).map(f => f.key)).toEqual(['all', 'promoter', 'protagonist', 'accompanier', 'contact', 'cso', 'devotional-host']);
+    expect(peopleFilters(rows, false).map(f => f.key)).toEqual(['all', 'promoter', 'protagonist', 'accompanier', 'contact', 'cso', 'participating', 'facilitating', 'devotional-host']);
   });
   test('every known role shows even when nobody holds it', () => {
-    expect(peopleFilters([], true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'protagonist', 'accompanier', 'contact', 'devotional-host']);
+    expect(peopleFilters([], true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'protagonist', 'accompanier', 'contact', 'participating', 'facilitating', 'devotional-host']);
   });
   test('labels', () => {
     expect(peopleFilters(rows, true).slice(0, 3).map(f => f.label)).toEqual(['All', 'Resident', 'Promoting']);
@@ -85,7 +85,7 @@ describe('age and devotional host filters', () => {
   const r = (name: string, ageCategory: AgeCategory | null, devotionalHost: DevotionalHostRole | null = null): PersonRow => ({ ...row(name, []), ageCategory, devotionalHost });
   test('keys and labels', () => {
     const f = peopleFilters([r('A', 'YOUTH'), r('B', 'ADULT')], true);
-    expect(f.map(x => x.key)).toEqual(['all', 'resident', 'promoter', 'protagonist', 'accompanier', 'contact', 'devotional-host', 'age:YOUTH', 'age:ADULT']);
+    expect(f.map(x => x.key)).toEqual(['all', 'resident', 'promoter', 'protagonist', 'accompanier', 'contact', 'participating', 'facilitating', 'devotional-host', 'age:YOUTH', 'age:ADULT']);
     expect(f.find(x => x.key === 'devotional-host')?.label).toBe('Devotional host');
     expect(f.find(x => x.key === 'age:YOUTH')?.label).toBe('Youth');
   });
@@ -203,26 +203,33 @@ describe('nextRoleIds', () => {
 });
 
 describe('toPersonRow', () => {
+  const noActivity = { participates: false, facilitates: false, participation: [] };
+  test('activity fields pass through', () => {
+    const ind = { id: '4', firstName: 'Di', middleNames: null, familyName: null, nickname: null, place: null, placeSync: null, inSrp: true };
+    const participation = [act({})];
+    const r = toPersonRow({ individual: ind, roles: [], isResident: false, ageCategory: null, devotionalHost: null, participates: true, facilitates: true, participation });
+    expect([r.participates, r.facilitates, r.participation]).toEqual([true, true, participation]);
+  });
   test('uses the display name and keeps roles and residency', () => {
     const r = toPersonRow({
       individual: { id: '7', firstName: 'Ana', middleNames: null, familyName: 'Lopez', nickname: 'Annie', place: null, placeSync: null, inSrp: true },
-      roles: ['promoter'], isResident: true, ageCategory: null, devotionalHost: null,
+      roles: ['promoter'], isResident: true, ageCategory: null, devotionalHost: null, ...noActivity,
     });
-    expect(r).toEqual({ id: '7', name: 'Ana Lopez (Annie)', familyFirst: 'Lopez, Ana (Annie)', roles: ['promoter'], isResident: true, place: null, placeSync: null, inSrp: true, ageCategory: null, devotionalHost: null });
+    expect(r).toEqual({ id: '7', name: 'Ana Lopez (Annie)', familyFirst: 'Lopez, Ana (Annie)', roles: ['promoter'], isResident: true, place: null, placeSync: null, inSrp: true, ageCategory: null, devotionalHost: null, ...noActivity });
   });
   test('age category and devotional host pass through', () => {
     const ind = { id: '5', firstName: 'Cy', middleNames: null, familyName: null, nickname: null, place: null, placeSync: null, inSrp: true };
-    const r = toPersonRow({ individual: ind, roles: [], isResident: false, ageCategory: 'YOUTH', devotionalHost: 'CO_HOST' });
+    const r = toPersonRow({ individual: ind, roles: [], isResident: false, ageCategory: 'YOUTH', devotionalHost: 'CO_HOST', ...noActivity });
     expect(r.ageCategory).toBe('YOUTH');
     expect(r.devotionalHost).toBe('CO_HOST');
   });
   test('inSrp passes through', () => {
     const ind = { id: '9', firstName: 'Ben', middleNames: null, familyName: null, nickname: null, place: null, placeSync: null };
-    expect(toPersonRow({ individual: { ...ind, inSrp: false }, roles: [], isResident: false, ageCategory: null, devotionalHost: null }).inSrp).toBe(false);
+    expect(toPersonRow({ individual: { ...ind, inSrp: false }, roles: [], isResident: false, ageCategory: null, devotionalHost: null, ...noActivity }).inSrp).toBe(false);
   });
   test('family-first name copes with missing parts', () => {
     const ind = { id: '8', firstName: 'Ana', middleNames: 'Maria', familyName: 'Lopez', nickname: null, place: null, placeSync: null, inSrp: true };
-    const person = (over: object) => toPersonRow({ individual: { ...ind, ...over }, roles: [], isResident: true, ageCategory: null, devotionalHost: null }).familyFirst;
+    const person = (over: object) => toPersonRow({ individual: { ...ind, ...over }, roles: [], isResident: true, ageCategory: null, devotionalHost: null, ...noActivity }).familyFirst;
     expect(person({})).toBe('Lopez, Ana Maria');
     expect(person({ firstName: null, middleNames: null })).toBe('Lopez');
     expect(person({ familyName: null })).toBe('Ana Maria');
@@ -251,7 +258,7 @@ describe('people.ts stays browser-safe', () => {
 });
 
 describe('sortPeople', () => {
-  const p = (name: string, familyFirst: string): PersonRow => ({ id: name, name, familyFirst, roles: [], isResident: true, place: null, placeSync: null, inSrp: true, ageCategory: null, devotionalHost: null });
+  const p = (name: string, familyFirst: string): PersonRow => ({ ...row(name, [], true), familyFirst });
   const rows = [p('carla Diaz', 'Diaz, carla'), p('Ben Okafor', 'Okafor, Ben'), p('Zoe Adams', 'Adams, Zoe')];
   test('by first name, ignoring case', () => {
     expect(sortPeople(rows, 'first').map(r => r.name)).toEqual(['Ben Okafor', 'carla Diaz', 'Zoe Adams']);
@@ -359,5 +366,51 @@ describe('namedToShow', () => {
     expect(namedToShow(' 4 ', 4)).toBeUndefined();
     expect(namedToShow('', 0)).toBeUndefined();
     expect(namedToShow('12', undefined)).toBeUndefined();
+  });
+});
+
+function act(over: Partial<Participation>): Participation {
+  return { activityId: 'A1', activityType: 'jyg', heldAt: 'Lloyd Farm', role: 'PARTICIPANT', studyItem: null, studyItemTitle: null,
+    startDate: '2025-09-01', endDate: null, completed: false, current: true, ...over };
+}
+
+describe('activity filters', () => {
+  const r = (name: string, participates: boolean, facilitates: boolean): PersonRow => ({ ...row(name, []), participates, facilitates });
+  const rows = [r('A', true, false), r('B', false, true), r('C', true, true), r('D', false, false)];
+  test('come before devotional host, always listed', () => {
+    expect(peopleFilters([], false).map(f => f.key).slice(-3)).toEqual(['participating', 'facilitating', 'devotional-host']);
+    expect(peopleFilters([], false).find(f => f.key === 'facilitating')?.label).toBe('Facilitating');
+  });
+  test('keep those taking part or facilitating', () => {
+    expect(filterPeople(rows, 'participating', '').map(x => x.name)).toEqual(['A', 'C']);
+    expect(filterPeople(rows, 'facilitating', '').map(x => x.name)).toEqual(['B', 'C']);
+  });
+});
+
+describe('activityLines', () => {
+  test('a current facilitator with no study item', () => {
+    expect(activityLines([act({ role: 'FACILITATOR' })])).toEqual([
+      { key: 'A1:FACILITATOR::0', icon: '🎓', title: 'Facilitator · Junior youth group, Lloyd Farm', detail: '2025-09-01 → now' },
+    ]);
+  });
+  test('a completed study item shows book, title and dates', () => {
+    const [l] = activityLines([act({ activityType: 'sc', heldAt: 'Carrboro', studyItem: 'Book 3', studyItemTitle: 'Teaching Children\'s Classes, Grade 1',
+      startDate: '2024-01-10', endDate: '2024-06-02', completed: true, current: false })]);
+    expect(l.icon).toBe('📖');
+    expect(l.title).toBe('Participant · Study circle, Carrboro');
+    expect(l.detail).toBe('Book 3 · Teaching Children\'s Classes, Grade 1 · 2024-01-10 → 2024-06-02 (completed)');
+  });
+  test('children\'s class label, unknown type code as given, missing place and dates', () => {
+    expect(activityLines([act({ activityType: 'cc', heldAt: null })])[0].title).toBe('Participant · Children\'s class');
+    expect(activityLines([act({ activityType: 'xx' })])[0].title).toBe('Participant · xx, Lloyd Farm');
+    expect(activityLines([act({ startDate: null, endDate: null, current: false })])[0].detail).toBe('');
+    expect(activityLines([act({ startDate: null, endDate: '2024-06-02', current: false })])[0].detail).toBe('? → 2024-06-02');
+  });
+  test('current first, otherwise the server order', () => {
+    const lines = activityLines([act({ activityId: 'P1', current: false }), act({ activityId: 'C1' }), act({ activityId: 'P2', current: false })]);
+    expect(lines.map(l => l.key.split(':')[0])).toEqual(['C1', 'P1', 'P2']);
+  });
+  test('nothing in, nothing out', () => {
+    expect(activityLines([])).toEqual([]);
   });
 });
