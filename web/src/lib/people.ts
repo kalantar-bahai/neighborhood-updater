@@ -207,8 +207,8 @@ const DASH = '—';
 // What the details panel shows. Dates are ISO strings, so plain string comparison decides "expired".
 export function detailsView(d: PersonDetails, today: string): DetailsView {
   if (!d.individual.inSrp) return { inSrp: false };
-  const registration = d.isRegistered === null ? DASH
-    : !d.isRegistered ? 'Not registered'
+  // Only a positive shows: "not registered" and "not cleared" read like no record (owner, 2026-11-20).
+  const registration = !d.isRegistered ? DASH
     : d.registrationDate ? `Registered since ${d.registrationDate}` : 'Registered';
   const exp = d.checks?.backgroundCheckExpiration ?? null;
   const mv = d.checks?.motorVehicleClearance ?? null;
@@ -223,7 +223,7 @@ export function detailsView(d: PersonDetails, today: string): DetailsView {
     checks: d.checks ? {
       background: exp ? `expires ${exp}` : DASH,
       backgroundExpired: exp !== null && exp < today,
-      motorVehicle: mv === null ? DASH : mv ? 'cleared' : 'not cleared',
+      motorVehicle: mv ? 'cleared' : DASH,
     } : null,
   };
 }

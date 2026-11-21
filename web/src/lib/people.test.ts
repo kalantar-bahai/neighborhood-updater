@@ -130,7 +130,7 @@ describe('detailsView', () => {
   test('registration', () => {
     expect(ok(d({ isRegistered: true, registrationDate: '2019-03-02' })).registration).toBe('Registered since 2019-03-02');
     expect(ok(d({ isRegistered: true })).registration).toBe('Registered');
-    expect(ok(d({ isRegistered: false })).registration).toBe('Not registered');
+    expect(ok(d({ isRegistered: false })).registration).toBe('—');
   });
   test('phones and emails', () => {
     const v = ok(d({ phones: ['555-0100', '555-0101'], emails: ['a@example.org', 'b@example.org'] }));
@@ -146,7 +146,7 @@ describe('detailsView', () => {
       ok(d({ checks: { backgroundCheckExpiration, motorVehicleClearance } })).checks;
     expect(c('2027-03-01', null)).toEqual({ background: 'expires 2027-03-01', backgroundExpired: false, motorVehicle: '—' });
     expect(c('2026-11-19', true)).toEqual({ background: 'expires 2026-11-19', backgroundExpired: true, motorVehicle: 'cleared' });
-    expect(c(null, false)).toEqual({ background: '—', backgroundExpired: false, motorVehicle: 'not cleared' });
+    expect(c(null, false)).toEqual({ background: '—', backgroundExpired: false, motorVehicle: '—' });
   });
 });
 
@@ -165,7 +165,7 @@ describe('detailLines', () => {
   test('age and registration keep only present parts', () => {
     expect(text(v({ age: '17', registration: 'Registered since 2019-03-02' }))).toEqual(['Age 17 · Registered since 2019-03-02']);
     expect(text(v({ age: '17' }))).toEqual(['Age 17']);
-    expect(text(v({ registration: 'Not registered' }))).toEqual(['Not registered']);
+    expect(text(v({ registration: 'Registered' }))).toEqual(['Registered']);
   });
   test('address line only when present', () => {
     expect(text(v({ address: '12 Elm St', age: '17' }))).toEqual(['Age 17', '12 Elm St']);
@@ -177,7 +177,7 @@ describe('detailLines', () => {
   test('checks drop missing parts, flag expired, and vanish when both missing', () => {
     expect(detailLines(v({ checks: { background: 'expires 2026-11-19', backgroundExpired: true, motorVehicle: 'cleared' } })).lines)
       .toEqual([[{ text: 'Background check expires 2026-11-19', danger: true }, { text: 'Motor vehicle: cleared' }]]);
-    expect(text(v({ checks: { background: '—', backgroundExpired: false, motorVehicle: 'not cleared' } }))).toEqual(['Motor vehicle: not cleared']);
+    expect(text(v({ checks: { background: '—', backgroundExpired: false, motorVehicle: 'cleared' } }))).toEqual(['Motor vehicle: cleared']);
     expect(text(v({ age: '17', checks: { background: '—', backgroundExpired: false, motorVehicle: '—' } }))).toEqual(['Age 17']);
   });
   test('lines in the sketch order', () => {
