@@ -715,6 +715,29 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     void attempt();
   }
 
+  // Clicking a diagram label edits that estimate's number (owner, 2026-11-23); it used to open the
+  // role's name list, which stays on the Overview card's labels.
+  type EstimateKey = 'totalPop' | 'inConversation' | 'inCommunityActivities' | 'protagonists' | 'devotionalHosts'
+    | 'inEducationalActivities' | 'educationalFacilitators' | 'helpingOthers' | 'accompanying';
+  const ESTIMATE_LABELS: Record<EstimateKey, string> = {
+    totalPop: 'Total Population', inConversation: 'In Conversation', inCommunityActivities: 'Participating',
+    protagonists: 'Promoting', devotionalHosts: 'Hosting Devotional Gatherings',
+    inEducationalActivities: 'In Educational Activity', educationalFacilitators: 'Facilitating Educational Activity',
+    helpingOthers: 'Helping Others', accompanying: 'Accompanying',
+  };
+  const [estimateEdit, setEstimateEdit] = useState<{ key: EstimateKey; value: string; error: string } | null>(null);
+  const editEstimate = (key: EstimateKey) => canWrite ? () => setEstimateEdit({ key, value: form[key], error: '' }) : undefined;
+  function saveEstimate() {
+    if (!estimateEdit) return;
+    const { key } = estimateEdit;
+    const value = estimateEdit.value.trim();
+    const label = ESTIMATE_LABELS[key];
+    if (!isValidInt(value)) { setEstimateEdit({ ...estimateEdit, error: `${label} must be a number` }); return; }
+    setEstimateEdit(null);
+    if (value === committedRef.current[key]) { setForm(f => ({ ...f, [key]: value })); return; }
+    setAndSave(key, value, { [key]: value }, label);
+  }
+
   // Immediate-trigger fields: stage, nucleusType (admin dropdowns), presence, gatherings
   // (toggles) -- the change event itself is the complete, discrete action, no blur needed.
   function setAndSave<K extends keyof FormState>(key: K, value: FormState[K], fragment: Record<string, unknown>, label: string, reloadAfter = false) {
@@ -828,30 +851,30 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // assignment lists (promoter/protagonist/accompanier workers) or from summing
   // activity data, so showing the diagrams' old computed/counted values would
   // silently disagree with what the Overview card now shows for the exact same
-  // concept. Role-list click-to-manage-names (onClick) stays wherever it was --
-  // unrelated to, and still independent of, the number displayed.
+  // concept. Clicking a label edits that number (2026-11-23); the role name lists open from the
+  // Overview card's labels.
   const diagramData = [
-    { label: 'Residing',      value: form.totalPop },
-    { label: 'Connected',     value: form.inConversation, named: residentsNamed },
-    { label: 'Participating', value: form.inCommunityActivities },
-    { label: 'Helping Others', value: form.helpingOthers, named: protagonistNames.length, onClick: () => setShowProtagonistsModal(true) },
-    { label: 'Accompanying',  value: form.accompanying, named: accompanierNames.length, onClick: () => setShowAccompaniersModal(true) },
+    { label: 'Residing',      value: form.totalPop, onClick: editEstimate('totalPop') },
+    { label: 'Connected',     value: form.inConversation, named: residentsNamed, onClick: editEstimate('inConversation') },
+    { label: 'Participating', value: form.inCommunityActivities, onClick: editEstimate('inCommunityActivities') },
+    { label: 'Helping Others', value: form.helpingOthers, named: protagonistNames.length, onClick: editEstimate('helpingOthers') },
+    { label: 'Accompanying',  value: form.accompanying, named: accompanierNames.length, onClick: editEstimate('accompanying') },
   ];
 
-  const alignedResiding = { label: 'Residing', value: form.totalPop };
+  const alignedResiding = { label: 'Residing', value: form.totalPop, onClick: editEstimate('totalPop') };
   const alignedRings: AlignedRingContent[] = [
-    { single: { label: 'In conversation', value: form.inConversation, named: residentsNamed } },
+    { single: { label: 'In conversation', value: form.inConversation, named: residentsNamed, onClick: editEstimate('inConversation') } },
     {
-      right: { label: 'In core activity', value: form.inEducationalActivities, named: counts.participating },
-      left:  { label: 'Participating',    value: form.inCommunityActivities },
+      right: { label: 'In core activity', value: form.inEducationalActivities, named: counts.participating, onClick: editEstimate('inEducationalActivities') },
+      left:  { label: 'Participating',    value: form.inCommunityActivities, onClick: editEstimate('inCommunityActivities') },
     },
     {
-      right: { label: 'Facilitating', value: form.educationalFacilitators, named: counts.facilitating },
-      left:  { label: 'Promoting',    value: form.protagonists, named: promoterNames.length, onClick: () => setShowPromotersModal(true) },
+      right: { label: 'Facilitating', value: form.educationalFacilitators, named: counts.facilitating, onClick: editEstimate('educationalFacilitators') },
+      left:  { label: 'Promoting',    value: form.protagonists, named: promoterNames.length, onClick: editEstimate('protagonists') },
     },
     {
-      right: { label: 'Accompanying', value: form.accompanying, named: accompanierNames.length, onClick: () => setShowAccompaniersModal(true) },
-      left:  { label: 'Helping Others', value: form.helpingOthers, named: protagonistNames.length, onClick: () => setShowProtagonistsModal(true) },
+      right: { label: 'Accompanying', value: form.accompanying, named: accompanierNames.length, onClick: editEstimate('accompanying') },
+      left:  { label: 'Helping Others', value: form.helpingOthers, named: protagonistNames.length, onClick: editEstimate('helpingOthers') },
     },
   ];
 
@@ -859,15 +882,15 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // Devotional Meetings/Gatherings has a real mapping now (devotionalHosts,
   // 2026-10-07) -- was always blank before, no field existed for it yet.
   const staggeredLabels: AlignedLabel[] = [
-    { label: 'Accompanying',                           value: form.accompanying, named: accompanierNames.length, onClick: () => setShowAccompaniersModal(true) },
-    { label: 'Helping Others',                          value: form.helpingOthers, named: protagonistNames.length, onClick: () => setShowProtagonistsModal(true) },
-    { label: 'Facilitating Ed. Act.',                   value: form.educationalFacilitators, named: counts.facilitating },
-    { label: 'Participating in Ed. Act.',               value: form.inEducationalActivities, named: counts.participating },
-    { label: 'Hosting Devotional Meetings/Gatherings',  value: form.devotionalHosts, named: counts.devotionalHosts },
-    { label: 'Protagonists/Promoting',                  value: form.protagonists, named: promoterNames.length, onClick: () => setShowPromotersModal(true) },
-    { label: 'Participating',                           value: form.inCommunityActivities },
-    { label: 'In Conversation',                         value: form.inConversation, named: residentsNamed },
-    { label: 'Population/Residing',                     value: form.totalPop },
+    { label: 'Accompanying',                           value: form.accompanying, named: accompanierNames.length, onClick: editEstimate('accompanying') },
+    { label: 'Helping Others',                          value: form.helpingOthers, named: protagonistNames.length, onClick: editEstimate('helpingOthers') },
+    { label: 'Facilitating Ed. Act.',                   value: form.educationalFacilitators, named: counts.facilitating, onClick: editEstimate('educationalFacilitators') },
+    { label: 'Participating in Ed. Act.',               value: form.inEducationalActivities, named: counts.participating, onClick: editEstimate('inEducationalActivities') },
+    { label: 'Hosting Devotional Meetings/Gatherings',  value: form.devotionalHosts, named: counts.devotionalHosts, onClick: editEstimate('devotionalHosts') },
+    { label: 'Protagonists/Promoting',                  value: form.protagonists, named: promoterNames.length, onClick: editEstimate('protagonists') },
+    { label: 'Participating',                           value: form.inCommunityActivities, onClick: editEstimate('inCommunityActivities') },
+    { label: 'In Conversation',                         value: form.inConversation, named: residentsNamed, onClick: editEstimate('inConversation') },
+    { label: 'Population/Residing',                     value: form.totalPop, onClick: editEstimate('totalPop') },
   ];
 
   // Three cases, confirmed with cluster-notebook 2026-10-04 -- null means no audit
@@ -1182,6 +1205,27 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
               {diagramType === 'simple' && <ConcentricDiagram data={diagramData} />}
               {diagramType === 'aligned' && <AlignedConcentricDiagram rings={alignedRings} residing={alignedResiding} />}
               {diagramType === 'staggered' && <StaggeredConcentricDiagram labels={staggeredLabels} />}
+              {estimateEdit && createPortal(
+                <div onClick={() => setEstimateEdit(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+                  <form
+                    onClick={e => e.stopPropagation()}
+                    onSubmit={e => { e.preventDefault(); saveEstimate(); }}
+                    style={{ background: 'white', borderRadius: 8, padding: 16, width: '100%', maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 10 }}
+                  >
+                    <label style={{ fontWeight: 600, fontSize: 14 }} htmlFor="estimate-edit">{ESTIMATE_LABELS[estimateEdit.key]}</label>
+                    <input
+                      id="estimate-edit" type="text" inputMode="numeric" autoFocus value={estimateEdit.value}
+                      onChange={e => setEstimateEdit({ ...estimateEdit, value: e.target.value, error: '' })}
+                    />
+                    {estimateEdit.error && <div style={{ fontSize: 12, color: '#c53030' }}>{estimateEdit.error}</div>}
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                      <button type="button" onClick={() => setEstimateEdit(null)} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #cbd5e0', background: 'white', color: '#4a5568', cursor: 'pointer' }}>Cancel</button>
+                      <button type="submit" style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #3182ce', background: '#3182ce', color: 'white', cursor: 'pointer' }}>Save</button>
+                    </div>
+                  </form>
+                </div>,
+                document.body,
+              )}
             </div>
           )}
         </div>
