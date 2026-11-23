@@ -344,3 +344,51 @@ export function hideRolesLine(name: string, roles: string[]): string | null {
   const parts = sortRoles(roles).map(r => { const { label, icon } = roleLabel(r); return icon ? `${label} ${icon}` : label; });
   return `${name} is ${parts.join(', ')} here; hiding keeps the ${roles.length === 1 ? 'role' : 'roles'}.`;
 }
+
+// Layout A of the institute course view (owner, 2026-11-23): per activity type (study circles, children's
+// classes, junior youth groups), one chip per study item (book, grade, text) the person has an entry for, drawn
+// from participation until cluster-notebook exposes SRP's per-person course record. An activity with no study
+// item gets one chip named for where it is held. Chips are in natural order.
+// state, from participant entries: current (in it now), ended (was in it, now finished), none (only facilitated).
+// Confirmed with cluster-notebook 2026-11-23: Participation.completed is the study item's (or activity's) own
+// completion, shared by everyone on it, not the person's, so a chip can't say "completed it" yet. A per-person
+// field (proposed `personCompleted`) would split ended into completed / didn't complete.
+// label: "Book 3 (G1)" → "3 (G1)", "Grade 1" → "G1" (the row already names the activity type).
+export type ChipState = 'current' | 'ended' | 'none';
+export type CourseChip = { key: string; label: string; title: string | null; state: ChipState; facilitated: boolean; lines: string[] };
+export type CourseGroup = { type: string; label: string; chips: CourseChip[] };
+const GROUP_ORDER = ['sc', 'cc', 'jyg'];
+const GROUP_LABELS: Record<string, string> = { sc: 'Study circles', cc: "Children's classes", jyg: 'Junior youth groups' };
+export function courseGroups(participation: Participation[]): CourseGroup[] {
+  const groups = new Map<string, Map<string, Participation[]>>();
+  for (const p of participation) {
+    const key = p.studyItem ?? `activity:${p.activityId}`;
+    const g = groups.get(p.activityType) ?? new Map<string, Participation[]>();
+    g.set(key, [...(g.get(key) ?? []), p]);
+    groups.set(p.activityType, g);
+  }
+  const typeRank = (t: string) => (GROUP_ORDER.includes(t) ? GROUP_ORDER.indexOf(t) : GROUP_ORDER.length);
+  return [...groups.entries()]
+    .sort(([a], [b]) => typeRank(a) - typeRank(b) || a.localeCompare(b))
+    .map(([type, items]) => ({
+      type,
+      label: GROUP_LABELS[type] ?? ACTIVITY_TYPES[type] ?? type,
+      chips: [...items.entries()].map(([key, entries]) => courseChip(key, entries))
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })),
+    }));
+}
+function courseChip(key: string, entries: Participation[]): CourseChip {
+  const studied = entries.filter(p => p.role === 'PARTICIPANT');
+  const state: ChipState = studied.some(p => p.current) ? 'current' : studied.length ? 'ended' : 'none';
+  const first = entries[0];
+  const label = first.studyItem ? first.studyItem.replace(/^Book\s+/i, '').replace(/^Grade\s+/i, 'G') : (first.heldAt ?? ACTIVITY_TYPES[first.activityType] ?? first.activityType);
+  const lines = entries.map(p => {
+    const dates = p.startDate || p.endDate || p.current ? `${p.startDate ?? '?'} → ${p.current ? 'now' : p.endDate ?? '?'}` : null;
+    return [p.role === 'FACILITATOR' ? 'Facilitated' : 'Took part', p.heldAt, dates && (p.completed ? `${dates} (completed)` : dates)]
+      .filter(Boolean).join(' · ');
+  });
+  return {
+    key, label, title: first.studyItem ? (entries.find(p => p.studyItemTitle)?.studyItemTitle ?? first.studyItem) : null,
+    state, facilitated: entries.some(p => p.role === 'FACILITATOR'), lines,
+  };
+}

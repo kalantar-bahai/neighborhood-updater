@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { PersonSrpDot } from './SrpBadge';
 import type { AgeCategory, PermissionSet, PersonDetails } from '@/lib/clusterNotebook';
 import {
-  AGE_FILTERS, AGE_LABELS, DEVOTIONAL_HOST, FACILITATES, KNOWN_ROLES, PARTICIPATES, activityLines, activitySummary, hideNote, hideRolesLine, peopleCountLabel, RESIDENT, canEditRole, detailLines, detailsView, filterPeople, isMoving, moveResultError,
+  AGE_FILTERS, AGE_LABELS, DEVOTIONAL_HOST, FACILITATES, KNOWN_ROLES, PARTICIPATES, activityLines, activitySummary, courseGroups, hideNote, hideRolesLine, peopleCountLabel, RESIDENT, canEditRole, detailLines, detailsView, filterPeople, isMoving, moveResultError,
   nextRoleIds, peopleFilters, placePath, roleLabel, rolesToClear, sortPeople, sortRoles, syncNote, type MoveTarget,
-  type PersonRow,
+  type ChipState, type PersonRow,
 } from '@/lib/people';
 
 // People card (specs: docs/superpowers/specs/2026-11-18-people-card-design.md, phase 1, and
@@ -143,6 +144,8 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
   // The open "Hide…" confirm (its reason as typed), and a Hide/Unhide error, for the open person.
   const [hideConfirm, setHideConfirm] = useState<{ personId: string; reason: string } | null>(null);
   const [activitiesOpen, setActivitiesOpen] = useState(false);
+  const [courseOpen, setCourseOpen] = useState<string | null>(null);
+  const [fullListFor, setFullListFor] = useState<string | null>(null);
   const [hideError, setHideError] = useState('');
 
   useEffect(() => {
@@ -185,6 +188,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     setHideConfirm(null);
     setHideError('');
     setActivitiesOpen(false);
+    setCourseOpen(null);
     setAdding(false);
     // Read details on each open; a new person isn't one of this nucleus's people yet, so has none here.
     if (e.isNew) { setDetails(null); return; }
@@ -459,16 +463,25 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     );
   };
 
-  // Activities come with the list, so they show at once.
-  // One summary line; a click opens the full list (owner, 2026-11-23). Starts closed for each person.
+  // Activities come with the list, so they show at once. One summary line; a click opens the course chips
+  // (layout A), and "Full list" under them opens every activity in a dialog (owner, 2026-11-23).
+  // Chips: one row per activity type; blue ◐ in it now, grey ended, white only facilitated; 🎓 facilitated.
+  // Tap a chip for its entries. No "completed it" until cluster-notebook exposes the person's own completion
+  // (see courseGroups).
+  const CHIP_STYLE: Record<ChipState, { background: string; color: string; border: string; mark: string }> = {
+    current: { background: '#bee3f8', color: '#2a4365', border: '#90cdf4', mark: ' ◐' },
+    ended: { background: '#edf2f7', color: '#4a5568', border: '#e2e8f0', mark: '' },
+    none: { background: 'white', color: '#4a5568', border: '#e2e8f0', mark: '' },
+  };
   const activitiesSection = (personId: string) => {
     const participation = rows?.find(r => r.id === personId)?.participation ?? [];
-    const lines = activityLines(participation);
     const summary = activitySummary(participation);
+    const groups = courseGroups(participation);
+    const open = groups.flatMap(g => g.chips.map(c => ({ ...c, id: `${g.type}:${c.key}` }))).find(c => c.id === courseOpen);
     return (
       <div style={{ padding: '6px 0 2px', display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: '#4a5568' }}>Activities</div>
-        {lines.length === 0 ? (
+        {participation.length === 0 ? (
           <div style={{ fontSize: 13, color: '#718096' }}>{summary}</div>
         ) : (
           <button type="button" onClick={() => setActivitiesOpen(o => !o)} aria-expanded={activitiesOpen}
@@ -476,16 +489,73 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
             <span style={{ fontSize: 11, color: '#718096' }}>{activitiesOpen ? '▼' : '▶'}</span>{summary}
           </button>
         )}
-        {activitiesOpen && lines.map(l => (
-          <div key={l.key} style={{ display: 'flex', gap: 6, fontSize: 13 }}>
-            <span aria-hidden="true">{l.icon}</span>
-            <div>
-              <div>{l.title}</div>
-              {l.detail && <div style={{ fontSize: 12, color: '#718096' }}>{l.detail}</div>}
+        {activitiesOpen && groups.map(g => (
+          <div key={g.type}>
+            <div style={{ fontSize: 12, color: '#4a5568' }}>{g.label}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+              {g.chips.map(c => {
+                const id = `${g.type}:${c.key}`;
+                const st = CHIP_STYLE[c.state];
+                return (
+                  <button key={id} type="button" aria-pressed={courseOpen === id} title={c.title ?? c.label}
+                    onClick={() => setCourseOpen(o => (o === id ? null : id))}
+                    style={{ fontSize: 12, padding: '2px 8px', borderRadius: 10, cursor: 'pointer', background: st.background, color: st.color,
+                      border: `1px solid ${courseOpen === id ? '#2b6cb0' : st.border}` }}>
+                    {c.label}{st.mark}{c.facilitated && ' 🎓'}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ))}
+        {activitiesOpen && open && (
+          <div style={{ fontSize: 12, color: '#4a5568' }}>
+            <div style={{ fontWeight: 600 }}>{open.title ?? open.label}</div>
+            {open.lines.map((l, k) => <div key={k}>{l}</div>)}
+          </div>
+        )}
+        {activitiesOpen && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, fontSize: 11, color: '#718096' }}>
+            <span>◐ in it now · grey: ended · 🎓 facilitated</span>
+            <button type="button" onClick={() => setFullListFor(personId)}
+              style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: '#2b6cb0', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              Full list
+            </button>
+          </div>
+        )}
       </div>
+    );
+  };
+
+  // Every activity, one line each, in a dialog over the page (portal: cards clip with overflow hidden).
+  const fullListDialog = () => {
+    const row = fullListFor ? rows?.find(r => r.id === fullListFor) : undefined;
+    if (!row) return null;
+    const lines = activityLines(row.participation);
+    return createPortal(
+      <div onClick={() => setFullListFor(null)}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+        <div role="dialog" aria-modal="true" aria-label={`${row.name}: activities`} onClick={ev => ev.stopPropagation()}
+          style={{ background: 'white', borderRadius: 8, width: '100%', maxWidth: 480, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{row.name}: activities</div>
+            <button type="button" onClick={() => setFullListFor(null)}
+              style={{ background: 'none', border: 'none', fontSize: 13, color: '#2b6cb0', cursor: 'pointer' }}>Close</button>
+          </div>
+          <div style={{ overflowY: 'auto', padding: '8px 14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {lines.map(l => (
+              <div key={l.key} style={{ display: 'flex', gap: 6, fontSize: 13 }}>
+                <span aria-hidden="true">{l.icon}</span>
+                <div>
+                  <div>{l.title}</div>
+                  {l.detail && <div style={{ fontSize: 12, color: '#718096' }}>{l.detail}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>,
+      document.body,
     );
   };
 
@@ -627,6 +697,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
           {peopleCountLabel(shown.length, rows.filter(r => r.hidden === (activeFilter === 'hidden')).length, activeFilter === 'hidden')}
         </div>
       )}
+      {fullListDialog()}
     </div>
   );
 }
