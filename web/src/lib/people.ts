@@ -298,6 +298,21 @@ export function detailLines(v: Extract<DetailsView, { inSrp: true }>): { lines: 
 // One line pair per entry in the Activities section. Current entries first, then the rest, each in the server's
 // newest-first order. title: "Facilitator · Junior youth group, Lloyd Farm"; detail: study item, its title and dates.
 export type ActivityLine = { key: string; icon: string; title: string; detail: string };
+// The one-line Activities summary shown before the list is opened (owner, 2026-11-23), counting entries:
+// "🎓 Facilitating 1 · 📖 Participating 2 · 5 past". Current facilitating and participating come first.
+export function activitySummary(participation: Participation[]): string {
+  if (participation.length === 0) return 'No activities in SRP';
+  const current = participation.filter(p => p.current);
+  const facilitating = current.filter(p => p.role === 'FACILITATOR').length;
+  const participating = current.length - facilitating;
+  const past = participation.length - current.length;
+  return [
+    facilitating ? `${FACILITATES.icon} Facilitating ${facilitating}` : null,
+    participating ? `${PARTICIPATES.icon} Participating ${participating}` : null,
+    past ? `${past} past` : null,
+  ].filter(Boolean).join(' · ');
+}
+
 export function activityLines(participation: Participation[]): ActivityLine[] {
   const ordered = [...participation.filter(p => p.current), ...participation.filter(p => !p.current)];
   return ordered.map((p, i) => {

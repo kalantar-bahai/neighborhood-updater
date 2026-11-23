@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PersonSrpDot } from './SrpBadge';
 import type { AgeCategory, PermissionSet, PersonDetails } from '@/lib/clusterNotebook';
 import {
-  AGE_FILTERS, AGE_LABELS, DEVOTIONAL_HOST, FACILITATES, KNOWN_ROLES, PARTICIPATES, activityLines, hideNote, hideRolesLine, peopleCountLabel, RESIDENT, canEditRole, detailLines, detailsView, filterPeople, isMoving, moveResultError,
+  AGE_FILTERS, AGE_LABELS, DEVOTIONAL_HOST, FACILITATES, KNOWN_ROLES, PARTICIPATES, activityLines, activitySummary, hideNote, hideRolesLine, peopleCountLabel, RESIDENT, canEditRole, detailLines, detailsView, filterPeople, isMoving, moveResultError,
   nextRoleIds, peopleFilters, placePath, roleLabel, rolesToClear, sortPeople, sortRoles, syncNote, type MoveTarget,
   type PersonRow,
 } from '@/lib/people';
@@ -142,6 +142,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
   const [details, setDetails] = useState<Details | null>(null);
   // The open "Hide…" confirm (its reason as typed), and a Hide/Unhide error, for the open person.
   const [hideConfirm, setHideConfirm] = useState<{ personId: string; reason: string } | null>(null);
+  const [activitiesOpen, setActivitiesOpen] = useState(false);
   const [hideError, setHideError] = useState('');
 
   useEffect(() => {
@@ -183,6 +184,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     setCardError('');
     setHideConfirm(null);
     setHideError('');
+    setActivitiesOpen(false);
     setAdding(false);
     // Read details on each open; a new person isn't one of this nucleus's people yet, so has none here.
     if (e.isNew) { setDetails(null); return; }
@@ -458,13 +460,23 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
   };
 
   // Activities come with the list, so they show at once.
+  // One summary line; a click opens the full list (owner, 2026-11-23). Starts closed for each person.
   const activitiesSection = (personId: string) => {
-    const lines = activityLines(rows?.find(r => r.id === personId)?.participation ?? []);
+    const participation = rows?.find(r => r.id === personId)?.participation ?? [];
+    const lines = activityLines(participation);
+    const summary = activitySummary(participation);
     return (
       <div style={{ padding: '6px 0 2px', display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: '#4a5568' }}>Activities</div>
-        {lines.length === 0 && <div style={{ fontSize: 13, color: '#718096' }}>No activities in SRP</div>}
-        {lines.map(l => (
+        {lines.length === 0 ? (
+          <div style={{ fontSize: 13, color: '#718096' }}>{summary}</div>
+        ) : (
+          <button type="button" onClick={() => setActivitiesOpen(o => !o)} aria-expanded={activitiesOpen}
+            style={{ display: 'flex', gap: 6, alignItems: 'center', background: 'none', border: 'none', padding: 0, fontSize: 13, color: '#2d3748', cursor: 'pointer', textAlign: 'left' }}>
+            <span style={{ fontSize: 11, color: '#718096' }}>{activitiesOpen ? '▼' : '▶'}</span>{summary}
+          </button>
+        )}
+        {activitiesOpen && lines.map(l => (
           <div key={l.key} style={{ display: 'flex', gap: 6, fontSize: 13 }}>
             <span aria-hidden="true">{l.icon}</span>
             <div>
