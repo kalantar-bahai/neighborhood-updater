@@ -465,11 +465,11 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
 
   // Activities come with the list, so they show at once. One summary line; a click opens the course chips
   // (layout A), and "Full list" under them opens every activity in a dialog (owner, 2026-11-23).
-  // Chips: one row per activity type; blue ◐ in it now, grey ended, white only facilitated; 🎓 facilitated.
-  // Tap a chip for its entries. No "completed it" until cluster-notebook exposes the person's own completion
-  // (see courseGroups).
+  // Chips: one row per activity type; blue ◐ in it now, green ✓ completed, grey ended without completing (or
+  // unknown), white only facilitated; 🎓 facilitated. Tap a chip for its entries (see courseGroups).
   const CHIP_STYLE: Record<ChipState, { background: string; color: string; border: string; mark: string }> = {
     current: { background: '#bee3f8', color: '#2a4365', border: '#90cdf4', mark: ' ◐' },
+    completed: { background: '#c6f6d5', color: '#22543d', border: '#9ae6b4', mark: ' ✓' },
     ended: { background: '#edf2f7', color: '#4a5568', border: '#e2e8f0', mark: '' },
     none: { background: 'white', color: '#4a5568', border: '#e2e8f0', mark: '' },
   };
@@ -516,7 +516,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
         )}
         {activitiesOpen && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, fontSize: 11, color: '#718096' }}>
-            <span>◐ in it now · grey: ended · 🎓 facilitated</span>
+            <span>◐ in it now · ✓ completed · grey: didn&apos;t complete · 🎓 facilitated</span>
             <button type="button" onClick={() => setFullListFor(personId)}
               style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: '#2b6cb0', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               Full list

@@ -785,7 +785,7 @@ describe('getNucleusPeople', () => {
       individual: { id: '7', firstName: 'Ana', familyName: 'Lopez', middleNames: null, nickname: null, place: { id: 'S1', name: 'Parkside', type: 'SETTING', locality: 'Chapelboro', cluster: 'Chapel Hill', localityId: 'L1', homeNucleus: 'Alpha' }, placeSync: { status: 'pending', code: null }, inSrp: false },
       roles: ['promoter'], isResident: true, ageCategory: null, devotionalHost: null,
       participates: true, facilitates: false, hidden: false, hide: null,
-      participation: [{ activityId: 'A1', activityType: 'sc', heldAt: 'Parkside', role: 'PARTICIPANT', studyItem: 'Book 1', studyItemTitle: 'Reflections on the Life of the Spirit', startDate: '2026-01-05', endDate: null, completed: false, current: true }],
+      participation: [{ activityId: 'A1', activityType: 'sc', heldAt: 'Parkside', role: 'PARTICIPANT', studyItem: 'Book 1', studyItemTitle: 'Reflections on the Life of the Spirit', startDate: '2026-01-05', endDate: null, completed: false, current: true, studyItemShortName: 'B1', personCompleted: null }],
     };
     mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { people: [person] } } }));
 
@@ -794,7 +794,7 @@ describe('getNucleusPeople', () => {
     expect(result).toEqual([person]);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables).toEqual({ name: 'Alpha' });
-    expect((body.query as string).replace(/\s+/g, ' ')).toContain('people(includeHidden: true) { individual { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } roles isResident ageCategory devotionalHost participates facilitates participation { activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current } hidden hide { hiddenAt reason hiddenBy { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } } }');
+    expect((body.query as string).replace(/\s+/g, ' ')).toContain('people(includeHidden: true) { individual { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } roles isResident ageCategory devotionalHost participates facilitates participation { activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current studyItemShortName personCompleted } hidden hide { hiddenAt reason hiddenBy { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } } }');
   });
 
   test('returns null when the nucleus is not found', async () => {

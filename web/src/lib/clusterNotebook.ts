@@ -594,6 +594,10 @@ export interface Participation {
   activityId: string; activityType: string; heldAt: string | null; role: ActivityRole;
   studyItem: string | null; studyItemTitle: string | null;
   startDate: string | null; endDate: string | null; completed: boolean; current: boolean;
+  // Confirmed with cluster-notebook 2026-11-23: studyItemShortName is SRP's short name ("B3 (G1)", "G1", "BC"),
+  // null only when there is no study item. personCompleted is whether this participant completed it, null for
+  // facilitators or when SRP records nothing. completed stays the item's (or activity's) own completion.
+  studyItemShortName: string | null; personCompleted: boolean | null;
 }
 // hide is null unless the person is hidden AND the caller can edit the nucleus.
 export interface PersonHide { hiddenAt: string; hiddenBy: PersonSummary | null; reason: string | null }
@@ -603,7 +607,7 @@ export interface NucleusPerson {
   participates: boolean; facilitates: boolean; participation: Participation[];
   hidden: boolean; hide: PersonHide | null;
 }
-const PARTICIPATION_SELECTION = 'activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current';
+const PARTICIPATION_SELECTION = 'activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current studyItemShortName personCompleted';
 const PLACE_SELECTION = 'id name type locality cluster localityId homeNucleus';
 const PERSON_SUMMARY_SELECTION = `${PERSON_NAME_SELECTION} inSrp place { ${PLACE_SELECTION} } placeSync { status code }`;
 

@@ -380,7 +380,7 @@ describe('namedToShow', () => {
 
 function act(over: Partial<Participation>): Participation {
   return { activityId: 'A1', activityType: 'jyg', heldAt: 'Lloyd Farm', role: 'PARTICIPANT', studyItem: null, studyItemTitle: null,
-    startDate: '2025-09-01', endDate: null, completed: false, current: true, ...over };
+    startDate: '2025-09-01', endDate: null, completed: false, current: true, studyItemShortName: null, personCompleted: null, ...over };
 }
 
 describe('activity filters', () => {
@@ -402,12 +402,18 @@ describe('activityLines', () => {
       { key: 'A1:FACILITATOR::0', icon: '🎓', title: 'Facilitator · Junior youth group, Lloyd Farm', detail: '2025-09-01 → now' },
     ]);
   });
-  test('a completed study item shows book, title and dates', () => {
+  test('a study item the person completed shows book, title and dates', () => {
     const [l] = activityLines([act({ activityType: 'sc', heldAt: 'Carrboro', studyItem: 'Book 3', studyItemTitle: 'Teaching Children\'s Classes, Grade 1',
-      startDate: '2024-01-10', endDate: '2024-06-02', completed: true, current: false })]);
+      startDate: '2024-01-10', endDate: '2024-06-02', completed: true, current: false, personCompleted: true })]);
     expect(l.icon).toBe('📖');
     expect(l.title).toBe('Participant · Study circle, Carrboro');
     expect(l.detail).toBe('Book 3 · Teaching Children\'s Classes, Grade 1 · 2024-01-10 → 2024-06-02 (completed)');
+  });
+  test('a participant\'s completion is their own; a facilitator\'s is the item\'s', () => {
+    const detail = (over: Partial<Participation>) => activityLines([act({ startDate: '2024-01-10', endDate: '2024-06-02', current: false, ...over })])[0].detail;
+    expect(detail({ completed: true, personCompleted: false })).toBe('2024-01-10 → 2024-06-02 (did not complete)');
+    expect(detail({ completed: true, personCompleted: null })).toBe('2024-01-10 → 2024-06-02');
+    expect(detail({ role: 'FACILITATOR', completed: true })).toBe('2024-01-10 → 2024-06-02 (completed)');
   });
   test('children\'s class label, unknown type code as given, missing place and dates', () => {
     expect(activityLines([act({ activityType: 'cc', heldAt: null })])[0].title).toBe('Participant · Children\'s class');
@@ -497,20 +503,35 @@ describe('courseGroups', () => {
   const sc = (over: Partial<Participation>) => act({ activityType: 'sc', heldAt: 'Carrboro', ...over });
   test('grouped study circles, children\'s classes, junior youth groups; chips in natural order', () => {
     const g = courseGroups([
-      act({ activityType: 'jyg', studyItem: 'Breezes of Confirmation' }),
-      sc({ studyItem: 'Book 10' }), sc({ studyItem: 'Book 2' }), sc({ studyItem: 'Book 3 (G1)' }),
-      act({ activityType: 'cc', studyItem: 'Grade 2' }), act({ activityType: 'cc', studyItem: 'Grade 1' }),
+      act({ activityType: 'jyg', studyItem: 'Breezes of Confirmation', studyItemShortName: 'BC' }),
+      sc({ studyItem: 'Book 10', studyItemShortName: 'B10' }), sc({ studyItem: 'Book 2', studyItemShortName: 'B2' }),
+      sc({ studyItem: 'Book 3 (G1)', studyItemShortName: 'B3 (G1)' }),
+      act({ activityType: 'cc', studyItem: 'Grade 2', studyItemShortName: 'G2' }), act({ activityType: 'cc', studyItem: 'Grade 1', studyItemShortName: 'G1' }),
     ]);
     expect(g.map(x => x.label)).toEqual(['Study circles', "Children's classes", 'Junior youth groups']);
     expect(g[0].chips.map(c => c.label)).toEqual(['2', '3 (G1)', '10']);
     expect(g[1].chips.map(c => c.label)).toEqual(['G1', 'G2']);
   });
+  test('labels use SRP\'s short name, without the B on books', () => {
+    const g = courseGroups([
+      sc({ studyItem: 'Book 3 (G1)', studyItemShortName: 'B3 (G1)' }), sc({ studyItem: 'Book 10', studyItemShortName: 'B10' }),
+      act({ activityType: 'cc', studyItem: 'Grade 1', studyItemShortName: 'G1' }),
+      act({ activityType: 'jyg', studyItem: 'Breezes of Confirmation', studyItemShortName: 'BC' }),
+    ]);
+    expect(g.map(x => x.chips.map(c => [c.label, c.title]))).toEqual([
+      [['3 (G1)', 'Book 3 (G1)'], ['10', 'Book 10']], [['G1', 'Grade 1']], [['BC', 'Breezes of Confirmation']],
+    ]);
+  });
   test('an activity with no study item is one chip named for where it is held', () => {
     const [g] = courseGroups([act({ activityType: 'jyg', studyItem: null, activityId: 'J1', heldAt: 'Lloyd Farm' })]);
     expect(g.chips.map(c => [c.label, c.title])).toEqual([['Lloyd Farm', null]]);
   });
-  test('states: current, ended, none (facilitated only); the item\'s completed flag is not the person\'s', () => {
+  test('states: current, completed, ended, none (facilitated only); the item\'s completed flag is not the person\'s', () => {
     const state = (ps: Participation[]) => courseGroups(ps)[0].chips[0].state;
+    expect(state([sc({ studyItem: 'Book 1', current: false, personCompleted: true })])).toBe('completed');
+    expect(state([sc({ studyItem: 'Book 1', current: false, personCompleted: false }), sc({ studyItem: 'Book 1', current: false, personCompleted: true })])).toBe('completed');
+    expect(state([sc({ studyItem: 'Book 1', current: false, personCompleted: false })])).toBe('ended');
+    expect(state([sc({ studyItem: 'Book 1', current: false, personCompleted: true }), sc({ studyItem: 'Book 1' })])).toBe('current');
     expect(state([sc({ studyItem: 'Book 1', current: false, completed: true }), sc({ studyItem: 'Book 1' })])).toBe('current');
     expect(state([sc({ studyItem: 'Book 1', current: false, completed: true })])).toBe('ended');
     expect(state([sc({ studyItem: 'Book 1', current: false })])).toBe('ended');
@@ -519,7 +540,7 @@ describe('courseGroups', () => {
   });
   test('title and lines for the tap-open detail', () => {
     const [c] = courseGroups([
-      sc({ studyItem: 'Book 3 (G1)', studyItemTitle: "Teaching Children's Classes, Grade 1", startDate: '2024-01-10', endDate: '2024-06-02', completed: true, current: false }),
+      sc({ studyItem: 'Book 3 (G1)', studyItemTitle: "Teaching Children's Classes, Grade 1", startDate: '2024-01-10', endDate: '2024-06-02', completed: true, current: false, personCompleted: true }),
       sc({ studyItem: 'Book 3 (G1)', role: 'FACILITATOR', startDate: '2025-09-01' }),
     ])[0].chips;
     expect(c.title).toBe("Teaching Children's Classes, Grade 1");
