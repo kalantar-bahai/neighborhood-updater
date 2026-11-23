@@ -343,9 +343,9 @@ describe('getRowData', () => {
       return [];
     });
     mockGetNucleusPeopleFlags.mockResolvedValue([
-      { devotionalHost: 'HOST', participates: true, facilitates: false },
-      { devotionalHost: 'CO_HOST', participates: true, facilitates: true },
-      { devotionalHost: null, participates: false, facilitates: false },
+      { devotionalHost: 'HOST', participates: true, facilitates: false, isResident: true },
+      { devotionalHost: 'CO_HOST', participates: true, facilitates: true, isResident: false },
+      { devotionalHost: null, participates: false, facilitates: false, isResident: true },
     ]);
 
     const result = await getRowData('Alpha');
@@ -361,7 +361,7 @@ describe('getRowData', () => {
     expect(result?.contactNames).toEqual([{ id: '4', name: 'Dave', email: 'dave@x.com' }]);
     expect(result?.promoterNames).toEqual([{ id: '5', name: 'Erin', email: null }]);
     expect(mockGetNucleusPeopleFlags).toHaveBeenCalledWith('Alpha');
-    expect(result?.peopleCounts).toEqual({ devotionalHosts: 2, participating: 2, facilitating: 1 });
+    expect(result?.peopleCounts).toEqual({ devotionalHosts: 2, participating: 2, facilitating: 1, residents: 2 });
   });
 
   test('passes through lastUpdated from cluster-notebook', async () => {

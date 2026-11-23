@@ -626,13 +626,13 @@ export async function searchIndividuals(nucleusName: string, search?: string, li
 
 // Just the flags the Overview counts, for the same people as getNucleusPeople (no names, no activity lists).
 // null when the nucleus isn't found.
-export async function getNucleusPeopleFlags(nucleusName: string): Promise<Pick<NucleusPerson, 'devotionalHost' | 'participates' | 'facilitates'>[] | null> {
+export async function getNucleusPeopleFlags(nucleusName: string): Promise<Pick<NucleusPerson, 'devotionalHost' | 'participates' | 'facilitates' | 'isResident'>[] | null> {
   const query = `
     query NucleusPeopleFlags($name: String!) {
-      nucleus(name: $name) { people { devotionalHost participates facilitates } }
+      nucleus(name: $name) { people { devotionalHost participates facilitates isResident } }
     }
   `;
-  const data = await request<{ nucleus: { people: Pick<NucleusPerson, 'devotionalHost' | 'participates' | 'facilitates'>[] } | null }>(query, { name: nucleusName });
+  const data = await request<{ nucleus: { people: Pick<NucleusPerson, 'devotionalHost' | 'participates' | 'facilitates' | 'isResident'>[] } | null }>(query, { name: nucleusName });
   return data.nucleus?.people ?? null;
 }
 

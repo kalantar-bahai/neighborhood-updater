@@ -766,12 +766,12 @@ describe('createIndividual', () => {
 
 describe('getNucleusPeopleFlags', () => {
   test('selects only the three flags and returns them', async () => {
-    const people = [{ devotionalHost: 'HOST', participates: true, facilitates: false }];
+    const people = [{ devotionalHost: 'HOST', participates: true, facilitates: false, isResident: true }];
     mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { people } } }));
     expect(await getNucleusPeopleFlags('Alpha')).toEqual(people);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables).toEqual({ name: 'Alpha' });
-    expect((body.query as string).replace(/\s+/g, ' ')).toContain('nucleus(name: $name) { people { devotionalHost participates facilitates } }');
+    expect((body.query as string).replace(/\s+/g, ' ')).toContain('nucleus(name: $name) { people { devotionalHost participates facilitates isResident } }');
   });
   test('null when the nucleus is not found', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: null } }));

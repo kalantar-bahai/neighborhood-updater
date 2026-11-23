@@ -427,11 +427,11 @@ describe('activityLines', () => {
 describe('countPeople', () => {
   test('hosts and co-hosts, participants, facilitators', () => {
     expect(countPeople([
-      { devotionalHost: 'HOST', participates: true, facilitates: false },
-      { devotionalHost: 'CO_HOST', participates: false, facilitates: true },
-      { devotionalHost: null, participates: true, facilitates: true },
-    ])).toEqual({ devotionalHosts: 2, participating: 2, facilitating: 2 });
-    expect(countPeople([])).toEqual({ devotionalHosts: 0, participating: 0, facilitating: 0 });
+      { devotionalHost: 'HOST', participates: true, facilitates: false, isResident: true },
+      { devotionalHost: 'CO_HOST', participates: false, facilitates: true, isResident: false },
+      { devotionalHost: null, participates: true, facilitates: true, isResident: true },
+    ])).toEqual({ devotionalHosts: 2, participating: 2, facilitating: 2, residents: 2 });
+    expect(countPeople([])).toEqual({ devotionalHosts: 0, participating: 0, facilitating: 0, residents: 0 });
   });
 });
 

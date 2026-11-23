@@ -607,6 +607,8 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const [promoterNames, setPromoterNames] = useState<Worker[]>(() => detail.promoterNames);
   // People SRP shows hosting devotionals, taking part in and facilitating activities: the "(x)" on those estimates.
   const counts = detail.peopleCounts;
+  // Residents only mean something on a home nucleus (only there can anyone be placed at its Setting).
+  const residentsNamed = detail.srp.isHome ? counts.residents : undefined;
   const [showPromotersModal, setShowPromotersModal] = useState(false);
   // Which cards are open lives in AppClient, so an in-place reload (Refresh, Push, Location
   // save), which remounts this view, keeps the cards the user had open.
@@ -829,7 +831,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // unrelated to, and still independent of, the number displayed.
   const diagramData = [
     { label: 'Residing',      value: form.totalPop },
-    { label: 'Connected',     value: form.inConversation },
+    { label: 'Connected',     value: form.inConversation, named: residentsNamed },
     { label: 'Participating', value: form.inCommunityActivities },
     { label: 'Helping Others', value: form.helpingOthers, named: protagonistNames.length, onClick: () => setShowProtagonistsModal(true) },
     { label: 'Accompanying',  value: form.accompanying, named: accompanierNames.length, onClick: () => setShowAccompaniersModal(true) },
@@ -837,7 +839,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
 
   const alignedResiding = { label: 'Residing', value: form.totalPop };
   const alignedRings: AlignedRingContent[] = [
-    { single: { label: 'In conversation', value: form.inConversation } },
+    { single: { label: 'In conversation', value: form.inConversation, named: residentsNamed } },
     {
       right: { label: 'In core activity', value: form.inEducationalActivities, named: counts.participating },
       left:  { label: 'Participating',    value: form.inCommunityActivities },
@@ -863,7 +865,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     { label: 'Hosting Devotional Meetings/Gatherings',  value: form.devotionalHosts, named: counts.devotionalHosts },
     { label: 'Protagonists/Promoting',                  value: form.protagonists, named: promoterNames.length, onClick: () => setShowPromotersModal(true) },
     { label: 'Participating',                           value: form.inCommunityActivities },
-    { label: 'In Conversation',                         value: form.inConversation },
+    { label: 'In Conversation',                         value: form.inConversation, named: residentsNamed },
     { label: 'Population/Residing',                     value: form.totalPop },
   ];
 
@@ -1165,7 +1167,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
               <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} onBlur={() => commitField('totalPop', 'Total Population', true)} readonly={!canWrite} integer />
               <Field
                 label="In Conversation"
-                value={form.inConversation} onChange={v => set('inConversation', v)} onBlur={() => commitField('inConversation', 'In Conversation', true)} readonly={!canWrite} integer
+                value={form.inConversation} onChange={v => set('inConversation', v)} onBlur={() => commitField('inConversation', 'In Conversation', true)} readonly={!canWrite} integer named={residentsNamed}
                 info="Estimated number of individuals with whom there is some contact or conversation in the neighborhood, but who do not yet participate regularly in activities or collective spaces."
               />
               <Field
