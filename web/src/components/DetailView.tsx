@@ -1216,6 +1216,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                     <input
                       id="estimate-edit" type="text" inputMode="numeric" autoFocus value={estimateEdit.value}
                       onChange={e => setEstimateEdit({ ...estimateEdit, value: e.target.value, error: '' })}
+                      style={{ border: '1px solid #cbd5e0', borderRadius: 6, background: 'white', padding: '6px 8px', fontSize: 16, color: '#2d3748' }}
                     />
                     {estimateEdit.error && <div style={{ fontSize: 12, color: '#c53030' }}>{estimateEdit.error}</div>}
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
