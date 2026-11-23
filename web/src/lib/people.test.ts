@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, activityLines, countPeople, AGE_FILTERS, peopleCountLabel, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
+import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, activityLines, countPeople, AGE_FILTERS, peopleCountLabel, hideNote, hideRolesLine, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
 import type { Participation, AgeCategory, DevotionalHostRole, MoveContext, PermissionSet, PersonDetails, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -7,7 +7,7 @@ const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
   assignableRoles: [], createableEntityTypes: [], ...over,
 });
 
-const row = (name: string, roles: string[], isResident = false): PersonRow => ({ id: name, name, familyFirst: name, roles, isResident, place: null, placeSync: null, inSrp: true, ageCategory: null, devotionalHost: null, participates: false, facilitates: false, participation: [] });
+const row = (name: string, roles: string[], isResident = false): PersonRow => ({ id: name, name, familyFirst: name, roles, isResident, place: null, placeSync: null, inSrp: true, ageCategory: null, devotionalHost: null, participates: false, facilitates: false, participation: [], hidden: false, hide: null });
 
 describe('placePath', () => {
   test('a Setting shows cluster, locality and setting', () => {
@@ -55,13 +55,13 @@ describe('canEditRole', () => {
 describe('peopleFilters', () => {
   const rows = [row('Ana', ['contact']), row('Ben', ['promoter', 'cso']), row('Cy', [], true)];
   test('home nucleus: the Overview card\'s order, then contact, unknown roles last', () => {
-    expect(peopleFilters(rows, true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'cso']);
+    expect(peopleFilters(rows, true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'cso', 'hidden']);
   });
   test('non-home nucleus has no resident filter', () => {
-    expect(peopleFilters(rows, false).map(f => f.key)).toEqual(['all', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'cso']);
+    expect(peopleFilters(rows, false).map(f => f.key)).toEqual(['all', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'cso', 'hidden']);
   });
   test('every known role shows even when nobody holds it', () => {
-    expect(peopleFilters([], true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact']);
+    expect(peopleFilters([], true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'hidden']);
   });
   test('labels', () => {
     expect(peopleFilters(rows, true).slice(0, 3).map(f => f.label)).toEqual(['All', 'Resident', 'Promoting']);
@@ -224,7 +224,7 @@ describe('toPersonRow', () => {
       individual: { id: '7', firstName: 'Ana', middleNames: null, familyName: 'Lopez', nickname: 'Annie', place: null, placeSync: null, inSrp: true },
       roles: ['promoter'], isResident: true, ageCategory: null, devotionalHost: null, ...noActivity, ...noHide,
     });
-    expect(r).toEqual({ id: '7', name: 'Ana Lopez (Annie)', familyFirst: 'Lopez, Ana (Annie)', roles: ['promoter'], isResident: true, place: null, placeSync: null, inSrp: true, ageCategory: null, devotionalHost: null, ...noActivity });
+    expect(r).toEqual({ id: '7', name: 'Ana Lopez (Annie)', familyFirst: 'Lopez, Ana (Annie)', roles: ['promoter'], isResident: true, place: null, placeSync: null, inSrp: true, ageCategory: null, devotionalHost: null, ...noActivity, ...noHide });
   });
   test('age category and devotional host pass through', () => {
     const ind = { id: '5', firstName: 'Cy', middleNames: null, familyName: null, nickname: null, place: null, placeSync: null, inSrp: true };
@@ -442,5 +442,37 @@ describe('peopleCountLabel', () => {
     expect(peopleCountLabel(0, 85)).toBe('0 of 85 people');
     expect(peopleCountLabel(1, 1)).toBe('1 person');
     expect(peopleCountLabel(0, 1)).toBe('0 of 1 person');
+  });
+});
+
+describe('hidden people', () => {
+  const hid = (name: string, age: AgeCategory | null = null): PersonRow => ({ ...row(name, []), ageCategory: age, hidden: true, hide: { hiddenAt: '2026-11-23T10:00:00Z', hiddenBy: null, reason: null } });
+  const rows = [row('Ana Lopez', []), hid('Ben Okafor', 'ADULT'), hid('Cy Adams', 'YOUTH')];
+  test('Hidden is the last filter, always listed', () => {
+    expect(peopleFilters([], false).at(-1)).toEqual({ key: 'hidden', label: 'Hidden' });
+    expect(peopleFilters(rows, true).at(-1)).toEqual({ key: 'hidden', label: 'Hidden' });
+  });
+  test('every other filter drops hidden people', () => {
+    expect(filterPeople(rows, 'all', '').map(r => r.name)).toEqual(['Ana Lopez']);
+  });
+  test('hidden keeps only hidden, with age and search', () => {
+    expect(filterPeople(rows, 'hidden', '').map(r => r.name)).toEqual(['Ben Okafor', 'Cy Adams']);
+    expect(filterPeople(rows, 'hidden', '', 'YOUTH').map(r => r.name)).toEqual(['Cy Adams']);
+    expect(filterPeople(rows, 'hidden', 'ben').map(r => r.name)).toEqual(['Ben Okafor']);
+  });
+  test('peopleCountLabel for hidden', () => {
+    expect(peopleCountLabel(3, 3, true)).toBe('3 hidden');
+    expect(peopleCountLabel(1, 3, true)).toBe('1 of 3 hidden');
+  });
+  test('hideNote', () => {
+    const by = { firstName: 'Ben', middleNames: null, familyName: 'Okafor', nickname: null, place: null, placeSync: null, inSrp: true } as never;
+    expect(hideNote({ hiddenAt: '2026-11-23T10:00:00Z', hiddenBy: by, reason: 'moved away' })).toBe('Hidden by Ben Okafor on 2026-11-23: moved away');
+    expect(hideNote({ hiddenAt: '2026-11-23T10:00:00Z', hiddenBy: by, reason: null })).toBe('Hidden by Ben Okafor on 2026-11-23');
+    expect(hideNote({ hiddenAt: '2026-11-23T10:00:00Z', hiddenBy: null, reason: null })).toBe('Hidden on 2026-11-23');
+  });
+  test('hideRolesLine', () => {
+    expect(hideRolesLine('Ana Lopez', ['promoter'])).toBe('Ana Lopez is Promoting 📣 here; hiding keeps the role.');
+    expect(hideRolesLine('Ana Lopez', ['contact', 'promoter'])).toBe('Ana Lopez is Promoting 📣, Contact ★ here; hiding keeps the roles.');
+    expect(hideRolesLine('Ana Lopez', [])).toBeNull();
   });
 });
