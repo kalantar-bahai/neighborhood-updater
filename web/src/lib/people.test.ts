@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, activityLines, countPeople, AGE_FILTERS, peopleCountLabel, hideNote, hideRolesLine, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
+import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, activityLines, activitySummary, countPeople, AGE_FILTERS, peopleCountLabel, hideNote, hideRolesLine, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
 import type { Participation, AgeCategory, DevotionalHostRole, MoveContext, PermissionSet, PersonDetails, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -474,5 +474,21 @@ describe('hidden people', () => {
     expect(hideRolesLine('Ana Lopez', ['promoter'])).toBe('Ana Lopez is Promoting 📣 here; hiding keeps the role.');
     expect(hideRolesLine('Ana Lopez', ['contact', 'promoter'])).toBe('Ana Lopez is Promoting 📣, Contact ★ here; hiding keeps the roles.');
     expect(hideRolesLine('Ana Lopez', [])).toBeNull();
+  });
+});
+
+describe('activitySummary', () => {
+  test('current facilitating and participating, then past', () => {
+    expect(activitySummary([
+      act({ role: 'FACILITATOR' }), act({}), act({}),
+      act({ current: false }), act({ role: 'FACILITATOR', current: false }),
+    ])).toBe('🎓 Facilitating 1 · 📖 Participating 2 · 2 past');
+  });
+  test('only the parts that are there', () => {
+    expect(activitySummary([act({ current: false })])).toBe('1 past');
+    expect(activitySummary([act({ role: 'FACILITATOR' })])).toBe('🎓 Facilitating 1');
+  });
+  test('none', () => {
+    expect(activitySummary([])).toBe('No activities in SRP');
   });
 });
