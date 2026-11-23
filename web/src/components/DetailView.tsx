@@ -618,13 +618,14 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     return [open, setOpen] as const;
   };
   const [identityOpen, setIdentityOpen] = card('identity', false);
-  const [diagramCardOpen, setDiagramCardOpen] = card('diagram', false);
+  // Open by default, right after Identity; the Overview moved after Narrative, closed (owner, 2026-11-23).
+  const [diagramCardOpen, setDiagramCardOpen] = card('diagram', true);
   const [accessOpen, setAccessOpen] = card('access', false);
   const [dangerOpen, setDangerOpen] = card('danger', false);
   // Open by default (2026-10-08) -- these five were previously always shown with
   // no way to collapse them at all; now they're collapsible like every other card,
   // just starting open instead of closed.
-  const [overviewOpen, setOverviewOpen] = card('overview', true);
+  const [overviewOpen, setOverviewOpen] = card('overview', false);
   const [peopleOpen, setPeopleOpen] = card('people', false);
   const [familiesOpen, setFamiliesOpen] = card('families', true);
   const [activitiesOpen, setActivitiesOpen] = card('activities', true);
@@ -1140,88 +1141,49 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           </div>}
         </div>
 
-        {/* Overview (formerly "Workers & Prevalence"). Restructured 2026-10-07: all
-            nine fields are now independently editable, hand-entered estimates
-            synced both ways with SRP -- confirmed with cluster-notebook directly.
-            Previously Participating/In Educational Activity/Facilitating Educational
-            Activity were computed from the Activities card's totals, and Promoting/
-            Helping Others/Accompanying were read off our own role-assignment lists
-            (promoter/protagonist/accompanier workers) -- both approaches are gone
-            now, deliberately: SRP itself only stores numbers, never names, so a
-            count derived from our own lists could never round-trip with it. The role
-            lists themselves are untouched and still reachable via each field's
-            clickable label (for naming specific individuals) -- that's now fully
-            decoupled from the number shown, which the user enters directly instead.
-            Total Population moved here from the Population card below, as the first
-            of the nine (it was already a NucleusPatch field, just newly SRP-synced). */}
+        {/* Concentric Circles -- one card showing any of the three diagram types,
+            switched via the small buttons below (moved here from the page header,
+            2026-10-08, where each used to open its own full-screen modal instead). */}
         <div className="card">
           <div
             className="card-header"
-            onClick={() => setOverviewOpen(o => !o)}
+            onClick={() => setDiagramCardOpen(o => !o)}
             style={{ cursor: 'pointer', userSelect: 'none' }}
           >
-            <span><span style={{ fontSize: 11, marginRight: 6 }}>{overviewOpen ? '▼' : '▶'}</span>Overview</span>
+            <span><span style={{ fontSize: 11, marginRight: 6 }}>{diagramCardOpen ? '▼' : '▶'}</span>Concentric Circles</span>
           </div>
-          {overviewOpen && <div className="card-body">
-            <div className="field-grid-3">
-              <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} onBlur={() => commitField('totalPop', 'Total Population', true)} readonly={!canWrite} integer />
-              <Field
-                label="In Conversation"
-                value={form.inConversation} onChange={v => set('inConversation', v)} onBlur={() => commitField('inConversation', 'In Conversation', true)} readonly={!canWrite} integer named={residentsNamed}
-                info="Estimated number of individuals with whom there is some contact or conversation in the neighborhood, but who do not yet participate regularly in activities or collective spaces."
-              />
-              <Field
-                label="Participating"
-                value={form.inCommunityActivities} onChange={v => set('inCommunityActivities', v)} onBlur={() => commitField('inCommunityActivities', 'Participating', true)} readonly={!canWrite} integer
-                info="Estimated number of individuals who participate with some regularity in collective spaces in the neighborhood, such as devotional meetings, family groups, neighborhood gatherings, festivals, community gatherings, Bahá’í holy days, or neighborhood Feasts, and home visits."
-              />
+          {diagramCardOpen && (
+            <div className="card-body">
+              <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                {([
+                  ['simple', IcoDiagram, 'Concentric Circles'],
+                  ['aligned', IcoDiagram2, 'Concentric Circles (Aligned)'],
+                  ['staggered', IcoDiagram3, 'Concentric Circles (Staggered)'],
+                ] as const).map(([type, Icon, title]) => {
+                  const active = diagramType === type;
+                  return (
+                    <button
+                      key={type}
+                      onClick={e => { e.stopPropagation(); setDiagramType(type); }}
+                      title={title} aria-label={title}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        color: active ? '#2b6cb0' : '#a0aec0',
+                        background: active ? '#ebf8ff' : 'none',
+                        border: `1px solid ${active ? '#90cdf4' : '#e2e8f0'}`,
+                        borderRadius: 6, padding: '5px 7px', cursor: 'pointer',
+                      }}
+                    >
+                      <Icon />
+                    </button>
+                  );
+                })}
+              </div>
+              {diagramType === 'simple' && <ConcentricDiagram data={diagramData} />}
+              {diagramType === 'aligned' && <AlignedConcentricDiagram rings={alignedRings} residing={alignedResiding} />}
+              {diagramType === 'staggered' && <StaggeredConcentricDiagram labels={staggeredLabels} />}
             </div>
-            <div className="field-grid-3">
-              {/* Promoting/Helping Others/Accompanying still open their role list on
-                  a label click (naming specific individuals), entirely independent
-                  of the number itself now -- see this card's own comment above. */}
-              <Field
-                label="Promoting"
-                value={form.protagonists} onChange={v => set('protagonists', v)} onBlur={() => commitField('protagonists', 'Promoting', true)} readonly={!canWrite} integer named={promoterNames.length}
-                onLabelClick={permissions.canAssignRoles ? () => setShowPromotersModal(true) : undefined}
-                info="Estimated number of individuals promoting various aspects of community life such as parents encouraging participation, junior youth bringing friends, or youth inviting peers. It also includes promoting collective spaces such as festivals, Summer of Service, family gatherings, and various logistical assistance such as providing food, giving rides, serving others, etc."
-              />
-              <Field
-                label="Hosting Devotional Gatherings"
-                value={form.devotionalHosts} onChange={v => set('devotionalHosts', v)} onBlur={() => commitField('devotionalHosts', 'Hosting Devotional Gatherings', true)} readonly={!canWrite} integer named={counts.devotionalHosts}
-                info="Estimated number of individuals who are sharing prayers with others, with family members, and inviting others to attend devotional meetings or gatherings. Examples include where prayers are shared in home visits, community gatherings, festivals, and educational activities."
-              />
-              <Field
-                label="In Educational Activity"
-                value={form.inEducationalActivities} onChange={v => set('inEducationalActivities', v)} onBlur={() => commitField('inEducationalActivities', 'In Educational Activity', true)} readonly={!canWrite} integer named={counts.participating}
-                info="Estimated number of children, junior youth, youth, and adults participating in educational activities in various modalities and forms: children’s classes, junior youth groups, and study circles."
-              />
-            </div>
-            <div className="field-grid-3">
-              <Field
-                label="Facilitating Educational Activity"
-                value={form.educationalFacilitators} onChange={v => set('educationalFacilitators', v)} onBlur={() => commitField('educationalFacilitators', 'Facilitating Educational Activity', true)} readonly={!canWrite} integer named={counts.facilitating}
-                info="Estimated number of individuals who facilitate or share the content of the institute’s educational programs, in various forms, approaches, methods, and modalities, to all ages in the neighborhood."
-              />
-              <Field
-                label="Helping Others"
-                value={form.helpingOthers} onChange={v => set('helpingOthers', v)} onBlur={() => commitField('helpingOthers', 'Helping Others', true)} readonly={!canWrite} integer named={protagonistNames.length}
-                onLabelClick={permissions.canAssignRoles ? () => setShowProtagonistsModal(true) : undefined}
-                info="Estimated number of individuals who assist others in taking initial steps in serving others. For example, one may walk with another to do home visits, to share a prayer, to learn a quotation, to introduce the institute’s programs, or other acts of service."
-              />
-              <Field
-                label="Accompanying"
-                value={form.accompanying} onChange={v => set('accompanying', v)} onBlur={() => commitField('accompanying', 'Accompanying', true)} readonly={!canWrite} integer named={accompanierNames.length}
-                onLabelClick={permissions.canAssignRoles && permissions.assignableRoles.includes('accompanier') ? () => setShowAccompaniersModal(true) : undefined}
-                info="Estimated number of individuals who have gained a measure of experience from the institute’s courses alongside acts of service, whose actions are motivated by a desire to see capacity develop in others and to foster friendships founded on cooperation and reciprocity."
-              />
-            </div>
-            {/* Moved here from the Families card, 2026-10-08. */}
-            <div className="field">
-              <label>Makeup of Population</label>
-              <textarea value={form.makeup || ''} onChange={e => set('makeup', e.target.value)} onBlur={() => commitField('makeup', 'Makeup of Population')} readOnly={!canWrite} />
-            </div>
-          </div>}
+          )}
         </div>
 
         {/* People (2026-11-18): everyone connected to this nucleus -- role holders here, plus
@@ -1266,51 +1228,6 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
               />
             </div>
           </div>}
-        </div>
-
-        {/* Concentric Circles -- one card showing any of the three diagram types,
-            switched via the small buttons below (moved here from the page header,
-            2026-10-08, where each used to open its own full-screen modal instead). */}
-        <div className="card">
-          <div
-            className="card-header"
-            onClick={() => setDiagramCardOpen(o => !o)}
-            style={{ cursor: 'pointer', userSelect: 'none' }}
-          >
-            <span><span style={{ fontSize: 11, marginRight: 6 }}>{diagramCardOpen ? '▼' : '▶'}</span>Concentric Circles</span>
-          </div>
-          {diagramCardOpen && (
-            <div className="card-body">
-              <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-                {([
-                  ['simple', IcoDiagram, 'Concentric Circles'],
-                  ['aligned', IcoDiagram2, 'Concentric Circles (Aligned)'],
-                  ['staggered', IcoDiagram3, 'Concentric Circles (Staggered)'],
-                ] as const).map(([type, Icon, title]) => {
-                  const active = diagramType === type;
-                  return (
-                    <button
-                      key={type}
-                      onClick={e => { e.stopPropagation(); setDiagramType(type); }}
-                      title={title} aria-label={title}
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        color: active ? '#2b6cb0' : '#a0aec0',
-                        background: active ? '#ebf8ff' : 'none',
-                        border: `1px solid ${active ? '#90cdf4' : '#e2e8f0'}`,
-                        borderRadius: 6, padding: '5px 7px', cursor: 'pointer',
-                      }}
-                    >
-                      <Icon />
-                    </button>
-                  );
-                })}
-              </div>
-              {diagramType === 'simple' && <ConcentricDiagram data={diagramData} />}
-              {diagramType === 'aligned' && <AlignedConcentricDiagram rings={alignedRings} residing={alignedResiding} />}
-              {diagramType === 'staggered' && <StaggeredConcentricDiagram labels={staggeredLabels} />}
-            </div>
-          )}
         </div>
 
         {/* Activities */}
@@ -1392,6 +1309,90 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 readOnly={!canWrite}
                 rows={6}
               />
+            </div>
+          </div>}
+        </div>
+
+        {/* Overview (formerly "Workers & Prevalence"). Restructured 2026-10-07: all
+            nine fields are now independently editable, hand-entered estimates
+            synced both ways with SRP -- confirmed with cluster-notebook directly.
+            Previously Participating/In Educational Activity/Facilitating Educational
+            Activity were computed from the Activities card's totals, and Promoting/
+            Helping Others/Accompanying were read off our own role-assignment lists
+            (promoter/protagonist/accompanier workers) -- both approaches are gone
+            now, deliberately: SRP itself only stores numbers, never names, so a
+            count derived from our own lists could never round-trip with it. The role
+            lists themselves are untouched and still reachable via each field's
+            clickable label (for naming specific individuals) -- that's now fully
+            decoupled from the number shown, which the user enters directly instead.
+            Total Population moved here from the Population card below, as the first
+            of the nine (it was already a NucleusPatch field, just newly SRP-synced). */}
+        <div className="card">
+          <div
+            className="card-header"
+            onClick={() => setOverviewOpen(o => !o)}
+            style={{ cursor: 'pointer', userSelect: 'none' }}
+          >
+            <span><span style={{ fontSize: 11, marginRight: 6 }}>{overviewOpen ? '▼' : '▶'}</span>Overview</span>
+          </div>
+          {overviewOpen && <div className="card-body">
+            <div className="field-grid-3">
+              <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} onBlur={() => commitField('totalPop', 'Total Population', true)} readonly={!canWrite} integer />
+              <Field
+                label="In Conversation"
+                value={form.inConversation} onChange={v => set('inConversation', v)} onBlur={() => commitField('inConversation', 'In Conversation', true)} readonly={!canWrite} integer named={residentsNamed}
+                info="Estimated number of individuals with whom there is some contact or conversation in the neighborhood, but who do not yet participate regularly in activities or collective spaces."
+              />
+              <Field
+                label="Participating"
+                value={form.inCommunityActivities} onChange={v => set('inCommunityActivities', v)} onBlur={() => commitField('inCommunityActivities', 'Participating', true)} readonly={!canWrite} integer
+                info="Estimated number of individuals who participate with some regularity in collective spaces in the neighborhood, such as devotional meetings, family groups, neighborhood gatherings, festivals, community gatherings, Bahá’í holy days, or neighborhood Feasts, and home visits."
+              />
+            </div>
+            <div className="field-grid-3">
+              {/* Promoting/Helping Others/Accompanying still open their role list on
+                  a label click (naming specific individuals), entirely independent
+                  of the number itself now -- see this card's own comment above. */}
+              <Field
+                label="Promoting"
+                value={form.protagonists} onChange={v => set('protagonists', v)} onBlur={() => commitField('protagonists', 'Promoting', true)} readonly={!canWrite} integer named={promoterNames.length}
+                onLabelClick={permissions.canAssignRoles ? () => setShowPromotersModal(true) : undefined}
+                info="Estimated number of individuals promoting various aspects of community life such as parents encouraging participation, junior youth bringing friends, or youth inviting peers. It also includes promoting collective spaces such as festivals, Summer of Service, family gatherings, and various logistical assistance such as providing food, giving rides, serving others, etc."
+              />
+              <Field
+                label="Hosting Devotional Gatherings"
+                value={form.devotionalHosts} onChange={v => set('devotionalHosts', v)} onBlur={() => commitField('devotionalHosts', 'Hosting Devotional Gatherings', true)} readonly={!canWrite} integer named={counts.devotionalHosts}
+                info="Estimated number of individuals who are sharing prayers with others, with family members, and inviting others to attend devotional meetings or gatherings. Examples include where prayers are shared in home visits, community gatherings, festivals, and educational activities."
+              />
+              <Field
+                label="In Educational Activity"
+                value={form.inEducationalActivities} onChange={v => set('inEducationalActivities', v)} onBlur={() => commitField('inEducationalActivities', 'In Educational Activity', true)} readonly={!canWrite} integer named={counts.participating}
+                info="Estimated number of children, junior youth, youth, and adults participating in educational activities in various modalities and forms: children’s classes, junior youth groups, and study circles."
+              />
+            </div>
+            <div className="field-grid-3">
+              <Field
+                label="Facilitating Educational Activity"
+                value={form.educationalFacilitators} onChange={v => set('educationalFacilitators', v)} onBlur={() => commitField('educationalFacilitators', 'Facilitating Educational Activity', true)} readonly={!canWrite} integer named={counts.facilitating}
+                info="Estimated number of individuals who facilitate or share the content of the institute’s educational programs, in various forms, approaches, methods, and modalities, to all ages in the neighborhood."
+              />
+              <Field
+                label="Helping Others"
+                value={form.helpingOthers} onChange={v => set('helpingOthers', v)} onBlur={() => commitField('helpingOthers', 'Helping Others', true)} readonly={!canWrite} integer named={protagonistNames.length}
+                onLabelClick={permissions.canAssignRoles ? () => setShowProtagonistsModal(true) : undefined}
+                info="Estimated number of individuals who assist others in taking initial steps in serving others. For example, one may walk with another to do home visits, to share a prayer, to learn a quotation, to introduce the institute’s programs, or other acts of service."
+              />
+              <Field
+                label="Accompanying"
+                value={form.accompanying} onChange={v => set('accompanying', v)} onBlur={() => commitField('accompanying', 'Accompanying', true)} readonly={!canWrite} integer named={accompanierNames.length}
+                onLabelClick={permissions.canAssignRoles && permissions.assignableRoles.includes('accompanier') ? () => setShowAccompaniersModal(true) : undefined}
+                info="Estimated number of individuals who have gained a measure of experience from the institute’s courses alongside acts of service, whose actions are motivated by a desire to see capacity develop in others and to foster friendships founded on cooperation and reciprocity."
+              />
+            </div>
+            {/* Moved here from the Families card, 2026-10-08. */}
+            <div className="field">
+              <label>Makeup of Population</label>
+              <textarea value={form.makeup || ''} onChange={e => set('makeup', e.target.value)} onBlur={() => commitField('makeup', 'Makeup of Population')} readOnly={!canWrite} />
             </div>
           </div>}
         </div>
