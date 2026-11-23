@@ -75,8 +75,11 @@ function RoleMarks({ row, isHome }: { row: PersonRow; isHome: boolean }) {
 }
 
 // Set one person on or off a role's list at a nucleus (full-list replace, as /api/workers expects).
+// Reads and writes include hidden holders so that unticking a hidden person's role actually removes
+// them (a default write keeps hidden holders missing from the list). See
+// docs/superpowers/specs/2026-11-23-hide-people-design.md, "Calls made by the builder".
 async function writeRole(nucleus: string, role: string, personId: string, on: boolean) {
-  const res = await fetch(`/api/workers?nucleus=${encodeURIComponent(nucleus)}&type=${encodeURIComponent(role)}`);
+  const res = await fetch(`/api/workers?nucleus=${encodeURIComponent(nucleus)}&type=${encodeURIComponent(role)}&includeHidden=1`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || `Failed to load ${roleLabel(role).label}`);
   const currentIds = (data.workers as { id: string }[]).map(w => w.id);
@@ -84,7 +87,7 @@ async function writeRole(nucleus: string, role: string, personId: string, on: bo
   const post = await fetch('/api/workers', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nucleus, type: role, personIds }),
+    body: JSON.stringify({ nucleus, type: role, personIds, includesHidden: true }),
   });
   const postData = await post.json();
   if (!post.ok) throw new Error(postData.error || `Failed to save ${roleLabel(role).label}`);
