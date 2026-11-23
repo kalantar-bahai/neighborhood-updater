@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, activityLines, activitySummary, countPeople, AGE_FILTERS, peopleCountLabel, hideNote, hideRolesLine, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
+import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, activityLines, activitySummary, courseGroups, countPeople, AGE_FILTERS, peopleCountLabel, hideNote, hideRolesLine, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
 import type { Participation, AgeCategory, DevotionalHostRole, MoveContext, PermissionSet, PersonDetails, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -490,5 +490,39 @@ describe('activitySummary', () => {
   });
   test('none', () => {
     expect(activitySummary([])).toBe('No activities in SRP');
+  });
+});
+
+describe('courseGroups', () => {
+  const sc = (over: Partial<Participation>) => act({ activityType: 'sc', heldAt: 'Carrboro', ...over });
+  test('grouped study circles, children\'s classes, junior youth groups; chips in natural order', () => {
+    const g = courseGroups([
+      act({ activityType: 'jyg', studyItem: 'Breezes of Confirmation' }),
+      sc({ studyItem: 'Book 10' }), sc({ studyItem: 'Book 2' }), sc({ studyItem: 'Book 3 (G1)' }),
+      act({ activityType: 'cc', studyItem: 'Grade 2' }), act({ activityType: 'cc', studyItem: 'Grade 1' }),
+    ]);
+    expect(g.map(x => x.label)).toEqual(['Study circles', "Children's classes", 'Junior youth groups']);
+    expect(g[0].chips.map(c => c.label)).toEqual(['2', '3 (G1)', '10']);
+    expect(g[1].chips.map(c => c.label)).toEqual(['G1', 'G2']);
+  });
+  test('an activity with no study item is one chip named for where it is held', () => {
+    const [g] = courseGroups([act({ activityType: 'jyg', studyItem: null, activityId: 'J1', heldAt: 'Lloyd Farm' })]);
+    expect(g.chips.map(c => [c.label, c.title])).toEqual([['Lloyd Farm', null]]);
+  });
+  test('states: current, ended, none (facilitated only); the item\'s completed flag is not the person\'s', () => {
+    const state = (ps: Participation[]) => courseGroups(ps)[0].chips[0].state;
+    expect(state([sc({ studyItem: 'Book 1', current: false, completed: true }), sc({ studyItem: 'Book 1' })])).toBe('current');
+    expect(state([sc({ studyItem: 'Book 1', current: false, completed: true })])).toBe('ended');
+    expect(state([sc({ studyItem: 'Book 1', current: false })])).toBe('ended');
+    const [c] = courseGroups([sc({ studyItem: 'Book 7', role: 'FACILITATOR', completed: true })])[0].chips;
+    expect([c.state, c.facilitated]).toEqual(['none', true]);
+  });
+  test('title and lines for the tap-open detail', () => {
+    const [c] = courseGroups([
+      sc({ studyItem: 'Book 3 (G1)', studyItemTitle: "Teaching Children's Classes, Grade 1", startDate: '2024-01-10', endDate: '2024-06-02', completed: true, current: false }),
+      sc({ studyItem: 'Book 3 (G1)', role: 'FACILITATOR', startDate: '2025-09-01' }),
+    ])[0].chips;
+    expect(c.title).toBe("Teaching Children's Classes, Grade 1");
+    expect(c.lines).toEqual(['Took part · Carrboro · 2024-01-10 → 2024-06-02 (completed)', 'Facilitated · Carrboro · 2025-09-01 → now']);
   });
 });
