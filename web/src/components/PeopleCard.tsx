@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PersonSrpDot } from './SrpBadge';
 import type { AgeCategory, PermissionSet, PersonDetails } from '@/lib/clusterNotebook';
 import {
-  AGE_FILTERS, AGE_LABELS, DEVOTIONAL_HOST, FACILITATES, KNOWN_ROLES, PARTICIPATES, activityLines, peopleCountLabel, RESIDENT, canEditRole, detailLines, detailsView, filterPeople, isMoving, moveResultError,
+  AGE_FILTERS, AGE_LABELS, DEVOTIONAL_HOST, FACILITATES, KNOWN_ROLES, PARTICIPATES, activityLines, hideNote, hideRolesLine, peopleCountLabel, RESIDENT, canEditRole, detailLines, detailsView, filterPeople, isMoving, moveResultError,
   nextRoleIds, peopleFilters, placePath, roleLabel, rolesToClear, sortPeople, sortRoles, syncNote, type MoveTarget,
   type PersonRow,
 } from '@/lib/people';
@@ -30,6 +30,8 @@ type Found = { id: string; name: string; place: string; homeNucleus: string | nu
 type Editing = {
   id: string; name: string; roles: string[]; isResident: boolean; isNew: boolean;
   placePath: string; homeNucleus: string | null;
+  // Picked while hidden here through "+ Add": Save unhides them first (picking says they belong here).
+  unhideFirst: boolean;
 };
 // A move waiting for the person to confirm it.
 type PendingMove = {
@@ -70,6 +72,7 @@ function RoleMarks({ row, isHome }: { row: PersonRow; isHome: boolean }) {
         return <span role="img" aria-label={label} title={label}>{DEVOTIONAL_HOST.icon}</span>;
       })()}
       {row.ageCategory && <span title={AGE_LABELS[row.ageCategory]} style={TAG}>{AGE_LABELS[row.ageCategory]}</span>}
+      {row.hidden && <span title="Hidden here" style={TAG}>Hidden</span>}
     </span>
   );
 }
@@ -91,6 +94,19 @@ async function writeRole(nucleus: string, role: string, personId: string, on: bo
   });
   const postData = await post.json();
   if (!post.ok) throw new Error(postData.error || `Failed to save ${roleLabel(role).label}`);
+}
+
+// Hide or unhide one person at a nucleus (spec: 2026-11-23-hide-people-design.md).
+async function postHide(nucleus: string, individualId: string, hidden: boolean, reason?: string) {
+  const res = await fetch('/api/hide', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nucleus, individualId, hidden, ...(reason ? { reason } : {}) }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || (hidden ? "Couldn't hide" : "Couldn't unhide"));
+  }
 }
 
 // The roles a person holds at another nucleus that the caller may clear there. Empty when that
@@ -124,6 +140,9 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
   const [adding, setAdding] = useState(false);
   const [reloads, setReloads] = useState(0);
   const [details, setDetails] = useState<Details | null>(null);
+  // The open "Hide…" confirm (its reason as typed), and a Hide/Unhide error, for the open person.
+  const [hideConfirm, setHideConfirm] = useState<{ personId: string; reason: string } | null>(null);
+  const [hideError, setHideError] = useState('');
 
   useEffect(() => {
     let live = true;
@@ -162,6 +181,8 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     setPendingMove(null);
     setSaveError('');
     setCardError('');
+    setHideConfirm(null);
+    setHideError('');
     setAdding(false);
     // Read details on each open; a new person isn't one of this nucleus's people yet, so has none here.
     if (e.isNew) { setDetails(null); return; }
@@ -195,7 +216,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
 
   const fromRow = (r: PersonRow): Editing => ({
     id: r.id, name: r.name, roles: r.roles, isResident: r.isResident, isNew: false,
-    placePath: placePath(r.place), homeNucleus: r.place?.homeNucleus ?? null,
+    placePath: placePath(r.place), homeNucleus: r.place?.homeNucleus ?? null, unhideFirst: false,
   });
 
   // Roles offered in the editor: the known ones plus any this person already holds.
@@ -212,12 +233,34 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     const changed = editorRoles(target).filter(role =>
       canEditRole(permissions, role) && target.roles.includes(role) !== ticked.includes(role));
     const moveWanted = resident !== target.isResident;
-    if (!moveWanted && changed.length === 0) { close(); return; }
+    if (!moveWanted && changed.length === 0 && !target.unhideFirst) { close(); return; }
 
     for (const role of changed) {
       if (!SINGLE_ROLES.includes(role) || !ticked.includes(role)) continue;
       const current = (rows ?? []).find(r => r.id !== target.id && r.roles.includes(role));
       if (current && !window.confirm(`This replaces ${current.name} as ${roleLabel(role).label.toLowerCase()}.`)) return;
+    }
+
+    if (target.unhideFirst) {
+      // Picked while hidden through "+ Add": unhide first; if that fails, write nothing.
+      setSaving(true);
+      setSaveError('');
+      try {
+        await postHide(nucleus, target.id, false);
+      } catch (e: unknown) {
+        if (editingId.current === target.id) setSaveError(e instanceof Error ? e.message : String(e));
+        return;
+      } finally {
+        setSaving(false);
+      }
+      // Show them as unhidden at once (and under All, so their open row stays in view), then re-read.
+      setRows(rs => rs && rs.map(r => r.id === target.id ? { ...r, hidden: false, hide: null } : r));
+      setFilter(f => f === 'hidden' ? 'all' : f);
+      setReloads(n => n + 1);
+      if (target.roles.length > 0) onRolesChanged(target.roles);
+      if (editingId.current !== target.id) return;
+      target = { ...target, unhideFirst: false };
+      setEditing(target);
     }
 
     if (moveWanted) {
@@ -290,6 +333,25 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
       // Re-read this card, and the page's name lists for whatever did save.
       setReloads(n => n + 1);
       if (written.length > 0) onRolesChanged(written);
+    }
+  }
+
+  // Hide (with an optional reason) or unhide the open person, then close the panel and re-read.
+  async function setHidden(target: Editing, hidden: boolean, reason?: string) {
+    const held = rows?.find(r => r.id === target.id)?.roles ?? [];
+    setSaving(true);
+    setHideError('');
+    try {
+      await postHide(nucleus, target.id, hidden, reason?.trim() || undefined);
+      if (editingId.current === target.id) close();
+      setHideConfirm(null);
+      // Hidden role holders drop out of the page's name lists (and come back on unhide).
+      if (held.length > 0) onRolesChanged(held);
+    } catch (e: unknown) {
+      if (editingId.current === target.id) setHideError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+      setReloads(n => n + 1);
     }
   }
 
@@ -415,7 +477,53 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     );
   };
 
-  // The panel under an existing person's row: details when permitted, activities, then the editor or a Close button.
+  // Editors (canWrite) only: Hide… with its confirm, or for a hidden person who/when/why and Unhide.
+  const hideSection = (e: Editing) => {
+    const row = rows?.find(r => r.id === e.id);
+    if (!permissions.canWrite || !row) return null;
+    const confirm = hideConfirm?.personId === e.id ? hideConfirm : null;
+    const rolesLine = hideRolesLine(e.name, row.roles);
+    return (
+      <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 4, padding: '8px 0 4px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {row.hidden ? (
+          <>
+            {row.hide && <div style={{ fontSize: 13, color: '#4a5568' }}>{hideNote(row.hide)}</div>}
+            <div>
+              <button type="button" disabled={saving} onClick={() => setHidden(e, false)} style={btn('white', '#4a5568', '#cbd5e0')}>
+                {saving ? 'Unhiding…' : 'Unhide'}
+              </button>
+            </div>
+          </>
+        ) : confirm ? (
+          <div style={{ border: '1px solid #e2e8f0', background: '#f7fafc', borderRadius: 6, padding: 8, fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ fontWeight: 600 }}>Hide {e.name} from {nucleus}?</div>
+            <div>Stays in SRP; a CSO can review and archive.</div>
+            {rolesLine && <div>{rolesLine}</div>}
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              Reason (optional)
+              <input type="text" value={confirm.reason} disabled={saving}
+                onChange={ev => setHideConfirm({ personId: e.id, reason: ev.target.value })} />
+            </label>
+            <div style={{ display: 'flex', gap: 8, marginTop: 4, justifyContent: 'flex-end' }}>
+              <button type="button" disabled={saving} onClick={() => setHideConfirm(null)} style={btn('white', '#4a5568', '#cbd5e0')}>Cancel</button>
+              <button type="button" disabled={saving} onClick={() => setHidden(e, true, confirm.reason)} style={btn('#c53030', 'white')}>
+                {saving ? 'Hiding…' : 'Hide'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <button type="button" disabled={saving || Boolean(pendingMove)} onClick={() => { setHideError(''); setHideConfirm({ personId: e.id, reason: '' }); }}
+              style={btn('white', '#4a5568', '#cbd5e0')}>Hide…</button>
+          </div>
+        )}
+        {hideError && <div style={{ fontSize: 12, color: '#c53030' }}>{hideError}</div>}
+      </div>
+    );
+  };
+
+  // The panel under an existing person's row: details when permitted, activities, the editor or a Close
+  // button, then (for editors) Hide or Unhide.
   const panel = (e: Editing) => (
     <div>
       {detailsSection(e.id)}
@@ -429,6 +537,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
           <button type="button" onClick={close} style={btn('white', '#4a5568', '#cbd5e0')}>Close</button>
         </div>
       )}
+      {hideSection(e)}
     </div>
   );
 
@@ -451,13 +560,14 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
       {adding && (
         <AddPerson
           nucleus={nucleus}
+          hiddenIds={rows.filter(r => r.hidden).map(r => r.id)}
           onPick={p => {
             const existing = rows.find(r => r.id === p.id);
-            // Their row must be visible for its editor to show.
-            if (existing) { setFilter('all'); setAge('all'); setSearch(''); }
+            // Their row must be visible for its editor to show (a hidden person's only under Hidden).
+            if (existing) { setFilter(existing.hidden ? 'hidden' : 'all'); setAge('all'); setSearch(''); }
             startEdit(existing
-              ? fromRow(existing)
-              : { id: p.id, name: p.name, roles: [], isResident: false, isNew: true, placePath: p.place, homeNucleus: p.homeNucleus });
+              ? { ...fromRow(existing), unhideFirst: existing.hidden }
+              : { id: p.id, name: p.name, roles: [], isResident: false, isNew: true, placePath: p.place, homeNucleus: p.homeNucleus, unhideFirst: false });
           }}
         />
       )}
@@ -500,7 +610,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
       {/* Outside the scrolling list, so it stays put (owner, 2026-11-21). */}
       {rows.length > 0 && (
         <div style={{ fontSize: 12, color: '#718096', borderTop: '1px solid #e2e8f0', paddingTop: 4, marginTop: 2 }}>
-          {peopleCountLabel(shown.length, rows.length)}
+          {peopleCountLabel(shown.length, rows.filter(r => r.hidden === (activeFilter === 'hidden')).length, activeFilter === 'hidden')}
         </div>
       )}
     </div>
@@ -512,7 +622,7 @@ function btn(background: string, color: string, border = background): React.CSSP
 }
 
 // Search everyone in the cluster (name and place path), or create a new person.
-function AddPerson({ nucleus, onPick }: { nucleus: string; onPick: (p: Found) => void }) {
+function AddPerson({ nucleus, hiddenIds, onPick }: { nucleus: string; hiddenIds: string[]; onPick: (p: Found) => void }) {
   const [input, setInput] = useState('');
   const [results, setResults] = useState<Found[]>([]);
   const [more, setMore] = useState(false);
@@ -575,7 +685,7 @@ function AddPerson({ nucleus, onPick }: { nucleus: string; onPick: (p: Found) =>
           {results.map(p => (
             <button key={p.id} type="button" onClick={() => { setInput(''); setResults([]); onPick(p); }}
               style={{ textAlign: 'left', background: 'none', border: 'none', padding: '4px 2px', cursor: 'pointer', fontSize: 13 }}>
-              {p.name}{p.place && <span style={{ color: '#718096' }}> · {p.place}</span>}
+              {p.name}{hiddenIds.includes(p.id) && ' (hidden here)'}{p.place && <span style={{ color: '#718096' }}> · {p.place}</span>}
             </button>
           ))}
           {more && <div style={{ fontSize: 12, color: '#718096', padding: '2px' }}>Keep typing to narrow the list.</div>}
