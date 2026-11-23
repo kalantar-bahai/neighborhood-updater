@@ -501,8 +501,10 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
             {rolesLine && <div>{rolesLine}</div>}
             <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               Reason (optional)
-              <input type="text" value={confirm.reason} disabled={saving}
-                onChange={ev => setHideConfirm({ personId: e.id, reason: ev.target.value })} />
+              {/* Explicit border and background: the page's CSS reset leaves a bare input invisible (owner, 2026-11-23). */}
+              <input type="text" value={confirm.reason} disabled={saving} placeholder="e.g. moved away"
+                onChange={ev => setHideConfirm({ personId: e.id, reason: ev.target.value })}
+                style={{ border: '1px solid #cbd5e0', borderRadius: 6, background: 'white', padding: '6px 8px', fontSize: 16, color: '#2d3748' }} />
             </label>
             <div style={{ display: 'flex', gap: 8, marginTop: 4, justifyContent: 'flex-end' }}>
               <button type="button" disabled={saving} onClick={() => setHideConfirm(null)} style={btn('white', '#4a5568', '#cbd5e0')}>Cancel</button>
