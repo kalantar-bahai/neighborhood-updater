@@ -101,7 +101,10 @@ export default function WorkerListModal({ title, role, nucleus, workers, importW
       const res = await fetch('/api/workers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nucleus, type: role, personIds }),
+        // A single-person role (contact) means "the contact is now X": authoritative for people hidden here
+        // too, so a hidden former contact loses the role instead of staying alongside X. Lists keep the
+        // default, which never drops hidden holders the modal can't see (cluster-notebook, 2026-11-23).
+        body: JSON.stringify({ nucleus, type: role, personIds, ...(single ? { includesHidden: true } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Save failed');
