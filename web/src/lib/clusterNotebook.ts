@@ -595,10 +595,13 @@ export interface Participation {
   studyItem: string | null; studyItemTitle: string | null;
   startDate: string | null; endDate: string | null; completed: boolean; current: boolean;
 }
+// hide is null unless the person is hidden AND the caller can edit the nucleus.
+export interface PersonHide { hiddenAt: string; hiddenBy: PersonSummary | null; reason: string | null }
 export interface NucleusPerson {
   individual: PersonSummary; roles: string[]; isResident: boolean;
   ageCategory: AgeCategory | null; devotionalHost: DevotionalHostRole | null;
   participates: boolean; facilitates: boolean; participation: Participation[];
+  hidden: boolean; hide: PersonHide | null;
 }
 const PARTICIPATION_SELECTION = 'activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current';
 const PLACE_SELECTION = 'id name type locality cluster localityId homeNucleus';
@@ -633,12 +636,15 @@ export async function getNucleusPeopleFlags(nucleusName: string): Promise<Pick<N
   return data.nucleus?.people ?? null;
 }
 
+const NUCLEUS_PERSON_SELECTION = `individual { ${PERSON_SUMMARY_SELECTION} } roles isResident ageCategory devotionalHost participates facilitates participation { ${PARTICIPATION_SELECTION} } hidden hide { hiddenAt reason hiddenBy { ${PERSON_SUMMARY_SELECTION} } }`;
+
 // Everyone connected to the nucleus: role holders here, plus residents on a home nucleus.
+// Includes hidden people (flagged `hidden`); `hide` is only filled for callers who can edit.
 // null when the nucleus isn't found.
 export async function getNucleusPeople(nucleusName: string): Promise<NucleusPerson[] | null> {
   const query = `
     query GetNucleusPeople($name: String!) {
-      nucleus(name: $name) { people { individual { ${PERSON_SUMMARY_SELECTION} } roles isResident ageCategory devotionalHost participates facilitates participation { ${PARTICIPATION_SELECTION} } } }
+      nucleus(name: $name) { people(includeHidden: true) { ${NUCLEUS_PERSON_SELECTION} } }
     }
   `;
   const data = await request<{ nucleus: { people: NucleusPerson[] } | null }>(query, { name: nucleusName });
@@ -718,31 +724,55 @@ export async function createIndividual(name: string, nucleusName: string): Promi
 
 // `role` is a fully open string on cluster-notebook's side (no fixed enum) --
 // "accompanier"/"protagonist"/"abm-assistant" today, anything else works the same way.
-export async function getNucleusWorkers(nucleusName: string, role: string): Promise<Individual[]> {
+export async function getNucleusWorkers(nucleusName: string, role: string, includeHidden = false): Promise<Individual[]> {
   const query = `
-    query GetNucleusWorkers($name: String!, $role: String!) {
-      nucleus(name: $name) { workers(role: $role) { ${INDIVIDUAL_SELECTION} } }
+    query GetNucleusWorkers($name: String!, $role: String!, $includeHidden: Boolean) {
+      nucleus(name: $name) { workers(role: $role, includeHidden: $includeHidden) { ${INDIVIDUAL_SELECTION} } }
     }
   `;
-  const data = await request<{ nucleus: { workers: Individual[] } | null }>(query, { name: nucleusName, role });
+  const data = await request<{ nucleus: { workers: Individual[] } | null }>(query, { name: nucleusName, role, includeHidden });
   return data.nucleus?.workers ?? [];
 }
 
 // Full-list replace, same pattern as updateNucleus -- personIds is the complete
 // ordered list for this (nucleus, role) pair, not an incremental add/remove.
-export async function updateNucleusWorkers(nucleusName: string, role: string, personIds: string[]): Promise<Individual[]> {
+// Note the mutation argument is `includesHidden` (the queries say `includeHidden`): pass true when
+// personIds contains hidden people, so they aren't dropped from the role.
+export async function updateNucleusWorkers(nucleusName: string, role: string, personIds: string[], includesHidden = false): Promise<Individual[]> {
   const mutation = `
-    mutation UpdateNucleusWorkers($name: String!, $role: String!, $personIds: [String!]!) {
-      updateNucleusWorkers(nucleusName: $name, role: $role, personIds: $personIds) {
-        workers(role: $role) { ${INDIVIDUAL_SELECTION} }
+    mutation UpdateNucleusWorkers($name: String!, $role: String!, $personIds: [String!]!, $includesHidden: Boolean) {
+      updateNucleusWorkers(nucleusName: $name, role: $role, personIds: $personIds, includesHidden: $includesHidden) {
+        workers(role: $role, includeHidden: $includesHidden) { ${INDIVIDUAL_SELECTION} }
       }
     }
   `;
-  const data = await request<{ updateNucleusWorkers: { workers: Individual[] } | null }>(mutation, { name: nucleusName, role, personIds });
+  const data = await request<{ updateNucleusWorkers: { workers: Individual[] } | null }>(mutation, { name: nucleusName, role, personIds, includesHidden });
   if (data.updateNucleusWorkers === null) {
     throw new Error(`cluster-notebook has no nucleus named "${nucleusName}" — workers not saved`);
   }
   return data.updateNucleusWorkers.workers;
+}
+
+// Hide / unhide a person at one nucleus (FORBIDDEN unless the caller can edit it; coded error
+// NOT_AT_NUCLEUS when the person isn't connected there). null when the nucleus isn't found.
+export async function hideIndividual(individualId: string, nucleusName: string, reason: string | null): Promise<NucleusPerson | null> {
+  const mutation = `
+    mutation HideIndividual($individualId: String!, $nucleusName: String!, $reason: String) {
+      hideIndividual(individualId: $individualId, nucleusName: $nucleusName, reason: $reason) { ${NUCLEUS_PERSON_SELECTION} }
+    }
+  `;
+  const data = await request<{ hideIndividual: NucleusPerson | null }>(mutation, { individualId, nucleusName, reason });
+  return data.hideIndividual;
+}
+
+export async function unhideIndividual(individualId: string, nucleusName: string): Promise<NucleusPerson | null> {
+  const mutation = `
+    mutation UnhideIndividual($individualId: String!, $nucleusName: String!) {
+      unhideIndividual(individualId: $individualId, nucleusName: $nucleusName) { ${NUCLEUS_PERSON_SELECTION} }
+    }
+  `;
+  const data = await request<{ unhideIndividual: NucleusPerson | null }>(mutation, { individualId, nucleusName });
+  return data.unhideIndividual;
 }
 
 // Ad hoc, single-entity permission check -- works on Nucleus, Cluster, Locality,

@@ -38,6 +38,8 @@ const CODED_ERRORS: Record<string, { status: number; message: string | null }> =
   // Confirmed with cluster-notebook 2026-11-19 (moveIndividuals whole-call refusals).
   LOCATION_NOT_FOUND: { status: 400, message: "That place doesn't exist any more. Reload and try again." },
   NOT_A_PLACE: { status: 400, message: 'People can only be moved to a locality or a neighbourhood in SRP.' },
+  // Confirmed with cluster-notebook 2026-11-23: hideIndividual/unhideIndividual refuse a person who isn't at the nucleus.
+  NOT_AT_NUCLEUS: { status: 409, message: "This person isn't connected to this nucleus." },
 };
 
 export function clusterNotebookErrorResponse(e: unknown): NextResponse {

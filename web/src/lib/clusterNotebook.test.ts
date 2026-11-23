@@ -8,7 +8,7 @@ import {
   getActivitySummaries, updateActivitySummary, getAllNuclei, getNucleusFields, updateNucleus,
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
-  getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusPeopleFlags, getPersonDetails, moveIndividuals, getMoveContext,
+  getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusPeopleFlags, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext,
 } from './clusterNotebook';
 import type { Individual, PersonSummary, NucleusPerson, MoveResult, MoveContext, PersonDetails } from './clusterNotebook';
 import { auth } from '@clerk/nextjs/server';
@@ -784,7 +784,7 @@ describe('getNucleusPeople', () => {
     const person: NucleusPerson = {
       individual: { id: '7', firstName: 'Ana', familyName: 'Lopez', middleNames: null, nickname: null, place: { id: 'S1', name: 'Parkside', type: 'SETTING', locality: 'Chapelboro', cluster: 'Chapel Hill', localityId: 'L1', homeNucleus: 'Alpha' }, placeSync: { status: 'pending', code: null }, inSrp: false },
       roles: ['promoter'], isResident: true, ageCategory: null, devotionalHost: null,
-      participates: true, facilitates: false,
+      participates: true, facilitates: false, hidden: false, hide: null,
       participation: [{ activityId: 'A1', activityType: 'sc', heldAt: 'Parkside', role: 'PARTICIPANT', studyItem: 'Book 1', studyItemTitle: 'Reflections on the Life of the Spirit', startDate: '2026-01-05', endDate: null, completed: false, current: true }],
     };
     mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { people: [person] } } }));
@@ -794,7 +794,7 @@ describe('getNucleusPeople', () => {
     expect(result).toEqual([person]);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables).toEqual({ name: 'Alpha' });
-    expect((body.query as string).replace(/\s+/g, ' ')).toContain('people { individual { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } roles isResident ageCategory devotionalHost participates facilitates participation { activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current } }');
+    expect((body.query as string).replace(/\s+/g, ' ')).toContain('people(includeHidden: true) { individual { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } roles isResident ageCategory devotionalHost participates facilitates participation { activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current } hidden hide { hiddenAt reason hiddenBy { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } } }');
   });
 
   test('returns null when the nucleus is not found', async () => {
@@ -873,7 +873,15 @@ describe('getNucleusWorkers', () => {
 
     expect(result).toEqual([bob]);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
-    expect(body.variables).toEqual({ name: 'Alpha', role: 'accompanier' });
+    expect(body.variables).toEqual({ name: 'Alpha', role: 'accompanier', includeHidden: false });
+    expect((body.query as string).replace(/\s+/g, ' ')).toContain('workers(role: $role, includeHidden: $includeHidden)');
+  });
+
+  test('sends includeHidden: true when asked', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { workers: [] } } }));
+    await getNucleusWorkers('A', 'promoter', true);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ name: 'A', role: 'promoter', includeHidden: true });
   });
 
   test('returns an empty array when the nucleus is not found', async () => {
@@ -894,13 +902,58 @@ describe('updateNucleusWorkers', () => {
 
     expect(result).toEqual([bob]);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
-    expect(body.variables).toEqual({ name: 'Alpha', role: 'accompanier', personIds: ['2'] });
+    expect(body.variables).toEqual({ name: 'Alpha', role: 'accompanier', personIds: ['2'], includesHidden: false });
+  });
+
+  test('sends includesHidden: true when the list includes hidden people', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { updateNucleusWorkers: { workers: [] } } }));
+    await updateNucleusWorkers('Alpha', 'promoter', ['2'], true);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ name: 'Alpha', role: 'promoter', personIds: ['2'], includesHidden: true });
+    expect((body.query as string).replace(/\s+/g, ' ')).toContain('personIds: $personIds, includesHidden: $includesHidden');
   });
 
   test('throws when the mutation returns null (no matching nucleus)', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { updateNucleusWorkers: null } }));
 
     await expect(updateNucleusWorkers('Nonexistent', 'accompanier', [])).rejects.toThrow('cluster-notebook has no nucleus named "Nonexistent"');
+  });
+});
+
+describe('hideIndividual / unhideIndividual', () => {
+  const person = {
+    individual: { id: '7', firstName: 'Ana', familyName: 'Lopez', middleNames: null, nickname: null, place: null, placeSync: null, inSrp: false },
+    roles: [], isResident: true, ageCategory: null, devotionalHost: null, participates: false, facilitates: false,
+    participation: [], hidden: true, hide: { hiddenAt: '2026-11-23T10:00:00Z', reason: 'Moved away', hiddenBy: null },
+  } as NucleusPerson;
+
+  test('hide sends individualId, nucleusName and reason, and returns the person', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { hideIndividual: person } }));
+    const result = await hideIndividual('7', 'Alpha', 'Moved away');
+    expect(result).toEqual(person);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ individualId: '7', nucleusName: 'Alpha', reason: 'Moved away' });
+    const q = (body.query as string).replace(/\s+/g, ' ');
+    expect(q).toContain('hideIndividual(individualId: $individualId, nucleusName: $nucleusName, reason: $reason)');
+    expect(q).toContain('hidden hide { hiddenAt reason hiddenBy {');
+  });
+
+  test('hide with no reason sends null; null result for an unknown nucleus', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { hideIndividual: null } }));
+    expect(await hideIndividual('7', 'Nowhere', null)).toBeNull();
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ individualId: '7', nucleusName: 'Nowhere', reason: null });
+  });
+
+  test('unhide sends individualId and nucleusName, and returns the person or null', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { unhideIndividual: person } }));
+    expect(await unhideIndividual('7', 'Alpha')).toEqual(person);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ individualId: '7', nucleusName: 'Alpha' });
+    expect((body.query as string).replace(/\s+/g, ' ')).toContain('unhideIndividual(individualId: $individualId, nucleusName: $nucleusName)');
+
+    mockFetch.mockResolvedValue(jsonResponse({ data: { unhideIndividual: null } }));
+    expect(await unhideIndividual('7', 'Nowhere')).toBeNull();
   });
 });
 

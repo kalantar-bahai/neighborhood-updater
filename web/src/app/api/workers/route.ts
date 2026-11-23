@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   if (!permissions.canRead) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
   try {
-    const workers = await getNucleusWorkers(name, type);
+    const workers = await getNucleusWorkers(name, type, req.nextUrl.searchParams.get('includeHidden') === '1');
     return NextResponse.json({ workers: toWorkers(workers) });
   } catch (e: unknown) {
     return clusterNotebookErrorResponse(e);
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const { nucleus, type, personIds } = await req.json();
+  const { nucleus, type, personIds, includesHidden } = await req.json();
   if (!nucleus) return NextResponse.json({ error: 'Missing nucleus' }, { status: 400 });
   if (!type) return NextResponse.json({ error: 'Missing type' }, { status: 400 });
   if (!Array.isArray(personIds)) return NextResponse.json({ error: 'personIds must be an array' }, { status: 400 });
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const workers = await updateNucleusWorkers(nucleus, type, personIds);
+    const workers = await updateNucleusWorkers(nucleus, type, personIds, includesHidden === true);
     return NextResponse.json({ workers: toWorkers(workers) });
   } catch (e: unknown) {
     return clusterNotebookErrorResponse(e);

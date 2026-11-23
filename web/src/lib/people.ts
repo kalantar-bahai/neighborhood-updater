@@ -1,7 +1,7 @@
 // People card (phase 1): pure decisions, tested in people.test.ts.
 // Spec: docs/superpowers/specs/2026-11-18-people-card-design.md
 // Age, devotional host, details (phase A) and activities (phase B): docs/superpowers/specs/2026-11-20-people-card-details-design.md.
-import type { AgeCategory, DevotionalHostRole, MoveContext, Participation, MoveResult, NucleusPerson, PermissionSet, PersonDetails, PlaceSummary, PlaceSync } from './clusterNotebook';
+import type { AgeCategory, PersonHide, DevotionalHostRole, MoveContext, Participation, MoveResult, NucleusPerson, PermissionSet, PersonDetails, PlaceSummary, PlaceSync } from './clusterNotebook';
 import { individualDisplayName } from './personName';
 import { INFORMAL_WORKER_TYPES } from './config';
 
@@ -11,6 +11,7 @@ export type PersonRow = {
   place: PlaceSummary | null; placeSync: PlaceSync | null; inSrp: boolean;
   ageCategory: AgeCategory | null; devotionalHost: DevotionalHostRole | null;
   participates: boolean; facilitates: boolean; participation: Participation[];
+  hidden: boolean; hide: PersonHide | null;
 };
 export type PeopleSort = 'first' | 'family';
 
@@ -77,6 +78,7 @@ export function peopleFilters(rows: PersonRow[], isHome: boolean): { key: string
     ...(isHome ? [{ key: 'resident', label: RESIDENT.label }] : []),
     ...PRIMARY_FILTERS,
     ...rest.map(role => ({ key: role, label: roleLabel(role).label })),
+    { key: 'hidden', label: 'Hidden' },
   ];
 }
 
@@ -87,6 +89,8 @@ export const AGE_FILTERS: { key: 'all' | AgeCategory; label: string }[] = [
 ];
 
 function matchesFilter(r: PersonRow, filter: string): boolean {
+  if (filter === 'hidden') return r.hidden;
+  if (r.hidden) return false;
   if (filter === 'all') return true;
   if (filter === 'resident') return r.isResident;
   if (filter === 'participating') return r.participates;
@@ -104,7 +108,8 @@ export function filterPeople(rows: PersonRow[], filter: string, search: string, 
 }
 
 // The total line under the list: "85 people", or "12 of 85 people" while a filter or search narrows it.
-export function peopleCountLabel(shown: number, total: number): string {
+export function peopleCountLabel(shown: number, total: number, hidden = false): string {
+  if (hidden) return shown === total ? `${total} hidden` : `${shown} of ${total} hidden`;
   const noun = total === 1 ? 'person' : 'people';
   return shown === total ? `${total} ${noun}` : `${shown} of ${total} ${noun}`;
 }
@@ -128,6 +133,7 @@ export function toPersonRow(p: NucleusPerson): PersonRow {
     place: ind.place, placeSync: ind.placeSync, inSrp: ind.inSrp,
     ageCategory: p.ageCategory, devotionalHost: p.devotionalHost,
     participates: p.participates, facilitates: p.facilitates, participation: p.participation,
+    hidden: p.hidden, hide: p.hide,
   };
 }
 
@@ -305,4 +311,19 @@ export function activityLines(participation: Participation[]): ActivityLine[] {
       detail: [p.studyItem, p.studyItemTitle, dates && (p.completed ? `${dates} (completed)` : dates)].filter(Boolean).join(' · '),
     };
   });
+}
+
+// ---- Hidden people ----
+
+// "Hidden by Ben Okafor on 2026-11-23: moved away"; the hider and the reason are left out when unknown.
+export function hideNote(h: PersonHide): string {
+  const by = h.hiddenBy ? ` by ${individualDisplayName(h.hiddenBy)}` : '';
+  return `Hidden${by} on ${h.hiddenAt.slice(0, 10)}${h.reason ? `: ${h.reason}` : ''}`;
+}
+
+// Shown when hiding someone who holds roles here: hiding keeps them. Null when they hold none.
+export function hideRolesLine(name: string, roles: string[]): string | null {
+  if (roles.length === 0) return null;
+  const parts = sortRoles(roles).map(r => { const { label, icon } = roleLabel(r); return icon ? `${label} ${icon}` : label; });
+  return `${name} is ${parts.join(', ')} here; hiding keeps the ${roles.length === 1 ? 'role' : 'roles'}.`;
 }

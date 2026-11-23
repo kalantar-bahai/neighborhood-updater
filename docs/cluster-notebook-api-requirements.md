@@ -279,3 +279,39 @@ Phase A (cluster-notebook PR #46). Spec: `docs/superpowers/specs/2026-11-20-peop
 - Rosters are read with each locality read request (srp-client `activity-rosters`), not live.
 - The People card shows 🎓 (facilitating) and 📖 (participating) on rows, "Participating" and "Facilitating" filters, and
   an Activities section in every reader's panel: current entries first, then the server's order.
+
+## Hiding people, confirmed with cluster-notebook 2026-11-23
+
+Phase 4, cluster-notebook PR #54 (27ac384, live in production). Spec: `docs/superpowers/specs/2026-11-23-hide-people-design.md`.
+
+- `PersonHide { hiddenAt: DateTime!  hiddenBy: PersonSummary  reason: String }`. A hide is per person, per nucleus.
+  `hiddenBy` is null only for a hide not made by a signed-in person.
+- `NucleusPerson.hidden: Boolean!` and `NucleusPerson.hide: PersonHide`. `hide` is null unless the person is hidden
+  there and the caller can edit that nucleus.
+- `Nucleus.people(includeHidden: Boolean = false)` and `Nucleus.workers(role: String!, includeHidden: Boolean = false)`.
+  The defaults leave hidden people out, so counts and lists need no change.
+- `hideIndividual(individualId, nucleusName, reason)` and `unhideIndividual(individualId, nucleusName)` return
+  `NucleusPerson`.
+  - `FORBIDDEN` unless the caller can edit the nucleus. Null for an unknown nucleus.
+  - `NOT_AT_NUCLEUS` when the person is neither a role holder nor a resident there.
+  - Repeats are no-ops. Hiding someone already hidden keeps the original reason.
+  - `unhideIndividual` also works for someone hidden there who has since left (the result has roles [], isResident
+    false, hidden false).
+- `updateNucleusWorkers(nucleusName, role, personIds, includesHidden: Boolean = false)`. Note the spelling: the
+  field arguments use `includeHidden`, the mutation argument uses `includesHidden`.
+  - With `includesHidden` false, hidden holders missing from `personIds` are kept.
+  - With `includesHidden` true, `personIds` is authoritative for everyone.
+  - Either way, a hidden person newly given the role is unhidden. A resident (move) does not unhide.
+- `Query.hiddenPeople(clusterName)` returns `HiddenPerson { individual, nucleusName, roles, isResident, hide }`. It is for
+  Administrator or CSO of the cluster (or above), and returns [] for an unknown cluster. It is for the later
+  review dashboard, not used yet.
+- `hide` is editor-only (`canWrite` on the nucleus).
+
+How this app uses it:
+
+- The People card reads `people(includeHidden: true)` once and filters hidden rows itself (the Hidden filter, the
+  "(hidden here)" tag in "+ Add").
+- The card's per-person role writes read `workers(role, includeHidden: true)` and save with `includesHidden: true`, so
+  unticking a role on a hidden person works.
+- The Overview's name lists and counts keep the defaults.
+- "+ Add" unhides a picked hidden person before saving their Resident and roles.
