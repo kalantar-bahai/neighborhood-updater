@@ -313,6 +313,14 @@ export function activitySummary(participation: Participation[]): string {
   ].filter(Boolean).join(' · ');
 }
 
+// "(completed)" after the dates: a participant's own completion (personCompleted), or for a facilitator the
+// item's. Nothing when unknown or not finished.
+function completionNote(p: Participation): string | null {
+  if (p.role === 'FACILITATOR') return p.completed ? '(completed)' : null;
+  return p.personCompleted === true ? '(completed)' : p.personCompleted === false ? '(did not complete)' : null;
+}
+const withCompletion = (dates: string | null, p: Participation) => dates && [dates, completionNote(p)].filter(Boolean).join(' ');
+
 export function activityLines(participation: Participation[]): ActivityLine[] {
   const ordered = [...participation.filter(p => p.current), ...participation.filter(p => !p.current)];
   return ordered.map((p, i) => {
@@ -325,7 +333,7 @@ export function activityLines(participation: Participation[]): ActivityLine[] {
       key: `${p.activityId}:${p.role}:${p.studyItem ?? ''}:${i}`,
       icon: facilitator ? FACILITATES.icon : PARTICIPATES.icon,
       title: `${facilitator ? 'Facilitator' : 'Participant'} · ${what}`,
-      detail: [p.studyItem, p.studyItemTitle, dates && (p.completed ? `${dates} (completed)` : dates)].filter(Boolean).join(' · '),
+      detail: [p.studyItem, p.studyItemTitle, withCompletion(dates, p)].filter(Boolean).join(' · '),
     };
   });
 }
@@ -349,12 +357,11 @@ export function hideRolesLine(name: string, roles: string[]): string | null {
 // classes, junior youth groups), one chip per study item (book, grade, text) the person has an entry for, drawn
 // from participation until cluster-notebook exposes SRP's per-person course record. An activity with no study
 // item gets one chip named for where it is held. Chips are in natural order.
-// state, from participant entries: current (in it now), ended (was in it, now finished), none (only facilitated).
-// Confirmed with cluster-notebook 2026-11-23: Participation.completed is the study item's (or activity's) own
-// completion, shared by everyone on it, not the person's, so a chip can't say "completed it" yet. A per-person
-// field (proposed `personCompleted`) would split ended into completed / didn't complete.
-// label: "Book 3 (G1)" → "3 (G1)", "Grade 1" → "G1" (the row already names the activity type).
-export type ChipState = 'current' | 'ended' | 'none';
+// state, from participant entries: current (in it now), completed (personCompleted on any entry), ended (was in
+// it, didn't complete or SRP doesn't say), none (only facilitated). Participation.completed is the item's own
+// completion, not the person's, so it never makes a chip completed.
+// label: SRP's short name, without the "B" on books (the row already says Study circles): "3 (G1)", "G1", "BC".
+export type ChipState = 'current' | 'completed' | 'ended' | 'none';
 export type CourseChip = { key: string; label: string; title: string | null; state: ChipState; facilitated: boolean; lines: string[] };
 export type CourseGroup = { type: string; label: string; chips: CourseChip[] };
 const GROUP_ORDER = ['sc', 'cc', 'jyg'];
@@ -379,12 +386,15 @@ export function courseGroups(participation: Participation[]): CourseGroup[] {
 }
 function courseChip(key: string, entries: Participation[]): CourseChip {
   const studied = entries.filter(p => p.role === 'PARTICIPANT');
-  const state: ChipState = studied.some(p => p.current) ? 'current' : studied.length ? 'ended' : 'none';
+  const state: ChipState = studied.some(p => p.current) ? 'current'
+    : studied.some(p => p.personCompleted === true) ? 'completed' : studied.length ? 'ended' : 'none';
   const first = entries[0];
-  const label = first.studyItem ? first.studyItem.replace(/^Book\s+/i, '').replace(/^Grade\s+/i, 'G') : (first.heldAt ?? ACTIVITY_TYPES[first.activityType] ?? first.activityType);
+  const short = entries.find(p => p.studyItemShortName)?.studyItemShortName;
+  const label = short ? (first.activityType === 'sc' ? short.replace(/^B(?=\d)/, '') : short)
+    : first.studyItem ?? first.heldAt ?? ACTIVITY_TYPES[first.activityType] ?? first.activityType;
   const lines = entries.map(p => {
     const dates = p.startDate || p.endDate || p.current ? `${p.startDate ?? '?'} → ${p.current ? 'now' : p.endDate ?? '?'}` : null;
-    return [p.role === 'FACILITATOR' ? 'Facilitated' : 'Took part', p.heldAt, dates && (p.completed ? `${dates} (completed)` : dates)]
+    return [p.role === 'FACILITATOR' ? 'Facilitated' : 'Took part', p.heldAt, withCompletion(dates, p)]
       .filter(Boolean).join(' · ');
   });
   return {
