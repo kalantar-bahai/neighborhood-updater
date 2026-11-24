@@ -306,6 +306,12 @@ Phase 4, cluster-notebook PR #54 (27ac384, live in production). Spec: `docs/supe
   Administrator or CSO of the cluster (or above), and returns [] for an unknown cluster. It is for the later
   review dashboard, not used yet.
 - `hide` is editor-only (`canWrite` on the nucleus).
+- Confirmed with cluster-notebook 2026-11-24: `moveIndividuals` never touches hides; a hide ends only through
+  `unhideIndividual`. There is no hide or unhide across all nuclei. After a move away from N the person is still hidden
+  at N and `hiddenPeople` still lists them "from N" (isResident false). At a new nucleus M they are visible unless they
+  also have a hide at M. cluster-notebook prefers that a move not unhide on the server (SRP can refuse and undo a move,
+  but an unhide would stay); a client that wants both calls `unhideIndividual(id, N)` after a successful move.
+  This app does (owner 2026-11-24): the Admin page's Move unhides everyone it placed, in every nucleus of the cluster.
 
 How this app uses it:
 

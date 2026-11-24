@@ -2,12 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { AccountInfo } from '@/lib/clusterNotebook';
-import { accountLine, accountRemovedNote, activeAccountCount, removeAccessConfirm } from '@/lib/admin';
+import { accountLine, accountRemovedNote, activeAccountCount, findAccounts, removeAccessConfirm } from '@/lib/admin';
 import { individualDisplayName } from '@/lib/personName';
 
 // Row buttons are 44px tall so they are easy to hit on a phone.
 const BTN: React.CSSProperties = { fontSize: 13, padding: '4px 12px', minHeight: 44, borderRadius: 6, cursor: 'pointer', border: '1px solid #cbd5e0', background: 'white', color: '#4a5568' };
+const INPUT: React.CSSProperties = { width: '100%', boxSizing: 'border-box', fontSize: 16, padding: '6px 8px', border: '1px solid #a0aec0', borderRadius: 6 };
 const DANGER: React.CSSProperties = { ...BTN, background: '#c53030', color: 'white', border: '1px solid #c53030' };
+
+const SHOWN = 20;
 
 // The inline "Remove access…" confirm, open on at most one row at a time.
 type Confirm = { id: string; endRoles: boolean };
@@ -23,6 +26,8 @@ export default function AccountsCard({ cluster, me }: { cluster: string; me: { i
   // Busy and error are per row (keyed by person id), so a reply always reports on its own row.
   const [busy, setBusy] = useState<Record<string, 'remove' | 'restore'>>({});
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  // Name or email search; the list shows at most SHOWN rows so it never grows without end.
+  const [search, setSearch] = useState('');
 
   // Latest list read; an older read never overwrites a newer one.
   const readSeq = useRef(0);
@@ -131,6 +136,7 @@ export default function AccountsCard({ cluster, me }: { cluster: string; me: { i
     );
   };
 
+  const found = accounts && accounts.length > 0 ? findAccounts(accounts, search, SHOWN) : null;
   const title = accounts ? `Accounts (${activeAccountCount(accounts)})` : 'Accounts';
 
   return (
@@ -143,7 +149,15 @@ export default function AccountsCard({ cluster, me }: { cluster: string; me: { i
           {loadError && <div style={{ color: '#c53030', fontSize: 13 }}>{loadError}</div>}
           {!accounts && !loadError && <div style={{ fontSize: 12, color: '#718096' }}>Loading…</div>}
           {accounts && accounts.length === 0 && <div style={{ fontSize: 13, color: '#718096' }}>No accounts in this cluster.</div>}
-          {accounts && accounts.map(a => {
+          {accounts && accounts.length > 0 && (
+            <input type="search" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search by name or email…" aria-label="Search accounts" style={{ ...INPUT, marginBottom: 6 }} />
+          )}
+          {found && found.matched === 0 && <div style={{ fontSize: 13, color: '#718096' }}>No accounts match.</div>}
+          {found && found.matched > found.shown.length && (
+            <div style={{ fontSize: 12, color: '#718096' }}>Showing {found.shown.length} of {found.matched}. Search to find others.</div>
+          )}
+          {found && found.shown.map(a => {
             const id = a.individual.id;
             const rowBusy = !!busy[id];
             const removed = accountRemovedNote(a);

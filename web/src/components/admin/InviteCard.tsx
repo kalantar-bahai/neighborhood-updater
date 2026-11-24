@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { AdminPerson, Invitation, RoleHolding } from '@/lib/clusterNotebook';
-import { adminPersonLine, adminPersonTag, currentRolesLine, cancelInvitationConfirm, invitationLine, invitationStatusWord, inviteRequestBody, prefillEmail } from '@/lib/admin';
+import { adminPersonLine, adminPersonTag, currentRolesLine, cancelInvitationConfirm, invitationLine, invitationStatusWord, inviteRequestBody, prefillEmail, splitInvitations } from '@/lib/admin';
 import PersonFinder from './PersonFinder';
 import PlaceRolePicker, { type PlaceRole } from './PlaceRolePicker';
 
@@ -36,6 +36,8 @@ export default function InviteCard({ cluster }: { cluster: string }) {
   const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState<Record<string, 'resend' | 'cancel'>>({});
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  // "Past invitations" (accepted, expired, cancelled) starts collapsed.
+  const [showPast, setShowPast] = useState(false);
 
   // The pick now showing. A details or invite reply for an earlier pick is dropped, so A's email never lands on B.
   const pickSeq = useRef(0);
@@ -195,6 +197,25 @@ export default function InviteCard({ cluster }: { cluster: string }) {
     );
   };
 
+  const invitationRow = (i: Invitation) => {
+    const rowBusy = !!busy[i.id];
+    return (
+      <div key={i.id} style={{ padding: '8px 0', borderTop: '1px solid #edf2f7' }}>
+        <div style={{ fontSize: 14, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span>{invitationLine(i)}</span>
+          <span style={TAG}>{invitationStatusWord(i.status)}</span>
+        </div>
+        {i.status === 'PENDING' && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+            <button type="button" disabled={rowBusy} onClick={() => act(i, 'resend')} style={BTN}>{busy[i.id] === 'resend' ? 'Resending…' : 'Resend'}</button>
+            <button type="button" disabled={rowBusy} onClick={() => act(i, 'cancel')} style={BTN}>{busy[i.id] === 'cancel' ? 'Cancelling…' : 'Cancel'}</button>
+          </div>
+        )}
+        {rowErrors[i.id] && <div style={{ color: '#c53030', fontSize: 13, marginTop: 6 }}>{rowErrors[i.id]}</div>}
+      </div>
+    );
+  };
+
   return (
     <div className="card">
       <div className="card-header" onClick={() => setOpen(o => !o)} style={{ cursor: 'pointer', userSelect: 'none' }}>
@@ -209,24 +230,22 @@ export default function InviteCard({ cluster }: { cluster: string }) {
           {loadError && <div style={{ color: '#c53030', fontSize: 13 }}>{loadError}</div>}
           {!invitations && !loadError && <div style={{ fontSize: 12, color: '#718096' }}>Loading…</div>}
           {invitations && invitations.length === 0 && <div style={{ fontSize: 13, color: '#718096' }}>No invitations in this cluster.</div>}
-          {invitations && invitations.map(i => {
-            const rowBusy = !!busy[i.id];
+          {invitations && (() => {
+            const { pending, past } = splitInvitations(invitations);
             return (
-              <div key={i.id} style={{ padding: '8px 0', borderTop: '1px solid #edf2f7' }}>
-                <div style={{ fontSize: 14, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span>{invitationLine(i)}</span>
-                  <span style={TAG}>{invitationStatusWord(i.status)}</span>
-                </div>
-                {i.status === 'PENDING' && (
-                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                    <button type="button" disabled={rowBusy} onClick={() => act(i, 'resend')} style={BTN}>{busy[i.id] === 'resend' ? 'Resending…' : 'Resend'}</button>
-                    <button type="button" disabled={rowBusy} onClick={() => act(i, 'cancel')} style={BTN}>{busy[i.id] === 'cancel' ? 'Cancelling…' : 'Cancel'}</button>
-                  </div>
+              <>
+                {invitations.length > 0 && pending.length === 0 && <div style={{ fontSize: 13, color: '#718096' }}>No pending invitations.</div>}
+                {pending.map(invitationRow)}
+                {past.length > 0 && (
+                  <button type="button" onClick={() => setShowPast(v => !v)} aria-expanded={showPast}
+                    style={{ background: 'none', border: 'none', padding: '8px 0', minHeight: 44, cursor: 'pointer', fontSize: 13, color: '#4a5568', textAlign: 'left' }}>
+                    <span style={{ fontSize: 11, marginRight: 6 }}>{showPast ? '▼' : '▶'}</span>Past invitations ({past.length})
+                  </button>
                 )}
-                {rowErrors[i.id] && <div style={{ color: '#c53030', fontSize: 13, marginTop: 6 }}>{rowErrors[i.id]}</div>}
-              </div>
+                {showPast && past.map(invitationRow)}
+              </>
             );
-          })}
+          })()}
         </div>
       )}
     </div>
