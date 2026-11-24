@@ -11,6 +11,7 @@ interface Props {
   onSelect: (name: string) => void;
   onSignOut: () => void;
   onAdd?: () => void;
+  onAdmin?: () => void;
 }
 
 function typeBadgeStyle(nucleusType: string): React.CSSProperties {
@@ -184,7 +185,7 @@ function RollupCards({ rows: rowsIn, groupLabel, onCardClick }: {
   );
 }
 
-export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Props) {
+export default function Picker({ rows, email, onSelect, onSignOut, onAdd, onAdmin }: Props) {
   const [openClusters, setOpenClusters] = useState<Set<string>>(new Set());
   const [openPockets, setOpenPockets] = useState<Set<string>>(new Set());
   const [openLocalities, setOpenLocalities] = useState<Set<string>>(new Set());
@@ -382,6 +383,14 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd }: Prop
               + Add
             </button>
           )}
+          {onAdmin && (
+            <button onClick={onAdmin} style={{ fontSize: 12, color: '#2b6cb0', background: '#ebf4ff', border: '1px solid #bee3f8', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 600 }}>
+              Admin
+            </button>
+          )}
+          <button onClick={() => { window.location.href = '/account'; }} style={{ fontSize: 12, color: '#718096', background: 'none', border: '1px solid #cbd5e0', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
+            My account
+          </button>
           <button onClick={onSignOut} style={{ fontSize: 12, color: '#718096', background: 'none', border: '1px solid #cbd5e0', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
             Sign out
           </button>

@@ -9,6 +9,7 @@ import {
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
   getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusPeopleFlags, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext,
+  getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople,
 } from './clusterNotebook';
 import type { Individual, PersonSummary, NucleusPerson, MoveResult, MoveContext, PersonDetails } from './clusterNotebook';
 import { auth } from '@clerk/nextjs/server';
@@ -819,8 +820,20 @@ describe('getPersonDetails', () => {
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables).toEqual({ individualId: '7', nucleusName: 'Alpha' });
     const q = (body.query as string).replace(/\s+/g, ' ');
+    expect(q).toContain('query GetPersonDetails($individualId: String!, $nucleusName: String!)');
     expect(q).toContain('personDetails(individualId: $individualId, nucleusName: $nucleusName)');
     expect(q).toContain('checks { backgroundCheckExpiration motorVehicleClearance }');
+  });
+
+  test('with no nucleus, sends a query that has no nucleusName at all', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { personDetails: details } }));
+
+    expect(await getPersonDetails('7', null)).toEqual(details);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ individualId: '7' });
+    const q = (body.query as string).replace(/\s+/g, ' ');
+    expect(q).toContain('personDetails(individualId: $individualId)');
+    expect(q).not.toContain('nucleusName');
   });
 
   test('returns null when personDetails is null', async () => {
@@ -1099,5 +1112,96 @@ describe('SRP actions and coded errors', () => {
     expect(query).toContain('srpAction { action status');
     expect(query).toContain('srpChanged');
     expect(query).toContain('location { type }');
+  });
+});
+
+describe('admin client', () => {
+  const norm = (c: number) => {
+    const body = JSON.parse(mockFetch.mock.calls[c][1].body as string);
+    return { vars: body.variables, q: (body.query as string).replace(/\s+/g, ' ') };
+  };
+
+  test('getAdminClusters', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { adminClusters: [{ id: 'C1', name: 'Testville' }] } }));
+    expect(await getAdminClusters()).toEqual([{ id: 'C1', name: 'Testville' }]);
+    const { vars, q } = norm(0);
+    expect(vars).toEqual({});
+    expect(q).toContain('adminClusters { id name }');
+  });
+
+  test('searchPeople sends cluster, search and limit (default 20)', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { searchPeople: [] } }));
+    expect(await searchPeople('Testville', 'ana')).toEqual([]);
+    const { vars, q } = norm(0);
+    expect(vars).toEqual({ clusterName: 'Testville', search: 'ana', limit: 20 });
+    expect(q).toContain('searchPeople(clusterName: $clusterName, search: $search, limit: $limit)');
+    expect(q).toContain('ageCategory placePath hasAccess');
+    expect(q).toContain('individual {');
+  });
+
+  test('getIndividualRoles', async () => {
+    const roles = [{ id: 'R1', role: 'cso', entity: { id: 'C1', name: 'Testville', type: 'cluster' }, start: null }];
+    mockFetch.mockResolvedValue(jsonResponse({ data: { individualRoles: roles } }));
+    expect(await getIndividualRoles('7')).toEqual(roles);
+    const { vars, q } = norm(0);
+    expect(vars).toEqual({ individualId: '7' });
+    expect(q).toContain('individualRoles(individualId: $individualId) { id role entity { id name type } start }');
+  });
+
+  test('getAdminPlaces', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { adminPlaces: [{ id: 'P1', name: 'Testville', type: 'cluster', parentId: null, parentName: null }] } }));
+    expect(await getAdminPlaces('Testville')).toHaveLength(1);
+    const { vars, q } = norm(0);
+    expect(vars).toEqual({ clusterName: 'Testville' });
+    expect(q).toContain('adminPlaces(clusterName: $clusterName) { id name type parentId parentName }');
+  });
+
+  test('getAssignableRolesAt', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { assignableRolesAt: [] } }));
+    expect(await getAssignableRolesAt('P1')).toEqual([]);
+    const { vars, q } = norm(0);
+    expect(vars).toEqual({ entityId: 'P1' });
+    expect(q).toContain('assignableRolesAt(entityId: $entityId) { role permissions {');
+  });
+
+  test('grantRole returns the holding', async () => {
+    const holding = { id: 'R2', role: 'contact', entity: { id: 'P1', name: 'Northside', type: 'nucleus' }, start: '2026-11-24' };
+    mockFetch.mockResolvedValue(jsonResponse({ data: { grantRole: holding } }));
+    expect(await grantRole('7', 'contact', 'P1')).toEqual(holding);
+    const { vars, q } = norm(0);
+    expect(vars).toEqual({ individualId: '7', role: 'contact', entityId: 'P1' });
+    expect(q).toContain('grantRole(individualId: $individualId, role: $role, entityId: $entityId) { id role entity { id name type } start }');
+  });
+
+  test('endRole', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { endRole: true } }));
+    expect(await endRole('R1')).toBe(true);
+    const { vars, q } = norm(0);
+    expect(vars).toEqual({ roleId: 'R1' });
+    expect(q).toContain('endRole(roleId: $roleId)');
+  });
+
+  test('getHiddenPeople', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { hiddenPeople: [] } }));
+    expect(await getHiddenPeople('Testville')).toEqual([]);
+    const { vars, q } = norm(0);
+    expect(vars).toEqual({ clusterName: 'Testville' });
+    expect(q).toContain('hiddenPeople(clusterName: $clusterName)');
+    expect(q).toContain('nucleusName roles isResident hide { hiddenAt reason hiddenBy {');
+  });
+
+  test('getPersonDetails with null nucleus omits the variable and the argument', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { personDetails: null } }));
+    expect(await getPersonDetails('I1', null)).toBeNull();
+    const { vars, q } = norm(0);
+    expect(vars).toEqual({ individualId: 'I1' });
+    expect('nucleusName' in vars).toBe(false);
+    expect(q).not.toContain('nucleusName');
+  });
+
+  test('getPersonDetails with a nucleus name still sends it', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { personDetails: null } }));
+    await getPersonDetails('I1', 'Northside');
+    expect(norm(0).vars).toEqual({ individualId: 'I1', nucleusName: 'Northside' });
   });
 });

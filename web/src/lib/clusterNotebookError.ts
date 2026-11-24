@@ -40,6 +40,13 @@ const CODED_ERRORS: Record<string, { status: number; message: string | null }> =
   NOT_A_PLACE: { status: 400, message: 'People can only be moved to a locality or a neighbourhood in SRP.' },
   // Confirmed with cluster-notebook 2026-11-23: hideIndividual/unhideIndividual refuse a person who isn't at the nucleus.
   NOT_AT_NUCLEUS: { status: 409, message: "This person isn't connected to this nucleus." },
+  // Confirmed with cluster-notebook 2026-11-24: endRole refuses the caller's own last role giving admin standing over a cluster.
+  SELF_LOCKOUT: { status: 409, message: "You can't end your own last admin role here." },
+  // Confirmed with cluster-notebook 2026-11-24: grantRole refuses a role it doesn't know, or a missing entityId (only Administrator needs none).
+  UNKNOWN_ROLE: { status: 400, message: "That role can't be given here." },
+  ENTITY_REQUIRED: { status: 400, message: 'Choose where the role applies.' },
+  // Confirmed with cluster-notebook 2026-11-24: NOT_FOUND for an unknown role id, person or place.
+  NOT_FOUND: { status: 404, message: 'Not found.' },
 };
 
 export function clusterNotebookErrorResponse(e: unknown): NextResponse {

@@ -663,16 +663,25 @@ export interface PersonDetails {
 
 // Confirmed with cluster-notebook 2026-11-20 (PR #46): null means not permitted, unknown nucleus, or the
 // person isn't one of that nucleus's people. `checks` is null unless the caller has tier 2.
-export async function getPersonDetails(individualId: string, nucleusName: string): Promise<PersonDetails | null> {
-  const query = `
-    query GetPersonDetails($individualId: String!, $nucleusName: String!) {
-      personDetails(individualId: $individualId, nucleusName: $nucleusName) {
+export async function getPersonDetails(individualId: string, nucleusName: string | null): Promise<PersonDetails | null> {
+  // Confirmed with cluster-notebook 2026-11-24: with no nucleusName, an Administrator or a CSO of the person's
+  // cluster may read the details. With a nucleus we send the original `String!` query unchanged, so the People
+  // card works whether or not cluster-notebook's nullable change is deployed; only the no-nucleus case needs it.
+  const body = `
         individual { ${PERSON_SUMMARY_SELECTION} } estimatedAge isRegistered registrationDate address phones emails srpComments
         checks { backgroundCheckExpiration motorVehicleClearance }
       }
     }
   `;
-  const data = await request<{ personDetails: PersonDetails | null }>(query, { individualId, nucleusName });
+  const query = nucleusName === null
+    ? `
+    query GetPersonDetails($individualId: String!) {
+      personDetails(individualId: $individualId) {${body}`
+    : `
+    query GetPersonDetails($individualId: String!, $nucleusName: String!) {
+      personDetails(individualId: $individualId, nucleusName: $nucleusName) {${body}`;
+  const variables = nucleusName === null ? { individualId } : { individualId, nucleusName };
+  const data = await request<{ personDetails: PersonDetails | null }>(query, variables);
   return data.personDetails;
 }
 
@@ -822,4 +831,109 @@ export async function getIsAdministrator(): Promise<boolean> {
   `;
   const data = await request<{ isAdministrator: boolean }>(query, {});
   return data.isAdministrator;
+}
+
+// ---- Admin page (Phase 1) ----
+
+export interface AdminCluster { id: string; name: string }
+
+// Confirmed with cluster-notebook 2026-11-24: every cluster for an Administrator; for a CSO, the clusters at or
+// below each current CSO role. Empty means no Admin link. Cheap enough for every home-page load.
+export async function getAdminClusters(): Promise<AdminCluster[]> {
+  const data = await request<{ adminClusters: AdminCluster[] }>(`query GetAdminClusters { adminClusters { id name } }`, {});
+  return data.adminClusters;
+}
+
+export interface AdminPerson { individual: PersonSummary; ageCategory: AgeCategory | null; placePath: string[]; hasAccess: boolean }
+
+// Confirmed with cluster-notebook 2026-11-24: allowed for an Administrator or a CSO of the cluster. Names repeat,
+// so every result carries ageCategory and placePath; later calls use the person's id.
+export async function searchPeople(clusterName: string, search: string, limit = 20): Promise<AdminPerson[]> {
+  const query = `
+    query SearchPeople($clusterName: String!, $search: String!, $limit: Int) {
+      searchPeople(clusterName: $clusterName, search: $search, limit: $limit) {
+        individual { ${PERSON_SUMMARY_SELECTION} } ageCategory placePath hasAccess
+      }
+    }
+  `;
+  const data = await request<{ searchPeople: AdminPerson[] }>(query, { clusterName, search, limit });
+  return data.searchPeople;
+}
+
+export interface AdminLocation { id: string; name: string; type: string }
+export interface RoleHolding { id: string; role: string; entity: AdminLocation | null; start: string | null }
+
+// Confirmed with cluster-notebook 2026-11-24: the roles the caller may see. `entity` is null for Administrator.
+export async function getIndividualRoles(individualId: string): Promise<RoleHolding[]> {
+  const query = `
+    query GetIndividualRoles($individualId: String!) {
+      individualRoles(individualId: $individualId) { id role entity { id name type } start }
+    }
+  `;
+  const data = await request<{ individualRoles: RoleHolding[] }>(query, { individualId });
+  return data.individualRoles;
+}
+
+export interface AdminPlace { id: string; name: string; type: 'cluster' | 'locality' | 'setting' | 'nucleus'; parentId: string | null; parentName: string | null }
+
+// Confirmed with cluster-notebook 2026-11-24: the cluster and every locality, setting and live nucleus under it,
+// parents first. Names such as "Chapel Hill" repeat, so places are chosen by id.
+export async function getAdminPlaces(clusterName: string): Promise<AdminPlace[]> {
+  const query = `
+    query GetAdminPlaces($clusterName: String!) {
+      adminPlaces(clusterName: $clusterName) { id name type parentId parentName }
+    }
+  `;
+  const data = await request<{ adminPlaces: AdminPlace[] }>(query, { clusterName });
+  return data.adminPlaces;
+}
+
+// Confirmed with cluster-notebook 2026-11-24: exactly grantRole's gate, so the picker offers only roles that will succeed.
+export async function getAssignableRolesAt(entityId: string): Promise<RoleGrant[]> {
+  const query = `
+    query GetAssignableRolesAt($entityId: String!) {
+      assignableRolesAt(entityId: $entityId) { role permissions { ${PERMISSION_SET_SELECTION} } }
+    }
+  `;
+  const data = await request<{ assignableRolesAt: RoleGrant[] }>(query, { entityId });
+  return data.assignableRolesAt;
+}
+
+// Confirmed with cluster-notebook 2026-11-24: gated like assignableRoles; granting a role already held is unchanged.
+export async function grantRole(individualId: string, role: string, entityId: string): Promise<RoleHolding> {
+  const mutation = `
+    mutation GrantRole($individualId: String!, $role: String!, $entityId: String!) {
+      grantRole(individualId: $individualId, role: $role, entityId: $entityId) { id role entity { id name type } start }
+    }
+  `;
+  const data = await request<{ grantRole: RoleHolding }>(mutation, { individualId, role, entityId });
+  return data.grantRole;
+}
+
+// Confirmed with cluster-notebook 2026-11-24: SELF_LOCKOUT when ending the caller's own last role that gives
+// admin standing over a cluster (last Administrator, or last CSO covering it).
+export async function endRole(roleId: string): Promise<boolean> {
+  const mutation = `
+    mutation EndRole($roleId: String!) {
+      endRole(roleId: $roleId)
+    }
+  `;
+  const data = await request<{ endRole: boolean }>(mutation, { roleId });
+  return data.endRole;
+}
+
+export interface HiddenPerson { individual: PersonSummary; nucleusName: string; roles: string[]; isResident: boolean; hide: PersonHide }
+
+// Confirmed with cluster-notebook 2026-11-24: an Administrator or a CSO of the cluster can read, unhide and
+// move anyone hidden in it (they inherit WRITE down from the cluster).
+export async function getHiddenPeople(clusterName: string): Promise<HiddenPerson[]> {
+  const query = `
+    query GetHiddenPeople($clusterName: String!) {
+      hiddenPeople(clusterName: $clusterName) {
+        individual { ${PERSON_SUMMARY_SELECTION} } nucleusName roles isResident hide { hiddenAt reason hiddenBy { ${PERSON_SUMMARY_SELECTION} } }
+      }
+    }
+  `;
+  const data = await request<{ hiddenPeople: HiddenPerson[] }>(query, { clusterName });
+  return data.hiddenPeople;
 }

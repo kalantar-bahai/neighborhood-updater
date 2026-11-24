@@ -142,6 +142,7 @@ export default function AppClient() {
         onSelect={(name) => { setCardOpen({}); loadNucleus(name); }}
         onSignOut={() => window.location.href = '/signout'}
         onAdd={canCreateNucleus ? () => setCreatingNew(true) : undefined}
+        onAdmin={initialData.isAdmin ? () => window.location.href = '/admin' : undefined}
       />
 
       {creatingNew && (

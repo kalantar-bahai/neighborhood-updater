@@ -3,7 +3,8 @@ import { srpStateFor } from '@/lib/srp';
 import { auth } from '@clerk/nextjs/server';
 import { getCurrentUserEmail } from '@/lib/clerkUser';
 import { activitiesFromClusterNotebook } from '@/lib/data';
-import { getAllNuclei, getClusters } from '@/lib/clusterNotebook';
+import { getAdminClusters, getAllNuclei, getClusters } from '@/lib/clusterNotebook';
+import { lookupIsAdmin } from '@/lib/admin';
 import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
 
 function n(v: string) { return parseInt(v || '0', 10) || 0; }
@@ -19,7 +20,9 @@ export async function GET() {
   const email = await getCurrentUserEmail();
 
   try {
-    const [clusterNotebookNuclei, clusters] = await Promise.all([getAllNuclei(), getClusters()]);
+    const [clusterNotebookNuclei, clusters, isAdmin] = await Promise.all([
+      getAllNuclei(), getClusters(), lookupIsAdmin(getAdminClusters),
+    ]);
 
     const readableNuclei = clusterNotebookNuclei.filter(cn => cn.myPermissions.canRead);
     // Clusters this user can actually create a nucleus under -- drives both whether
@@ -77,6 +80,8 @@ export async function GET() {
       rows: authorizedRows,
       email,
       clusterNames: createableClusterNames,
+      // Drives the home page's "Admin" link: Administrator or CSO of some cluster.
+      isAdmin,
     });
   } catch (e: unknown) {
     return clusterNotebookErrorResponse(e);
