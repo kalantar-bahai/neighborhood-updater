@@ -357,11 +357,12 @@ export function hideRolesLine(name: string, roles: string[]): string | null {
 // classes, junior youth groups), one chip per study item (book, grade, text) the person has an entry for, drawn
 // from participation until cluster-notebook exposes SRP's per-person course record. An activity with no study
 // item gets one chip named for where it is held. Chips are in natural order.
-// state, from participant entries: current (in it now), completed (personCompleted on any entry), ended (was in
-// it, didn't complete or SRP doesn't say), none (only facilitated). Participation.completed is the item's own
-// completion, not the person's, so it never makes a chip completed.
+// state (owner, 2026-11-23), first that applies: facilitating (facilitating it now), current (taking part now),
+// done (completed it, or facilitated it), notCompleted (SRP says they never completed it), ended (took part,
+// SRP doesn't say whether they completed). Participation.completed is the item's own completion, not the
+// person's, so it never makes a chip done.
 // label: SRP's short name, without the "B" on books (the row already says Study circles): "3 (G1)", "G1", "BC".
-export type ChipState = 'current' | 'completed' | 'ended' | 'none';
+export type ChipState = 'facilitating' | 'current' | 'done' | 'notCompleted' | 'ended';
 export type CourseChip = { key: string; label: string; title: string | null; state: ChipState; facilitated: boolean; lines: string[] };
 export type CourseGroup = { type: string; label: string; chips: CourseChip[] };
 const GROUP_ORDER = ['sc', 'cc', 'jyg'];
@@ -386,8 +387,11 @@ export function courseGroups(participation: Participation[]): CourseGroup[] {
 }
 function courseChip(key: string, entries: Participation[]): CourseChip {
   const studied = entries.filter(p => p.role === 'PARTICIPANT');
-  const state: ChipState = studied.some(p => p.current) ? 'current'
-    : studied.some(p => p.personCompleted === true) ? 'completed' : studied.length ? 'ended' : 'none';
+  const facilitated = entries.some(p => p.role === 'FACILITATOR');
+  const state: ChipState = entries.some(p => p.role === 'FACILITATOR' && p.current) ? 'facilitating'
+    : studied.some(p => p.current) ? 'current'
+    : facilitated || studied.some(p => p.personCompleted === true) ? 'done'
+    : studied.every(p => p.personCompleted === false) ? 'notCompleted' : 'ended';
   const first = entries[0];
   const short = entries.find(p => p.studyItemShortName)?.studyItemShortName;
   const label = short ? (first.activityType === 'sc' ? short.replace(/^B(?=\d)/, '') : short)
@@ -399,6 +403,6 @@ function courseChip(key: string, entries: Participation[]): CourseChip {
   });
   return {
     key, label, title: first.studyItem ? (entries.find(p => p.studyItemTitle)?.studyItemTitle ?? first.studyItem) : null,
-    state, facilitated: entries.some(p => p.role === 'FACILITATOR'), lines,
+    state, facilitated, lines,
   };
 }
