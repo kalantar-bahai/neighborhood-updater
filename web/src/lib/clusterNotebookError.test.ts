@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { clusterNotebookErrorResponse } from './clusterNotebookError';
 import { ClusterNotebookCodedError, ClusterNotebookForbiddenError } from './clusterNotebook';
+import { ACCOUNT_MESSAGES } from './accessRoute';
 
 describe('clusterNotebookErrorResponse', () => {
   test('maps ClusterNotebookForbiddenError to a 403 with our own message, not cluster-notebook\'s raw text', async () => {
@@ -69,5 +70,13 @@ describe('clusterNotebookErrorResponse', () => {
     const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('m', 'ALREADY_HAS_ACCESS', 'u'), { name: 'Ana Lopez' });
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: 'Ana Lopez already has access.', code: 'ALREADY_HAS_ACCESS' });
+  });
+
+  test('the accounts route rewords SELF_LOCKOUT; the global text stays elsewhere', async () => {
+    const err = () => new ClusterNotebookCodedError('m', 'SELF_LOCKOUT', 'u');
+    const res = clusterNotebookErrorResponse(err(), { messages: ACCOUNT_MESSAGES });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "You can't remove your own access.", code: 'SELF_LOCKOUT' });
+    expect(await clusterNotebookErrorResponse(err()).json()).toEqual({ error: "You can't end your own last admin role here.", code: 'SELF_LOCKOUT' });
   });
 });

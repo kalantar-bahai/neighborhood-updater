@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { requireAdmin } from '@/lib/adminAccess';
-import { accessErrorResponse } from '@/lib/accessRoute';
+import { ACCOUNT_MESSAGES, accessErrorResponse } from '@/lib/accessRoute';
 import { getAccounts, removeAccess, restoreAccess } from '@/lib/clusterNotebook';
 
 // Who can sign in, in one cluster (Admin page, Accounts card), and removing/restoring a person's access.
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     if (!cluster) return NextResponse.json({ error: 'Missing cluster' }, { status: 400 });
     return NextResponse.json({ accounts: await getAccounts(cluster) });
   } catch (e: unknown) {
-    return accessErrorResponse(e);
+    return accessErrorResponse(e, undefined, ACCOUNT_MESSAGES);
   }
 }
 
@@ -23,10 +23,10 @@ export async function DELETE(req: NextRequest) {
     const admin = await requireAdmin(cluster);
     if (admin instanceof NextResponse) return admin;
     if (!cluster || !body.individualId) return NextResponse.json({ error: 'Missing cluster or person' }, { status: 400 });
-    await removeAccess(String(body.individualId), body.endRoles === true);
-    return NextResponse.json({ ok: true });
+    // false: the person has no enabled account, so nothing was done.
+    return NextResponse.json({ removed: await removeAccess(String(body.individualId), body.endRoles === true) });
   } catch (e: unknown) {
-    return accessErrorResponse(e);
+    return accessErrorResponse(e, undefined, ACCOUNT_MESSAGES);
   }
 }
 
@@ -40,6 +40,6 @@ export async function PATCH(req: NextRequest) {
     if (body.action !== 'restore') return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     return NextResponse.json({ restored: await restoreAccess(String(body.individualId)) });
   } catch (e: unknown) {
-    return accessErrorResponse(e);
+    return accessErrorResponse(e, undefined, ACCOUNT_MESSAGES);
   }
 }

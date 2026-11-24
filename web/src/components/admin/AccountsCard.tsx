@@ -13,8 +13,8 @@ const DANGER: React.CSSProperties = { ...BTN, background: '#c53030', color: 'whi
 type Confirm = { id: string; endRoles: boolean };
 
 // Who can sign in, in one cluster (spec: admin page, Accounts card). The card is keyed by cluster in AdminClient,
-// so switching cluster remounts it. `me` (from /api/admin/clusters) spots the caller's own row: removing it warns
-// and then signs them out. The login email is shown only on these rows; it is never written anywhere else.
+// so switching cluster remounts it. `me` (from /api/admin/clusters) spots the caller's own row, which can't be
+// removed. The login email is shown only on these rows; it is never written anywhere else.
 export default function AccountsCard({ cluster, me }: { cluster: string; me: { id: string } | null }) {
   const [open, setOpen] = useState(true);
   const [accounts, setAccounts] = useState<AccountInfo[] | null>(null);
@@ -62,24 +62,24 @@ export default function AccountsCard({ cluster, me }: { cluster: string; me: { i
   const remove = async (a: AccountInfo, endRoles: boolean) => {
     const id = a.individual.id;
     if (busy[id]) return;
-    const isSelf = id === me?.id;
     setBusyFor(id, 'remove'); setErrorFor(id, '');
     let failure = '';
+    let reread = true;
     try {
       const res = await fetch('/api/admin/accounts', {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cluster, individualId: id, endRoles }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error) failure = data.error || "Couldn't remove access.";
+      if (!res.ok || data.error) { failure = data.error || "Couldn't remove access."; reread = false; }
+      // false: the person has no enabled account any more (removed meanwhile); the list is out of date.
+      else if (data.removed === false) failure = 'No active login to remove.';
     } catch {
       failure = "Couldn't remove access. Please try again.";
+      reread = false;
     }
-    if (failure) { setErrorFor(id, failure); setBusyFor(id, null); return; }
-    // The caller's own login is now disabled; their session is no longer any use, so sign them out.
-    if (isSelf) { window.location.assign('/signout'); return; }
-    setConfirm(c => (c?.id === id ? null : c));
-    await reload();
+    if (failure) setErrorFor(id, failure);
+    if (reread) { setConfirm(c => (c?.id === id ? null : c)); await reload(); }
     setBusyFor(id, null);
   };
 
@@ -113,7 +113,7 @@ export default function AccountsCard({ cluster, me }: { cluster: string; me: { i
     return (
       <div style={{ marginTop: 8, padding: 10, border: '1px solid #fed7d7', borderRadius: 6, background: '#fff5f5', display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>
-          {removeAccessConfirm(individualDisplayName(a.individual), id === me?.id)}
+          {removeAccessConfirm(individualDisplayName(a.individual), false)}
         </div>
         <label style={{ fontSize: 14, display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}>
           <input type="checkbox" checked={c.endRoles} disabled={rowBusy}
@@ -147,6 +147,10 @@ export default function AccountsCard({ cluster, me }: { cluster: string; me: { i
             const id = a.individual.id;
             const rowBusy = !!busy[id];
             const removed = accountRemovedNote(a);
+            // Confirmed with cluster-notebook 2026-11-24: removeAccess on yourself throws SELF_LOCKOUT, so your own
+            // row has no "Remove access…". Without `me` every row shows it and the backend still refuses.
+            const isSelf = id === me?.id;
+            // Confirmed with cluster-notebook 2026-11-24: at most one account per person (replace re-points it), so rows key by individual.id.
             return (
               <div key={id} style={{ padding: '8px 0', borderTop: '1px solid #edf2f7' }}>
                 <div style={{ fontSize: 14, color: removed ? '#a0aec0' : undefined }}>
@@ -159,7 +163,7 @@ export default function AccountsCard({ cluster, me }: { cluster: string; me: { i
                       {busy[id] === 'restore' ? 'Restoring…' : 'Restore access'}
                     </button>
                   </div>
-                ) : confirm?.id === id ? confirmView(a, confirm) : (
+                ) : isSelf ? null : confirm?.id === id ? confirmView(a, confirm) : (
                   <div style={{ marginTop: 6 }}>
                     <button type="button" disabled={rowBusy} onClick={() => { setErrorFor(id, ''); setConfirm({ id, endRoles: false }); }} style={BTN}>
                       Remove access…

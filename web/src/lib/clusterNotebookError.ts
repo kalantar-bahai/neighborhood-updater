@@ -57,8 +57,11 @@ const CODED_ERRORS: Record<string, { status: number; message: string | null }> =
   CLERK_NOT_CONFIGURED: { status: 503, message: "Invitations aren't set up yet." },
 };
 
-// Options let a route word its own 403 (`forbidden`) and fill the "{name}" placeholder (`name`, ALREADY_HAS_ACCESS).
-export function clusterNotebookErrorResponse(e: unknown, opts: { forbidden?: string; name?: string } = {}): NextResponse {
+// Options let a route word its own 403 (`forbidden`), fill the "{name}" placeholder (`name`, ALREADY_HAS_ACCESS),
+// and reword a coded error where the global text would be wrong (`messages`, keyed by code; status and code stay).
+export function clusterNotebookErrorResponse(
+  e: unknown, opts: { forbidden?: string; name?: string; messages?: Partial<Record<string, string>> } = {},
+): NextResponse {
   if (e instanceof ClusterNotebookForbiddenError) {
     return NextResponse.json({ error: opts.forbidden ?? "You don't have permission to make this change." }, { status: 403 });
   }
@@ -68,7 +71,7 @@ export function clusterNotebookErrorResponse(e: unknown, opts: { forbidden?: str
   console.error('cluster-notebook call failed:', message, e instanceof Error && e.cause ? e.cause : '');
   if (e instanceof ClusterNotebookCodedError) {
     const mapped = CODED_ERRORS[e.code];
-    const text = mapped ? (mapped.message ?? e.upstreamMessage) : message;
+    const text = opts.messages?.[e.code] ?? (mapped ? (mapped.message ?? e.upstreamMessage) : message);
     return NextResponse.json(
       { error: opts.name !== undefined ? text.replace('{name}', opts.name) : text, code: e.code },
       { status: mapped?.status ?? 502 },
