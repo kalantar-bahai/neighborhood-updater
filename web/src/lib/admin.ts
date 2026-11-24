@@ -1,6 +1,6 @@
 // Admin page (phase 1): pure decisions, tested in admin.test.ts.
 // Spec: docs/superpowers/specs/ (admin page design); plan: docs/superpowers/plans/2026-11-24-admin-page-phase1.md
-import type { AdminCluster, AdminPerson, AdminPlace, RoleHolding } from './clusterNotebook';
+import type { AccountInfo, AdminCluster, AdminPerson, AdminPlace, Invitation, InvitationStatus, PersonDetails, RoleHolding } from './clusterNotebook';
 import { AGE_LABELS, roleLabel } from './people';
 import { individualDisplayName } from './personName';
 
@@ -71,4 +71,49 @@ export async function lookupIsAdmin(lookup: () => Promise<AdminCluster[]>): Prom
     console.error('adminClusters lookup failed; hiding the Admin link', e);
     return false;
   }
+}
+
+const STATUS_WORDS: Record<InvitationStatus, string> = { PENDING: 'pending', ACCEPTED: 'accepted', EXPIRED: 'expired', REVOKED: 'cancelled' };
+export function invitationStatusWord(s: InvitationStatus): string {
+  return STATUS_WORDS[s];
+}
+
+const day = (iso: string) => iso.slice(0, 10);
+
+export function invitationLine(i: Invitation): string {
+  const role = i.role ? (i.entity ? `${roleLabel(i.role).label} at ${i.entity.name}` : roleLabel(i.role).label) : '';
+  return [
+    individualDisplayName(i.individual),
+    i.email,
+    role,
+    i.invitedBy ? `invited by ${individualDisplayName(i.invitedBy)} ${day(i.createdAt)}` : '',
+    `expires ${day(i.expiresAt)}`,
+  ].filter(Boolean).join(' · ');
+}
+
+export function accountLine(a: AccountInfo): string {
+  return [
+    individualDisplayName(a.individual),
+    a.email,
+    a.createdAt ? `since ${day(a.createdAt)}` : '',
+    a.lastSeenAt ? `last seen ${day(a.lastSeenAt)}` : 'never seen',
+  ].filter(Boolean).join(' · ');
+}
+
+export function accountRemovedNote(a: AccountInfo): string | null {
+  return a.disabledAt ? `access removed ${day(a.disabledAt)}` : null;
+}
+
+// The login email is not the contact email, but SRP's first email is the best starting guess; the field stays editable.
+export function prefillEmail(details: PersonDetails | null): string {
+  return details?.emails[0]?.trim() ?? '';
+}
+
+export function adminPersonTag(p: AdminPerson): 'has access' | 'invited' | null {
+  if (p.hasAccess) return 'has access';
+  return p.pendingInvitation ? 'invited' : null;
+}
+
+export function removeAccessConfirm(name: string, isSelf: boolean): string {
+  return isSelf ? 'Remove your own access? You will be signed out.' : `Remove ${name}'s access?`;
 }
