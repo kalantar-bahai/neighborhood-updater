@@ -58,4 +58,16 @@ describe('clusterNotebookErrorResponse', () => {
     const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('cluster-notebook GraphQL error: raw text', code, 'raw text'));
     expect((await res.json()).error).toBe('raw text');
   });
+
+  test('a route can word its own 403', async () => {
+    const res = clusterNotebookErrorResponse(new ClusterNotebookForbiddenError('x'), { forbidden: 'Nope.' });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'Nope.' });
+  });
+
+  test('fills {name} and keeps the code', async () => {
+    const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('m', 'ALREADY_HAS_ACCESS', 'u'), { name: 'Ana Lopez' });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'Ana Lopez already has access.', code: 'ALREADY_HAS_ACCESS' });
+  });
 });

@@ -1,6 +1,6 @@
 import { describe, test, expect, vi } from 'vitest';
 import { adminPersonLine, roleHoldingLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin,
-  invitationStatusWord, invitationLine, accountLine, accountRemovedNote, prefillEmail, adminPersonTag, removeAccessConfirm } from './admin';
+  invitationStatusWord, invitationLine, accountLine, accountRemovedNote, prefillEmail, adminPersonTag, removeAccessConfirm, validateInvite } from './admin';
 import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary } from './clusterNotebook';
 
 const person = (ageCategory: AdminPerson['ageCategory'], placePath: string[]): AdminPerson => ({
@@ -166,5 +166,37 @@ describe('removeAccessConfirm', () => {
   test('other and self', () => {
     expect(removeAccessConfirm('Ana Lopez', false)).toBe("Remove Ana Lopez's access?");
     expect(removeAccessConfirm('Ana Lopez', true)).toBe('Remove your own access? You will be signed out.');
+  });
+});
+
+describe('validateInvite', () => {
+  const ok = { cluster: 'Metro', individualId: 'i1', email: 'ana@example.org' };
+  test('defaults: 30 days, no role, no replace', () => {
+    expect(validateInvite(ok)).toEqual({ ok: true, value: { individualId: 'i1', email: 'ana@example.org', role: null, entityId: null, expiresInDays: 30, replaceExisting: false } });
+  });
+  test('trims the email', () => {
+    expect(validateInvite({ ...ok, email: '  ana@example.org ' })).toMatchObject({ ok: true, value: { email: 'ana@example.org' } });
+  });
+  test.each(['', '   ', 'ana.example.org'])('rejects email %j', (email) => {
+    expect(validateInvite({ ...ok, email })).toMatchObject({ ok: false });
+  });
+  test('rejects a missing person', () => {
+    expect(validateInvite({ ...ok, individualId: '' })).toMatchObject({ ok: false });
+  });
+  test('role without a place is rejected', () => {
+    expect(validateInvite({ ...ok, role: 'CSO' })).toMatchObject({ ok: false });
+  });
+  test('Administrator without a place is allowed', () => {
+    expect(validateInvite({ ...ok, role: 'Administrator' })).toMatchObject({ ok: true, value: { role: 'Administrator', entityId: null } });
+  });
+  test('role with a place is passed through', () => {
+    expect(validateInvite({ ...ok, role: 'CSO', entityId: 'e1', replaceExisting: true }))
+      .toMatchObject({ ok: true, value: { role: 'CSO', entityId: 'e1', replaceExisting: true } });
+  });
+  test.each([0, 91, 'x', 1.5, null])('rejects expiry %j', (expiresInDays) => {
+    expect(validateInvite({ ...ok, expiresInDays })).toMatchObject({ ok: false });
+  });
+  test.each([1, 90, 14])('accepts expiry %j', (expiresInDays) => {
+    expect(validateInvite({ ...ok, expiresInDays })).toMatchObject({ ok: true, value: { expiresInDays } });
   });
 });

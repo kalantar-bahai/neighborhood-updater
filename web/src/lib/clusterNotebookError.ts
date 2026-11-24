@@ -57,9 +57,10 @@ const CODED_ERRORS: Record<string, { status: number; message: string | null }> =
   CLERK_NOT_CONFIGURED: { status: 503, message: "Invitations aren't set up yet." },
 };
 
-export function clusterNotebookErrorResponse(e: unknown): NextResponse {
+// Options let a route word its own 403 (`forbidden`) and fill the "{name}" placeholder (`name`, ALREADY_HAS_ACCESS).
+export function clusterNotebookErrorResponse(e: unknown, opts: { forbidden?: string; name?: string } = {}): NextResponse {
   if (e instanceof ClusterNotebookForbiddenError) {
-    return NextResponse.json({ error: "You don't have permission to make this change." }, { status: 403 });
+    return NextResponse.json({ error: opts.forbidden ?? "You don't have permission to make this change." }, { status: 403 });
   }
   const message = e instanceof Error ? e.message : 'Unexpected error contacting cluster-notebook';
   // Log the cause too: Node's fetch reports every connection problem as a bare
@@ -67,8 +68,9 @@ export function clusterNotebookErrorResponse(e: unknown): NextResponse {
   console.error('cluster-notebook call failed:', message, e instanceof Error && e.cause ? e.cause : '');
   if (e instanceof ClusterNotebookCodedError) {
     const mapped = CODED_ERRORS[e.code];
+    const text = mapped ? (mapped.message ?? e.upstreamMessage) : message;
     return NextResponse.json(
-      { error: mapped ? (mapped.message ?? e.upstreamMessage) : message, code: e.code },
+      { error: opts.name !== undefined ? text.replace('{name}', opts.name) : text, code: e.code },
       { status: mapped?.status ?? 502 },
     );
   }

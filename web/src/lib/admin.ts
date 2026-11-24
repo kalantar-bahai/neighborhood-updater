@@ -117,3 +117,24 @@ export function adminPersonTag(p: AdminPerson): 'has access' | 'invited' | null 
 export function removeAccessConfirm(name: string, isSelf: boolean): string {
   return isSelf ? 'Remove your own access? You will be signed out.' : `Remove ${name}'s access?`;
 }
+
+export interface InviteInput {
+  individualId: string; email: string; role: string | null; entityId: string | null; expiresInDays: number; replaceExisting: boolean;
+}
+
+// Validates the body of POST /api/admin/invitations (cluster is checked by the route). Only "Administrator" may
+// be given without a place; expiry defaults to 30 days and must be an integer 1-90 when given.
+export function validateInvite(body: Record<string, unknown>): { ok: true; value: InviteInput } | { ok: false; error: string } {
+  const individualId = typeof body.individualId === 'string' ? body.individualId : '';
+  if (!individualId) return { ok: false, error: 'Missing person' };
+  const email = typeof body.email === 'string' ? body.email.trim() : '';
+  if (!email.includes('@')) return { ok: false, error: 'Enter an email address.' };
+  const role = typeof body.role === 'string' && body.role ? body.role : null;
+  const entityId = typeof body.entityId === 'string' && body.entityId ? body.entityId : null;
+  if (role !== null && role !== 'Administrator' && entityId === null) return { ok: false, error: 'Choose where the role applies.' };
+  const days = body.expiresInDays === undefined ? 30 : body.expiresInDays;
+  if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 90) {
+    return { ok: false, error: 'Expiry must be a whole number of days from 1 to 90.' };
+  }
+  return { ok: true, value: { individualId, email, role, entityId, expiresInDays: days, replaceExisting: body.replaceExisting === true } };
+}
