@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from 'vitest';
-import { adminPersonLine, roleHoldingLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin,
+import { adminPersonLine, roleHoldingLine, currentRolesLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin,
   invitationStatusWord, invitationLine, accountLine, accountRemovedNote, activeAccountCount, prefillEmail, adminPersonTag, removeAccessConfirm, validateInvite,
   inviteRequestBody, cancelInvitationConfirm } from './admin';
 import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary } from './clusterNotebook';
@@ -225,4 +225,11 @@ describe('cancelInvitationConfirm', () => {
   test('names the address', () => {
     expect(cancelInvitationConfirm('ana@example.org')).toBe('Cancel the invitation to ana@example.org?');
   });
+});
+
+describe('currentRolesLine', () => {
+  test('lists each holding', () =>
+    expect(currentRolesLine([holding('CSO', 'NC-215 Triangle'), holding('CSO', null)]))
+      .toBe('Current roles: CSO · NC-215 Triangle; CSO'));
+  test('none', () => expect(currentRolesLine([])).toBe('No current roles'));
 });

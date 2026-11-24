@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { AdminPerson, Invitation } from '@/lib/clusterNotebook';
-import { adminPersonLine, adminPersonTag, cancelInvitationConfirm, invitationLine, invitationStatusWord, inviteRequestBody, prefillEmail } from '@/lib/admin';
+import type { AdminPerson, Invitation, RoleHolding } from '@/lib/clusterNotebook';
+import { adminPersonLine, adminPersonTag, currentRolesLine, cancelInvitationConfirm, invitationLine, invitationStatusWord, inviteRequestBody, prefillEmail } from '@/lib/admin';
 import PersonFinder from './PersonFinder';
 import PlaceRolePicker, { type PlaceRole } from './PlaceRolePicker';
 
@@ -13,7 +13,11 @@ const LABEL: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#4a5
 const TAG: React.CSSProperties = { fontSize: 11, color: '#4a5568', background: '#edf2f7', borderRadius: 8, padding: '1px 6px', whiteSpace: 'nowrap' };
 
 // The invite form for one picked person. `seq` changes on every pick and keys the PlaceRolePicker so it resets.
-type Form = { person: AdminPerson; seq: number; email: string; value: PlaceRole | 'none' | null; days: string };
+// `roles` is what the person already holds (null until loaded); an invitation never removes them.
+type Form = {
+  person: AdminPerson; seq: number; email: string; value: PlaceRole | 'none' | null; days: string;
+  roles: RoleHolding[] | null;
+};
 // An invite error in words; offerReplace after 409 ALREADY_HAS_ACCESS ("{name} already has access.") shows "Replace their login?".
 type Outcome = { text: string; offerReplace: boolean } | null;
 
@@ -71,16 +75,19 @@ export default function InviteCard({ cluster }: { cluster: string }) {
     const seq = ++pickSeq.current;
     emailTyped.current = false;
     // The email is replaced on every pick: empty now, then the person's first SRP email if they have one.
-    setForm({ person: p, seq, email: '', value: 'none', days: '30' });
+    setForm({ person: p, seq, email: '', value: 'none', days: '30', roles: null });
     setOutcome(null); setSent(''); setSending(false);
     try {
       const res = await fetch(`/api/admin/person?id=${encodeURIComponent(p.individual.id)}`);
       const data = await res.json();
-      if (pickSeq.current !== seq || emailTyped.current || !res.ok || data.error) return;
-      const email = prefillEmail(data.details);
-      setForm(f => f && f.seq === seq ? { ...f, email } : f);
+      if (pickSeq.current !== seq || !res.ok || data.error) return;
+      const roles: RoleHolding[] = data.roles ?? [];
+      // The prefill never overwrites what the admin has typed since this pick.
+      setForm(f => f && f.seq === seq
+        ? { ...f, roles, email: emailTyped.current ? f.email : prefillEmail(data.details) }
+        : f);
     } catch {
-      // No prefill; the field stays empty and editable.
+      // No prefill and no roles line; the field stays empty and editable.
     }
   };
 
@@ -158,6 +165,7 @@ export default function InviteCard({ cluster }: { cluster: string }) {
           </span>
           <button type="button" disabled={sending} onClick={changePerson} style={BTN}>Change person</button>
         </div>
+        {f.roles && <div style={{ fontSize: 13, color: '#4a5568' }}>{currentRolesLine(f.roles)}</div>}
         <label style={LABEL}>
           Email
           <input type="email" value={f.email} autoComplete="off"
