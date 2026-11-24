@@ -956,7 +956,7 @@ export interface Invitation {
   acceptedAt: string | null; replacedBy: string | null;
 }
 export interface AccountInfo {
-  individual: PersonSummary; email: string; provider: string | null; createdAt: string | null;
+  individual: PersonSummary; email: string | null; provider: string | null; createdAt: string | null;
   lastSeenAt: string | null; disabledAt: string | null;
 }
 

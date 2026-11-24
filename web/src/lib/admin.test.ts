@@ -127,7 +127,7 @@ describe('accountLine and accountRemovedNote', () => {
     expect(accountLine(account({ lastSeenAt: null }))).toBe('Ana Lopez · ana@example.org · since 2026-11-24 · never seen');
   });
   test('omits a null email', () => {
-    expect(accountLine(account({ email: null as unknown as string }))).toBe('Ana Lopez · since 2026-11-24 · last seen 2026-11-25');
+    expect(accountLine(account({ email: null }))).toBe('Ana Lopez · since 2026-11-24 · last seen 2026-11-25');
   });
   test('removed note', () => {
     expect(accountRemovedNote(account({ disabledAt: '2026-11-26T09:00:00Z' }))).toBe('access removed 2026-11-26');
