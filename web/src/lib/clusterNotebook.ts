@@ -969,7 +969,7 @@ export async function inviteIndividual(input: {
   individualId: string; email: string; role: string | null; entityId: string | null; expiresInDays: number; replaceExisting: boolean;
 }): Promise<Invitation> {
   const mutation = `
-    mutation InviteIndividual($individualId: String!, $email: String!, $role: String, $entityId: String, $expiresInDays: Int, $replaceExisting: Boolean) {
+    mutation InviteIndividual($individualId: String!, $email: String!, $role: String, $entityId: String, $expiresInDays: Int!, $replaceExisting: Boolean!) {
       inviteIndividual(individualId: $individualId, email: $email, role: $role, entityId: $entityId, expiresInDays: $expiresInDays, replaceExisting: $replaceExisting) { ${INVITATION_SELECTION} }
     }
   `;
@@ -992,7 +992,7 @@ export async function revokeInvitation(id: string): Promise<Invitation> {
 // Confirmed with cluster-notebook 2026-11-24: removeAccess disables the login (endRoles also ends their roles).
 export async function removeAccess(individualId: string, endRoles: boolean): Promise<boolean> {
   const mutation = `
-    mutation RemoveAccess($individualId: String!, $endRoles: Boolean) {
+    mutation RemoveAccess($individualId: String!, $endRoles: Boolean!) {
       removeAccess(individualId: $individualId, endRoles: $endRoles)
     }
   `;
