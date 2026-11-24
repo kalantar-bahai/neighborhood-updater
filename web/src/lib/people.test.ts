@@ -526,17 +526,19 @@ describe('courseGroups', () => {
     const [g] = courseGroups([act({ activityType: 'jyg', studyItem: null, activityId: 'J1', heldAt: 'Lloyd Farm' })]);
     expect(g.chips.map(c => [c.label, c.title])).toEqual([['Lloyd Farm', null]]);
   });
-  test('states: current, completed, ended, none (facilitated only); the item\'s completed flag is not the person\'s', () => {
+  test('states: facilitating now, in it now, done, ended, not completed; the item\'s completed flag is not the person\'s', () => {
     const state = (ps: Participation[]) => courseGroups(ps)[0].chips[0].state;
-    expect(state([sc({ studyItem: 'Book 1', current: false, personCompleted: true })])).toBe('completed');
-    expect(state([sc({ studyItem: 'Book 1', current: false, personCompleted: false }), sc({ studyItem: 'Book 1', current: false, personCompleted: true })])).toBe('completed');
-    expect(state([sc({ studyItem: 'Book 1', current: false, personCompleted: false })])).toBe('ended');
-    expect(state([sc({ studyItem: 'Book 1', current: false, personCompleted: true }), sc({ studyItem: 'Book 1' })])).toBe('current');
-    expect(state([sc({ studyItem: 'Book 1', current: false, completed: true }), sc({ studyItem: 'Book 1' })])).toBe('current');
-    expect(state([sc({ studyItem: 'Book 1', current: false, completed: true })])).toBe('ended');
-    expect(state([sc({ studyItem: 'Book 1', current: false })])).toBe('ended');
-    const [c] = courseGroups([sc({ studyItem: 'Book 7', role: 'FACILITATOR', completed: true })])[0].chips;
-    expect([c.state, c.facilitated]).toEqual(['none', true]);
+    const past = { studyItem: 'Book 1', current: false };
+    expect(state([sc({ ...past, role: 'FACILITATOR' }), sc({ studyItem: 'Book 1', role: 'FACILITATOR' })])).toBe('facilitating');
+    expect(state([sc({ studyItem: 'Book 1', role: 'FACILITATOR' }), sc({ studyItem: 'Book 1' })])).toBe('facilitating');
+    expect(state([sc({ ...past, personCompleted: true }), sc({ studyItem: 'Book 1' })])).toBe('current');
+    expect(state([sc({ ...past, personCompleted: true })])).toBe('done');
+    expect(state([sc({ ...past, personCompleted: false }), sc({ ...past, personCompleted: true })])).toBe('done');
+    expect(state([sc({ ...past, role: 'FACILITATOR', completed: true })])).toBe('done');
+    expect(state([sc({ ...past, personCompleted: false }), sc({ ...past, role: 'FACILITATOR' })])).toBe('done');
+    expect(state([sc({ ...past, personCompleted: false })])).toBe('notCompleted');
+    expect(state([sc({ ...past, personCompleted: false }), sc({ ...past, personCompleted: null })])).toBe('ended');
+    expect(state([sc({ ...past, completed: true })])).toBe('ended');
   });
   test('title and lines for the tap-open detail', () => {
     const [c] = courseGroups([

@@ -465,13 +465,15 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
 
   // Activities come with the list, so they show at once. One summary line; a click opens the course chips
   // (layout A), and "Full list" under them opens every activity in a dialog (owner, 2026-11-23).
-  // Chips: one row per activity type; blue ◐ in it now, green ✓ completed, grey ended without completing (or
-  // unknown), white only facilitated; 🎓 facilitated. Tap a chip for its entries (see courseGroups).
-  const CHIP_STYLE: Record<ChipState, { background: string; color: string; border: string; mark: string }> = {
+  // Chips (owner, 2026-11-23): one row per activity type. Green: facilitating now; blue ◐: taking part now;
+  // white: completed or facilitated; grey: took part, not completed (struck through when SRP says never
+  // completed). 🎓 marks anything they facilitated. Tap a chip for its entries (see courseGroups).
+  const CHIP_STYLE: Record<ChipState, { background: string; color: string; border: string; mark: string; strike?: boolean }> = {
+    facilitating: { background: '#c6f6d5', color: '#22543d', border: '#9ae6b4', mark: '' },
     current: { background: '#bee3f8', color: '#2a4365', border: '#90cdf4', mark: ' ◐' },
-    completed: { background: '#c6f6d5', color: '#22543d', border: '#9ae6b4', mark: ' ✓' },
-    ended: { background: '#edf2f7', color: '#4a5568', border: '#e2e8f0', mark: '' },
-    none: { background: 'white', color: '#4a5568', border: '#e2e8f0', mark: '' },
+    done: { background: 'white', color: '#2d3748', border: '#cbd5e0', mark: '' },
+    ended: { background: '#edf2f7', color: '#718096', border: '#e2e8f0', mark: '' },
+    notCompleted: { background: '#edf2f7', color: '#718096', border: '#e2e8f0', mark: '', strike: true },
   };
   const activitiesSection = (personId: string) => {
     const participation = rows?.find(r => r.id === personId)?.participation ?? [];
@@ -499,7 +501,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
                 return (
                   <button key={id} type="button" aria-pressed={courseOpen === id} title={c.title ?? c.label}
                     onClick={() => setCourseOpen(o => (o === id ? null : id))}
-                    style={{ fontSize: 12, padding: '2px 8px', borderRadius: 10, cursor: 'pointer', background: st.background, color: st.color,
+                    style={{ fontSize: 12, padding: '2px 8px', borderRadius: 10, cursor: 'pointer', background: st.background, color: st.color, textDecoration: st.strike ? 'line-through' : undefined,
                       border: `1px solid ${courseOpen === id ? '#2b6cb0' : st.border}` }}>
                     {c.label}{st.mark}{c.facilitated && ' 🎓'}
                   </button>
@@ -516,7 +518,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
         )}
         {activitiesOpen && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, fontSize: 11, color: '#718096' }}>
-            <span>◐ in it now · ✓ completed · grey: didn&apos;t complete · 🎓 facilitated</span>
+            <span>green: facilitating now · ◐ taking part now · grey: not completed · 🎓 facilitated</span>
             <button type="button" onClick={() => setFullListFor(personId)}
               style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: '#2b6cb0', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               Full list
