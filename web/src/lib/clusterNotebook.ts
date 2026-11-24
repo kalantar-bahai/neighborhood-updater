@@ -844,7 +844,10 @@ export async function getAdminClusters(): Promise<AdminCluster[]> {
   return data.adminClusters;
 }
 
-export interface AdminPerson { individual: PersonSummary; ageCategory: AgeCategory | null; placePath: string[]; hasAccess: boolean }
+export interface AdminPerson { individual: PersonSummary; ageCategory: AgeCategory | null; placePath: string[]; hasAccess: boolean;
+  // Confirmed with cluster-notebook 2026-11-24: the person's pending invitation, if any. Selected only by this admin search.
+  pendingInvitation: { id: string; expiresAt: string } | null;
+}
 
 // Confirmed with cluster-notebook 2026-11-24: allowed for an Administrator or a CSO of the cluster. Names repeat,
 // so every result carries ageCategory and placePath; later calls use the person's id.
@@ -852,7 +855,7 @@ export async function searchPeople(clusterName: string, search: string, limit = 
   const query = `
     query SearchPeople($clusterName: String!, $search: String!, $limit: Int) {
       searchPeople(clusterName: $clusterName, search: $search, limit: $limit) {
-        individual { ${PERSON_SUMMARY_SELECTION} } ageCategory placePath hasAccess
+        individual { ${PERSON_SUMMARY_SELECTION} } ageCategory placePath hasAccess pendingInvitation { id expiresAt }
       }
     }
   `;
@@ -936,4 +939,91 @@ export async function getHiddenPeople(clusterName: string): Promise<HiddenPerson
   `;
   const data = await request<{ hiddenPeople: HiddenPerson[] }>(query, { clusterName });
   return data.hiddenPeople;
+}
+
+// ---- Admin page (Phase 2): invitations and accounts ----
+
+// Confirmed with cluster-notebook 2026-11-24: the caller as a person; null when they have no Individual record.
+export async function getMe(): Promise<PersonSummary | null> {
+  const data = await request<{ me: PersonSummary | null }>(`query GetMe { me { ${PERSON_SUMMARY_SELECTION} } }`, {});
+  return data.me;
+}
+
+export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'REVOKED';
+export interface Invitation {
+  id: string; individual: PersonSummary; email: string; role: string | null; entity: AdminLocation | null;
+  status: InvitationStatus; invitedBy: PersonSummary | null; createdAt: string; expiresAt: string;
+  acceptedAt: string | null; replacedBy: string | null;
+}
+export interface AccountInfo {
+  individual: PersonSummary; email: string | null; provider: string | null; createdAt: string | null;
+  lastSeenAt: string | null; disabledAt: string | null;
+}
+
+const INVITATION_SELECTION = `id individual { ${PERSON_SUMMARY_SELECTION} } email role entity { id name type } status invitedBy { ${PERSON_SUMMARY_SELECTION} } createdAt expiresAt acceptedAt replacedBy`;
+
+// Confirmed with cluster-notebook 2026-11-24: cluster-notebook owns invitations end to end (permission, Clerk, record,
+// link at first sign-in). role/entityId may be null (access only); replaceExisting re-invites someone who already
+// has a login. Needs an Administrator, or a caller able to end every current role the person holds.
+export async function inviteIndividual(input: {
+  individualId: string; email: string; role: string | null; entityId: string | null; expiresInDays: number; replaceExisting: boolean;
+}): Promise<Invitation> {
+  const mutation = `
+    mutation InviteIndividual($individualId: String!, $email: String!, $role: String, $entityId: String, $expiresInDays: Int!, $replaceExisting: Boolean!) {
+      inviteIndividual(individualId: $individualId, email: $email, role: $role, entityId: $entityId, expiresInDays: $expiresInDays, replaceExisting: $replaceExisting) { ${INVITATION_SELECTION} }
+    }
+  `;
+  const data = await request<{ inviteIndividual: Invitation }>(mutation, input);
+  return data.inviteIndividual;
+}
+
+export async function resendInvitation(id: string): Promise<Invitation> {
+  const mutation = `mutation ResendInvitation($id: String!) { resendInvitation(id: $id) { ${INVITATION_SELECTION} } }`;
+  const data = await request<{ resendInvitation: Invitation }>(mutation, { id });
+  return data.resendInvitation;
+}
+
+export async function revokeInvitation(id: string): Promise<Invitation> {
+  const mutation = `mutation RevokeInvitation($id: String!) { revokeInvitation(id: $id) { ${INVITATION_SELECTION} } }`;
+  const data = await request<{ revokeInvitation: Invitation }>(mutation, { id });
+  return data.revokeInvitation;
+}
+
+// Confirmed with cluster-notebook 2026-11-24: removeAccess disables the login (endRoles also ends their roles).
+export async function removeAccess(individualId: string, endRoles: boolean): Promise<boolean> {
+  const mutation = `
+    mutation RemoveAccess($individualId: String!, $endRoles: Boolean!) {
+      removeAccess(individualId: $individualId, endRoles: $endRoles)
+    }
+  `;
+  const data = await request<{ removeAccess: boolean }>(mutation, { individualId, endRoles });
+  return data.removeAccess;
+}
+
+// Confirmed with cluster-notebook 2026-11-24: same login back (lifts the Clerk ban, re-enables the link); roles
+// ended earlier stay ended; false when there is no disabled login.
+export async function restoreAccess(individualId: string): Promise<boolean> {
+  const mutation = `mutation RestoreAccess($individualId: String!) { restoreAccess(individualId: $individualId) }`;
+  const data = await request<{ restoreAccess: boolean }>(mutation, { individualId });
+  return data.restoreAccess;
+}
+
+export async function getInvitations(clusterName: string, status: InvitationStatus | null): Promise<Invitation[]> {
+  const query = `
+    query GetInvitations($clusterName: String!, $status: InvitationStatus) {
+      invitations(clusterName: $clusterName, status: $status) { ${INVITATION_SELECTION} }
+    }
+  `;
+  const data = await request<{ invitations: Invitation[] }>(query, { clusterName, status });
+  return data.invitations;
+}
+
+export async function getAccounts(clusterName: string): Promise<AccountInfo[]> {
+  const query = `
+    query GetAccounts($clusterName: String!) {
+      accounts(clusterName: $clusterName) { individual { ${PERSON_SUMMARY_SELECTION} } email provider createdAt lastSeenAt disabledAt }
+    }
+  `;
+  const data = await request<{ accounts: AccountInfo[] }>(query, { clusterName });
+  return data.accounts;
 }

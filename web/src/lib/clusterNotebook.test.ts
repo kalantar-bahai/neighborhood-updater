@@ -10,6 +10,7 @@ import {
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
   getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusPeopleFlags, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext,
   getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople,
+  getMe, inviteIndividual, resendInvitation, revokeInvitation, removeAccess, restoreAccess, getInvitations, getAccounts,
 } from './clusterNotebook';
 import type { Individual, PersonSummary, NucleusPerson, MoveResult, MoveContext, PersonDetails } from './clusterNotebook';
 import { auth } from '@clerk/nextjs/server';
@@ -1137,6 +1138,66 @@ describe('admin client', () => {
     expect(q).toContain('searchPeople(clusterName: $clusterName, search: $search, limit: $limit)');
     expect(q).toContain('ageCategory placePath hasAccess');
     expect(q).toContain('individual {');
+    expect(q).toContain('pendingInvitation { id expiresAt }');
+  });
+
+  const INV = 'id individual {';
+  test('getMe', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { me: null } }));
+    expect(await getMe()).toBeNull();
+    const { vars, q } = norm(0);
+    expect(vars).toEqual({});
+    expect(q).toContain('me {');
+  });
+
+  test('inviteIndividual sends every variable, nulls as null', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { inviteIndividual: { id: 'I1' } } }));
+    const input = { individualId: '7', email: 'ana@example.org', role: null, entityId: null, expiresInDays: 30, replaceExisting: false };
+    expect(await inviteIndividual(input)).toEqual({ id: 'I1' });
+    const { vars, q } = norm(0);
+    expect(vars).toEqual(input);
+    expect(q).toContain('inviteIndividual(individualId: $individualId, email: $email, role: $role, entityId: $entityId, expiresInDays: $expiresInDays, replaceExisting: $replaceExisting)');
+    expect(q).toContain(INV);
+    expect(q).toContain('status invitedBy {');
+    expect(q).toContain('createdAt expiresAt acceptedAt replacedBy');
+  });
+
+  test('resendInvitation and revokeInvitation send the id', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { resendInvitation: { id: 'I1' }, revokeInvitation: { id: 'I1' } } }));
+    expect(await resendInvitation('I1')).toEqual({ id: 'I1' });
+    expect(await revokeInvitation('I1')).toEqual({ id: 'I1' });
+    expect(norm(0).vars).toEqual({ id: 'I1' });
+    expect(norm(0).q).toContain('resendInvitation(id: $id)');
+    expect(norm(1).vars).toEqual({ id: 'I1' });
+    expect(norm(1).q).toContain('revokeInvitation(id: $id)');
+  });
+
+  test('removeAccess and restoreAccess', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { removeAccess: true, restoreAccess: false } }));
+    expect(await removeAccess('7', true)).toBe(true);
+    expect(await restoreAccess('7')).toBe(false);
+    expect(norm(0).vars).toEqual({ individualId: '7', endRoles: true });
+    expect(norm(0).q).toContain('removeAccess(individualId: $individualId, endRoles: $endRoles)');
+    expect(norm(1).vars).toEqual({ individualId: '7' });
+    expect(norm(1).q).toContain('restoreAccess(individualId: $individualId)');
+  });
+
+  test('getInvitations sends cluster and status (null when none)', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { invitations: [] } }));
+    expect(await getInvitations('Testville', null)).toEqual([]);
+    await getInvitations('Testville', 'PENDING');
+    expect(norm(0).vars).toEqual({ clusterName: 'Testville', status: null });
+    expect(norm(1).vars).toEqual({ clusterName: 'Testville', status: 'PENDING' });
+    expect(norm(0).q).toContain('invitations(clusterName: $clusterName, status: $status)');
+    expect(norm(0).q).toContain('$status: InvitationStatus');
+  });
+
+  test('getAccounts', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { accounts: [] } }));
+    expect(await getAccounts('Testville')).toEqual([]);
+    expect(norm(0).vars).toEqual({ clusterName: 'Testville' });
+    expect(norm(0).q).toContain('accounts(clusterName: $clusterName)');
+    expect(norm(0).q).toContain('provider createdAt lastSeenAt disabledAt');
   });
 
   test('getIndividualRoles', async () => {

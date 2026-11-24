@@ -1,10 +1,12 @@
 import { describe, test, expect, vi } from 'vitest';
-import { adminPersonLine, roleHoldingLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin } from './admin';
-import type { AdminPerson, AdminPlace, RoleHolding } from './clusterNotebook';
+import { adminPersonLine, roleHoldingLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin,
+  invitationStatusWord, invitationLine, accountLine, accountRemovedNote, activeAccountCount, prefillEmail, adminPersonTag, removeAccessConfirm, validateInvite,
+  inviteRequestBody, cancelInvitationConfirm } from './admin';
+import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary } from './clusterNotebook';
 
 const person = (ageCategory: AdminPerson['ageCategory'], placePath: string[]): AdminPerson => ({
   individual: { id: 'i1', firstName: 'Ana', familyName: 'Lopez', middleNames: null, nickname: null, place: null, placeSync: null, inSrp: true },
-  ageCategory, placePath, hasAccess: false,
+  ageCategory, placePath, hasAccess: false, pendingInvitation: null,
 });
 const holding = (role: string, name: string | null): RoleHolding => ({
   id: 'r1', role, start: null, entity: name === null ? null : { id: 'e1', name, type: 'cluster' },
@@ -78,5 +80,149 @@ describe('lookupIsAdmin', () => {
     expect(await lookupIsAdmin(async () => { throw new Error('boom'); })).toBe(false);
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
+  });
+});
+
+const summary = (firstName: string, familyName: string): PersonSummary =>
+  ({ id: 'x', firstName, familyName, middleNames: null, nickname: null, place: null, placeSync: null, inSrp: true });
+const invitation = (o: Partial<Invitation> = {}): Invitation => ({
+  id: 'inv1', individual: summary('Ana', 'Lopez'), email: 'ana@example.org', role: 'CSO',
+  entity: { id: 'e1', name: 'NC-215 Triangle', type: 'cluster' }, status: 'PENDING',
+  invitedBy: summary('Ben', 'Okafor'), createdAt: '2026-11-24T10:00:00Z', expiresAt: '2026-12-24T10:00:00Z',
+  acceptedAt: null, replacedBy: null, ...o,
+});
+const account = (o: Partial<AccountInfo> = {}): AccountInfo => ({
+  individual: summary('Ana', 'Lopez'), email: 'ana@example.org', provider: 'google',
+  createdAt: '2026-11-24T10:00:00Z', lastSeenAt: '2026-11-25T08:00:00Z', disabledAt: null, ...o,
+});
+
+describe('invitationStatusWord', () => {
+  test('words', () => {
+    expect(invitationStatusWord('PENDING')).toBe('pending');
+    expect(invitationStatusWord('ACCEPTED')).toBe('accepted');
+    expect(invitationStatusWord('EXPIRED')).toBe('expired');
+    expect(invitationStatusWord('REVOKED')).toBe('cancelled');
+  });
+});
+
+describe('invitationLine', () => {
+  test('full line', () => {
+    expect(invitationLine(invitation())).toBe('Ana Lopez · ana@example.org · CSO at NC-215 Triangle · invited by Ben Okafor 2026-11-24 · expires 2026-12-24');
+  });
+  test('no role', () => {
+    expect(invitationLine(invitation({ role: null, entity: null }))).toBe('Ana Lopez · ana@example.org · invited by Ben Okafor 2026-11-24 · expires 2026-12-24');
+  });
+  test('role without entity', () => {
+    expect(invitationLine(invitation({ entity: null }))).toBe('Ana Lopez · ana@example.org · CSO · invited by Ben Okafor 2026-11-24 · expires 2026-12-24');
+  });
+  test('unknown inviter', () => {
+    expect(invitationLine(invitation({ invitedBy: null }))).toBe('Ana Lopez · ana@example.org · CSO at NC-215 Triangle · expires 2026-12-24');
+  });
+});
+
+describe('accountLine and accountRemovedNote', () => {
+  test('full line', () => {
+    expect(accountLine(account())).toBe('Ana Lopez · ana@example.org · since 2026-11-24 · last seen 2026-11-25');
+  });
+  test('never seen', () => {
+    expect(accountLine(account({ lastSeenAt: null }))).toBe('Ana Lopez · ana@example.org · since 2026-11-24 · never seen');
+  });
+  test('omits a null email', () => {
+    expect(accountLine(account({ email: null }))).toBe('Ana Lopez · since 2026-11-24 · last seen 2026-11-25');
+  });
+  test('removed note', () => {
+    expect(accountRemovedNote(account({ disabledAt: '2026-11-26T09:00:00Z' }))).toBe('access removed 2026-11-26');
+    expect(accountRemovedNote(account())).toBeNull();
+  });
+  test('active count skips removed logins', () => {
+    expect(activeAccountCount([])).toBe(0);
+    expect(activeAccountCount([account(), account({ disabledAt: '2026-11-26T09:00:00Z' }), account()])).toBe(2);
+  });
+});
+
+describe('prefillEmail', () => {
+  const details = (emails: string[]): PersonDetails => ({
+    individual: summary('Ana', 'Lopez'), estimatedAge: null, isRegistered: null, registrationDate: null,
+    address: null, phones: [], emails, srpComments: null, checks: null,
+  });
+  test('first email, trimmed', () => {
+    expect(prefillEmail(details(['  ana@example.org ', 'b@example.org']))).toBe('ana@example.org');
+  });
+  test('empty without details or emails', () => {
+    expect(prefillEmail(null)).toBe('');
+    expect(prefillEmail(details([]))).toBe('');
+  });
+});
+
+describe('adminPersonTag', () => {
+  const inv = { id: 'inv1', expiresAt: '2026-12-24T10:00:00Z' };
+  test('has access wins over invited', () => {
+    expect(adminPersonTag({ ...person(null, []), hasAccess: true, pendingInvitation: inv })).toBe('has access');
+  });
+  test('invited', () => {
+    expect(adminPersonTag({ ...person(null, []), pendingInvitation: inv })).toBe('invited');
+  });
+  test('none', () => {
+    expect(adminPersonTag(person(null, []))).toBeNull();
+  });
+});
+
+describe('removeAccessConfirm', () => {
+  test('other and self', () => {
+    expect(removeAccessConfirm('Ana Lopez')).toBe("Remove Ana Lopez's access?");
+  });
+});
+
+describe('validateInvite', () => {
+  const ok = { cluster: 'Metro', individualId: 'i1', email: 'ana@example.org' };
+  test('defaults: 30 days, no role, no replace', () => {
+    expect(validateInvite(ok)).toEqual({ ok: true, value: { individualId: 'i1', email: 'ana@example.org', role: null, entityId: null, expiresInDays: 30, replaceExisting: false } });
+  });
+  test('trims the email', () => {
+    expect(validateInvite({ ...ok, email: '  ana@example.org ' })).toMatchObject({ ok: true, value: { email: 'ana@example.org' } });
+  });
+  test.each(['', '   ', 'ana.example.org'])('rejects email %j', (email) => {
+    expect(validateInvite({ ...ok, email })).toMatchObject({ ok: false });
+  });
+  test('rejects a missing person', () => {
+    expect(validateInvite({ ...ok, individualId: '' })).toMatchObject({ ok: false });
+  });
+  test('role without a place is rejected', () => {
+    expect(validateInvite({ ...ok, role: 'CSO' })).toMatchObject({ ok: false });
+  });
+  test('Administrator without a place is allowed', () => {
+    expect(validateInvite({ ...ok, role: 'Administrator' })).toMatchObject({ ok: true, value: { role: 'Administrator', entityId: null } });
+  });
+  test('role with a place is passed through', () => {
+    expect(validateInvite({ ...ok, role: 'CSO', entityId: 'e1', replaceExisting: true }))
+      .toMatchObject({ ok: true, value: { role: 'CSO', entityId: 'e1', replaceExisting: true } });
+  });
+  test.each([0, 91, 'x', 1.5, null])('rejects expiry %j', (expiresInDays) => {
+    expect(validateInvite({ ...ok, expiresInDays })).toMatchObject({ ok: false });
+  });
+  test.each([1, 90, 14])('accepts expiry %j', (expiresInDays) => {
+    expect(validateInvite({ ...ok, expiresInDays })).toMatchObject({ ok: true, value: { expiresInDays } });
+  });
+});
+
+describe('inviteRequestBody', () => {
+  const base = { cluster: 'North', individualId: 'i1', email: ' ana@example.org ', expiresInDays: '30' };
+  test('no role sends neither role nor entityId', () => {
+    expect(inviteRequestBody({ ...base, value: 'none', replaceExisting: false }))
+      .toEqual({ cluster: 'North', individualId: 'i1', email: 'ana@example.org', expiresInDays: 30, replaceExisting: false });
+  });
+  test('a chosen role sends role and entityId', () => {
+    expect(inviteRequestBody({ ...base, value: { entityId: 'loc1', role: 'tutor' }, replaceExisting: true }))
+      .toEqual({ cluster: 'North', individualId: 'i1', email: 'ana@example.org', role: 'tutor', entityId: 'loc1', expiresInDays: 30, replaceExisting: true });
+  });
+  test.each([['', ''], ['abc', 'abc'], [' 14 ', 14], ['2.5', 2.5]])('expiry %j is sent as %j', (text, sent) => {
+    // Non-numbers go as typed so the route answers with its own wording.
+    expect(inviteRequestBody({ ...base, expiresInDays: text, value: 'none', replaceExisting: false }).expiresInDays).toBe(sent);
+  });
+});
+
+describe('cancelInvitationConfirm', () => {
+  test('names the address', () => {
+    expect(cancelInvitationConfirm('ana@example.org')).toBe('Cancel the invitation to ana@example.org?');
   });
 });

@@ -180,11 +180,13 @@ type LogEntry { occurredAt: DateTime!  actor: PersonSummary  mutation: String
 - Error codes to show in words: `FORBIDDEN`, `SELF_LOCKOUT`, `EMAIL_IN_USE`, `ALREADY_HAS_ACCESS`,
   `INVITATION_PENDING`.
 - Invitations: cluster-notebook records the invitation, then calls Clerk with the invitation id in the
-  invitation's public metadata, redirect https://nucleus.kalantar.us. At first sign-in, a login it doesn't know
-  whose token carries a pending, unexpired invitation id is linked to that person, and the role granted.
+  invitation's public metadata, redirect https://nucleus.kalantar.us. At first sign-in, cluster-notebook asks
+  Clerk for the new user's invitation (no session-token claim), links that login to the invited person, and grants the role.
   No email matching.
-- **Owner setup before Phase 2:** the Clerk secret key as a Render secret on cluster-notebook's API service;
-  in Clerk, the session token gets the claim `"inv": "{{user.public_metadata.invitation_id}}"`.
+- **Owner setup before Phase 2:** the Clerk secret key as a Render secret on cluster-notebook's API service.
+  (Amended 2026-11-24: no session-token claim is needed; cluster-notebook asks Clerk for the new user's
+  invitation at first sign-in. Added restoreAccess, and invite/resend/cancel/remove/restore require standing
+  over the person: Administrator, or able to end every role they hold.)
 
 ## Rules for the builder
 

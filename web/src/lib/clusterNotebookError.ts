@@ -47,11 +47,23 @@ const CODED_ERRORS: Record<string, { status: number; message: string | null }> =
   ENTITY_REQUIRED: { status: 400, message: 'Choose where the role applies.' },
   // Confirmed with cluster-notebook 2026-11-24: NOT_FOUND for an unknown role id, person or place.
   NOT_FOUND: { status: 404, message: 'Not found.' },
+  // Confirmed with cluster-notebook 2026-11-24: invitation errors. ALREADY_HAS_ACCESS's "{name}" is filled in by the route.
+  EMAIL_IN_USE: { status: 409, message: 'This address belongs to someone else.' },
+  ALREADY_HAS_ACCESS: { status: 409, message: '{name} already has access.' },
+  INVITATION_PENDING: { status: 409, message: 'An invitation is already pending; resend it instead.' },
+  NOT_PENDING: { status: 409, message: 'This invitation is no longer pending.' },
+  BAD_INPUT: { status: 400, message: null },
+  CLERK_ERROR: { status: 502, message: "The invitation email couldn't be sent. Try again." },
+  CLERK_NOT_CONFIGURED: { status: 503, message: "Invitations aren't set up yet." },
 };
 
-export function clusterNotebookErrorResponse(e: unknown): NextResponse {
+// Options let a route word its own 403 (`forbidden`), fill the "{name}" placeholder (`name`, ALREADY_HAS_ACCESS),
+// and reword a coded error where the global text would be wrong (`messages`, keyed by code; status and code stay).
+export function clusterNotebookErrorResponse(
+  e: unknown, opts: { forbidden?: string; name?: string; messages?: Partial<Record<string, string>> } = {},
+): NextResponse {
   if (e instanceof ClusterNotebookForbiddenError) {
-    return NextResponse.json({ error: "You don't have permission to make this change." }, { status: 403 });
+    return NextResponse.json({ error: opts.forbidden ?? "You don't have permission to make this change." }, { status: 403 });
   }
   const message = e instanceof Error ? e.message : 'Unexpected error contacting cluster-notebook';
   // Log the cause too: Node's fetch reports every connection problem as a bare
@@ -59,8 +71,9 @@ export function clusterNotebookErrorResponse(e: unknown): NextResponse {
   console.error('cluster-notebook call failed:', message, e instanceof Error && e.cause ? e.cause : '');
   if (e instanceof ClusterNotebookCodedError) {
     const mapped = CODED_ERRORS[e.code];
+    const text = opts.messages?.[e.code] ?? (mapped ? (mapped.message ?? e.upstreamMessage) : message);
     return NextResponse.json(
-      { error: mapped ? (mapped.message ?? e.upstreamMessage) : message, code: e.code },
+      { error: opts.name !== undefined ? text.replace('{name}', opts.name) : text, code: e.code },
       { status: mapped?.status ?? 502 },
     );
   }
