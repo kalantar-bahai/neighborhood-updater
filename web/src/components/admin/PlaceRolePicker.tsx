@@ -11,17 +11,18 @@ const BTN: React.CSSProperties = { fontSize: 13, padding: '1px 6px', borderRadiu
 const INPUT: React.CSSProperties = { width: '100%', boxSizing: 'border-box', fontSize: 16, padding: '6px 8px', border: '1px solid #a0aec0', borderRadius: 6 };
 
 // Pick a place in the cluster, then a role offered at that place. onChange gets {entityId, role} whenever both are
-// chosen and null whenever the choice is incomplete (or "No role" when optional). Mount it to start; it loads the
-// places itself, and unmounting discards it.
+// chosen, null whenever the choice is incomplete, and 'none' for an explicit "No role" (only with `optional`, which
+// starts with "No role" ticked, so the parent's initial value should be 'none'). Mount it to start; it loads the
+// places itself, and unmounting discards it, including any reply still in flight.
 export default function PlaceRolePicker({ cluster, onChange, optional = false }: {
-  cluster: string; onChange: (v: PlaceRole | null) => void; optional?: boolean;
+  cluster: string; onChange: (v: PlaceRole | 'none' | null) => void; optional?: boolean;
 }) {
   const [places, setPlaces] = useState<AdminPlace[] | null>(null);
   const [filter, setFilter] = useState('');
   const [place, setPlace] = useState<AdminPlace | null>(null);
   const [grants, setGrants] = useState<RoleGrant[] | null>(null);
   const [role, setRole] = useState('');
-  const [noRole, setNoRole] = useState(false);
+  const [noRole, setNoRole] = useState(optional);
   const [error, setError] = useState('');
   // Place now chosen; a roles reply for any other place is dropped.
   const placeId = useRef<string | null>(null);
@@ -39,10 +40,11 @@ export default function PlaceRolePicker({ cluster, onChange, optional = false }:
         if (live) setError("Couldn't load places. Please try again.");
       }
     })();
-    return () => { live = false; };
+    return () => { live = false; placeId.current = null; };
   }, [cluster]);
 
-  const clearPlace = () => { placeId.current = null; setPlace(null); setGrants(null); setRole(''); onChange(null); };
+  const resetPlace = () => { placeId.current = null; setPlace(null); setGrants(null); setRole(''); };
+  const clearPlace = () => { resetPlace(); onChange(null); };
 
   const choosePlace = async (p: AdminPlace) => {
     setError('');
@@ -68,7 +70,8 @@ export default function PlaceRolePicker({ cluster, onChange, optional = false }:
 
   const toggleNoRole = (checked: boolean) => {
     setNoRole(checked);
-    if (checked) { clearPlace(); setFilter(''); }
+    if (checked) { resetPlace(); setFilter(''); }
+    onChange(checked ? 'none' : null);
   };
 
   return (
@@ -82,7 +85,7 @@ export default function PlaceRolePicker({ cluster, onChange, optional = false }:
         <>
           <input type="text" value={filter} onChange={e => setFilter(e.target.value)}
             placeholder="Filter places…" aria-label="Filter places" style={INPUT} />
-          {places === null ? <div style={{ fontSize: 12, color: '#718096' }}>Loading…</div> : (
+          {places === null ? (error ? null : <div style={{ fontSize: 12, color: '#718096' }}>Loading…</div>) : (
             <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
               {placeTree(places, filter).map(({ place: p, depth }) => (
                 <button key={p.id} type="button" onClick={() => choosePlace(p)}

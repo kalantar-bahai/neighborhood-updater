@@ -101,7 +101,7 @@ export default function RolesCard({ cluster }: { cluster: string }) {
 
   const formView = (f: Form) => (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: 8, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <PlaceRolePicker cluster={cluster} onChange={value => setForm(x => x && { ...x, value })} />
+      <PlaceRolePicker cluster={cluster} onChange={v => setForm(x => x && { ...x, value: v && v !== 'none' ? v : null })} />
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="button" disabled={!f.value || f.saving} onClick={saveRole}
           style={{ ...BTN, background: '#3182ce', color: 'white', border: '1px solid #3182ce', opacity: !f.value || f.saving ? 0.5 : 1 }}>
