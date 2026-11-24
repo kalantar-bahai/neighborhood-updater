@@ -169,8 +169,7 @@ describe('adminPersonTag', () => {
 
 describe('removeAccessConfirm', () => {
   test('other and self', () => {
-    expect(removeAccessConfirm('Ana Lopez', false)).toBe("Remove Ana Lopez's access?");
-    expect(removeAccessConfirm('Ana Lopez', true)).toBe('Remove your own access? You will be signed out.');
+    expect(removeAccessConfirm('Ana Lopez')).toBe("Remove Ana Lopez's access?");
   });
 });
 

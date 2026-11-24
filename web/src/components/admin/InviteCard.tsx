@@ -6,7 +6,7 @@ import { adminPersonLine, adminPersonTag, cancelInvitationConfirm, invitationLin
 import PersonFinder from './PersonFinder';
 import PlaceRolePicker, { type PlaceRole } from './PlaceRolePicker';
 
-const BTN: React.CSSProperties = { fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', border: '1px solid #cbd5e0', background: 'white', color: '#4a5568' };
+const BTN: React.CSSProperties = { fontSize: 13, padding: '4px 10px', minHeight: 44, borderRadius: 6, cursor: 'pointer', border: '1px solid #cbd5e0', background: 'white', color: '#4a5568' };
 const PRIMARY: React.CSSProperties = { ...BTN, background: '#3182ce', color: 'white', border: '1px solid #3182ce' };
 const INPUT: React.CSSProperties = { width: '100%', boxSizing: 'border-box', fontSize: 16, padding: '6px 8px', border: '1px solid #a0aec0', borderRadius: 6 };
 const LABEL: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#4a5568', display: 'flex', flexDirection: 'column', gap: 4 };
@@ -192,8 +192,8 @@ export default function InviteCard({ cluster }: { cluster: string }) {
       <div className="card-header" onClick={() => setOpen(o => !o)} style={{ cursor: 'pointer', userSelect: 'none' }}>
         <span><span style={{ fontSize: 11, marginRight: 6 }}>{open ? '▼' : '▶'}</span>Invite</span>
       </div>
-      {open && (
-        <div className="card-body">
+      {(
+        <div className="card-body" style={{ display: open ? undefined : 'none' }}>
           {form ? formView(form) : <PersonFinder cluster={cluster} onPick={pick} />}
           {sent && <div style={{ color: '#276749', fontSize: 13, marginTop: 8 }}>{sent}</div>}
 

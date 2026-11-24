@@ -119,8 +119,8 @@ export function adminPersonTag(p: AdminPerson): 'has access' | 'invited' | null 
   return p.pendingInvitation ? 'invited' : null;
 }
 
-export function removeAccessConfirm(name: string, isSelf: boolean): string {
-  return isSelf ? 'Remove your own access? You will be signed out.' : `Remove ${name}'s access?`;
+export function removeAccessConfirm(name: string): string {
+  return `Remove ${name}'s access?`;
 }
 
 export function cancelInvitationConfirm(email: string): string {

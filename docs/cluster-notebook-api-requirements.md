@@ -319,7 +319,7 @@ How this app uses it:
 ## Admin page, Phase 1, confirmed with cluster-notebook 2026-11-24
 
 Spec: `docs/superpowers/specs/2026-11-24-admin-page-design.md`. cluster-notebook's final shape below supersedes the
-spec where they differ. Status: nothing is deployed yet; cluster-notebook announces it field by field.
+spec where they differ. Status: in production (2026-11-24).
 
 ```graphql
 type Query {
@@ -368,8 +368,8 @@ type Mutation {
   `ALREADY_HAS_ACCESS`, `INVITATION_PENDING`, `NOT_PENDING`, `BAD_INPUT`, `CLERK_ERROR`, `CLERK_NOT_CONFIGURED`.
 - Deploy gating: a field asked for before it is in production breaks the whole query (the People card went down that
   way on 2026-11-23). Branch `feat/admin-page` therefore waits to merge until these fields are live.
-- Phase 2 (invitations, `removeAccess`, `accounts`) and Phase 3 (`peopleNotInSrp`, `changeLog`) are agreed and
-  documented in the spec; they get their own sections here when cluster-notebook confirms each deploy.
+- Phase 2 (invitations, `removeAccess`, `accounts`) is recorded in the next section. Phase 3 (`peopleNotInSrp`,
+  `changeLog`) is agreed and documented in the spec; it gets its own section here when cluster-notebook confirms its deploy.
 
 ## Admin page, Phase 2, confirmed with cluster-notebook 2026-11-24
 

@@ -113,7 +113,7 @@ export default function AccountsCard({ cluster, me }: { cluster: string; me: { i
     return (
       <div style={{ marginTop: 8, padding: 10, border: '1px solid #fed7d7', borderRadius: 6, background: '#fff5f5', display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>
-          {removeAccessConfirm(individualDisplayName(a.individual), false)}
+          {removeAccessConfirm(individualDisplayName(a.individual))}
         </div>
         <label style={{ fontSize: 14, display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}>
           <input type="checkbox" checked={c.endRoles} disabled={rowBusy}

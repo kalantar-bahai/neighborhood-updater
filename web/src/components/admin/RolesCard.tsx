@@ -117,8 +117,8 @@ export default function RolesCard({ cluster }: { cluster: string }) {
       <div className="card-header" onClick={() => setOpen(o => !o)} style={{ cursor: 'pointer', userSelect: 'none' }}>
         <span><span style={{ fontSize: 11, marginRight: 6 }}>{open ? '▼' : '▶'}</span>Roles</span>
       </div>
-      {open && (
-        <div className="card-body">
+      {(
+        <div className="card-body" style={{ display: open ? undefined : 'none' }}>
           {!person ? <PersonFinder cluster={cluster} onPick={pick} /> : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
