@@ -370,3 +370,61 @@ type Mutation {
   way on 2026-11-23). Branch `feat/admin-page` therefore waits to merge until these fields are live.
 - Phase 2 (invitations, `removeAccess`, `accounts`) and Phase 3 (`peopleNotInSrp`, `changeLog`) are agreed and
   documented in the spec; they get their own sections here when cluster-notebook confirms each deploy.
+
+## Admin page, Phase 2, confirmed with cluster-notebook 2026-11-24
+
+Invitations and account access. Status: in production, introspected 2026-11-24. This app never calls Clerk's backend
+for any of it; cluster-notebook owns the permission check, the Clerk call, the record and the link at first sign-in.
+
+```graphql
+type Query {
+  invitations(clusterName: String!, status: InvitationStatus): [Invitation!]!
+  accounts(clusterName: String!): [AccountInfo!]!
+  me: PersonSummary
+}
+enum InvitationStatus { PENDING ACCEPTED EXPIRED REVOKED }
+type Invitation { id: String!  individual: PersonSummary!  email: String!  role: String  entity: AdminPlace
+                  status: InvitationStatus!  invitedBy: PersonSummary  createdAt: DateTime!  expiresAt: DateTime!
+                  acceptedAt: DateTime  replacedBy: String }
+type AccountInfo { individual: PersonSummary!  email: String  provider: String!  createdAt: DateTime!
+                   lastSeenAt: DateTime  disabledAt: DateTime }          # email is nullable
+type AdminPerson { ...  pendingInvitation: Invitation }                  # we ask only for { id expiresAt }
+type Mutation {
+  inviteIndividual(individualId: String!, email: String!, role: String, entityId: String,
+                   expiresInDays: Int! = 30, replaceExisting: Boolean! = false): Invitation!
+  resendInvitation(id: String!): Invitation!      # revokes the old invitation and issues a new one
+  revokeInvitation(id: String!): Invitation!
+  removeAccess(individualId: String!, endRoles: Boolean! = false): Boolean!
+  restoreAccess(individualId: String!): Boolean!
+}
+```
+
+- **Standing over the person.** All five access mutations check, in order: (1) `administers_person`: the caller is an
+  Administrator, or the person is placed at a location under, or holds a current role at an entity under, a cluster
+  the caller administers; otherwise `FORBIDDEN`. (2) `may_manage_access`: the caller is an Administrator, or can end
+  every current role the person holds; otherwise `FORBIDDEN`. A role-less person outside the caller's clusters is
+  refused. The cluster our route names is not used by these mutations; our `requireAdmin(cluster)` gate is ours alone.
+  On these routes we show a 403 as "You can't manage access for this person."
+- **Invitation lifecycle.** `PENDING` becomes `ACCEPTED` at first sign-in, `EXPIRED` after `expiresInDays`, or
+  `REVOKED` by `revokeInvitation`, by a resend (the old one is revoked, `replacedBy` points at the new one) or by
+  `removeAccess`. Resend and revoke on anything not pending fail with `NOT_PENDING`. We show `REVOKED` as "cancelled".
+- **One account per person.** `accounts.individual_id` is unique. An accepted `replaceExisting: true` invitation
+  re-points the account to the new login and re-enables it; without the flag, inviting someone who already has access
+  is `ALREADY_HAS_ACCESS` and nothing changes.
+- **`removeAccess`** bans the login in Clerk and revokes the person's pending invitations; `endRoles: true` also ends
+  their roles. On yourself it throws `SELF_LOCKOUT` (we show "You can't remove your own access."). It returns `false`
+  when the person has no enabled account: nothing was done (we show "No active login to remove."). `CLERK_ERROR` and
+  `CLERK_NOT_CONFIGURED` mean nothing changed.
+- **`restoreAccess`** lifts the ban and re-enables the same login. Roles ended earlier stay ended. It returns `false`
+  when there is no disabled account (we show "No removed login to restore.").
+- **The login email is not the contact email.** It is kept only on the invitation and the account. We show it only on
+  the invitation and account rows and never write it anywhere else.
+- **No Clerk session-token claim is needed.** At the new user's first sign-in cluster-notebook asks Clerk for their
+  invitation, links them, and grants the invitation's role on their first request. Owner setup: only the Clerk secret
+  key on Render.
+- **Error codes and our wording** (`CODED_ERRORS`): `EMAIL_IN_USE` 409 "This address belongs to someone else.";
+  `ALREADY_HAS_ACCESS` 409 "{name} already has access." (the card offers "Replace their login?");
+  `INVITATION_PENDING` 409 "An invitation is already pending; resend it instead."; `NOT_PENDING` 409 "This
+  invitation is no longer pending."; `BAD_INPUT` 400, upstream message shown; `CLERK_ERROR` 502 "The invitation email
+  couldn't be sent. Try again."; `CLERK_NOT_CONFIGURED` 503 "Invitations aren't set up yet."
+- `pendingInvitation` goes only into the admin search query, never into a query the home page or People card uses.
