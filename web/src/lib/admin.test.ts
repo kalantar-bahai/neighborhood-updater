@@ -1,8 +1,8 @@
 import { describe, test, expect, vi } from 'vitest';
 import { adminPersonLine, roleHoldingLine, currentRolesLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin,
   invitationStatusWord, invitationLine, accountLine, accountRemovedNote, activeAccountCount, prefillEmail, adminPersonTag, removeAccessConfirm, validateInvite,
-  inviteRequestBody, cancelInvitationConfirm } from './admin';
-import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary } from './clusterNotebook';
+  inviteRequestBody, cancelInvitationConfirm, splitInvitations, findAccounts, hidesToLift } from './admin';
+import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary, HiddenPerson, MoveResult } from './clusterNotebook';
 
 const person = (ageCategory: AdminPerson['ageCategory'], placePath: string[]): AdminPerson => ({
   individual: { id: 'i1', firstName: 'Ana', familyName: 'Lopez', middleNames: null, nickname: null, place: null, placeSync: null, inSrp: true },
@@ -232,4 +232,60 @@ describe('currentRolesLine', () => {
     expect(currentRolesLine([holding('CSO', 'NC-215 Triangle'), holding('CSO', null)]))
       .toBe('Current roles: CSO · NC-215 Triangle; CSO'));
   test('none', () => expect(currentRolesLine([])).toBe('No current roles'));
+});
+
+describe('splitInvitations', () => {
+  test('pending soonest-expiring first; past newest first', () => {
+    const a = invitation({ id: 'a', status: 'PENDING', expiresAt: '2026-12-30T00:00:00Z' });
+    const b = invitation({ id: 'b', status: 'PENDING', expiresAt: '2026-12-01T00:00:00Z' });
+    const c = invitation({ id: 'c', status: 'ACCEPTED', createdAt: '2026-11-01T00:00:00Z' });
+    const d = invitation({ id: 'd', status: 'REVOKED', createdAt: '2026-11-20T00:00:00Z' });
+    const e = invitation({ id: 'e', status: 'EXPIRED', createdAt: '2026-10-01T00:00:00Z' });
+    const { pending, past } = splitInvitations([c, a, d, b, e]);
+    expect(pending.map(i => i.id)).toEqual(['b', 'a']);
+    expect(past.map(i => i.id)).toEqual(['d', 'c', 'e']);
+  });
+  test('empty', () => {
+    expect(splitInvitations([])).toEqual({ pending: [], past: [] });
+  });
+});
+
+describe('findAccounts', () => {
+  const ana = account();
+  const ben = account({ individual: summary('Ben', 'Okafor'), email: 'ben@example.org' });
+  const cy = account({ individual: summary('Cy', 'Adams'), email: null, disabledAt: '2026-11-26T09:00:00Z' });
+  test('matches every word against name or email, ignoring case', () => {
+    expect(findAccounts([ana, ben, cy], 'OKA').shown).toEqual([ben]);
+    expect(findAccounts([ana, ben, cy], 'ana example').shown).toEqual([ana]);
+    expect(findAccounts([ana, ben, cy], 'ben lopez').shown).toEqual([]);
+  });
+  test('empty search lists everyone, active first, then by name', () => {
+    expect(findAccounts([cy, ben, ana], '  ').shown).toEqual([ana, ben, cy]);
+  });
+  test('caps the list and reports how many matched', () => {
+    const many = Array.from({ length: 30 }, (_, n) => account({ individual: summary(`P${String(n).padStart(2, '0')}`, 'Test') }));
+    const r = findAccounts(many, '', 20);
+    expect(r.shown).toHaveLength(20);
+    expect(r.matched).toBe(30);
+    expect(r.shown[0].individual.firstName).toBe('P00');
+  });
+});
+
+describe('hidesToLift', () => {
+  const ana = summary('Ana', 'Lopez');
+  const ben = { ...summary('Ben', 'Okafor'), id: 'ben' };
+  const cy = { ...summary('Cy', 'Adams'), id: 'cy' };
+  const hide = { hiddenAt: '2026-11-20T00:00:00Z', hiddenBy: null, reason: null };
+  const hp = (individual: PersonSummary, nucleusName: string): HiddenPerson => ({ individual, nucleusName, roles: [], isResident: false, hide });
+  const res = (individual: PersonSummary, moved: boolean, code: string | null = null): MoveResult => ({ individual, moved, code });
+  test('every hide of everyone who moved (or was already there), in every nucleus', () => {
+    const hidden = [hp(ana, 'N'), hp(ana, 'M'), hp(ben, 'N'), hp(cy, 'N')];
+    const results = [res(ana, true), res(ben, false, 'ALREADY_THERE'), res(cy, false, 'SRP_REFUSED')];
+    expect(hidesToLift(hidden, results)).toEqual([
+      { individualId: ana.id, nucleusName: 'N' }, { individualId: ana.id, nucleusName: 'M' }, { individualId: 'ben', nucleusName: 'N' },
+    ]);
+  });
+  test('nothing when no one moved', () => {
+    expect(hidesToLift([hp(ana, 'N')], [res(ana, false, 'SRP_REFUSED')])).toEqual([]);
+  });
 });

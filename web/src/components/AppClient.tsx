@@ -140,7 +140,6 @@ export default function AppClient() {
         rows={initialData.rows}
         email={initialData.email}
         onSelect={(name) => { setCardOpen({}); loadNucleus(name); }}
-        onSignOut={() => window.location.href = '/signout'}
         onAdd={canCreateNucleus ? () => setCreatingNew(true) : undefined}
         onAdmin={initialData.isAdmin ? () => window.location.href = '/admin' : undefined}
       />

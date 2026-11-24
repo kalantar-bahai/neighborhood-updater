@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import PageHeader, { HeaderButton } from '../PageHeader';
 import RolesCard from './RolesCard';
 import HiddenCard from './HiddenCard';
 import InviteCard from './InviteCard';
@@ -15,13 +15,23 @@ type State =
   | { kind: 'error'; message: string }
   | { kind: 'ready'; clusters: AdminCluster[]; me: { id: string } | null };
 
-const homeLink = { fontSize: 13, color: '#2b6cb0' };
+const TITLE = 'My Nuclei – Admin';
+const goHome = () => { window.location.href = '/'; };
+
+// The title row, as on the home page, with Home in place of + Add and Admin.
+function Header({ sub }: { sub?: string }) {
+  return (
+    <PageHeader title={TITLE} sub={sub}>
+      <HeaderButton onClick={goHome}>Home</HeaderButton>
+    </PageHeader>
+  );
+}
 
 export default function AdminClient() {
   const [state, setState] = useState<State>({ kind: 'loading' });
-  // The cluster being administered. Cards below are keyed by it, so switching
-  // remounts them and clears any picked person or open role form.
-  const [cluster, setCluster] = useState('');
+  // Open clusters, by name. Like the home page: one cluster is always open (no twisty); with several, each opens on
+  // its own and starts closed. A closed cluster's cards unmount, which clears any picked person or open form.
+  const [openClusters, setOpenClusters] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetch('/api/admin/clusters')
@@ -31,53 +41,62 @@ export default function AdminClient() {
         if (!r.ok || data.error) { setState({ kind: 'error', message: data.error || 'Failed to load.' }); return; }
         const clusters: AdminCluster[] = data.clusters;
         if (clusters.length === 0) { setState({ kind: 'denied' }); return; }
-        setCluster(clusters[0].name);
         // me is null when cluster-notebook couldn't say who the caller is; the Accounts card then can't spot their own row.
         setState({ kind: 'ready', clusters, me: data.me ?? null });
       })
       .catch(() => setState({ kind: 'error', message: 'Failed to load. Please refresh.' }));
   }, []);
 
+  const toggle = (name: string) =>
+    setOpenClusters(prev => { const s = new Set(prev); if (s.has(name)) s.delete(name); else s.add(name); return s; });
+
   if (state.kind === 'loading') return <div className="loading-state">Loading...</div>;
 
   if (state.kind === 'denied') {
     return (
-      <div style={{ maxWidth: 880, margin: '0 auto', padding: 16 }}>
-        <Link href="/" style={homeLink}>Home</Link>
-        <h1 style={{ fontSize: 20, marginTop: 16 }}>Access denied</h1>
+      <div className="picker-container">
+        <Header />
+        <p style={{ marginTop: 16 }}>Access denied</p>
       </div>
     );
   }
 
   if (state.kind === 'error') {
     return (
-      <div style={{ maxWidth: 880, margin: '0 auto', padding: 16 }}>
-        <Link href="/" style={homeLink}>Home</Link>
+      <div className="picker-container">
+        <Header />
         <p style={{ color: '#c53030', marginTop: 16 }}>{state.message}</p>
       </div>
     );
   }
 
+  const single = state.clusters.length === 1;
   return (
-    <div style={{ maxWidth: 880, margin: '0 auto', padding: '16px 16px 40px' }}>
-      <Link href="/" style={homeLink}>Home</Link>
-      <div style={{ fontSize: 12, color: '#718096', marginTop: 12 }}>Admin</div>
-      {state.clusters.length === 1 ? (
-        <h1 style={{ fontSize: 20, margin: '2px 0 16px' }}>{state.clusters[0].name}</h1>
-      ) : (
-        <select
-          value={cluster}
-          onChange={e => setCluster(e.target.value)}
-          aria-label="Cluster"
-          style={{ fontSize: 16, margin: '4px 0 16px', padding: '4px 8px', display: 'block' }}
-        >
-          {state.clusters.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-        </select>
-      )}
-      <InviteCard key={`invite:${cluster}`} cluster={cluster} />
-      <AccountsCard key={`accounts:${cluster}`} cluster={cluster} me={state.me} />
-      <RolesCard key={`roles:${cluster}`} cluster={cluster} />
-      <HiddenCard key={`hidden:${cluster}`} cluster={cluster} />
+    <div className="picker-container" style={{ paddingBottom: 40 }}>
+      <Header sub="Invitations, accounts, roles and hidden people" />
+      {state.clusters.map(c => {
+        const isOpen = single || openClusters.has(c.name);
+        return (
+          <div key={c.id}>
+            <div className="cluster-header" onClick={single ? undefined : () => toggle(c.name)}
+              style={single ? { cursor: 'default' } : undefined}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {!single && <span className={`cluster-arrow${isOpen ? ' open' : ''}`}>▶</span>}
+                <span className="cluster-name">{c.name}</span>
+              </div>
+            </div>
+            {/* Cards are keyed by cluster, so each cluster has its own. */}
+            {isOpen && (
+              <div className="cluster-rows open" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6, marginBottom: 16 }}>
+                <InviteCard key={`invite:${c.name}`} cluster={c.name} />
+                <AccountsCard key={`accounts:${c.name}`} cluster={c.name} me={state.me} />
+                <RolesCard key={`roles:${c.name}`} cluster={c.name} />
+                <HiddenCard key={`hidden:${c.name}`} cluster={c.name} />
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

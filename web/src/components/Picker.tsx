@@ -4,12 +4,12 @@ import React, { useState } from 'react';
 import { NucleusSummary } from '@/types';
 import StaggeredConcentricDiagram, { type AlignedLabel } from './StaggeredConcentricDiagram';
 import SrpBadge from './SrpBadge';
+import PageHeader, { HeaderButton } from './PageHeader';
 
 interface Props {
   rows: NucleusSummary[];
   email: string;
   onSelect: (name: string) => void;
-  onSignOut: () => void;
   onAdd?: () => void;
   onAdmin?: () => void;
 }
@@ -185,7 +185,7 @@ function RollupCards({ rows: rowsIn, groupLabel, onCardClick }: {
   );
 }
 
-export default function Picker({ rows, email, onSelect, onSignOut, onAdd, onAdmin }: Props) {
+export default function Picker({ rows, email, onSelect, onAdd, onAdmin }: Props) {
   const [openClusters, setOpenClusters] = useState<Set<string>>(new Set());
   const [openPockets, setOpenPockets] = useState<Set<string>>(new Set());
   const [openLocalities, setOpenLocalities] = useState<Set<string>>(new Set());
@@ -375,28 +375,10 @@ export default function Picker({ rows, email, onSelect, onSignOut, onAdd, onAdmi
   return (
     <>
     <div className="picker-container">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-        <div className="picker-title">My Nuclei</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {onAdd && (
-            <button onClick={onAdd} style={{ fontSize: 12, color: '#2b6cb0', background: '#ebf4ff', border: '1px solid #bee3f8', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 600 }}>
-              + Add
-            </button>
-          )}
-          {onAdmin && (
-            <button onClick={onAdmin} style={{ fontSize: 12, color: '#2b6cb0', background: '#ebf4ff', border: '1px solid #bee3f8', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 600 }}>
-              Admin
-            </button>
-          )}
-          <button onClick={() => { window.location.href = '/account'; }} style={{ fontSize: 12, color: '#718096', background: 'none', border: '1px solid #cbd5e0', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
-            My account
-          </button>
-          <button onClick={onSignOut} style={{ fontSize: 12, color: '#718096', background: 'none', border: '1px solid #cbd5e0', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
-            Sign out
-          </button>
-        </div>
-      </div>
-      <div className="picker-sub">{email}</div>
+      <PageHeader title="My Nuclei" sub={email}>
+        {onAdd && <HeaderButton onClick={onAdd}>+ Add</HeaderButton>}
+        {onAdmin && <HeaderButton onClick={onAdmin}>Admin</HeaderButton>}
+      </PageHeader>
 
       {groupingOrder.map(gName => {
         const gEntry = groupingMap[gName];

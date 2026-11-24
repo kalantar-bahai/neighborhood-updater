@@ -1,6 +1,6 @@
 // Admin page (phase 1): pure decisions, tested in admin.test.ts.
 // Spec: docs/superpowers/specs/ (admin page design); plan: docs/superpowers/plans/2026-11-24-admin-page-phase1.md
-import type { AccountInfo, AdminCluster, AdminPerson, AdminPlace, Invitation, InvitationStatus, PersonDetails, RoleHolding } from './clusterNotebook';
+import type { AccountInfo, AdminCluster, AdminPerson, AdminPlace, HiddenPerson, Invitation, InvitationStatus, MoveResult, PersonDetails, RoleHolding } from './clusterNotebook';
 import { AGE_LABELS, roleLabel } from './people';
 import { individualDisplayName } from './personName';
 
@@ -167,4 +167,35 @@ export function validateInvite(body: Record<string, unknown>): { ok: true; value
     return { ok: false, error: 'Expiry must be a whole number of days from 1 to 90.' };
   }
   return { ok: true, value: { individualId, email, role, entityId, expiresInDays: days, replaceExisting: body.replaceExisting === true } };
+}
+
+// The Invite card shows pending invitations (soonest to expire first) and keeps the rest, newest first, under a
+// collapsed "Past invitations" so the card doesn't grow with every invitation ever sent.
+export function splitInvitations(list: Invitation[]): { pending: Invitation[]; past: Invitation[] } {
+  const pending = list.filter(i => i.status === 'PENDING').sort((a, b) => a.expiresAt.localeCompare(b.expiresAt));
+  const past = list.filter(i => i.status !== 'PENDING').sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return { pending, past };
+}
+
+// The Accounts card's search: every word must appear in the name or the login email (ignoring case). Active
+// logins come first, then by name; at most `limit` rows are shown, and `matched` says how many there were.
+export function findAccounts(accounts: AccountInfo[], search: string, limit = 20): { shown: AccountInfo[]; matched: number } {
+  const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const name = (a: AccountInfo) => individualDisplayName(a.individual);
+  const hits = accounts
+    .filter(a => {
+      const text = `${name(a)} ${a.email ?? ''}`.toLowerCase();
+      return words.every(w => text.includes(w));
+    })
+    .sort((a, b) => Number(!!a.disabledAt) - Number(!!b.disabledAt) || name(a).localeCompare(name(b)));
+  return { shown: hits.slice(0, limit), matched: hits.length };
+}
+
+// Owner 2026-11-24: a move from the Hidden card also unhides. Being hidden in one nucleus and visible in another makes
+// no sense, and someone who later moves back would mysteriously not show up. So every hide in the cluster of everyone
+// the move placed (the household moves too; ALREADY_THERE counts as placed) is lifted. Confirmed with cluster-notebook
+// 2026-11-24: moveIndividuals never touches hides, so the client unhides.
+export function hidesToLift(hidden: HiddenPerson[], results: MoveResult[]): { individualId: string; nucleusName: string }[] {
+  const placed = new Set(results.filter(r => r.individual && (r.moved || r.code === 'ALREADY_THERE')).map(r => r.individual!.id));
+  return hidden.filter(h => placed.has(h.individual.id)).map(h => ({ individualId: h.individual.id, nucleusName: h.nucleusName }));
 }
