@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PersonSrpDot } from './SrpBadge';
+import PersonDetailsBlock from './PersonDetailsBlock';
 import type { AgeCategory, PermissionSet, PersonDetails } from '@/lib/clusterNotebook';
 import {
-  AGE_FILTERS, AGE_LABELS, DEVOTIONAL_HOST, FACILITATES, KNOWN_ROLES, PARTICIPATES, activityLines, activitySummary, courseGroups, hideNote, hideRolesLine, peopleCountLabel, RESIDENT, canEditRole, detailLines, detailsView, filterPeople, isMoving, moveResultError,
+  AGE_FILTERS, AGE_LABELS, DEVOTIONAL_HOST, FACILITATES, KNOWN_ROLES, PARTICIPATES, activityLines, activitySummary, courseGroups, hideNote, hideRolesLine, peopleCountLabel, RESIDENT, canEditRole, filterPeople, isMoving, moveResultError,
   nextRoleIds, peopleFilters, placePath, roleLabel, rolesToClear, sortPeople, sortRoles, syncNote, type MoveTarget,
   type ChipState, type PersonRow,
 } from '@/lib/people';
@@ -47,12 +48,6 @@ type Details = { personId: string; status: 'loading' | 'none' | 'error' | 'ok'; 
 const SINGLE_ROLES = ['contact'];
 const POLL_MS = 10_000;
 const TAG: React.CSSProperties = { fontSize: 11, color: '#4a5568', background: '#edf2f7', borderRadius: 8, padding: '1px 6px' };
-
-// Today's local date as YYYY-MM-DD, to compare with SRP's ISO dates.
-function localToday(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 function RoleMarks({ row, isHome }: { row: PersonRow; isHome: boolean }) {
   const note = syncNote(row.placeSync);
@@ -433,34 +428,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     if (details.status === 'error' || !details.details) {
       return <div style={{ fontSize: 12, color: '#c53030', paddingTop: 6 }}>{details.error || "Couldn't load details"}</div>;
     }
-    const v = detailsView(details.details, localToday());
-    let body: React.ReactNode;
-    if (!v.inSrp) {
-      body = <div style={{ fontSize: 13, color: '#718096' }}>Not in SRP; nothing synced</div>;
-    } else {
-      const { lines, comments } = detailLines(v);
-      body = (
-        <>
-          {lines.map((parts, i) => (
-            <div key={i} style={{ fontSize: 13 }}>
-              {parts.map((p, j) => (
-                <span key={j}>
-                  {j > 0 && ' · '}
-                  <span style={p.danger ? { color: '#c53030' } : undefined}>{p.text}</span>
-                </span>
-              ))}
-            </div>
-          ))}
-          {comments && <div style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>SRP comments: {comments}</div>}
-        </>
-      );
-    }
-    return (
-      <div style={{ padding: '6px 0 2px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#4a5568' }}>Details</div>
-        {body}
-      </div>
-    );
+    return <PersonDetailsBlock details={details.details} />;
   };
 
   // Activities come with the list, so they show at once. One summary line; a click opens the course chips
