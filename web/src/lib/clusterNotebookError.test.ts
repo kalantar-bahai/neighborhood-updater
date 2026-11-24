@@ -40,6 +40,13 @@ describe('clusterNotebookErrorResponse', () => {
     ['UNKNOWN_ROLE', 400, "That role can't be given here."],
     ['ENTITY_REQUIRED', 400, 'Choose where the role applies.'],
     ['NOT_FOUND', 404, 'Not found.'],
+    ['EMAIL_IN_USE', 409, 'This address belongs to someone else.'],
+    ['ALREADY_HAS_ACCESS', 409, '{name} already has access.'],
+    ['INVITATION_PENDING', 409, 'An invitation is already pending; resend it instead.'],
+    ['NOT_PENDING', 409, 'This invitation is no longer pending.'],
+    ['BAD_INPUT', 400, 'upstream: 3 groups in use'],
+    ['CLERK_ERROR', 502, "The invitation email couldn't be sent. Try again."],
+    ['CLERK_NOT_CONFIGURED', 503, "Invitations aren't set up yet."],
     ['SOMETHING_NEW', 502, 'cluster-notebook GraphQL error: upstream: 3 groups in use'],
   ])('maps coded error %s to status %i with { error, code }', async (code, status, error) => {
     const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('cluster-notebook GraphQL error: upstream: 3 groups in use', code, 'upstream: 3 groups in use'));

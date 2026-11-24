@@ -4,7 +4,7 @@ import type { AdminPerson, AdminPlace, RoleHolding } from './clusterNotebook';
 
 const person = (ageCategory: AdminPerson['ageCategory'], placePath: string[]): AdminPerson => ({
   individual: { id: 'i1', firstName: 'Ana', familyName: 'Lopez', middleNames: null, nickname: null, place: null, placeSync: null, inSrp: true },
-  ageCategory, placePath, hasAccess: false,
+  ageCategory, placePath, hasAccess: false, pendingInvitation: null,
 });
 const holding = (role: string, name: string | null): RoleHolding => ({
   id: 'r1', role, start: null, entity: name === null ? null : { id: 'e1', name, type: 'cluster' },
