@@ -11,8 +11,8 @@ const BTN: React.CSSProperties = { fontSize: 13, padding: '1px 6px', borderRadiu
 const INPUT: React.CSSProperties = { width: '100%', boxSizing: 'border-box', fontSize: 16, padding: '6px 8px', border: '1px solid #a0aec0', borderRadius: 6 };
 
 // Pick a place in the cluster, then a role offered at that place. onChange gets {entityId, role} whenever both are
-// chosen, null whenever the choice is incomplete, and 'none' for an explicit "No role" (only with `optional`, which
-// starts with "No role" ticked, so the parent's initial value should be 'none'). Mount it to start; it loads the
+// chosen, null whenever the choice is incomplete, and 'none' for an explicit "No new role" (only with `optional`, which
+// starts with "No new role" ticked, so the parent's initial value should be 'none'). Mount it to start; it loads the
 // places itself, and unmounting discards it, including any reply still in flight.
 export default function PlaceRolePicker({ cluster, onChange, optional = false }: {
   cluster: string; onChange: (v: PlaceRole | 'none' | null) => void; optional?: boolean;
@@ -78,7 +78,7 @@ export default function PlaceRolePicker({ cluster, onChange, optional = false }:
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {optional && (
         <label style={{ fontSize: 14 }}>
-          <input type="checkbox" checked={noRole} onChange={e => toggleNoRole(e.target.checked)} /> No role
+          <input type="checkbox" checked={noRole} onChange={e => toggleNoRole(e.target.checked)} /> No new role
         </label>
       )}
       {!noRole && (!place ? (

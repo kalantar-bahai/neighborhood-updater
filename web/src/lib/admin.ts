@@ -23,6 +23,11 @@ export function roleHoldingLine(h: RoleHolding): string {
   return h.entity ? `${holdingLabel(h)} · ${h.entity.name}` : holdingLabel(h);
 }
 
+// The Invite card's reminder of what the person already holds, so "No new role" isn't read as "no roles".
+export function currentRolesLine(roles: RoleHolding[]): string {
+  return roles.length ? `Current roles: ${roles.map(roleHoldingLine).join('; ')}` : 'No current roles';
+}
+
 export function endRoleConfirm(name: string, h: RoleHolding): string {
   const { label } = roleLabel(h.role);
   return h.entity ? `End ${name}'s ${label} role at ${h.entity.name}?` : `End ${name}'s ${label} role?`;
