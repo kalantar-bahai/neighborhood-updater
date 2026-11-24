@@ -1,23 +1,19 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import type { AdminPerson, AdminPlace, PersonDetails, RoleGrant, RoleHolding } from '@/lib/clusterNotebook';
-import { endRoleConfirm, placeTree, roleHoldingLine } from '@/lib/admin';
-import { roleLabel } from '@/lib/people';
+import type { AdminPerson, PersonDetails, RoleHolding } from '@/lib/clusterNotebook';
+import { endRoleConfirm, roleHoldingLine } from '@/lib/admin';
 import { individualDisplayName } from '@/lib/personName';
 import PersonFinder from './PersonFinder';
+import PlaceRolePicker, { type PlaceRole } from './PlaceRolePicker';
 import PersonDetailsBlock from '../PersonDetailsBlock';
 
 type Loaded = { details: PersonDetails | null; roles: RoleHolding[] };
-// The "+ role" form: pick a place, then a role offered at that place.
-type Form = {
-  places: AdminPlace[] | null; filter: string;
-  place: AdminPlace | null; grants: RoleGrant[] | null; role: string; saving: boolean;
-};
+// The "+ role" form: the picker's current choice (null until place and role are both chosen) and the save flag.
+type Form = { value: PlaceRole | null; saving: boolean };
 
 const BTN: React.CSSProperties = { fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', border: '1px solid #cbd5e0', background: 'white', color: '#4a5568' };
-const INPUT: React.CSSProperties = { width: '100%', boxSizing: 'border-box', fontSize: 16, padding: '6px 8px', border: '1px solid #a0aec0', borderRadius: 6 };
-const NEW_FORM: Form = { places: null, filter: '', place: null, grants: null, role: '', saving: false };
+const NEW_FORM: Form = { value: null, saving: false };
 
 // Roles on one person at a time (spec: docs/superpowers/specs/, admin page). The card is keyed by cluster in
 // AdminClient, so switching cluster remounts it and clears the pick and any open form.
@@ -80,43 +76,17 @@ export default function RolesCard({ cluster }: { cluster: string }) {
     if (pickedId.current === id) setEnding(null);
   };
 
-  const openForm = async () => {
-    setError('');
-    setForm({ ...NEW_FORM });
-    try {
-      const res = await fetch(`/api/admin/places?cluster=${encodeURIComponent(cluster)}`);
-      const data = await res.json();
-      if (!res.ok || data.error) { setError(data.error || "Couldn't load places."); setForm(null); return; }
-      setForm(f => f && { ...f, places: data.places });
-    } catch {
-      setError("Couldn't load places. Please try again."); setForm(null);
-    }
-  };
-
-  const choosePlace = async (place: AdminPlace) => {
-    setError('');
-    setForm(f => f && { ...f, place, grants: null, role: '' });
-    try {
-      const res = await fetch(`/api/admin/places?entityId=${encodeURIComponent(place.id)}`);
-      const data = await res.json();
-      if (!res.ok || data.error) { setError(data.error || "Couldn't load the roles for this place."); setForm(f => f && { ...f, place: null }); return; }
-      const grants: RoleGrant[] = data.roles;
-      setForm(f => f && f.place?.id === place.id ? { ...f, grants, role: grants[0]?.role ?? '' } : f);
-    } catch {
-      setError("Couldn't load the roles for this place. Please try again.");
-      setForm(f => f && { ...f, place: null });
-    }
-  };
+  const openForm = () => { setError(''); setForm({ ...NEW_FORM }); };
 
   const saveRole = async () => {
-    if (!person || !form?.place || !form.role || form.saving) return;
+    if (!person || !form?.value || form.saving) return;
     const id = person.individual.id;
     setError('');
     setForm(f => f && { ...f, saving: true });
     try {
       const res = await fetch('/api/admin/roles', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ individualId: id, role: form.role, entityId: form.place.id }),
+        body: JSON.stringify({ individualId: id, role: form.value.role, entityId: form.value.entityId }),
       });
       const data = await res.json().catch(() => ({}));
       if (pickedId.current !== id) return;
@@ -131,41 +101,10 @@ export default function RolesCard({ cluster }: { cluster: string }) {
 
   const formView = (f: Form) => (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: 8, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {!f.place ? (
-        <>
-          <input type="text" value={f.filter} onChange={e => { const v = e.target.value; setForm(x => x && { ...x, filter: v }); }}
-            placeholder="Filter places…" aria-label="Filter places" style={INPUT} />
-          {f.places === null ? <div style={{ fontSize: 12, color: '#718096' }}>Loading…</div> : (
-            <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {placeTree(f.places, f.filter).map(({ place, depth }) => (
-                <button key={place.id} type="button" onClick={() => choosePlace(place)}
-                  style={{ textAlign: 'left', background: 'none', border: 'none', padding: `4px 4px 4px ${4 + depth * 12}px`, fontSize: 14, cursor: 'pointer' }}>
-                  {place.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <div style={{ fontSize: 13 }}>
-            Place: <strong>{f.place.name}</strong>{' '}
-            <button type="button" onClick={() => setForm(x => x && { ...x, place: null, grants: null, role: '' })}
-              style={{ ...BTN, padding: '1px 6px', fontSize: 12 }}>Change</button>
-          </div>
-          {f.grants === null ? <div style={{ fontSize: 12, color: '#718096' }}>Loading…</div>
-            : f.grants.length === 0 ? <div style={{ fontSize: 13, color: '#718096' }}>No roles can be given here.</div>
-            : (
-              <select value={f.role} onChange={e => { const v = e.target.value; setForm(x => x && { ...x, role: v }); }}
-                aria-label="Role" style={{ ...INPUT, width: 'auto' }}>
-                {f.grants.map(g => <option key={g.role} value={g.role}>{roleLabel(g.role).label}</option>)}
-              </select>
-            )}
-        </>
-      )}
+      <PlaceRolePicker cluster={cluster} onChange={value => setForm(x => x && { ...x, value })} />
       <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" disabled={!f.place || !f.role || f.saving} onClick={saveRole}
-          style={{ ...BTN, background: '#3182ce', color: 'white', border: '1px solid #3182ce', opacity: !f.place || !f.role || f.saving ? 0.5 : 1 }}>
+        <button type="button" disabled={!f.value || f.saving} onClick={saveRole}
+          style={{ ...BTN, background: '#3182ce', color: 'white', border: '1px solid #3182ce', opacity: !f.value || f.saving ? 0.5 : 1 }}>
           {f.saving ? 'Saving…' : 'Save'}
         </button>
         <button type="button" disabled={f.saving} onClick={() => { setForm(null); setError(''); }} style={BTN}>Cancel</button>
