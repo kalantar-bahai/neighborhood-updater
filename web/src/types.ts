@@ -152,6 +152,8 @@ export interface InitialData {
   // doubles as the "+Add nucleus" button's own gate: non-empty means yes. See
   // AppClient.tsx.
   clusterNames: string[];
+  // True when the user may open /admin (adminClusters is non-empty).
+  isAdmin: boolean;
 }
 
 export type FormData = Omit<NucleusRow,
