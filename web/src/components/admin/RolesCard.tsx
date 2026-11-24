@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { AdminPerson, AdminPlace, PersonDetails, RoleGrant, RoleHolding } from '@/lib/clusterNotebook';
 import { endRoleConfirm, placeTree, roleHoldingLine } from '@/lib/admin';
 import { roleLabel } from '@/lib/people';
@@ -29,6 +29,9 @@ export default function RolesCard({ cluster }: { cluster: string }) {
   const [error, setError] = useState('');
   const [form, setForm] = useState<Form | null>(null);
 
+  // Id of the person now picked. A reply for anyone else is dropped, so a late answer for A never lands under B.
+  const pickedId = useRef<string | null>(null);
+
   const name = person ? individualDisplayName(person.individual) : '';
 
   // Reads by id, never by name. Returns whether it worked.
@@ -36,36 +39,42 @@ export default function RolesCard({ cluster }: { cluster: string }) {
     try {
       const res = await fetch(`/api/admin/person?id=${encodeURIComponent(id)}`);
       const data = await res.json();
+      if (pickedId.current !== id) return false;
       if (!res.ok || data.error) { setError(data.error || "Couldn't load this person."); return false; }
       setLoaded({ details: data.details, roles: data.roles });
       return true;
     } catch {
+      if (pickedId.current !== id) return false;
       setError("Couldn't load this person. Please try again.");
       return false;
     }
   };
 
   const pick = async (p: AdminPerson) => {
+    pickedId.current = p.individual.id;
     setPerson(p); setLoaded(null); setError(''); setForm(null); setLoading(true);
     await read(p.individual.id);
-    setLoading(false);
+    if (pickedId.current === p.individual.id) setLoading(false);
   };
 
-  const changePerson = () => { setPerson(null); setLoaded(null); setError(''); setForm(null); };
+  const changePerson = () => { pickedId.current = null; setPerson(null); setLoaded(null); setError(''); setForm(null); };
 
   const endRole = async (h: RoleHolding) => {
     if (!person || !window.confirm(endRoleConfirm(name, h))) return;
+    const id = person.individual.id;
     setError('');
     try {
       const res = await fetch('/api/admin/roles', {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roleId: h.id }),
       });
       const data = await res.json().catch(() => ({}));
+      if (pickedId.current !== id) return;
       if (!res.ok || data.error) { setError(data.error || "Couldn't end the role."); return; }
     } catch {
-      setError("Couldn't end the role. Please try again."); return;
+      if (pickedId.current === id) setError("Couldn't end the role. Please try again.");
+      return;
     }
-    await read(person.individual.id);
+    await read(id);
   };
 
   const openForm = async () => {
@@ -98,20 +107,23 @@ export default function RolesCard({ cluster }: { cluster: string }) {
 
   const saveRole = async () => {
     if (!person || !form?.place || !form.role) return;
+    const id = person.individual.id;
     setError('');
     setForm(f => f && { ...f, saving: true });
     try {
       const res = await fetch('/api/admin/roles', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ individualId: person.individual.id, role: form.role, entityId: form.place.id }),
+        body: JSON.stringify({ individualId: id, role: form.role, entityId: form.place.id }),
       });
       const data = await res.json().catch(() => ({}));
+      if (pickedId.current !== id) return;
       if (!res.ok || data.error) { setError(data.error || "Couldn't add the role."); setForm(f => f && { ...f, saving: false }); return; }
     } catch {
-      setError("Couldn't add the role. Please try again."); setForm(f => f && { ...f, saving: false }); return;
+      if (pickedId.current === id) { setError("Couldn't add the role. Please try again."); setForm(f => f && { ...f, saving: false }); }
+      return;
     }
     setForm(null);
-    await read(person.individual.id);
+    await read(id);
   };
 
   const formView = (f: Form) => (
