@@ -118,6 +118,26 @@ export function removeAccessConfirm(name: string, isSelf: boolean): string {
   return isSelf ? 'Remove your own access? You will be signed out.' : `Remove ${name}'s access?`;
 }
 
+export function cancelInvitationConfirm(email: string): string {
+  return `Cancel the invitation to ${email}?`;
+}
+
+// The Invite card's POST body. role/entityId go only with a chosen place and role ('none' means access only).
+// The expiry text is sent as a number when it is one, else as typed, so the route's validateInvite words the error.
+export function inviteRequestBody(f: {
+  cluster: string; individualId: string; email: string; value: { entityId: string; role: string } | 'none';
+  expiresInDays: string; replaceExisting: boolean;
+}): Record<string, unknown> {
+  const t = f.expiresInDays.trim();
+  const n = Number(t);
+  return {
+    cluster: f.cluster, individualId: f.individualId, email: f.email.trim(),
+    ...(f.value === 'none' ? {} : { role: f.value.role, entityId: f.value.entityId }),
+    expiresInDays: t !== '' && Number.isFinite(n) ? n : t,
+    replaceExisting: f.replaceExisting,
+  };
+}
+
 export interface InviteInput {
   individualId: string; email: string; role: string | null; entityId: string | null; expiresInDays: number; replaceExisting: boolean;
 }

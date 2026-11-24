@@ -1,6 +1,7 @@
 import { describe, test, expect, vi } from 'vitest';
 import { adminPersonLine, roleHoldingLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin,
-  invitationStatusWord, invitationLine, accountLine, accountRemovedNote, prefillEmail, adminPersonTag, removeAccessConfirm, validateInvite } from './admin';
+  invitationStatusWord, invitationLine, accountLine, accountRemovedNote, prefillEmail, adminPersonTag, removeAccessConfirm, validateInvite,
+  inviteRequestBody, cancelInvitationConfirm } from './admin';
 import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary } from './clusterNotebook';
 
 const person = (ageCategory: AdminPerson['ageCategory'], placePath: string[]): AdminPerson => ({
@@ -198,5 +199,27 @@ describe('validateInvite', () => {
   });
   test.each([1, 90, 14])('accepts expiry %j', (expiresInDays) => {
     expect(validateInvite({ ...ok, expiresInDays })).toMatchObject({ ok: true, value: { expiresInDays } });
+  });
+});
+
+describe('inviteRequestBody', () => {
+  const base = { cluster: 'North', individualId: 'i1', email: ' ana@example.org ', expiresInDays: '30' };
+  test('no role sends neither role nor entityId', () => {
+    expect(inviteRequestBody({ ...base, value: 'none', replaceExisting: false }))
+      .toEqual({ cluster: 'North', individualId: 'i1', email: 'ana@example.org', expiresInDays: 30, replaceExisting: false });
+  });
+  test('a chosen role sends role and entityId', () => {
+    expect(inviteRequestBody({ ...base, value: { entityId: 'loc1', role: 'tutor' }, replaceExisting: true }))
+      .toEqual({ cluster: 'North', individualId: 'i1', email: 'ana@example.org', role: 'tutor', entityId: 'loc1', expiresInDays: 30, replaceExisting: true });
+  });
+  test.each([['', ''], ['abc', 'abc'], [' 14 ', 14], ['2.5', 2.5]])('expiry %j is sent as %j', (text, sent) => {
+    // Non-numbers go as typed so the route answers with its own wording.
+    expect(inviteRequestBody({ ...base, expiresInDays: text, value: 'none', replaceExisting: false }).expiresInDays).toBe(sent);
+  });
+});
+
+describe('cancelInvitationConfirm', () => {
+  test('names the address', () => {
+    expect(cancelInvitationConfirm('ana@example.org')).toBe('Cancel the invitation to ana@example.org?');
   });
 });

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import RolesCard from './RolesCard';
 import HiddenCard from './HiddenCard';
+import InviteCard from './InviteCard';
 
 interface AdminCluster { id: string; name: string }
 
@@ -71,6 +72,7 @@ export default function AdminClient() {
           {state.clusters.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
         </select>
       )}
+      <InviteCard key={`invite:${cluster}`} cluster={cluster} />
       <RolesCard key={`roles:${cluster}`} cluster={cluster} />
       <HiddenCard key={`hidden:${cluster}`} cluster={cluster} />
     </div>

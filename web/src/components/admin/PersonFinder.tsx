@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { AdminPerson } from '@/lib/clusterNotebook';
-import { adminPersonLine } from '@/lib/admin';
+import { adminPersonLine, adminPersonTag } from '@/lib/admin';
 
 const DEBOUNCE_MS = 300;
 const TAG: React.CSSProperties = { fontSize: 11, color: '#4a5568', background: '#edf2f7', borderRadius: 8, padding: '1px 6px', whiteSpace: 'nowrap' };
@@ -59,17 +59,20 @@ export default function PersonFinder({ cluster, onPick }: { cluster: string; onP
       {!searching && results && results.length === 0 && <div style={{ fontSize: 13, color: '#718096', marginTop: 6 }}>No one found.</div>}
       {results && results.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
-          {results.map(p => (
-            <button
-              key={p.individual.id}
-              type="button"
-              onClick={() => onPick(p)}
-              style={{ textAlign: 'left', background: 'white', border: '1px solid #cbd5e0', borderRadius: 6, padding: '6px 8px', fontSize: 14, cursor: 'pointer', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}
-            >
-              <span>{adminPersonLine(p)}</span>
-              {p.hasAccess && <span style={TAG}>has access</span>}
-            </button>
-          ))}
+          {results.map(p => {
+            const tag = adminPersonTag(p);
+            return (
+              <button
+                key={p.individual.id}
+                type="button"
+                onClick={() => onPick(p)}
+                style={{ textAlign: 'left', background: 'white', border: '1px solid #cbd5e0', borderRadius: 6, padding: '6px 8px', fontSize: 14, cursor: 'pointer', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}
+              >
+                <span>{adminPersonLine(p)}</span>
+                {tag && <span style={TAG}>{tag}</span>}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
