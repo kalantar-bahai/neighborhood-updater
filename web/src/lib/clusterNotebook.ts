@@ -665,16 +665,22 @@ export interface PersonDetails {
 // person isn't one of that nucleus's people. `checks` is null unless the caller has tier 2.
 export async function getPersonDetails(individualId: string, nucleusName: string | null): Promise<PersonDetails | null> {
   // Confirmed with cluster-notebook 2026-11-24: with no nucleusName, an Administrator or a CSO of the person's
-  // cluster may read the details. The variable is omitted (not sent as null) when there is no nucleus.
-  const query = `
-    query GetPersonDetails($individualId: String!, $nucleusName: String) {
-      personDetails(individualId: $individualId, nucleusName: $nucleusName) {
+  // cluster may read the details. With a nucleus we send the original `String!` query unchanged, so the People
+  // card works whether or not cluster-notebook's nullable change is deployed; only the no-nucleus case needs it.
+  const body = `
         individual { ${PERSON_SUMMARY_SELECTION} } estimatedAge isRegistered registrationDate address phones emails srpComments
         checks { backgroundCheckExpiration motorVehicleClearance }
       }
     }
   `;
-  const variables: Record<string, unknown> = nucleusName === null ? { individualId } : { individualId, nucleusName };
+  const query = nucleusName === null
+    ? `
+    query GetPersonDetails($individualId: String!) {
+      personDetails(individualId: $individualId) {${body}`
+    : `
+    query GetPersonDetails($individualId: String!, $nucleusName: String!) {
+      personDetails(individualId: $individualId, nucleusName: $nucleusName) {${body}`;
+  const variables = nucleusName === null ? { individualId } : { individualId, nucleusName };
   const data = await request<{ personDetails: PersonDetails | null }>(query, variables);
   return data.personDetails;
 }

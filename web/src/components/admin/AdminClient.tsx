@@ -71,8 +71,8 @@ export default function AdminClient() {
           {state.clusters.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
         </select>
       )}
-      <RolesCard key={cluster} cluster={cluster} />
-      <HiddenCard key={cluster} cluster={cluster} />
+      <RolesCard key={`roles:${cluster}`} cluster={cluster} />
+      <HiddenCard key={`hidden:${cluster}`} cluster={cluster} />
     </div>
   );
 }

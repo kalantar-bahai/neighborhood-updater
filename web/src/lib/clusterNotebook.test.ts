@@ -820,8 +820,20 @@ describe('getPersonDetails', () => {
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables).toEqual({ individualId: '7', nucleusName: 'Alpha' });
     const q = (body.query as string).replace(/\s+/g, ' ');
+    expect(q).toContain('query GetPersonDetails($individualId: String!, $nucleusName: String!)');
     expect(q).toContain('personDetails(individualId: $individualId, nucleusName: $nucleusName)');
     expect(q).toContain('checks { backgroundCheckExpiration motorVehicleClearance }');
+  });
+
+  test('with no nucleus, sends a query that has no nucleusName at all', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { personDetails: details } }));
+
+    expect(await getPersonDetails('7', null)).toEqual(details);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ individualId: '7' });
+    const q = (body.query as string).replace(/\s+/g, ' ');
+    expect(q).toContain('personDetails(individualId: $individualId)');
+    expect(q).not.toContain('nucleusName');
   });
 
   test('returns null when personDetails is null', async () => {
@@ -1178,14 +1190,13 @@ describe('admin client', () => {
     expect(q).toContain('nucleusName roles isResident hide { hiddenAt reason hiddenBy {');
   });
 
-  test('getPersonDetails with null nucleus omits the variable and declares it nullable', async () => {
+  test('getPersonDetails with null nucleus omits the variable and the argument', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { personDetails: null } }));
     expect(await getPersonDetails('I1', null)).toBeNull();
     const { vars, q } = norm(0);
     expect(vars).toEqual({ individualId: 'I1' });
     expect('nucleusName' in vars).toBe(false);
-    expect(q).toContain('$nucleusName: String)');
-    expect(q).not.toContain('$nucleusName: String!');
+    expect(q).not.toContain('nucleusName');
   });
 
   test('getPersonDetails with a nucleus name still sends it', async () => {

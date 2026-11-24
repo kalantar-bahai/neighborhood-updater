@@ -7,7 +7,7 @@ import { hideNote } from '@/lib/people';
 import { individualDisplayName } from '@/lib/personName';
 
 // The inline "Move…" form for one row: pick a locality or setting, then Move.
-type MoveForm = { key: string; places: AdminPlace[] | null; filter: string; place: AdminPlace | null; saving: boolean };
+type MoveForm = { key: string; places: AdminPlace[] | null; filter: string; place: AdminPlace | null };
 
 const BTN: React.CSSProperties = { fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', border: '1px solid #cbd5e0', background: 'white', color: '#4a5568' };
 const INPUT: React.CSSProperties = { width: '100%', boxSizing: 'border-box', fontSize: 16, padding: '6px 8px', border: '1px solid #a0aec0', borderRadius: 6 };
@@ -22,12 +22,14 @@ export default function HiddenCard({ cluster }: { cluster: string }) {
   const [open, setOpen] = useState(true);
   const [hidden, setHidden] = useState<HiddenPerson[] | null>(null);
   const [loadError, setLoadError] = useState('');
-  const [rowError, setRowError] = useState<{ key: string; text: string } | null>(null);
+  // Busy and error are per row (keyed by rowKey), so a reply always clears and reports on its own row even if
+  // another row was acted on meanwhile.
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [move, setMove] = useState<MoveForm | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Record<string, 'unhide' | 'move'>>({});
 
-  // Row currently being acted on. A reply for any other row (or after the row's form was closed) is dropped.
-  const current = useRef<string | null>(null);
+  // Row whose Move form is open. A places reply for any other row (or after the form was closed) is dropped.
+  const moveKey = useRef<string | null>(null);
   // Latest list read; an older read never overwrites a newer one.
   const readSeq = useRef(0);
 
@@ -58,9 +60,16 @@ export default function HiddenCard({ cluster }: { cluster: string }) {
       .catch(() => { if (seq === readSeq.current) setLoadError("Couldn't load hidden people. Please try again."); });
   }, [cluster]);
 
+  const setBusyFor = (key: string, what: 'unhide' | 'move' | null) =>
+    setBusy(b => { const n = { ...b }; if (what) n[key] = what; else delete n[key]; return n; });
+  const setErrorFor = (key: string, text: string) =>
+    setRowErrors(e => { const n = { ...e }; if (text) n[key] = text; else delete n[key]; return n; });
+
   const unhide = async (h: HiddenPerson) => {
     const key = rowKey(h);
-    current.current = key; setBusy(key); setRowError(null); setMove(null);
+    if (busy[key]) return;
+    setBusyFor(key, 'unhide'); setErrorFor(key, '');
+    if (moveKey.current === key) { moveKey.current = null; setMove(null); }
     let failure = '';
     try {
       const res = await fetch('/api/admin/hidden', {
@@ -72,36 +81,34 @@ export default function HiddenCard({ cluster }: { cluster: string }) {
     } catch {
       failure = "Couldn't unhide this person. Please try again.";
     }
-    if (current.current !== key) return;
-    if (failure) { setRowError({ key, text: failure }); setBusy(null); return; }
+    if (failure) { setErrorFor(key, failure); setBusyFor(key, null); return; }
     await reload();
-    if (current.current === key) setBusy(null);
+    setBusyFor(key, null);
   };
 
   const openMove = async (h: HiddenPerson) => {
     const key = rowKey(h);
-    current.current = key; setRowError(null);
-    setMove({ key, places: null, filter: '', place: null, saving: false });
+    moveKey.current = key; setErrorFor(key, '');
+    setMove({ key, places: null, filter: '', place: null });
     try {
       const res = await fetch(`/api/admin/places?cluster=${encodeURIComponent(cluster)}`);
       const data = await res.json();
-      if (current.current !== key) return;
-      if (!res.ok || data.error) { setRowError({ key, text: data.error || "Couldn't load places." }); setMove(null); return; }
+      if (moveKey.current !== key) return;
+      if (!res.ok || data.error) { setErrorFor(key, data.error || "Couldn't load places."); moveKey.current = null; setMove(null); return; }
       setMove(m => m && m.key === key ? { ...m, places: moveTargets(data.places) } : m);
     } catch {
-      if (current.current !== key) return;
-      setRowError({ key, text: "Couldn't load places. Please try again." }); setMove(null);
+      if (moveKey.current !== key) return;
+      setErrorFor(key, "Couldn't load places. Please try again."); moveKey.current = null; setMove(null);
     }
   };
 
-  const closeMove = () => { current.current = null; setMove(null); setRowError(null); };
+  const closeMove = () => { moveKey.current = null; setMove(null); setRowErrors({}); };
 
   const doMove = async (h: HiddenPerson) => {
     const key = rowKey(h);
-    if (!move || move.key !== key || !move.place) return;
+    if (!move || move.key !== key || !move.place || busy[key]) return;
     const place = move.place;
-    current.current = key; setRowError(null);
-    setMove(m => m && { ...m, saving: true });
+    setErrorFor(key, ''); setBusyFor(key, 'move');
     let failure = '';
     try {
       const res = await fetch('/api/admin/move', {
@@ -114,13 +121,13 @@ export default function HiddenCard({ cluster }: { cluster: string }) {
     } catch {
       failure = "Couldn't move this person. Please try again.";
     }
-    if (current.current !== key) return;
-    if (failure) { setRowError({ key, text: failure }); setMove(m => m && { ...m, saving: false }); return; }
-    setMove(null);
+    if (failure) { setErrorFor(key, failure); setBusyFor(key, null); return; }
+    if (moveKey.current === key) { moveKey.current = null; setMove(null); }
     await reload();
+    setBusyFor(key, null);
   };
 
-  const moveView = (h: HiddenPerson, m: MoveForm) => (
+  const moveView = (h: HiddenPerson, m: MoveForm, saving: boolean) => (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: 8, marginTop: 6, display: 'flex', flexDirection: 'column', gap: 8 }}>
       {!m.place ? (
         <>
@@ -140,16 +147,16 @@ export default function HiddenCard({ cluster }: { cluster: string }) {
       ) : (
         <div style={{ fontSize: 13 }}>
           Move to: <strong>{m.place.name}</strong>{' '}
-          <button type="button" disabled={m.saving} onClick={() => setMove(x => x && { ...x, place: null })}
+          <button type="button" disabled={saving} onClick={() => setMove(x => x && { ...x, place: null })}
             style={{ ...BTN, padding: '1px 6px', fontSize: 12 }}>Change</button>
         </div>
       )}
       <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" disabled={!m.place || m.saving} onClick={() => doMove(h)}
-          style={{ ...BTN, background: '#3182ce', color: 'white', border: '1px solid #3182ce', opacity: !m.place || m.saving ? 0.5 : 1 }}>
-          {m.saving ? 'Moving…' : 'Move'}
+        <button type="button" disabled={!m.place || saving} onClick={() => doMove(h)}
+          style={{ ...BTN, background: '#3182ce', color: 'white', border: '1px solid #3182ce', opacity: !m.place || saving ? 0.5 : 1 }}>
+          {saving ? 'Moving…' : 'Move'}
         </button>
-        <button type="button" disabled={m.saving} onClick={closeMove} style={BTN}>Cancel</button>
+        <button type="button" disabled={saving} onClick={closeMove} style={BTN}>Cancel</button>
       </div>
     </div>
   );
@@ -166,19 +173,19 @@ export default function HiddenCard({ cluster }: { cluster: string }) {
           {hidden && hidden.length === 0 && <div style={{ fontSize: 13, color: '#718096' }}>No one is hidden in this cluster.</div>}
           {hidden && hidden.map(h => {
             const key = rowKey(h);
-            const rowBusy = busy === key || (move?.key === key && move.saving);
+            const rowBusy = !!busy[key];
             return (
               <div key={key} style={{ padding: '8px 0', borderTop: '1px solid #edf2f7' }}>
                 <div style={{ fontSize: 15, fontWeight: 600 }}>{individualDisplayName(h.individual)}</div>
                 <div style={{ fontSize: 13, color: '#4a5568' }}>from {h.nucleusName}</div>
                 <div style={{ fontSize: 12, color: '#718096' }}>{hideNote(h.hide)}</div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                  <button type="button" disabled={rowBusy} onClick={() => unhide(h)} style={BTN}>{busy === key ? 'Unhiding…' : 'Unhide'}</button>
+                  <button type="button" disabled={rowBusy} onClick={() => unhide(h)} style={BTN}>{busy[key] === 'unhide' ? 'Unhiding…' : 'Unhide'}</button>
                   <button type="button" disabled={rowBusy || move?.key === key} onClick={() => openMove(h)} style={BTN}>Move…</button>
                   <button type="button" disabled title="Coming later" style={{ ...BTN, opacity: 0.5, cursor: 'not-allowed' }}>Archive</button>
                 </div>
-                {move?.key === key && moveView(h, move)}
-                {rowError?.key === key && <div style={{ color: '#c53030', fontSize: 13, marginTop: 6 }}>{rowError.text}</div>}
+                {move?.key === key && moveView(h, move, busy[key] === 'move')}
+                {rowErrors[key] && <div style={{ color: '#c53030', fontSize: 13, marginTop: 6 }}>{rowErrors[key]}</div>}
               </div>
             );
           })}

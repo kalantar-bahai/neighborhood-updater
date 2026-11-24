@@ -28,6 +28,7 @@ export default function RolesCard({ cluster }: { cluster: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState<Form | null>(null);
+  const [ending, setEnding] = useState<string | null>(null); // role id whose end request is in flight
 
   // Id of the person now picked. A reply for anyone else is dropped, so a late answer for A never lands under B.
   const pickedId = useRef<string | null>(null);
@@ -52,29 +53,31 @@ export default function RolesCard({ cluster }: { cluster: string }) {
 
   const pick = async (p: AdminPerson) => {
     pickedId.current = p.individual.id;
-    setPerson(p); setLoaded(null); setError(''); setForm(null); setLoading(true);
+    setPerson(p); setEnding(null); setLoaded(null); setError(''); setForm(null); setLoading(true);
     await read(p.individual.id);
     if (pickedId.current === p.individual.id) setLoading(false);
   };
 
-  const changePerson = () => { pickedId.current = null; setPerson(null); setLoaded(null); setError(''); setForm(null); };
+  const changePerson = () => { pickedId.current = null; setEnding(null); setPerson(null); setLoaded(null); setError(''); setForm(null); };
 
   const endRole = async (h: RoleHolding) => {
     if (!person || !window.confirm(endRoleConfirm(name, h))) return;
+    if (ending) return;
     const id = person.individual.id;
-    setError('');
+    setError(''); setEnding(h.id);
     try {
       const res = await fetch('/api/admin/roles', {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roleId: h.id }),
       });
       const data = await res.json().catch(() => ({}));
       if (pickedId.current !== id) return;
-      if (!res.ok || data.error) { setError(data.error || "Couldn't end the role."); return; }
+      if (!res.ok || data.error) { setError(data.error || "Couldn't end the role."); setEnding(null); return; }
     } catch {
-      if (pickedId.current === id) setError("Couldn't end the role. Please try again.");
+      if (pickedId.current === id) { setError("Couldn't end the role. Please try again."); setEnding(null); }
       return;
     }
     await read(id);
+    if (pickedId.current === id) setEnding(null);
   };
 
   const openForm = async () => {
@@ -106,7 +109,7 @@ export default function RolesCard({ cluster }: { cluster: string }) {
   };
 
   const saveRole = async () => {
-    if (!person || !form?.place || !form.role) return;
+    if (!person || !form?.place || !form.role || form.saving) return;
     const id = person.individual.id;
     setError('');
     setForm(f => f && { ...f, saving: true });
@@ -196,8 +199,8 @@ export default function RolesCard({ cluster }: { cluster: string }) {
                   {loaded.roles.map(h => (
                     <div key={h.id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, padding: '2px 0' }}>
                       <span>{roleHoldingLine(h)}</span>
-                      <button type="button" onClick={() => endRole(h)} aria-label={endRoleConfirm(name, h)} title="End this role"
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: 2 }}>🗑</button>
+                      <button type="button" onClick={() => endRole(h)} aria-label={endRoleConfirm(name, h)} title="End this role" disabled={ending !== null}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, minWidth: 44, minHeight: 44, padding: 0, opacity: ending !== null ? 0.4 : 1 }}>🗑</button>
                     </div>
                   ))}
                   {!form && <button type="button" onClick={openForm} style={{ ...BTN, marginTop: 6 }}>+ role</button>}
