@@ -40,6 +40,8 @@ const CODED_ERRORS: Record<string, { status: number; message: string | null }> =
   NOT_A_PLACE: { status: 400, message: 'People can only be moved to a locality or a neighbourhood in SRP.' },
   // Confirmed with cluster-notebook 2026-11-23: hideIndividual/unhideIndividual refuse a person who isn't at the nucleus.
   NOT_AT_NUCLEUS: { status: 409, message: "This person isn't connected to this nucleus." },
+  // Confirmed with cluster-notebook 2026-11-24: endRole refuses the caller's own last role giving admin standing over a cluster.
+  SELF_LOCKOUT: { status: 409, message: "You can't end your own last admin role here." },
 };
 
 export function clusterNotebookErrorResponse(e: unknown): NextResponse {
