@@ -315,3 +315,58 @@ How this app uses it:
   unticking a role on a hidden person works.
 - The Overview's name lists and counts keep the defaults.
 - "+ Add" unhides a picked hidden person before saving their Resident and roles.
+
+## Admin page, Phase 1, confirmed with cluster-notebook 2026-11-24
+
+Spec: `docs/superpowers/specs/2026-11-24-admin-page-design.md`. cluster-notebook's final shape below supersedes the
+spec where they differ. Status: nothing is deployed yet; cluster-notebook announces it field by field.
+
+```graphql
+type Query {
+  isAdministrator: Boolean!                                  # exists
+  adminClusters: [Cluster!]!
+  me: PersonSummary
+  searchPeople(clusterName: String!, search: String!, limit: Int = 20): [AdminPerson!]!
+  individualRoles(individualId: String!): [RoleHolding!]!
+  personDetails(individualId: String!, nucleusName: String = null): PersonDetails
+  hiddenPeople(clusterName: String!): [HiddenPerson!]!       # exists
+  adminPlaces(clusterName: String!): [AdminPlace!]!
+  assignableRolesAt(entityId: String!): [RoleGrant!]!
+  unlinkedSignIns: [UnlinkedSignIn!]!                        # Administrator only
+}
+type AdminPlace { id: String!  name: String!  type: String!  parentId: String  parentName: String }  # cluster|locality|setting|nucleus
+type AdminPerson { individual: PersonSummary!  ageCategory: AgeCategory  placePath: [String!]!  hasAccess: Boolean!
+                   pendingInvitation: Invitation }           # pendingInvitation arrives with Phase 2
+type RoleHolding { id: String!  role: String!  entity: AdminPlace  start: Date }   # entity null for Administrator
+type UnlinkedSignIn { providerUserId: String!  firstSeenAt: DateTime!  lastSeenAt: DateTime! }
+type Mutation {
+  grantRole(individualId: String!, role: String!, entityId: String = null): RoleHolding!
+  endRole(roleId: String!): Boolean!
+  moveIndividuals(...)                                       # exists
+  unhideIndividual(individualId: String!, nucleusName: String!): NucleusPerson   # exists
+}
+```
+
+- `Cluster`, `Locality`, `Setting` and `Nucleus` gain `id: String!`. Names such as "Chapel Hill" repeat, so roles and
+  places are chosen by id; nuclei stay keyed by name elsewhere.
+- `RoleHolding.entity` and `Invitation.entity` are `AdminPlace`, because `Location` can't represent a nucleus. We ask
+  only for `{ id name type }`.
+- `AdminPerson.ageCategory` is the existing `AgeCategory` enum (`CHILD | JUNIOR_YOUTH | YOUTH | ADULT`).
+- `grantRole`: `entityId` is required except for the role `Administrator` (`ENTITY_REQUIRED`). `role` must be one of
+  `ATC`, `CSO`, `CIC`, `LSA`, `ATC-Collaborator`, `CIC-Collaborator`, `abm-assistant`, `accompanier`, `contact`, or
+  `Administrator`; anything else is `UNKNOWN_ROLE`. Free-text informal roles still go through `updateNucleusWorkers`.
+  Granting a role the person already holds leaves it unchanged. Gated exactly like `assignableRolesAt`.
+- `adminClusters`: all clusters for an Administrator; for a CSO, the clusters at or below their role (a CSO role
+  above a cluster covers every cluster under it). Empty means no Admin link.
+- A CSO (at the cluster or above) and an Administrator can unhide and move anyone in the cluster with no role at the
+  nucleus: they inherit WRITE down from the cluster.
+- `SELF_LOCKOUT` fires only when `endRole` ends the caller's own last role giving admin standing over a cluster (last
+  Administrator, or last CSO covering it).
+- A disabled account (after `removeAccess`, Phase 2) is treated as signed out; `removeAccess` also revokes the
+  person's pending invitations.
+- Error codes: `FORBIDDEN`, `NOT_FOUND`, `UNKNOWN_ROLE`, `ENTITY_REQUIRED`, `SELF_LOCKOUT`, `EMAIL_IN_USE`,
+  `ALREADY_HAS_ACCESS`, `INVITATION_PENDING`, `NOT_PENDING`, `BAD_INPUT`, `CLERK_ERROR`, `CLERK_NOT_CONFIGURED`.
+- Deploy gating: a field asked for before it is in production breaks the whole query (the People card went down that
+  way on 2026-11-23). Branch `feat/admin-page` therefore waits to merge until these fields are live.
+- Phase 2 (invitations, `removeAccess`, `accounts`) and Phase 3 (`peopleNotInSrp`, `changeLog`) are agreed and
+  documented in the spec; they get their own sections here when cluster-notebook confirms each deploy.
