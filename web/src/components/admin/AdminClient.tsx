@@ -5,6 +5,7 @@ import Link from 'next/link';
 import RolesCard from './RolesCard';
 import HiddenCard from './HiddenCard';
 import InviteCard from './InviteCard';
+import AccountsCard from './AccountsCard';
 
 interface AdminCluster { id: string; name: string }
 
@@ -12,7 +13,7 @@ type State =
   | { kind: 'loading' }
   | { kind: 'denied' }
   | { kind: 'error'; message: string }
-  | { kind: 'ready'; clusters: AdminCluster[] };
+  | { kind: 'ready'; clusters: AdminCluster[]; me: { id: string } | null };
 
 const homeLink = { fontSize: 13, color: '#2b6cb0' };
 
@@ -31,7 +32,8 @@ export default function AdminClient() {
         const clusters: AdminCluster[] = data.clusters;
         if (clusters.length === 0) { setState({ kind: 'denied' }); return; }
         setCluster(clusters[0].name);
-        setState({ kind: 'ready', clusters });
+        // me is null when cluster-notebook couldn't say who the caller is; the Accounts card then can't spot their own row.
+        setState({ kind: 'ready', clusters, me: data.me ?? null });
       })
       .catch(() => setState({ kind: 'error', message: 'Failed to load. Please refresh.' }));
   }, []);
@@ -73,6 +75,7 @@ export default function AdminClient() {
         </select>
       )}
       <InviteCard key={`invite:${cluster}`} cluster={cluster} />
+      <AccountsCard key={`accounts:${cluster}`} cluster={cluster} me={state.me} />
       <RolesCard key={`roles:${cluster}`} cluster={cluster} />
       <HiddenCard key={`hidden:${cluster}`} cluster={cluster} />
     </div>

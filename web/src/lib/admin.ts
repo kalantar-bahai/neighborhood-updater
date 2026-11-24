@@ -104,6 +104,11 @@ export function accountRemovedNote(a: AccountInfo): string | null {
   return a.disabledAt ? `access removed ${day(a.disabledAt)}` : null;
 }
 
+// The n in "Accounts (n)": logins that can still sign in (removed ones stay listed, greyed, but don't count).
+export function activeAccountCount(accounts: AccountInfo[]): number {
+  return accounts.filter(a => !a.disabledAt).length;
+}
+
 // The login email is not the contact email, but SRP's first email is the best starting guess; the field stays editable.
 export function prefillEmail(details: PersonDetails | null): string {
   return details?.emails[0]?.trim() ?? '';

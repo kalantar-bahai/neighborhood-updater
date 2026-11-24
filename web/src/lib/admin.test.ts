@@ -1,6 +1,6 @@
 import { describe, test, expect, vi } from 'vitest';
 import { adminPersonLine, roleHoldingLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin,
-  invitationStatusWord, invitationLine, accountLine, accountRemovedNote, prefillEmail, adminPersonTag, removeAccessConfirm, validateInvite,
+  invitationStatusWord, invitationLine, accountLine, accountRemovedNote, activeAccountCount, prefillEmail, adminPersonTag, removeAccessConfirm, validateInvite,
   inviteRequestBody, cancelInvitationConfirm } from './admin';
 import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary } from './clusterNotebook';
 
@@ -133,6 +133,10 @@ describe('accountLine and accountRemovedNote', () => {
   test('removed note', () => {
     expect(accountRemovedNote(account({ disabledAt: '2026-11-26T09:00:00Z' }))).toBe('access removed 2026-11-26');
     expect(accountRemovedNote(account())).toBeNull();
+  });
+  test('active count skips removed logins', () => {
+    expect(activeAccountCount([])).toBe(0);
+    expect(activeAccountCount([account(), account({ disabledAt: '2026-11-26T09:00:00Z' }), account()])).toBe(2);
   });
 });
 
