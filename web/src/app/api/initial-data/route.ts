@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getCurrentUserEmail } from '@/lib/clerkUser';
 import { activitiesFromClusterNotebook } from '@/lib/data';
 import { getAdminClusters, getAllNuclei, getClusters } from '@/lib/clusterNotebook';
+import { lookupIsAdmin } from '@/lib/admin';
 import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
 
 function n(v: string) { return parseInt(v || '0', 10) || 0; }
@@ -19,8 +20,8 @@ export async function GET() {
   const email = await getCurrentUserEmail();
 
   try {
-    const [clusterNotebookNuclei, clusters, adminClusters] = await Promise.all([
-      getAllNuclei(), getClusters(), getAdminClusters(),
+    const [clusterNotebookNuclei, clusters, isAdmin] = await Promise.all([
+      getAllNuclei(), getClusters(), lookupIsAdmin(getAdminClusters),
     ]);
 
     const readableNuclei = clusterNotebookNuclei.filter(cn => cn.myPermissions.canRead);
@@ -80,7 +81,7 @@ export async function GET() {
       email,
       clusterNames: createableClusterNames,
       // Drives the home page's "Admin" link: Administrator or CSO of some cluster.
-      isAdmin: adminClusters.length > 0,
+      isAdmin,
     });
   } catch (e: unknown) {
     return clusterNotebookErrorResponse(e);

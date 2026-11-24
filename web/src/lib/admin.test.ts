@@ -1,5 +1,5 @@
-import { describe, test, expect } from 'vitest';
-import { adminPersonLine, roleHoldingLine, endRoleConfirm, placeTree, moveTargets, isAdminOf } from './admin';
+import { describe, test, expect, vi } from 'vitest';
+import { adminPersonLine, roleHoldingLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin } from './admin';
 import type { AdminPerson, AdminPlace, RoleHolding } from './clusterNotebook';
 
 const person = (ageCategory: AdminPerson['ageCategory'], placePath: string[]): AdminPerson => ({
@@ -66,4 +66,17 @@ describe('isAdminOf', () => {
   const clusters = [{ id: 'c', name: 'NC-215 Triangle' }];
   test('true for a listed cluster', () => expect(isAdminOf(clusters, 'NC-215 Triangle')).toBe(true));
   test('false otherwise', () => expect(isAdminOf(clusters, 'Elsewhere')).toBe(false));
+});
+
+describe('lookupIsAdmin', () => {
+  test('true when any admin cluster is listed, false when none', async () => {
+    expect(await lookupIsAdmin(async () => [{ id: 'c1', name: 'Test Cluster' }])).toBe(true);
+    expect(await lookupIsAdmin(async () => [])).toBe(false);
+  });
+  test('a rejected lookup yields false instead of throwing', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await lookupIsAdmin(async () => { throw new Error('boom'); })).toBe(false);
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
 });

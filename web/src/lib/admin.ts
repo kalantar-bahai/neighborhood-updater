@@ -60,3 +60,15 @@ export function moveTargets(places: AdminPlace[]): AdminPlace[] {
 export function isAdminOf(clusters: AdminCluster[], clusterName: string): boolean {
   return clusters.some(c => c.name === clusterName);
 }
+
+// Whether the home page shows the Admin link. Fails closed without failing the caller: a
+// cluster-notebook error on adminClusters must never take the home page down for everyone
+// (it did on 2026-11-23); the user just doesn't see the link.
+export async function lookupIsAdmin(lookup: () => Promise<AdminCluster[]>): Promise<boolean> {
+  try {
+    return (await lookup()).length > 0;
+  } catch (e) {
+    console.error('adminClusters lookup failed; hiding the Admin link', e);
+    return false;
+  }
+}
