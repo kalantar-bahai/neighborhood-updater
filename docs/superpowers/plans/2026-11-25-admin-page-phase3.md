@@ -45,16 +45,25 @@ type LogEntry { id: String!  occurredAt: DateTime!  actor: PersonSummary  mutati
 - `actor` is null for the SRP sync, scripts, or anything not done by a signed-in person. `mutation` is the GraphQL mutation name or null.
 - Both: same admin gate as `hiddenPeople` (FORBIDDEN otherwise); unknown cluster → `[]`.
 
-## Proposed, awaiting the owner's approval in cluster-notebook (Part B)
+## Confirmed with cluster-notebook 2026-11-25, being built (Part B)
 
-- `roleHoldersWithoutAccess(clusterName: String!): [AdminPerson!]!`: current formal roles (ATC, CSO, CIC, LSA, ATC-/CIC-Collaborator, ABM-Assistant, accompanier, contact) at live entities in the cluster, `hasAccess` false (removed-access people included), pending invitations included; ordered by family name, first name; same gate.
-- `AdminPerson.roles: [RoleHolding!]!` (same list and visibility as `individualRoles`).
-- `AdminPerson.accessRemovedAt: DateTime` (null unless their account is disabled).
-- `AdminPerson.createdAt: DateTime`, `AdminPerson.createdBy: PersonSummary` (null for SRP sync/scripts/before auditing).
-- `LogEntry.entityName: String` (best effort; null if the row is gone).
-- `AdminPerson.pendingInvitation` may be an expired invitation (`status: EXPIRED`).
+All additive; nothing Part A calls changes.
 
-Final names come from cluster-notebook when deployed; Part B's gate step adjusts the plan's names to match.
+```graphql
+searchPeople(clusterName: String!, search: String! = "", limit: Int! = 20,
+             holdsRole: Boolean = null, hasAccess: Boolean = null): [AdminPerson!]!
+type AdminPerson { ...existing...  roles: [RoleHolding!]!  accessRemovedAt: DateTime
+                   createdAt: DateTime  createdBy: PersonSummary }
+type LogEntry { ...existing...  entityName: String }
+```
+
+- "Role holders without access" = `searchPeople(clusterName, search: "", limit: 1000, holdsRole: true, hasAccess: false)`. No maximum limit; the default stays 20. null filter = no filter.
+- `holdsRole: true` = a current recognised role (not Administrator, not promoter/protagonist) at a live place in the cluster. `hasAccess: false` = no enabled account, so removed-access people are included.
+- `roles` lists every current role (informal ones included), same visibility as `individualRoles`.
+- `accessRemovedAt`: when the account was disabled; null if enabled or never had one.
+- `createdAt`: from the audit log, null before auditing began. `createdBy`: null for SRP sync, scripts, or before auditing.
+- `entityName`: place name; person name for individual, invitation and account; `"<person> · <role> at <place>"` for a role; `"<person> · hidden at <nucleus>"` for a hide; null if the row is gone.
+- `pendingInvitation` is null once an invitation expires (only pending, unexpired), so there is no "invitation expired" tag.
 
 ## Review Focus
 
@@ -222,14 +231,14 @@ git commit -m "feat: Log card on the Admin page"
 ## Part B: after cluster-notebook deploys the approved fields
 
 **Gate (before Task 3):** introspect production (`__type(name:"AdminPerson")`, `__type(name:"LogEntry")`, Query fields)
-and confirm `roleHoldersWithoutAccess`, `AdminPerson.roles`, `AdminPerson.accessRemovedAt` exist (Task 3), and
+and confirm `searchPeople`'s `holdsRole`/`hasAccess` arguments, `AdminPerson.roles`, `AdminPerson.accessRemovedAt` exist (Task 3), and
 `AdminPerson.createdAt`, `AdminPerson.createdBy`, `LogEntry.entityName` (Task 4). If a name differs from this plan,
 use the deployed name and ledger the ruling. If Task 4's fields are not deployed, ship Task 3 alone.
 
 ### Task 3: No account yet card, with Invite… into the Invite card
 
 **Files:**
-- Modify: `web/src/lib/clusterNotebook.ts` (types; `getRoleHoldersWithoutAccess`; `pendingInvitation { id expiresAt status }` in its selection only), `web/src/lib/clusterNotebook.test.ts`
+- Modify: `web/src/lib/clusterNotebook.ts` (types; `getRoleHoldersWithoutAccess` calling `searchPeople` with filters), `web/src/lib/clusterNotebook.test.ts`
 - Modify: `web/src/lib/admin.ts`, `web/src/lib/admin.test.ts`
 - Create: `web/src/app/api/admin/no-account/route.ts`
 - Create: `web/src/components/admin/NoAccountCard.tsx`
@@ -239,7 +248,7 @@ use the deployed name and ledger the ruling. If Task 4's fields are not deployed
 **Interfaces:**
 - Consumes: `findPeople` (Task 1), `roleHoldingLine`, `currentRolesLine`.
 - Produces:
-  - `AdminPerson` gains optional `roles?: RoleHolding[]` and `accessRemovedAt?: string | null`; `pendingInvitation` gains optional `status?: InvitationStatus`.
+  - `AdminPerson` gains optional `roles?: RoleHolding[]` and `accessRemovedAt?: string | null` (selected only by `getRoleHoldersWithoutAccess`).
   - `getRoleHoldersWithoutAccess(clusterName: string): Promise<AdminPerson[]>`
   - `adminPersonTags(p: AdminPerson): string[]` replacing `adminPersonTag` (update `PersonFinder`, `InviteCard`, `NotInSrpCard`)
   - `InviteCard` accepts `ref?: React.Ref<InviteHandle>` with `export interface InviteHandle { start(p: AdminPerson): void }`, and `onInvited?: () => void`
@@ -254,19 +263,15 @@ describe('adminPersonTags', () => {
     expect(adminPersonTags({ ...base, hasAccess: true, accessRemovedAt: null })).toEqual(['has access']);
   });
   test('removed and invited both show, removed first, with the date', () => {
-    expect(adminPersonTags({ ...base, accessRemovedAt: '2026-11-20T09:00:00Z', pendingInvitation: { id: 'i', expiresAt: '2026-12-20T00:00:00Z', status: 'PENDING' } }))
+    expect(adminPersonTags({ ...base, accessRemovedAt: '2026-11-20T09:00:00Z', pendingInvitation: { id: 'i', expiresAt: '2026-12-20T00:00:00Z' } }))
       .toEqual(['access removed Nov 20, 2026', 'invited']);
-  });
-  test('an expired invitation says so', () => {
-    expect(adminPersonTags({ ...base, pendingInvitation: { id: 'i', expiresAt: '2026-11-01T00:00:00Z', status: 'EXPIRED' } }))
-      .toEqual(['invitation expired']);
   });
   test('nothing for a plain person', () => {
     expect(adminPersonTags(base)).toEqual([]);
   });
 });
 ```
-`clusterNotebook.test.ts`: `getRoleHoldersWithoutAccess` selects the shared person fields plus `roles { id role entity { id name type } start } accessRemovedAt` and `pendingInvitation { id expiresAt status }`.
+`clusterNotebook.test.ts`: `getRoleHoldersWithoutAccess` queries `searchPeople` with variables `{ clusterName, search: '', limit: 1000, holdsRole: true, hasAccess: false }` (declared `$search: String!, $limit: Int!, $holdsRole: Boolean, $hasAccess: Boolean`) and selects the shared person fields plus `roles { id role entity { id name type } start } accessRemovedAt`.
 
 - [ ] **Step 2: Run to see them fail**
 

@@ -114,9 +114,9 @@ Each row shows the person (as in search results) and their roles with places, pl
 fills the Invite card with them. The roles that count are ATC, CSO, CIC, LSA, ATC-/CIC-Collaborator,
 ABM-Assistant, accompanier and contact; informal roles and Administrator don't count. People whose access was
 removed are listed with an "access removed" tag (owner 2026-11-25). People with a pending invitation are listed with
-an "invited" tag. cluster-notebook proposed (2026-11-25, awaiting owner approval there)
-`roleHoldersWithoutAccess(clusterName: String!): [AdminPerson!]!` plus `AdminPerson.roles: [RoleHolding!]!`,
-with the same gate as `hiddenPeople`, ordered by family name, then first name.
+an "invited" tag. Confirmed with cluster-notebook 2026-11-25: `searchPeople(..., holdsRole: true, hasAccess: false)`
+gives the list, and `AdminPerson` gains `roles`, `accessRemovedAt`, `createdAt` and `createdBy` (existing queries
+extended, not new ones; owner 2026-11-25).
 
 ### Log (Phase 3)
 
