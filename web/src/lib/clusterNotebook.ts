@@ -229,6 +229,8 @@ export interface NucleusFields {
 // doesn't need population/households/connected*, and its query below doesn't
 // request them, so keep this decoupled from NucleusFields' full shape.
 export interface NucleusSummary {
+  // Confirmed with cluster-notebook 2026-11-25: a stable uuid that survives renames. Used for the address bar.
+  id: string;
   name: string;
   inSrp?: boolean;
   srpAction: SrpAction | null;
@@ -397,7 +399,7 @@ export async function getAllNuclei(): Promise<NucleusSummary[]> {
   const query = `
     query GetAllNuclei {
       nuclei {
-        name stage locality populationMakeup nucleusType
+        id name stage locality populationMakeup nucleusType
         devotionalGathering { ${ACTIVITY_SUMMARY_SELECTION} }
         childrensClasses { ${ACTIVITY_SUMMARY_SELECTION} }
         juniorYouthGroups { ${ACTIVITY_SUMMARY_SELECTION} }

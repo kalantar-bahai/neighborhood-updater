@@ -474,3 +474,21 @@ type LogEntry { ...existing...  entityName: String }
 - `createdAt`: from the audit log, null before auditing began. `createdBy`: null for SRP sync, scripts, or before auditing.
 - `entityName`: place name; person name for individual, invitation and account; `"<person> · <role> at <place>"` for a role; `"<person> · hidden at <nucleus>"` for a hide; null if the row is gone.
 - `pendingInvitation` is null once an invitation expires (only pending, unexpired), so there is no "invitation expired" tag.
+
+## Nucleus ids and names, confirmed with cluster-notebook 2026-11-25
+
+- `Nucleus.id` is a stable uuid that survives renames. The app puts it in the address (`/?nucleus=<id>`) so refresh,
+  the browser's back button and shared links keep a nucleus open.
+- Today names are unique among live nuclei across **all** clusters, case-sensitive (`NAME_TAKEN`; a pending SRP
+  rename also reserves its name). An archived nucleus gives up its name.
+- **Owner decision 2026-11-25:** names must be unique within a locality (or cluster, for a nucleus placed on the
+  cluster), and may repeat across them. cluster-notebook will ignore case (matches SRP's own clash check).
+- Id forms are deployed (cluster-notebook fe01c5d). Each takes the name **or** the id, exactly one, else
+  `BAD_INPUT`: `nucleus(name, id)`, `updateNucleus(patch, name, id)`, `deleteNucleus(name, id)`,
+  `pushNucleusToSrp(name, id)`, and `nucleusId` beside `nucleusName` on `updateNucleusWorkers`, `hideIndividual`,
+  `unhideIndividual`, `updateActivitySummary`, `individuals`, `createIndividual`, `personDetails`.
+  `NucleusPatch.parentNucleusId` (null clears; not with `parentNucleusName`). `HiddenPerson.nucleusId: String!`.
+  `nucleus(id)` returns null for the same reasons as by name: signed out, unknown, archived, not readable.
+- **Still to do before names can repeat:** this app must stop looking nuclei up by name (switch to the id forms
+  above, and stop keying permissions by lower-cased name). Then cluster-notebook narrows uniqueness to the locality
+  and adds `NucleusPatch.locationId`, since setting names can repeat across localities too.

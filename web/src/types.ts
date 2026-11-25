@@ -14,6 +14,8 @@ export interface Activity {
 }
 
 export interface NucleusSummary {
+  // cluster-notebook's stable Nucleus.id; the address bar carries it (see lib/nucleusUrl.ts).
+  id: string;
   nucleus: string;
   parentNucleus: string;
   grouping: string;
