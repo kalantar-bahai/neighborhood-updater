@@ -9,7 +9,7 @@ import {
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
   getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusPeopleFlags, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext,
-  getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople,
+  getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople, getPeopleNotInSrp, getRoleHoldersWithoutAccess, getChangeLog,
   getMe, inviteIndividual, resendInvitation, revokeInvitation, removeAccess, restoreAccess, getInvitations, getAccounts,
 } from './clusterNotebook';
 import type { Individual, PersonSummary, NucleusPerson, MoveResult, MoveContext, PersonDetails } from './clusterNotebook';
@@ -1139,6 +1139,50 @@ describe('admin client', () => {
     expect(q).toContain('ageCategory placePath hasAccess');
     expect(q).toContain('individual {');
     expect(q).toContain('pendingInvitation { id expiresAt }');
+  });
+
+  test('getPeopleNotInSrp sends the cluster and selects what searchPeople does', async () => {
+    const person = { individual: { id: 'i1' }, ageCategory: null, placePath: ['Triangle'], hasAccess: false, pendingInvitation: null };
+    mockFetch.mockResolvedValue(jsonResponse({ data: { peopleNotInSrp: [person] } }));
+    expect(await getPeopleNotInSrp('NC-215 Triangle')).toEqual([person]);
+    const { vars, q } = norm(0);
+    expect(vars).toEqual({ clusterName: 'NC-215 Triangle' });
+    expect(q).toContain('peopleNotInSrp(clusterName: $clusterName)');
+    expect(q).toContain('individual {');
+    expect(q).toContain('ageCategory placePath hasAccess pendingInvitation { id expiresAt }');
+    expect(q).toContain('createdAt createdBy { ');
+  });
+
+  test('getRoleHoldersWithoutAccess filters searchPeople to role holders with no account and selects roles', async () => {
+    const person = { individual: { id: 'i1' }, ageCategory: null, placePath: [], hasAccess: false, pendingInvitation: null, roles: [], accessRemovedAt: null };
+    mockFetch.mockResolvedValue(jsonResponse({ data: { searchPeople: [person] } }));
+    expect(await getRoleHoldersWithoutAccess('NC-215 Triangle')).toEqual([person]);
+    const { vars, q } = norm(0);
+    expect(vars).toEqual({ clusterName: 'NC-215 Triangle', search: '', limit: 1000, holdsRole: true, hasAccess: false });
+    expect(q).toContain('$search: String!, $limit: Int!, $holdsRole: Boolean, $hasAccess: Boolean');
+    expect(q).toContain('individual {');
+    expect(q).toContain('roles { id role entity { id name type } start } accessRemovedAt');
+  });
+
+  describe('getChangeLog', () => {
+    test('first page sends clusterName and limit 100 only', async () => {
+      mockFetch.mockResolvedValue(jsonResponse({ data: { changeLog: [] } }));
+      expect(await getChangeLog('NC-215 Triangle')).toEqual([]);
+      const { vars, q } = norm(0);
+      expect(vars).toEqual({ clusterName: 'NC-215 Triangle', limit: 100 });
+      expect('before' in vars).toBe(false);
+      expect('beforeId' in vars).toBe(false);
+      expect(q).toContain('$limit: Int!');
+      expect(q).toContain('$before: DateTime');
+      expect(q).toContain('$beforeId: String');
+      expect(q).toContain('id occurredAt actor {');
+      expect(q).toContain('mutation entityType entityId changeType changes entityName');
+    });
+    test('a page sends before and beforeId', async () => {
+      mockFetch.mockResolvedValue(jsonResponse({ data: { changeLog: [] } }));
+      await getChangeLog('NC-215 Triangle', { before: '2026-11-24T14:05:00Z', beforeId: 'e9' });
+      expect(norm(0).vars).toEqual({ clusterName: 'NC-215 Triangle', limit: 100, before: '2026-11-24T14:05:00Z', beforeId: 'e9' });
+    });
   });
 
   const INV = 'id individual {';

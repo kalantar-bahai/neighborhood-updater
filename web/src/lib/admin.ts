@@ -1,7 +1,7 @@
-// Admin page (phase 1): pure decisions, tested in admin.test.ts.
+// Admin page: pure decisions, tested in admin.test.ts.
 // Spec: docs/superpowers/specs/ (admin page design); plan: docs/superpowers/plans/2026-11-24-admin-page-phase1.md
-import type { AccountInfo, AdminCluster, AdminPerson, AdminPlace, HiddenPerson, Invitation, InvitationStatus, MoveResult, PersonDetails, RoleHolding } from './clusterNotebook';
-import { AGE_LABELS, roleLabel } from './people';
+import type { AccountInfo, AdminCluster, AdminPerson, AdminPlace, HiddenPerson, Invitation, InvitationStatus, MoveResult, PersonDetails, RoleHolding, LogEntry } from './clusterNotebook';
+import { AGE_LABELS, formatDate, roleLabel } from './people';
 import { individualDisplayName } from './personName';
 
 // Names repeat, so a result shows age and the whole place path to tell two people apart.
@@ -120,9 +120,21 @@ export function prefillEmail(details: PersonDetails | null): string {
   return details?.emails[0]?.trim() ?? '';
 }
 
-export function adminPersonTag(p: AdminPerson): 'has access' | 'invited' | null {
-  if (p.hasAccess) return 'has access';
-  return p.pendingInvitation ? 'invited' : null;
+// "added Nov 2, 2026 by Ben Okafor" on People not in SRP. createdBy is null for the SRP sync, scripts, or before auditing.
+export function createdNote(p: AdminPerson): string | null {
+  if (!p.createdAt) return null;
+  const date = formatDate(day(p.createdAt));
+  return p.createdBy ? `added ${date} by ${individualDisplayName(p.createdBy)}` : `added ${date}`;
+}
+
+// Pills beside a person: "has access" alone, else "access removed <date>" and/or "invited". There is no "invitation
+// expired" tag: cluster-notebook sends pendingInvitation null once it expires (confirmed 2026-11-25).
+export function adminPersonTags(p: AdminPerson): string[] {
+  if (p.hasAccess) return ['has access'];
+  const tags: string[] = [];
+  if (p.accessRemovedAt) tags.push(`access removed ${formatDate(day(p.accessRemovedAt))}`);
+  if (p.pendingInvitation) tags.push('invited');
+  return tags;
 }
 
 export function removeAccessConfirm(name: string): string {
@@ -181,15 +193,24 @@ export function splitInvitations(list: Invitation[]): { pending: Invitation[]; p
 // The Accounts card's search: every word must appear in the name or the login email (ignoring case). Active
 // logins come first, then by name; at most `limit` rows are shown, and `matched` says how many there were.
 export function findAccounts(accounts: AccountInfo[], search: string, limit = 20): { shown: AccountInfo[]; matched: number } {
-  const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const name = (a: AccountInfo) => individualDisplayName(a.individual);
   const hits = accounts
-    .filter(a => {
-      const text = `${name(a)} ${a.email ?? ''}`.toLowerCase();
-      return words.every(w => text.includes(w));
-    })
+    .filter(a => matchesWords(`${name(a)} ${a.email ?? ''}`, search))
     .sort((a, b) => Number(!!a.disabledAt) - Number(!!b.disabledAt) || name(a).localeCompare(name(b)));
   return { shown: hits.slice(0, limit), matched: hits.length };
+}
+
+// A person list's search (People not in SRP): every word must appear in the name or the place path (ignoring case).
+// Input order is kept (cluster-notebook sends family-name order); at most `limit` rows are shown.
+export function findPeople(people: AdminPerson[], search: string, limit = 20): { shown: AdminPerson[]; matched: number } {
+  const hits = people.filter(p => matchesWords(`${individualDisplayName(p.individual)} ${p.placePath.join(' ')}`, search));
+  return { shown: hits.slice(0, limit), matched: hits.length };
+}
+
+// Every word of the search must appear in the text, ignoring case; a blank search matches everything.
+function matchesWords(text: string, search: string): boolean {
+  const hay = text.toLowerCase();
+  return search.trim().toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w));
 }
 
 // Owner 2026-11-24: a move from the Hidden card also unhides. Being hidden in one nucleus and visible in another makes
@@ -199,4 +220,42 @@ export function findAccounts(accounts: AccountInfo[], search: string, limit = 20
 export function hidesToLift(hidden: HiddenPerson[], results: MoveResult[]): { individualId: string; nucleusName: string }[] {
   const placed = new Set(results.filter(r => r.individual && (r.moved || r.code === 'ALREADY_THERE')).map(r => r.individual!.id));
   return hidden.filter(h => placed.has(h.individual.id)).map(h => ({ individualId: h.individual.id, nucleusName: h.nucleusName }));
+}
+
+// Rows per Log page (cluster-notebook's changeLog limit). Defined here, not in clusterNotebook.ts, which is server-only.
+export const LOG_PAGE = 100;
+
+// The Log card: who did what to which record. The entity word is the type as written, except two long names.
+const LOG_ENTITY_WORD: Record<string, string> = { role_in_ne: 'role', person_hide: 'hide' };
+
+export function logHeadline(e: LogEntry): string {
+  const who = e.actor ? individualDisplayName(e.actor) : 'System';
+  const what = e.entityName || `${LOG_ENTITY_WORD[e.entityType] ?? e.entityType} ${e.entityId}`;
+  return `${who} · ${e.mutation ?? e.changeType} · ${what}`;
+}
+
+export function changeValueText(v: unknown): string {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'string') return v === '' ? '(blank)' : v;
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
+export function logChanges(e: LogEntry): { field: string; old: string; new: string }[] {
+  return Object.entries(e.changes ?? {}).map(([field, c]) =>
+    c && typeof c === 'object' && !Array.isArray(c)
+      ? { field, old: changeValueText((c as { old?: unknown }).old), new: changeValueText((c as { new?: unknown }).new) }
+      : { field, old: '—', new: changeValueText(c) });
+}
+
+// A full page may have more behind it; a short one is the end of the log.
+export function nextLogCursor(page: LogEntry[]): { before: string; beforeId: string } | null {
+  if (page.length < LOG_PAGE) return null;
+  const last = page[page.length - 1];
+  return { before: last.occurredAt, beforeId: last.id };
+}
+
+export function mergeLogPages(have: LogEntry[], page: LogEntry[]): LogEntry[] {
+  const seen = new Set(have.map(e => e.id));
+  return [...have, ...page.filter(e => !seen.has(e.id))];
 }

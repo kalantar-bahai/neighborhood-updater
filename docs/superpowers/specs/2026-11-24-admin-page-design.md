@@ -107,6 +107,17 @@ confirms, with a tick box "Also end their roles". Removed accounts stay listed, 
 
 A list: name, place, created when and by whom. Nothing else yet.
 
+### No account yet (Phase 3, owner 2026-11-25)
+
+People who hold a formal role in the cluster but can't sign in, so the admin can see who still needs an invitation.
+Each row shows the person (as in search results) and their roles with places, plus an **Invite…** button that
+fills the Invite card with them. The roles that count are ATC, CSO, CIC, LSA, ATC-/CIC-Collaborator,
+ABM-Assistant, accompanier and contact; informal roles and Administrator don't count. People whose access was
+removed are listed with an "access removed" tag (owner 2026-11-25). People with a pending invitation are listed with
+an "invited" tag. Confirmed with cluster-notebook 2026-11-25: `searchPeople(..., holdsRole: true, hasAccess: false)`
+gives the list, and `AdminPerson` gains `roles`, `accessRemovedAt`, `createdAt` and `createdBy` (existing queries
+extended, not new ones; owner 2026-11-25).
+
 ### Log (Phase 3)
 
 Newest first, 100 at a time with "Older". Each entry: when, who, what (the change's name), on what, and the

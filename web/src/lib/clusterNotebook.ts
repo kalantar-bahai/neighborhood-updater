@@ -1,4 +1,5 @@
 import { auth } from '@clerk/nextjs/server';
+import { LOG_PAGE } from './admin';
 
 const CLUSTER_NOTEBOOK_URL = process.env.CLUSTER_NOTEBOOK_URL || 'http://localhost:8000';
 
@@ -847,7 +848,17 @@ export async function getAdminClusters(): Promise<AdminCluster[]> {
 export interface AdminPerson { individual: PersonSummary; ageCategory: AgeCategory | null; placePath: string[]; hasAccess: boolean;
   // Confirmed with cluster-notebook 2026-11-24: the person's pending invitation, if any. Selected only by this admin search.
   pendingInvitation: { id: string; expiresAt: string } | null;
+  // Confirmed with cluster-notebook 2026-11-25 (5a0b624): selected only by getRoleHoldersWithoutAccess. accessRemovedAt
+  // is when the account was disabled (null if enabled or never had one); roles lists every current role.
+  roles?: RoleHolding[];
+  accessRemovedAt?: string | null;
+  // Confirmed with cluster-notebook 2026-11-25: selected only by getPeopleNotInSrp. createdAt is from the audit log
+  // (null before auditing began); createdBy is null for the SRP sync, scripts, or before auditing.
+  createdAt?: string | null;
+  createdBy?: PersonSummary | null;
 }
+
+const ADMIN_PERSON_SELECTION = `individual { ${PERSON_SUMMARY_SELECTION} } ageCategory placePath hasAccess pendingInvitation { id expiresAt }`;
 
 // Confirmed with cluster-notebook 2026-11-24: allowed for an Administrator or a CSO of the cluster. Names repeat,
 // so every result carries ageCategory and placePath; later calls use the person's id.
@@ -855,12 +866,66 @@ export async function searchPeople(clusterName: string, search: string, limit = 
   const query = `
     query SearchPeople($clusterName: String!, $search: String!, $limit: Int) {
       searchPeople(clusterName: $clusterName, search: $search, limit: $limit) {
-        individual { ${PERSON_SUMMARY_SELECTION} } ageCategory placePath hasAccess pendingInvitation { id expiresAt }
+        ${ADMIN_PERSON_SELECTION}
       }
     }
   `;
   const data = await request<{ searchPeople: AdminPerson[] }>(query, { clusterName, search, limit });
   return data.searchPeople;
+}
+
+// Confirmed with cluster-notebook 2026-11-25: people placed in the cluster with no SRP link (holding a role there
+// doesn't count), ordered by family name, first name, id. Same admin gate as hiddenPeople; unknown cluster is [].
+export async function getPeopleNotInSrp(clusterName: string): Promise<AdminPerson[]> {
+  const query = `
+    query GetPeopleNotInSrp($clusterName: String!) {
+      peopleNotInSrp(clusterName: $clusterName) {
+        ${ADMIN_PERSON_SELECTION} createdAt createdBy { ${PERSON_SUMMARY_SELECTION} }
+      }
+    }
+  `;
+  const data = await request<{ peopleNotInSrp: AdminPerson[] }>(query, { clusterName });
+  return data.peopleNotInSrp;
+}
+
+// Confirmed with cluster-notebook 2026-11-25 (5a0b624): holdsRole = a current recognised role (not Administrator,
+// promoter or protagonist) at a live place in the cluster; hasAccess false includes people whose access was removed.
+// No maximum limit, so 1000 reads them all; the card caps what it shows.
+export async function getRoleHoldersWithoutAccess(clusterName: string): Promise<AdminPerson[]> {
+  const query = `
+    query GetRoleHoldersWithoutAccess($clusterName: String!, $search: String!, $limit: Int!, $holdsRole: Boolean, $hasAccess: Boolean) {
+      searchPeople(clusterName: $clusterName, search: $search, limit: $limit, holdsRole: $holdsRole, hasAccess: $hasAccess) {
+        ${ADMIN_PERSON_SELECTION} roles { id role entity { id name type } start } accessRemovedAt
+      }
+    }
+  `;
+  const data = await request<{ searchPeople: AdminPerson[] }>(query, { clusterName, search: '', limit: 1000, holdsRole: true, hasAccess: false });
+  return data.searchPeople;
+}
+
+// Confirmed with cluster-notebook 2026-11-25: `changes` is { field: { old, new } } (create: old null; delete: new null;
+// update: changed fields only). actor is null for the SRP sync, scripts, anything not done by a signed-in person.
+export interface LogEntry { id: string; occurredAt: string; actor: PersonSummary | null; mutation: string | null; entityType: string; entityId: string; changeType: string;
+  changes: Record<string, { old: unknown; new: unknown }>;
+  // Confirmed with cluster-notebook 2026-11-25: the place, person, invitation or account name (or a role/hide
+  // description); null if the row is gone. The Log card's headline uses it.
+  entityName?: string | null }
+
+// Confirmed with cluster-notebook 2026-11-25: newest first (occurredAt desc, id desc). Keyset: strictly older than
+// (before, beforeId), which are the last row's occurredAt and id. limit 1..500; beforeId without before is BAD_INPUT.
+// Same admin gate as hiddenPeople; unknown cluster is []. `changes` is a JSON scalar: no subselection.
+export async function getChangeLog(clusterName: string, page?: { before: string; beforeId: string }): Promise<LogEntry[]> {
+  const query = `
+    query GetChangeLog($clusterName: String!, $limit: Int!, $before: DateTime, $beforeId: String) {
+      changeLog(clusterName: $clusterName, limit: $limit, before: $before, beforeId: $beforeId) {
+        id occurredAt actor { ${PERSON_SUMMARY_SELECTION} } mutation entityType entityId changeType changes entityName
+      }
+    }
+  `;
+  const variables: Record<string, unknown> = { clusterName, limit: LOG_PAGE };
+  if (page) { variables.before = page.before; variables.beforeId = page.beforeId; }
+  const data = await request<{ changeLog: LogEntry[] }>(query, variables);
+  return data.changeLog;
 }
 
 export interface AdminLocation { id: string; name: string; type: string }

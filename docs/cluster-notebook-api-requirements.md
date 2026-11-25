@@ -434,3 +434,43 @@ type Mutation {
   invitation is no longer pending."; `BAD_INPUT` 400, upstream message shown; `CLERK_ERROR` 502 "The invitation email
   couldn't be sent. Try again."; `CLERK_NOT_CONFIGURED` 503 "Invitations aren't set up yet."
 - `pendingInvitation` goes only into the admin search query, never into a query the home page or People card uses.
+
+## Admin page, Phase 3, confirmed with cluster-notebook 2026-11-25
+
+People not in SRP and the change log. Status: in production 2026-11-25. Part B below is confirmed and deployed
+2026-11-25 (cluster-notebook 5a0b624); cluster-notebook changed existing queries rather than adding new ones (owner 2026-11-25).
+
+```graphql
+peopleNotInSrp(clusterName: String!): [AdminPerson!]!
+changeLog(clusterName: String!, before: DateTime, limit: Int! = 100, beforeId: String): [LogEntry!]!
+type LogEntry { id: String!  occurredAt: DateTime!  actor: PersonSummary  mutation: String
+                entityType: String!  entityId: String!  changeType: String!  changes: JSON! }
+```
+
+- `peopleNotInSrp`: people **placed** in the cluster with no SRP link (holding a role there doesn't count); ordered by family name, first name (case-insensitive), id.
+- `changeLog`: newest first (`occurredAt` desc, `id` desc). Keyset: strictly older than (`before`, `beforeId`); for Older pass the last row's `occurredAt` and `id`. `limit` 1..500 else `BAD_INPUT`; `beforeId` without `before` is `BAD_INPUT`.
+- `entityType` is one of `cluster, locality, setting, nucleus, individual, role_in_ne, person_hide, invitation, account`. `changeType` is one of `create, update, delete`.
+- `changes` is `{ field: { old, new } }`; create has `old` null, delete has `new` null, update lists only changed fields; timestamps are ISO strings.
+- `actor` is null for the SRP sync, scripts, or anything not done by a signed-in person. `mutation` is the GraphQL mutation name or null.
+- Both: same admin gate as `hiddenPeople` (FORBIDDEN otherwise); unknown cluster gives `[]`.
+- The Admin page uses `createdAt`/`createdBy` (People not in SRP, "added <date> by <name>") and `entityName` (the Log card's headline; `mutation` and the entity type are the fallback when it is null).
+
+### Part B: confirmed and deployed 2026-11-25 (cluster-notebook 5a0b624)
+
+All additive; nothing Part A calls changed.
+
+```graphql
+searchPeople(clusterName: String!, search: String! = "", limit: Int! = 20,
+             holdsRole: Boolean = null, hasAccess: Boolean = null): [AdminPerson!]!
+type AdminPerson { ...existing...  roles: [RoleHolding!]!  accessRemovedAt: DateTime
+                   createdAt: DateTime  createdBy: PersonSummary }
+type LogEntry { ...existing...  entityName: String }
+```
+
+- "Role holders without access" is `searchPeople(clusterName, search: "", limit: 1000, holdsRole: true, hasAccess: false)`. There is no maximum limit; the default stays 20. A null filter means no filter.
+- `holdsRole: true` is a current recognised role (not Administrator, not promoter/protagonist) at a live place in the cluster. `hasAccess: false` is no enabled account, so removed-access people are included.
+- `roles` lists every current role (informal ones included), with the same visibility as `individualRoles`.
+- `accessRemovedAt`: when the account was disabled; null if enabled or never had one.
+- `createdAt`: from the audit log, null before auditing began. `createdBy`: null for SRP sync, scripts, or before auditing.
+- `entityName`: place name; person name for individual, invitation and account; `"<person> · <role> at <place>"` for a role; `"<person> · hidden at <nucleus>"` for a hide; null if the row is gone.
+- `pendingInvitation` is null once an invitation expires (only pending, unexpired), so there is no "invitation expired" tag.

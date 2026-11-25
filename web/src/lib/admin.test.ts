@@ -1,8 +1,9 @@
 import { describe, test, expect, vi } from 'vitest';
 import { adminPersonLine, roleHoldingLine, holdingLabel, currentRolesLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin,
-  invitationStatusWord, invitationLine, accountLine, accountRemovedNote, activeAccountCount, prefillEmail, adminPersonTag, removeAccessConfirm, validateInvite,
-  inviteRequestBody, cancelInvitationConfirm, splitInvitations, findAccounts, hidesToLift } from './admin';
-import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary, HiddenPerson, MoveResult } from './clusterNotebook';
+  invitationStatusWord, invitationLine, accountLine, accountRemovedNote, activeAccountCount, prefillEmail, adminPersonTags, removeAccessConfirm, validateInvite,
+  inviteRequestBody, cancelInvitationConfirm, splitInvitations, findAccounts, findPeople, hidesToLift,
+  logHeadline, logChanges, changeValueText, nextLogCursor, mergeLogPages, createdNote } from './admin';
+import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary, HiddenPerson, MoveResult, LogEntry } from './clusterNotebook';
 
 const person = (ageCategory: AdminPerson['ageCategory'], placePath: string[]): AdminPerson => ({
   individual: { id: 'i1', firstName: 'Ana', familyName: 'Lopez', middleNames: null, nickname: null, place: null, placeSync: null, inSrp: true },
@@ -159,16 +160,20 @@ describe('prefillEmail', () => {
   });
 });
 
-describe('adminPersonTag', () => {
-  const inv = { id: 'inv1', expiresAt: '2026-12-24T10:00:00Z' };
-  test('has access wins over invited', () => {
-    expect(adminPersonTag({ ...person(null, []), hasAccess: true, pendingInvitation: inv })).toBe('has access');
+describe('adminPersonTags', () => {
+  const base = person(null, []);
+  test('has access wins alone', () => {
+    expect(adminPersonTags({ ...base, hasAccess: true, accessRemovedAt: null, pendingInvitation: { id: 'i', expiresAt: '2026-12-24T10:00:00Z' } })).toEqual(['has access']);
   });
-  test('invited', () => {
-    expect(adminPersonTag({ ...person(null, []), pendingInvitation: inv })).toBe('invited');
+  test('removed and invited both show, removed first, with the date', () => {
+    expect(adminPersonTags({ ...base, accessRemovedAt: '2026-11-20T09:00:00Z', pendingInvitation: { id: 'i', expiresAt: '2026-12-20T00:00:00Z' } }))
+      .toEqual(['access removed Nov 20, 2026', 'invited']);
   });
-  test('none', () => {
-    expect(adminPersonTag(person(null, []))).toBeNull();
+  test('invited alone', () => {
+    expect(adminPersonTags({ ...base, pendingInvitation: { id: 'i', expiresAt: '2026-12-20T00:00:00Z' } })).toEqual(['invited']);
+  });
+  test('nothing for a plain person', () => {
+    expect(adminPersonTags(base)).toEqual([]);
   });
 });
 
@@ -292,5 +297,81 @@ describe('hidesToLift', () => {
   });
   test('nothing when no one moved', () => {
     expect(hidesToLift([hp(ana, 'N')], [res(ana, false, 'SRP_REFUSED')])).toEqual([]);
+  });
+});
+
+describe('findPeople', () => {
+  const p = (first: string, last: string, place: string[] = ['Triangle']): AdminPerson =>
+    ({ individual: { ...summary(first, last), id: first }, ageCategory: null, placePath: place, hasAccess: false, pendingInvitation: null });
+  test('every word must match the name or place path, ignoring case; keeps input order', () => {
+    const list = [p('Ana', 'Lopez', ['Triangle', 'Elm St']), p('Ben', 'Okafor'), p('Cy', 'Adams', ['Triangle', 'Elm St'])];
+    expect(findPeople(list, 'elm').shown.map(x => x.individual.id)).toEqual(['Ana', 'Cy']);
+    expect(findPeople(list, 'ANA elm').shown.map(x => x.individual.id)).toEqual(['Ana']);
+    expect(findPeople(list, '  ').matched).toBe(3);
+  });
+  test('caps at the limit and reports the match count', () => {
+    const many = Array.from({ length: 25 }, (_, n) => p(`P${n}`, 'Test'));
+    const r = findPeople(many, '');
+    expect(r.shown).toHaveLength(20);
+    expect(r.matched).toBe(25);
+  });
+});
+
+const entry = (o: Partial<LogEntry> = {}): LogEntry => ({
+  id: 'e1', occurredAt: '2026-11-24T14:05:00Z', actor: summary('Ben', 'Okafor'), mutation: 'grantRole',
+  entityType: 'role_in_ne', entityId: 'r1', changeType: 'create', changes: { role: { old: null, new: 'CSO' } }, ...o });
+describe('logHeadline', () => {
+  test('who, what, on what', () => {
+    expect(logHeadline(entry())).toBe('Ben Okafor · grantRole · role r1');
+  });
+  test('uses entityName when it is non-empty', () => {
+    expect(logHeadline(entry({ entityName: 'Ana Lopez · CSO at Triangle' }))).toBe('Ben Okafor · grantRole · Ana Lopez · CSO at Triangle');
+    expect(logHeadline(entry({ entityName: '' }))).toBe('Ben Okafor · grantRole · role r1');
+  });
+  test('no actor is the system; no mutation uses the change type', () => {
+    expect(logHeadline(entry({ actor: null, mutation: null, changeType: 'update', entityType: 'person_hide', entityId: 'h9' })))
+      .toBe('System · update · hide h9');
+  });
+});
+describe('createdNote', () => {
+  const base: AdminPerson = { individual: summary('Ana', 'Lopez'), ageCategory: null, placePath: [], hasAccess: false, pendingInvitation: null };
+  test('date and who added', () =>
+    expect(createdNote({ ...base, createdAt: '2026-11-02T10:00:00Z', createdBy: summary('Ben', 'Okafor') })).toBe('added Nov 2, 2026 by Ben Okafor'));
+  test('date only when the adder is unknown (SRP sync, scripts, before auditing)', () =>
+    expect(createdNote({ ...base, createdAt: '2026-11-02T10:00:00Z', createdBy: null })).toBe('added Nov 2, 2026'));
+  test('null when there is no creation time', () => expect(createdNote(base)).toBeNull());
+});
+describe('logChanges and changeValueText', () => {
+  test('one row per field, in key order, values as text', () => {
+    expect(logChanges(entry({ changes: { name: { old: 'Elm', new: 'Elm St' }, active: { old: true, new: null } } })))
+      .toEqual([{ field: 'name', old: 'Elm', new: 'Elm St' }, { field: 'active', old: 'true', new: '—' }]);
+  });
+  test('objects and arrays as compact JSON; numbers as written', () => {
+    expect(changeValueText({ a: 1 })).toBe('{"a":1}');
+    expect(changeValueText([1, 'x'])).toBe('[1,"x"]');
+    expect(changeValueText(0)).toBe('0');
+    expect(changeValueText(undefined)).toBe('—');
+  });
+  test('an empty string reads as (blank)', () => {
+    expect(changeValueText('')).toBe('(blank)');
+  });
+  test('null changes give no rows', () => {
+    expect(logChanges(entry({ changes: null as unknown as LogEntry['changes'] }))).toEqual([]);
+  });
+  test('a null field value gives dashes; a string field value shows as the new text', () => {
+    expect(logChanges(entry({ changes: { a: null, b: 'plain' } as unknown as LogEntry['changes'] })))
+      .toEqual([{ field: 'a', old: '—', new: '—' }, { field: 'b', old: '—', new: 'plain' }]);
+  });
+});
+describe('nextLogCursor and mergeLogPages', () => {
+  test('a full page gives the cursor of its last row; a short page ends', () => {
+    const full = Array.from({ length: 100 }, (_, n) => entry({ id: `e${n}`, occurredAt: `2026-11-24T14:${String(n % 60).padStart(2, '0')}:00Z` }));
+    expect(nextLogCursor(full)).toEqual({ before: full[99].occurredAt, beforeId: 'e99' });
+    expect(nextLogCursor(full.slice(0, 99))).toBeNull();
+    expect(nextLogCursor([])).toBeNull();
+  });
+  test('merging drops rows already shown', () => {
+    expect(mergeLogPages([entry({ id: 'a' }), entry({ id: 'b' })], [entry({ id: 'b' }), entry({ id: 'c' })]).map(e => e.id))
+      .toEqual(['a', 'b', 'c']);
   });
 });
