@@ -122,6 +122,13 @@ export function prefillEmail(details: PersonDetails | null): string {
 
 // Pills beside a person: "has access" alone, else "access removed <date>" and/or "invited". There is no "invitation
 // expired" tag: cluster-notebook sends pendingInvitation null once it expires (confirmed 2026-11-25).
+// "added Nov 2, 2026 by Ben Okafor" on People not in SRP. createdBy is null for the SRP sync, scripts, or before auditing.
+export function createdNote(p: AdminPerson): string | null {
+  if (!p.createdAt) return null;
+  const date = formatDate(day(p.createdAt));
+  return p.createdBy ? `added ${date} by ${individualDisplayName(p.createdBy)}` : `added ${date}`;
+}
+
 export function adminPersonTags(p: AdminPerson): string[] {
   if (p.hasAccess) return ['has access'];
   const tags: string[] = [];
@@ -223,7 +230,8 @@ const LOG_ENTITY_WORD: Record<string, string> = { role_in_ne: 'role', person_hid
 
 export function logHeadline(e: LogEntry): string {
   const who = e.actor ? individualDisplayName(e.actor) : 'System';
-  return `${who} · ${e.mutation ?? e.changeType} · ${LOG_ENTITY_WORD[e.entityType] ?? e.entityType} ${e.entityId}`;
+  const what = e.entityName || `${LOG_ENTITY_WORD[e.entityType] ?? e.entityType} ${e.entityId}`;
+  return `${who} · ${e.mutation ?? e.changeType} · ${what}`;
 }
 
 export function changeValueText(v: unknown): string {

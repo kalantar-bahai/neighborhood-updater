@@ -1150,6 +1150,7 @@ describe('admin client', () => {
     expect(q).toContain('peopleNotInSrp(clusterName: $clusterName)');
     expect(q).toContain('individual {');
     expect(q).toContain('ageCategory placePath hasAccess pendingInvitation { id expiresAt }');
+    expect(q).toContain('createdAt createdBy { ');
   });
 
   test('getRoleHoldersWithoutAccess filters searchPeople to role holders with no account and selects roles', async () => {
@@ -1175,7 +1176,7 @@ describe('admin client', () => {
       expect(q).toContain('$before: DateTime');
       expect(q).toContain('$beforeId: String');
       expect(q).toContain('id occurredAt actor {');
-      expect(q).toContain('mutation entityType entityId changeType changes');
+      expect(q).toContain('mutation entityType entityId changeType changes entityName');
     });
     test('a page sends before and beforeId', async () => {
       mockFetch.mockResolvedValue(jsonResponse({ data: { changeLog: [] } }));

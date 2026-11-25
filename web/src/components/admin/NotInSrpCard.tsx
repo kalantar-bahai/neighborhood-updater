@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import type { AdminPerson } from '@/lib/clusterNotebook';
-import { adminPersonLine, adminPersonTags, findPeople } from '@/lib/admin';
+import { adminPersonLine, adminPersonTags, createdNote, findPeople } from '@/lib/admin';
 
 const INPUT: React.CSSProperties = { width: '100%', boxSizing: 'border-box', fontSize: 16, padding: '6px 8px', border: '1px solid #a0aec0', borderRadius: 6 };
 const TAG: React.CSSProperties = { fontSize: 11, color: '#4a5568', background: '#edf2f7', borderRadius: 8, padding: '1px 6px', whiteSpace: 'nowrap' };
@@ -67,6 +67,7 @@ export default function NotInSrpCard({ cluster }: { cluster: string }) {
               <div key={p.individual.id} style={{ padding: '8px 0', borderTop: '1px solid #edf2f7', fontSize: 14, display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
                 <span>{adminPersonLine(p)}</span>
                 {adminPersonTags(p).map(t => <span key={t} style={TAG}>{t}</span>)}
+                {createdNote(p) && <div style={{ width: '100%', fontSize: 12, color: '#718096' }}>{createdNote(p)}</div>}
               </div>
             );
           })}

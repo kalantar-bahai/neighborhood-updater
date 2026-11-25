@@ -2,7 +2,7 @@ import { describe, test, expect, vi } from 'vitest';
 import { adminPersonLine, roleHoldingLine, holdingLabel, currentRolesLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin,
   invitationStatusWord, invitationLine, accountLine, accountRemovedNote, activeAccountCount, prefillEmail, adminPersonTags, removeAccessConfirm, validateInvite,
   inviteRequestBody, cancelInvitationConfirm, splitInvitations, findAccounts, findPeople, hidesToLift,
-  logHeadline, logChanges, changeValueText, nextLogCursor, mergeLogPages } from './admin';
+  logHeadline, logChanges, changeValueText, nextLogCursor, mergeLogPages, createdNote } from './admin';
 import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary, HiddenPerson, MoveResult, LogEntry } from './clusterNotebook';
 
 const person = (ageCategory: AdminPerson['ageCategory'], placePath: string[]): AdminPerson => ({
@@ -324,10 +324,22 @@ describe('logHeadline', () => {
   test('who, what, on what', () => {
     expect(logHeadline(entry())).toBe('Ben Okafor · grantRole · role r1');
   });
+  test('uses entityName when it is non-empty', () => {
+    expect(logHeadline(entry({ entityName: 'Ana Lopez · CSO at Triangle' }))).toBe('Ben Okafor · grantRole · Ana Lopez · CSO at Triangle');
+    expect(logHeadline(entry({ entityName: '' }))).toBe('Ben Okafor · grantRole · role r1');
+  });
   test('no actor is the system; no mutation uses the change type', () => {
     expect(logHeadline(entry({ actor: null, mutation: null, changeType: 'update', entityType: 'person_hide', entityId: 'h9' })))
       .toBe('System · update · hide h9');
   });
+});
+describe('createdNote', () => {
+  const base: AdminPerson = { individual: summary('Ana', 'Lopez'), ageCategory: null, placePath: [], hasAccess: false, pendingInvitation: null };
+  test('date and who added', () =>
+    expect(createdNote({ ...base, createdAt: '2026-11-02T10:00:00Z', createdBy: summary('Ben', 'Okafor') })).toBe('added Nov 2, 2026 by Ben Okafor'));
+  test('date only when the adder is unknown (SRP sync, scripts, before auditing)', () =>
+    expect(createdNote({ ...base, createdAt: '2026-11-02T10:00:00Z', createdBy: null })).toBe('added Nov 2, 2026'));
+  test('null when there is no creation time', () => expect(createdNote(base)).toBeNull());
 });
 describe('logChanges and changeValueText', () => {
   test('one row per field, in key order, values as text', () => {

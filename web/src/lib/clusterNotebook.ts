@@ -852,6 +852,10 @@ export interface AdminPerson { individual: PersonSummary; ageCategory: AgeCatego
   // is when the account was disabled (null if enabled or never had one); roles lists every current role.
   roles?: RoleHolding[];
   accessRemovedAt?: string | null;
+  // Confirmed with cluster-notebook 2026-11-25: selected only by getPeopleNotInSrp. createdAt is from the audit log
+  // (null before auditing began); createdBy is null for the SRP sync, scripts, or before auditing.
+  createdAt?: string | null;
+  createdBy?: PersonSummary | null;
 }
 
 const ADMIN_PERSON_SELECTION = `individual { ${PERSON_SUMMARY_SELECTION} } ageCategory placePath hasAccess pendingInvitation { id expiresAt }`;
@@ -876,7 +880,7 @@ export async function getPeopleNotInSrp(clusterName: string): Promise<AdminPerso
   const query = `
     query GetPeopleNotInSrp($clusterName: String!) {
       peopleNotInSrp(clusterName: $clusterName) {
-        ${ADMIN_PERSON_SELECTION}
+        ${ADMIN_PERSON_SELECTION} createdAt createdBy { ${PERSON_SUMMARY_SELECTION} }
       }
     }
   `;
@@ -902,7 +906,10 @@ export async function getRoleHoldersWithoutAccess(clusterName: string): Promise<
 // Confirmed with cluster-notebook 2026-11-25: `changes` is { field: { old, new } } (create: old null; delete: new null;
 // update: changed fields only). actor is null for the SRP sync, scripts, anything not done by a signed-in person.
 export interface LogEntry { id: string; occurredAt: string; actor: PersonSummary | null; mutation: string | null; entityType: string; entityId: string; changeType: string;
-  changes: Record<string, { old: unknown; new: unknown }> }
+  changes: Record<string, { old: unknown; new: unknown }>;
+  // Confirmed with cluster-notebook 2026-11-25: the place, person, invitation or account name (or a role/hide
+  // description); null if the row is gone. The Log card's headline uses it.
+  entityName?: string | null }
 
 // Confirmed with cluster-notebook 2026-11-25: newest first (occurredAt desc, id desc). Keyset: strictly older than
 // (before, beforeId), which are the last row's occurredAt and id. limit 1..500; beforeId without before is BAD_INPUT.
@@ -911,7 +918,7 @@ export async function getChangeLog(clusterName: string, page?: { before: string;
   const query = `
     query GetChangeLog($clusterName: String!, $limit: Int!, $before: DateTime, $beforeId: String) {
       changeLog(clusterName: $clusterName, limit: $limit, before: $before, beforeId: $beforeId) {
-        id occurredAt actor { ${PERSON_SUMMARY_SELECTION} } mutation entityType entityId changeType changes
+        id occurredAt actor { ${PERSON_SUMMARY_SELECTION} } mutation entityType entityId changeType changes entityName
       }
     }
   `;

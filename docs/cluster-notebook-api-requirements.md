@@ -453,6 +453,7 @@ type LogEntry { id: String!  occurredAt: DateTime!  actor: PersonSummary  mutati
 - `changes` is `{ field: { old, new } }`; create has `old` null, delete has `new` null, update lists only changed fields; timestamps are ISO strings.
 - `actor` is null for the SRP sync, scripts, or anything not done by a signed-in person. `mutation` is the GraphQL mutation name or null.
 - Both: same admin gate as `hiddenPeople` (FORBIDDEN otherwise); unknown cluster gives `[]`.
+- The Admin page uses `createdAt`/`createdBy` (People not in SRP, "added <date> by <name>") and `entityName` (the Log card's headline; `mutation` and the entity type are the fallback when it is null).
 
 ### Part B: confirmed and deployed 2026-11-25 (cluster-notebook 5a0b624)
 
