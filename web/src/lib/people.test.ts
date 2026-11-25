@@ -166,10 +166,10 @@ describe('detailsView', () => {
   test('checks become pills: only positives and expiry', () => {
     const c = (backgroundCheckExpiration: string | null, motorVehicleClearance: boolean | null) =>
       ok(d({ checks: { backgroundCheckExpiration, motorVehicleClearance } })).checks;
-    expect(c('2027-03-01', null)).toEqual([{ text: 'Background checked', tone: 'ok' }]);
+    expect(c('2027-03-01', null)).toEqual([{ text: 'Background', tone: 'ok' }]);
     expect(c('2026-11-19', true)).toEqual([
       { text: 'Background check expired Nov 19, 2026', tone: 'danger' },
-      { text: 'Motor vehicle cleared', tone: 'ok' },
+      { text: 'Can drive', tone: 'ok' },
     ]);
     expect(c(null, false)).toEqual([]);
   });

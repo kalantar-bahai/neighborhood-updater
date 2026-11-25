@@ -282,9 +282,9 @@ export function detailsView(d: PersonDetails, today: string): DetailsView {
   if (exp) {
     checks.push(exp < today
       ? { text: `Background check expired ${formatDate(exp)}`, tone: 'danger' }
-      : { text: 'Background checked', tone: 'ok' });
+      : { text: 'Background', tone: 'ok' });
   }
-  if (d.checks?.motorVehicleClearance) checks.push({ text: 'Motor vehicle cleared', tone: 'ok' });
+  if (d.checks?.motorVehicleClearance) checks.push({ text: 'Can drive', tone: 'ok' });
   const address = d.address?.trim() ? d.address : null;
   return {
     inSrp: true,
