@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import PageHeader, { HeaderButton } from '../PageHeader';
 import RolesCard from './RolesCard';
 import HiddenCard from './HiddenCard';
+import NotInSrpCard from './NotInSrpCard';
 import InviteCard from './InviteCard';
 import AccountsCard from './AccountsCard';
 
@@ -92,6 +93,7 @@ export default function AdminClient() {
                 <AccountsCard key={`accounts:${c.name}`} cluster={c.name} me={state.me} />
                 <RolesCard key={`roles:${c.name}`} cluster={c.name} />
                 <HiddenCard key={`hidden:${c.name}`} cluster={c.name} />
+                <NotInSrpCard key={`notinsrp:${c.name}`} cluster={c.name} />
               </div>
             )}
           </div>

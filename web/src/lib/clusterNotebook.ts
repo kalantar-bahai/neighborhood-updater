@@ -849,18 +849,34 @@ export interface AdminPerson { individual: PersonSummary; ageCategory: AgeCatego
   pendingInvitation: { id: string; expiresAt: string } | null;
 }
 
+const ADMIN_PERSON_SELECTION = `individual { ${PERSON_SUMMARY_SELECTION} } ageCategory placePath hasAccess pendingInvitation { id expiresAt }`;
+
 // Confirmed with cluster-notebook 2026-11-24: allowed for an Administrator or a CSO of the cluster. Names repeat,
 // so every result carries ageCategory and placePath; later calls use the person's id.
 export async function searchPeople(clusterName: string, search: string, limit = 20): Promise<AdminPerson[]> {
   const query = `
     query SearchPeople($clusterName: String!, $search: String!, $limit: Int) {
       searchPeople(clusterName: $clusterName, search: $search, limit: $limit) {
-        individual { ${PERSON_SUMMARY_SELECTION} } ageCategory placePath hasAccess pendingInvitation { id expiresAt }
+        ${ADMIN_PERSON_SELECTION}
       }
     }
   `;
   const data = await request<{ searchPeople: AdminPerson[] }>(query, { clusterName, search, limit });
   return data.searchPeople;
+}
+
+// Confirmed with cluster-notebook 2026-11-25: people placed in the cluster with no SRP link (holding a role there
+// doesn't count), ordered by family name, first name, id. Same admin gate as hiddenPeople; unknown cluster is [].
+export async function getPeopleNotInSrp(clusterName: string): Promise<AdminPerson[]> {
+  const query = `
+    query GetPeopleNotInSrp($clusterName: String!) {
+      peopleNotInSrp(clusterName: $clusterName) {
+        ${ADMIN_PERSON_SELECTION}
+      }
+    }
+  `;
+  const data = await request<{ peopleNotInSrp: AdminPerson[] }>(query, { clusterName });
+  return data.peopleNotInSrp;
 }
 
 export interface AdminLocation { id: string; name: string; type: string }

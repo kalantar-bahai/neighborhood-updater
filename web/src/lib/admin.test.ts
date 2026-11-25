@@ -1,7 +1,7 @@
 import { describe, test, expect, vi } from 'vitest';
 import { adminPersonLine, roleHoldingLine, holdingLabel, currentRolesLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin,
   invitationStatusWord, invitationLine, accountLine, accountRemovedNote, activeAccountCount, prefillEmail, adminPersonTag, removeAccessConfirm, validateInvite,
-  inviteRequestBody, cancelInvitationConfirm, splitInvitations, findAccounts, hidesToLift } from './admin';
+  inviteRequestBody, cancelInvitationConfirm, splitInvitations, findAccounts, findPeople, hidesToLift } from './admin';
 import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary, HiddenPerson, MoveResult } from './clusterNotebook';
 
 const person = (ageCategory: AdminPerson['ageCategory'], placePath: string[]): AdminPerson => ({
@@ -292,5 +292,22 @@ describe('hidesToLift', () => {
   });
   test('nothing when no one moved', () => {
     expect(hidesToLift([hp(ana, 'N')], [res(ana, false, 'SRP_REFUSED')])).toEqual([]);
+  });
+});
+
+describe('findPeople', () => {
+  const p = (first: string, last: string, place: string[] = ['Triangle']): AdminPerson =>
+    ({ individual: { ...summary(first, last), id: first }, ageCategory: null, placePath: place, hasAccess: false, pendingInvitation: null });
+  test('every word must match the name or place path, ignoring case; keeps input order', () => {
+    const list = [p('Ana', 'Lopez', ['Triangle', 'Elm St']), p('Ben', 'Okafor'), p('Cy', 'Adams', ['Triangle', 'Elm St'])];
+    expect(findPeople(list, 'elm').shown.map(x => x.individual.id)).toEqual(['Ana', 'Cy']);
+    expect(findPeople(list, 'ANA elm').shown.map(x => x.individual.id)).toEqual(['Ana']);
+    expect(findPeople(list, '  ').matched).toBe(3);
+  });
+  test('caps at the limit and reports the match count', () => {
+    const many = Array.from({ length: 25 }, (_, n) => p(`P${n}`, 'Test'));
+    const r = findPeople(many, '');
+    expect(r.shown).toHaveLength(20);
+    expect(r.matched).toBe(25);
   });
 });

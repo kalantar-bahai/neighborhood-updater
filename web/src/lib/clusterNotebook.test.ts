@@ -9,7 +9,7 @@ import {
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
   getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusPeopleFlags, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext,
-  getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople,
+  getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople, getPeopleNotInSrp,
   getMe, inviteIndividual, resendInvitation, revokeInvitation, removeAccess, restoreAccess, getInvitations, getAccounts,
 } from './clusterNotebook';
 import type { Individual, PersonSummary, NucleusPerson, MoveResult, MoveContext, PersonDetails } from './clusterNotebook';
@@ -1139,6 +1139,17 @@ describe('admin client', () => {
     expect(q).toContain('ageCategory placePath hasAccess');
     expect(q).toContain('individual {');
     expect(q).toContain('pendingInvitation { id expiresAt }');
+  });
+
+  test('getPeopleNotInSrp sends the cluster and selects what searchPeople does', async () => {
+    const person = { individual: { id: 'i1' }, ageCategory: null, placePath: ['Triangle'], hasAccess: false, pendingInvitation: null };
+    mockFetch.mockResolvedValue(jsonResponse({ data: { peopleNotInSrp: [person] } }));
+    expect(await getPeopleNotInSrp('NC-215 Triangle')).toEqual([person]);
+    const { vars, q } = norm(0);
+    expect(vars).toEqual({ clusterName: 'NC-215 Triangle' });
+    expect(q).toContain('peopleNotInSrp(clusterName: $clusterName)');
+    expect(q).toContain('individual {');
+    expect(q).toContain('ageCategory placePath hasAccess pendingInvitation { id expiresAt }');
   });
 
   const INV = 'id individual {';
