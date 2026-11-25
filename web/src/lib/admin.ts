@@ -13,7 +13,8 @@ export function adminPersonLine(p: AdminPerson): string {
   ].filter(Boolean).join(' · ');
 }
 
-function holdingLabel(h: RoleHolding): string {
+// The role alone; the Roles card shows its place (entity) on a line of its own.
+export function holdingLabel(h: RoleHolding): string {
   const { label, icon } = roleLabel(h.role);
   return icon ? `${label} ${icon}` : label;
 }

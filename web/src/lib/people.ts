@@ -241,58 +241,58 @@ export function namedToShow(estimate: string, named: number | undefined): number
 
 // ---- Phase A: person details ----
 
+// A check shown as a pill: green for a positive, red for an expired background check.
+export type CheckPill = { text: string; tone: 'ok' | 'danger' };
+
+// What the details panel shows: only values SRP has. `summary` sits under the name ("Age 34 · Registered
+// since Mar 2, 2019"); each phone and email is its own (tappable) line; `empty` when SRP has nothing at all.
 export type DetailsView =
   | { inSrp: false }
-  | { inSrp: true; age: string; registration: string; address: string; phones: string; emails: string;
-      comments: string | null;
-      checks: { background: string; backgroundExpired: boolean; motorVehicle: string } | null };
+  | { inSrp: true; summary: string | null; checks: CheckPill[]; phones: string[]; emails: string[];
+      address: string | null; comments: string | null; empty: boolean };
 
-const DASH = '—';
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// What the details panel shows. Dates are ISO strings, so plain string comparison decides "expired".
+// SRP's ISO date as "Mar 2, 2019". Anything not YYYY-MM-DD is shown as given.
+export function formatDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  const month = m ? MONTHS[Number(m[2]) - 1] : undefined;
+  return m && month ? `${month} ${Number(m[3])}, ${m[1]}` : iso;
+}
+
+// Up to two letters for the avatar: the first and last word of the name.
+export function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '?';
+  const first = words[0][0];
+  const last = words.length > 1 ? words[words.length - 1][0] : '';
+  return (first + last).toUpperCase();
+}
+
+// Dates are ISO strings, so plain string comparison decides "expired".
 export function detailsView(d: PersonDetails, today: string): DetailsView {
   if (!d.individual.inSrp) return { inSrp: false };
   // Only a positive shows: "not registered" and "not cleared" read like no record (owner, 2026-11-20).
-  const registration = !d.isRegistered ? DASH
-    : d.registrationDate ? `Registered since ${d.registrationDate}` : 'Registered';
+  const registration = !d.isRegistered ? null
+    : d.registrationDate ? `Registered since ${formatDate(d.registrationDate)}` : 'Registered';
+  const age = d.estimatedAge === null ? null : `Age ${d.estimatedAge}`;
+  const summaryParts = [age, registration].filter((x): x is string => x !== null);
   const exp = d.checks?.backgroundCheckExpiration ?? null;
-  const mv = d.checks?.motorVehicleClearance ?? null;
+  const checks: CheckPill[] = [];
+  if (exp) {
+    checks.push(exp < today
+      ? { text: `Background check expired ${formatDate(exp)}`, tone: 'danger' }
+      : { text: `Background check valid to ${formatDate(exp)}`, tone: 'ok' });
+  }
+  if (d.checks?.motorVehicleClearance) checks.push({ text: 'Motor vehicle cleared', tone: 'ok' });
+  const address = d.address?.trim() ? d.address : null;
+  const comments = d.srpComments?.trim() ? d.srpComments : null;
   return {
     inSrp: true,
-    age: d.estimatedAge === null ? DASH : String(d.estimatedAge),
-    registration,
-    address: d.address?.trim() ? d.address : DASH,
-    phones: d.phones.length ? d.phones.join(', ') : DASH,
-    emails: d.emails.length ? d.emails.join(', ') : DASH,
-    comments: d.srpComments?.trim() ? d.srpComments : null,
-    checks: d.checks ? {
-      background: exp ? `expires ${exp}` : DASH,
-      backgroundExpired: exp !== null && exp < today,
-      motorVehicle: mv ? 'cleared' : DASH,
-    } : null,
+    summary: summaryParts.length ? summaryParts.join(' · ') : null,
+    checks, phones: d.phones, emails: d.emails, address, comments,
+    empty: !summaryParts.length && !checks.length && !d.phones.length && !d.emails.length && !address && !comments,
   };
-}
-
-// One segment of a details line; `danger` shows it in red (an expired background check).
-export type DetailPart = { text: string; danger?: boolean };
-
-// What the panel renders: only values SRP has (no unlabeled dashes), one line per group in the spec's
-// order, each line's parts joined with " · ". Comments are kept apart so they can render with line breaks.
-export function detailLines(v: Extract<DetailsView, { inSrp: true }>): { lines: DetailPart[][]; comments: string | null } {
-  const has = (s: string) => s !== DASH;
-  const part = (text: string, danger?: boolean): DetailPart => (danger ? { text, danger } : { text });
-  const groups: DetailPart[][] = [
-    [...(has(v.age) ? [part(`Age ${v.age}`)] : []), ...(has(v.registration) ? [part(v.registration)] : [])],
-    has(v.address) ? [part(v.address)] : [],
-    [v.phones, v.emails].filter(has).map(t => part(t)),
-    v.checks ? [
-      ...(has(v.checks.background) ? [part(`Background check ${v.checks.background}`, v.checks.backgroundExpired)] : []),
-      ...(has(v.checks.motorVehicle) ? [part(`Motor vehicle: ${v.checks.motorVehicle}`)] : []),
-    ] : [],
-  ];
-  const lines = groups.filter(g => g.length > 0);
-  if (lines.length === 0 && v.comments === null) return { lines: [[{ text: 'Nothing recorded in SRP' }]], comments: null };
-  return { lines, comments: v.comments };
 }
 
 // One line pair per entry in the Activities section. Current entries first, then the rest, each in the server's
