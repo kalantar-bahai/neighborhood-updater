@@ -15,7 +15,7 @@ export function personDetailsView(details: PersonDetails): DetailsView {
 export type DetailsState = { status: 'loading' } | { status: 'error'; error: string } | { status: 'ready'; view: DetailsView } | null;
 
 // One person, the same on the People card and the admin Roles card: a header (avatar, name, "Age 34 ·
-// Registered since Mar 2, 2019", `action` on the right), their SRP details, then the caller's sections
+// Registered", `action` on the right), their SRP details, then the caller's sections
 // (`children`, each a .pd-section). With `onHeaderClick` the header sticks to the top of a scrolling list
 // and a click on it closes the panel (owner, 2026-11-21).
 export function PersonPanel({ name, nameExtra, details, action, onHeaderClick, children }: {
@@ -47,7 +47,7 @@ const CHECK_ICON = {
 };
 
 // A person's SRP details under the PersonPanel header: check pills, then contact (each phone and email its
-// own tappable line), then SRP comments.
+// own tappable line).
 function PersonDetailsBlock({ view }: { view: DetailsView }) {
   if (!view.inSrp) return <div className="pd-muted">Not in SRP; nothing synced</div>;
   if (view.empty) return <div className="pd-muted">Nothing recorded in SRP</div>;
@@ -86,12 +86,6 @@ function PersonDetailsBlock({ view }: { view: DetailsView }) {
             </>
           )}
         </dl>
-      )}
-      {view.comments && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div className="pd-section-label">SRP comments</div>
-          <div className="pd-comments">{view.comments}</div>
-        </div>
       )}
     </div>
   );
