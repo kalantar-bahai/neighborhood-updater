@@ -244,12 +244,11 @@ export function namedToShow(estimate: string, named: number | undefined): number
 // A check shown as a pill: green for a positive, red for an expired background check.
 export type CheckPill = { text: string; tone: 'ok' | 'danger' };
 
-// What the details panel shows: only values SRP has. `summary` sits under the name ("Age 34 · Registered
-// since Mar 2, 2019"); each phone and email is its own (tappable) line; `empty` when SRP has nothing at all.
+// What the details panel shows: only values SRP has. `summary` sits under the name ("Age 34 · Registered"); each phone and email is its own (tappable) line; `empty` when SRP has nothing at all.
 export type DetailsView =
   | { inSrp: false }
   | { inSrp: true; summary: string | null; checks: CheckPill[]; phones: string[]; emails: string[];
-      address: string | null; comments: string | null; empty: boolean };
+      address: string | null; empty: boolean };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -273,8 +272,9 @@ export function initials(name: string): string {
 export function detailsView(d: PersonDetails, today: string): DetailsView {
   if (!d.individual.inSrp) return { inSrp: false };
   // Only a positive shows: "not registered" and "not cleared" read like no record (owner, 2026-11-20).
-  const registration = !d.isRegistered ? null
-    : d.registrationDate ? `Registered since ${formatDate(d.registrationDate)}` : 'Registered';
+  // No registration date and no valid-to date on a current check; only an expired check keeps its date
+  // (owner, 2026-11-25).
+  const registration = d.isRegistered ? 'Registered' : null;
   const age = d.estimatedAge === null ? null : `Age ${d.estimatedAge}`;
   const summaryParts = [age, registration].filter((x): x is string => x !== null);
   const exp = d.checks?.backgroundCheckExpiration ?? null;
@@ -282,16 +282,15 @@ export function detailsView(d: PersonDetails, today: string): DetailsView {
   if (exp) {
     checks.push(exp < today
       ? { text: `Background check expired ${formatDate(exp)}`, tone: 'danger' }
-      : { text: `Background check valid to ${formatDate(exp)}`, tone: 'ok' });
+      : { text: 'Background checked', tone: 'ok' });
   }
   if (d.checks?.motorVehicleClearance) checks.push({ text: 'Motor vehicle cleared', tone: 'ok' });
   const address = d.address?.trim() ? d.address : null;
-  const comments = d.srpComments?.trim() ? d.srpComments : null;
   return {
     inSrp: true,
     summary: summaryParts.length ? summaryParts.join(' · ') : null,
-    checks, phones: d.phones, emails: d.emails, address, comments,
-    empty: !summaryParts.length && !checks.length && !d.phones.length && !d.emails.length && !address && !comments,
+    checks, phones: d.phones, emails: d.emails, address,
+    empty: !summaryParts.length && !checks.length && !d.phones.length && !d.emails.length && !address,
   };
 }
 

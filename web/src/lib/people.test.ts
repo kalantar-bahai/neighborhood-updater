@@ -146,10 +146,10 @@ describe('detailsView', () => {
     expect(detailsView(d({ individual: { ...ind, inSrp: false } }), today)).toEqual({ inSrp: false });
   });
   test('nothing recorded', () => {
-    expect(ok(d())).toEqual({ inSrp: true, summary: null, checks: [], phones: [], emails: [], address: null, comments: null, empty: true });
+    expect(ok(d())).toEqual({ inSrp: true, summary: null, checks: [], phones: [], emails: [], address: null, empty: true });
   });
   test('summary keeps only present parts', () => {
-    expect(ok(d({ estimatedAge: 17, isRegistered: true, registrationDate: '2019-03-02' })).summary).toBe('Age 17 · Registered since Mar 2, 2019');
+    expect(ok(d({ estimatedAge: 17, isRegistered: true, registrationDate: '2019-03-02' })).summary).toBe('Age 17 · Registered');
     expect(ok(d({ estimatedAge: 17 })).summary).toBe('Age 17');
     expect(ok(d({ isRegistered: true })).summary).toBe('Registered');
     // Only a positive shows (owner, 2026-11-20).
@@ -160,16 +160,13 @@ describe('detailsView', () => {
     expect(v).toMatchObject({ phones: ['555-0100', '555-0101'], emails: ['a@example.org'], address: null, empty: false });
     expect(ok(d({ address: '1 Elm St' })).address).toBe('1 Elm St');
   });
-  test('comments', () => {
-    expect(ok(d({ srpComments: '  ' })).comments).toBeNull();
-    const v = ok(d({ srpComments: 'a\nb' }));
-    expect(v.comments).toBe('a\nb');
-    expect(v.empty).toBe(false);
+  test('SRP comments are not shown (owner, 2026-11-25)', () => {
+    expect(ok(d({ srpComments: 'a' })).empty).toBe(true);
   });
   test('checks become pills: only positives and expiry', () => {
     const c = (backgroundCheckExpiration: string | null, motorVehicleClearance: boolean | null) =>
       ok(d({ checks: { backgroundCheckExpiration, motorVehicleClearance } })).checks;
-    expect(c('2027-03-01', null)).toEqual([{ text: 'Background check valid to Mar 1, 2027', tone: 'ok' }]);
+    expect(c('2027-03-01', null)).toEqual([{ text: 'Background checked', tone: 'ok' }]);
     expect(c('2026-11-19', true)).toEqual([
       { text: 'Background check expired Nov 19, 2026', tone: 'danger' },
       { text: 'Motor vehicle cleared', tone: 'ok' },

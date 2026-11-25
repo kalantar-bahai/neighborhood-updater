@@ -309,7 +309,6 @@
 .pd-contact dd { display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
 .pd-contact a { color: #2b6cb0; text-decoration: none; }
 .pd-contact a:hover { text-decoration: underline; }
-.pd-comments { font-size: 13px; white-space: pre-wrap; background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; }
 .pd-muted { font-size: 13px; color: #4a5568; }
 
 /* ── Concentric rainbow ──────────────────────────────────────────────────── */
