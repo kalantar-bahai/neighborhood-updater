@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, detailLines, activityLines, activitySummary, courseGroups, countPeople, AGE_FILTERS, peopleCountLabel, hideNote, hideRolesLine, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type DetailsView, type PersonRow } from './people';
+import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, formatDate, initials, activityLines, activitySummary, courseGroups, countPeople, AGE_FILTERS, peopleCountLabel, hideNote, hideRolesLine, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
 import type { Participation, AgeCategory, DevotionalHostRole, MoveContext, PermissionSet, PersonDetails, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -110,6 +110,26 @@ describe('age and devotional host filters', () => {
   });
 });
 
+describe('formatDate', () => {
+  test('ISO date reads as a short month', () => {
+    expect(formatDate('2019-03-02')).toBe('Mar 2, 2019');
+    expect(formatDate('2026-12-31')).toBe('Dec 31, 2026');
+  });
+  test('anything else is shown as given', () => {
+    expect(formatDate('2019-13-02')).toBe('2019-13-02');
+    expect(formatDate('soon')).toBe('soon');
+  });
+});
+
+describe('initials', () => {
+  test('first and last word', () => {
+    expect(initials('Jordan Rivers')).toBe('JR');
+    expect(initials('ana maria de la cruz')).toBe('AC');
+    expect(initials('  Ana ')).toBe('A');
+    expect(initials('')).toBe('?');
+  });
+});
+
 describe('detailsView', () => {
   const today = '2026-11-20';
   const ind = { id: '1', firstName: 'Ana', middleNames: null, familyName: null, nickname: null, place: null, placeSync: null, inSrp: true };
@@ -126,72 +146,35 @@ describe('detailsView', () => {
     expect(detailsView(d({ individual: { ...ind, inSrp: false } }), today)).toEqual({ inSrp: false });
   });
   test('nothing recorded', () => {
-    expect(ok(d())).toEqual({ inSrp: true, age: '—', registration: '—', address: '—', phones: '—', emails: '—', comments: null, checks: null });
+    expect(ok(d())).toEqual({ inSrp: true, summary: null, checks: [], phones: [], emails: [], address: null, comments: null, empty: true });
   });
-  test('blank address shows a dash', () => {
-    expect(ok(d({ address: '  ' })).address).toBe('—');
+  test('summary keeps only present parts', () => {
+    expect(ok(d({ estimatedAge: 17, isRegistered: true, registrationDate: '2019-03-02' })).summary).toBe('Age 17 · Registered since Mar 2, 2019');
+    expect(ok(d({ estimatedAge: 17 })).summary).toBe('Age 17');
+    expect(ok(d({ isRegistered: true })).summary).toBe('Registered');
+    // Only a positive shows (owner, 2026-11-20).
+    expect(ok(d({ isRegistered: false, registrationDate: '2019-03-02' })).summary).toBeNull();
+  });
+  test('contact: each phone and email on its own, blank address dropped', () => {
+    const v = ok(d({ phones: ['555-0100', '555-0101'], emails: ['a@example.org'], address: '  ' }));
+    expect(v).toMatchObject({ phones: ['555-0100', '555-0101'], emails: ['a@example.org'], address: null, empty: false });
     expect(ok(d({ address: '1 Elm St' })).address).toBe('1 Elm St');
-  });
-  test('age', () => {
-    expect(ok(d({ estimatedAge: 17 })).age).toBe('17');
-  });
-  test('registration', () => {
-    expect(ok(d({ isRegistered: true, registrationDate: '2019-03-02' })).registration).toBe('Registered since 2019-03-02');
-    expect(ok(d({ isRegistered: true })).registration).toBe('Registered');
-    expect(ok(d({ isRegistered: false })).registration).toBe('—');
-  });
-  test('phones and emails', () => {
-    const v = ok(d({ phones: ['555-0100', '555-0101'], emails: ['a@example.org', 'b@example.org'] }));
-    expect(v.phones).toBe('555-0100, 555-0101');
-    expect(v.emails).toBe('a@example.org, b@example.org');
   });
   test('comments', () => {
     expect(ok(d({ srpComments: '  ' })).comments).toBeNull();
-    expect(ok(d({ srpComments: 'a\nb' })).comments).toBe('a\nb');
+    const v = ok(d({ srpComments: 'a\nb' }));
+    expect(v.comments).toBe('a\nb');
+    expect(v.empty).toBe(false);
   });
-  test('checks', () => {
+  test('checks become pills: only positives and expiry', () => {
     const c = (backgroundCheckExpiration: string | null, motorVehicleClearance: boolean | null) =>
       ok(d({ checks: { backgroundCheckExpiration, motorVehicleClearance } })).checks;
-    expect(c('2027-03-01', null)).toEqual({ background: 'expires 2027-03-01', backgroundExpired: false, motorVehicle: '—' });
-    expect(c('2026-11-19', true)).toEqual({ background: 'expires 2026-11-19', backgroundExpired: true, motorVehicle: 'cleared' });
-    expect(c(null, false)).toEqual({ background: '—', backgroundExpired: false, motorVehicle: '—' });
-  });
-});
-
-describe('detailLines', () => {
-  type V = Extract<DetailsView, { inSrp: true }>;
-  const v = (over: Partial<V> = {}): V => ({
-    inSrp: true, age: '—', registration: '—', address: '—', phones: '—', emails: '—', comments: null, checks: null, ...over,
-  });
-  const text = (x: V) => detailLines(x).lines.map(l => l.map(p => p.text).join(' · '));
-  test('nothing at all says so', () => {
-    expect(detailLines(v())).toEqual({ lines: [[{ text: 'Nothing recorded in SRP' }]], comments: null });
-  });
-  test('comments alone are enough', () => {
-    expect(detailLines(v({ comments: 'a\nb' }))).toEqual({ lines: [], comments: 'a\nb' });
-  });
-  test('age and registration keep only present parts', () => {
-    expect(text(v({ age: '17', registration: 'Registered since 2019-03-02' }))).toEqual(['Age 17 · Registered since 2019-03-02']);
-    expect(text(v({ age: '17' }))).toEqual(['Age 17']);
-    expect(text(v({ registration: 'Registered' }))).toEqual(['Registered']);
-  });
-  test('address line only when present', () => {
-    expect(text(v({ address: '12 Elm St', age: '17' }))).toEqual(['Age 17', '12 Elm St']);
-  });
-  test('phones and emails keep only present parts', () => {
-    expect(text(v({ phones: '555-0100', emails: 'a@example.org' }))).toEqual(['555-0100 · a@example.org']);
-    expect(text(v({ emails: 'a@example.org' }))).toEqual(['a@example.org']);
-  });
-  test('checks drop missing parts, flag expired, and vanish when both missing', () => {
-    expect(detailLines(v({ checks: { background: 'expires 2026-11-19', backgroundExpired: true, motorVehicle: 'cleared' } })).lines)
-      .toEqual([[{ text: 'Background check expires 2026-11-19', danger: true }, { text: 'Motor vehicle: cleared' }]]);
-    expect(text(v({ checks: { background: '—', backgroundExpired: false, motorVehicle: 'cleared' } }))).toEqual(['Motor vehicle: cleared']);
-    expect(text(v({ age: '17', checks: { background: '—', backgroundExpired: false, motorVehicle: '—' } }))).toEqual(['Age 17']);
-  });
-  test('lines in the sketch order', () => {
-    expect(text(v({ age: '17', address: '12 Elm St', phones: '555-0100',
-      checks: { background: 'expires 2027-03-01', backgroundExpired: false, motorVehicle: '—' } })))
-      .toEqual(['Age 17', '12 Elm St', '555-0100', 'Background check expires 2027-03-01']);
+    expect(c('2027-03-01', null)).toEqual([{ text: 'Background check valid to Mar 1, 2027', tone: 'ok' }]);
+    expect(c('2026-11-19', true)).toEqual([
+      { text: 'Background check expired Nov 19, 2026', tone: 'danger' },
+      { text: 'Motor vehicle cleared', tone: 'ok' },
+    ]);
+    expect(c(null, false)).toEqual([]);
   });
 });
 

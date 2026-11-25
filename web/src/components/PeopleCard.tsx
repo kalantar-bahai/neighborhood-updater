@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PersonSrpDot } from './SrpBadge';
-import PersonDetailsBlock from './PersonDetailsBlock';
+import { PersonPanel, personDetailsView, type DetailsState } from './PersonPanel';
 import type { AgeCategory, PermissionSet, PersonDetails } from '@/lib/clusterNotebook';
 import {
   AGE_FILTERS, AGE_LABELS, DEVOTIONAL_HOST, FACILITATES, KNOWN_ROLES, PARTICIPATES, activityLines, activitySummary, courseGroups, hideNote, hideRolesLine, peopleCountLabel, RESIDENT, canEditRole, filterPeople, isMoving, moveResultError,
@@ -413,22 +413,20 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
       })}
       {saveError && <div style={{ fontSize: 12, color: '#c53030' }}>{saveError}</div>}
       {pendingMove?.personId === e.id ? confirmMove(e, pendingMove) : (
-        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-          <button type="button" disabled={saving} onClick={() => save(e)} style={btn('#3182ce', 'white')}>{saving ? 'Saving…' : 'Save'}</button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 4, justifyContent: 'flex-end' }}>
           <button type="button" disabled={saving} onClick={close} style={btn('white', '#4a5568', '#cbd5e0')}>Cancel</button>
+          <button type="button" disabled={saving} onClick={() => save(e)} style={{ ...btn('#3182ce', 'white'), fontWeight: 600 }}>{saving ? 'Saving…' : 'Save'}</button>
         </div>
       )}
     </div>
   );
 
-  // Nothing (not even a heading) until details arrive; a 404 stays silent.
-  const detailsSection = (personId: string) => {
+  // Nothing until details arrive; a 404 stays silent.
+  const detailsState = (personId: string): DetailsState => {
     if (!details || details.personId !== personId || details.status === 'none') return null;
-    if (details.status === 'loading') return <div style={{ fontSize: 12, color: '#718096', paddingTop: 6 }}>Loading…</div>;
-    if (details.status === 'error' || !details.details) {
-      return <div style={{ fontSize: 12, color: '#c53030', paddingTop: 6 }}>{details.error || "Couldn't load details"}</div>;
-    }
-    return <PersonDetailsBlock details={details.details} />;
+    if (details.status === 'loading') return { status: 'loading' };
+    if (details.status === 'error' || !details.details) return { status: 'error', error: details.error || "Couldn't load details" };
+    return { status: 'ready', view: personDetailsView(details.details) };
   };
 
   // Activities come with the list, so they show at once. One summary line; a click opens the course chips
@@ -449,8 +447,8 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     const groups = courseGroups(participation);
     const open = groups.flatMap(g => g.chips.map(c => ({ ...c, id: `${g.type}:${c.key}` }))).find(c => c.id === courseOpen);
     return (
-      <div style={{ padding: '6px 0 2px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#4a5568' }}>Activities</div>
+      <div className="pd-section">
+        <div className="pd-section-label">Activities</div>
         {participation.length === 0 ? (
           <div style={{ fontSize: 13, color: '#718096' }}>{summary}</div>
         ) : (
@@ -536,7 +534,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     const confirm = hideConfirm?.personId === e.id ? hideConfirm : null;
     const rolesLine = hideRolesLine(e.name, row.roles);
     return (
-      <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 4, padding: '8px 0 4px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div className="pd-section">
         {row.hidden ? (
           <>
             {row.hide && <div style={{ fontSize: 13, color: '#4a5568' }}>{hideNote(row.hide)}</div>}
@@ -578,21 +576,24 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
 
   // The panel under an existing person's row: details when permitted, activities, the editor or a Close
   // button, then (for editors) Hide or Unhide.
-  const panel = (e: Editing) => (
-    <div>
-      {detailsSection(e.id)}
+  // The open person: the shared PersonPanel (same look as the admin Roles card). Its header replaces the
+  // row's name, stays at the top of the list while the panel scrolls, and closes the panel on click.
+  const panel = (e: Editing, r: PersonRow) => (
+    <PersonPanel name={r.name} nameExtra={<PersonSrpDot inSrp={r.inSrp} />} details={detailsState(e.id)}
+      action={<RoleMarks row={r} isHome={isHome} />} onHeaderClick={!saving ? close : undefined}>
       {activitiesSection(e.id)}
       {canEditPerson ? (
-        <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 4 }}>
+        <div className="pd-section">
+          <div className="pd-section-label">In this nucleus</div>
           {editor(e)}
         </div>
       ) : (
-        <div style={{ marginTop: 6 }}>
+        <div className="pd-section" style={{ alignItems: 'flex-start' }}>
           <button type="button" onClick={close} style={btn('white', '#4a5568', '#cbd5e0')}>Close</button>
         </div>
       )}
       {hideSection(e)}
-    </div>
+    </PersonPanel>
   );
 
   return (
@@ -639,22 +640,18 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
         <div style={{ maxHeight: 360, overflowY: 'auto' }}>
           {shown.map(r => {
             const note = syncNote(r.placeSync);
+            const open = editing && !editing.isNew && editing.id === r.id ? editing : null;
             return (
               <div key={r.id} style={{ borderBottom: '1px solid #f7fafc', padding: '6px 0' }}>
-                <div
-                  onClick={!saving ? () => (editing?.id === r.id ? close() : startEdit(fromRow(r))) : undefined}
-                  // The open person's name sticks to the top of the list while their panel scrolls, so a
-                  // click on it can always close the panel (owner, 2026-11-21).
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer',
-                    ...(editing?.id === r.id ? { position: 'sticky', top: 0, zIndex: 1, background: 'white', padding: '4px 0', borderBottom: '1px solid #e2e8f0' } : {}),
-                  }}
-                >
-                  <span style={{ fontSize: 14 }}>{r.name}<PersonSrpDot inSrp={r.inSrp} /></span>
-                  <RoleMarks row={r} isHome={isHome} />
-                </div>
+                {!open && (
+                  <div onClick={!saving ? () => startEdit(fromRow(r)) : undefined}
+                    style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
+                    <span style={{ fontSize: 14 }}>{r.name}<PersonSrpDot inSrp={r.inSrp} /></span>
+                    <RoleMarks row={r} isHome={isHome} />
+                  </div>
+                )}
                 {note?.tone === 'error' && <div style={{ fontSize: 12, color: '#c53030' }}>{note.text}</div>}
-                {editing && !editing.isNew && editing.id === r.id && panel(editing)}
+                {open && panel(open, r)}
               </div>
             );
           })}

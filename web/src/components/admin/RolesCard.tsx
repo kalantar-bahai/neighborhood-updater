@@ -2,11 +2,11 @@
 
 import { useRef, useState } from 'react';
 import type { AdminPerson, PersonDetails, RoleHolding } from '@/lib/clusterNotebook';
-import { endRoleConfirm, roleHoldingLine } from '@/lib/admin';
+import { endRoleConfirm, holdingLabel } from '@/lib/admin';
 import { individualDisplayName } from '@/lib/personName';
 import PersonFinder from './PersonFinder';
 import PlaceRolePicker, { type PlaceRole } from './PlaceRolePicker';
-import PersonDetailsBlock from '../PersonDetailsBlock';
+import { PersonPanel, personDetailsView } from '../PersonPanel';
 
 type Loaded = { details: PersonDetails | null; roles: RoleHolding[] };
 // The "+ role" form: the picker's current choice (null until place and role are both chosen) and the save flag.
@@ -30,6 +30,10 @@ export default function RolesCard({ cluster }: { cluster: string }) {
   const pickedId = useRef<string | null>(null);
 
   const name = person ? individualDisplayName(person.individual) : '';
+  // No details from cluster-notebook reads as "not in SRP".
+  const detailsState = loading ? { status: 'loading' as const }
+    : loaded ? { status: 'ready' as const, view: loaded.details ? personDetailsView(loaded.details) : { inSrp: false as const } }
+    : null;
 
   // Reads by id, never by name. Returns whether it worked.
   const read = async (id: string): Promise<boolean> => {
@@ -120,34 +124,39 @@ export default function RolesCard({ cluster }: { cluster: string }) {
       {(
         <div className="card-body" style={{ display: open ? undefined : 'none' }}>
           {!person ? <PersonFinder cluster={cluster} onPick={pick} /> : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
-                <strong style={{ fontSize: 16 }}>{name}</strong>
-                <button type="button" onClick={changePerson} style={BTN}>Change person</button>
-              </div>
-              {loading && <div style={{ fontSize: 12, color: '#718096' }}>Loading…</div>}
+            <PersonPanel name={name} details={detailsState}
+              action={<button type="button" onClick={changePerson} style={{ ...BTN, border: 'none', background: 'none', color: '#2b6cb0', minHeight: 36 }}>Change</button>}>
               {loaded && (
-                loaded.details
-                  ? <PersonDetailsBlock details={loaded.details} />
-                  : <div style={{ fontSize: 13, color: '#718096' }}>Not in SRP; nothing synced</div>
-              )}
-              {loaded && (
-                <div style={{ paddingTop: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#4a5568' }}>Roles</div>
-                  {loaded.roles.length === 0 && <div style={{ fontSize: 13, color: '#718096' }}>No roles.</div>}
-                  {loaded.roles.map(h => (
-                    <div key={h.id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, padding: '2px 0' }}>
-                      <span>{roleHoldingLine(h)}</span>
-                      <button type="button" onClick={() => endRole(h)} aria-label={endRoleConfirm(name, h)} title="End this role" disabled={ending !== null}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, minWidth: 44, minHeight: 44, padding: 0, opacity: ending !== null ? 0.4 : 1 }}>🗑</button>
+                <div className="pd-section" style={{ gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <div className="pd-section-label">Roles{loaded.roles.length > 0 && ` · ${loaded.roles.length}`}</div>
+                    {!form && (
+                      <button type="button" onClick={openForm}
+                        style={{ ...BTN, border: '1px solid #3182ce', color: '#2b6cb0', fontWeight: 600, minHeight: 32 }}>+ Add role</button>
+                    )}
+                  </div>
+                  {loaded.roles.length === 0 && <div className="pd-muted">No roles.</div>}
+                  {loaded.roles.length > 0 && (
+                    <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+                      {loaded.roles.map((h, i) => (
+                        <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 4px 4px 12px', borderTop: i > 0 ? '1px solid #edf2f7' : undefined }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexGrow: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600 }}>{holdingLabel(h)}</div>
+                            {h.entity && <div style={{ fontSize: 12, color: '#4a5568' }}>{h.entity.name}</div>}
+                          </div>
+                          <button type="button" onClick={() => endRole(h)} aria-label={endRoleConfirm(name, h)} title="End this role" disabled={ending !== null}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#c53030', minWidth: 44, minHeight: 44, padding: '0 8px', opacity: ending !== null ? 0.4 : 1 }}>
+                            {ending === h.id ? 'Ending…' : 'End'}
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                  {!form && <button type="button" onClick={openForm} style={{ ...BTN, marginTop: 6 }}>+ role</button>}
+                  )}
                   {form && formView(form)}
                 </div>
               )}
               {error && <div style={{ color: '#c53030', fontSize: 13 }}>{error}</div>}
-            </div>
+            </PersonPanel>
           )}
         </div>
       )}

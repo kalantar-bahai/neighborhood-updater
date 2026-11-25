@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from 'vitest';
-import { adminPersonLine, roleHoldingLine, currentRolesLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin,
+import { adminPersonLine, roleHoldingLine, holdingLabel, currentRolesLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin,
   invitationStatusWord, invitationLine, accountLine, accountRemovedNote, activeAccountCount, prefillEmail, adminPersonTag, removeAccessConfirm, validateInvite,
   inviteRequestBody, cancelInvitationConfirm, splitInvitations, findAccounts, hidesToLift } from './admin';
 import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary, HiddenPerson, MoveResult } from './clusterNotebook';
@@ -30,6 +30,11 @@ describe('adminPersonLine', () => {
   test('skips an empty place path', () => {
     expect(adminPersonLine(person('YOUTH', []))).toBe('Ana Lopez · Youth');
   });
+});
+
+describe('holdingLabel', () => {
+  test('role without an icon', () => expect(holdingLabel(holding('CSO', 'NC-215 Triangle'))).toBe('CSO'));
+  test('role with an icon', () => expect(holdingLabel(holding('contact', 'Northside'))).toBe('Contact ★'));
 });
 
 describe('roleHoldingLine', () => {
