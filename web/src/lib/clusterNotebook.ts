@@ -1,4 +1,5 @@
 import { auth } from '@clerk/nextjs/server';
+import { LOG_PAGE } from './admin';
 
 const CLUSTER_NOTEBOOK_URL = process.env.CLUSTER_NOTEBOOK_URL || 'http://localhost:8000';
 
@@ -878,8 +879,6 @@ export async function getPeopleNotInSrp(clusterName: string): Promise<AdminPerso
   const data = await request<{ peopleNotInSrp: AdminPerson[] }>(query, { clusterName });
   return data.peopleNotInSrp;
 }
-
-export const LOG_PAGE = 100;
 
 // Confirmed with cluster-notebook 2026-11-25: `changes` is { field: { old, new } } (create: old null; delete: new null;
 // update: changed fields only). actor is null for the SRP sync, scripts, anything not done by a signed-in person.

@@ -1,7 +1,6 @@
 // Admin page (phase 1): pure decisions, tested in admin.test.ts.
 // Spec: docs/superpowers/specs/ (admin page design); plan: docs/superpowers/plans/2026-11-24-admin-page-phase1.md
 import type { AccountInfo, AdminCluster, AdminPerson, AdminPlace, HiddenPerson, Invitation, InvitationStatus, MoveResult, PersonDetails, RoleHolding, LogEntry } from './clusterNotebook';
-import { LOG_PAGE } from './clusterNotebook';
 import { AGE_LABELS, roleLabel } from './people';
 import { individualDisplayName } from './personName';
 
@@ -210,6 +209,9 @@ export function hidesToLift(hidden: HiddenPerson[], results: MoveResult[]): { in
   const placed = new Set(results.filter(r => r.individual && (r.moved || r.code === 'ALREADY_THERE')).map(r => r.individual!.id));
   return hidden.filter(h => placed.has(h.individual.id)).map(h => ({ individualId: h.individual.id, nucleusName: h.nucleusName }));
 }
+
+// Rows per Log page (cluster-notebook's changeLog limit). Defined here, not in clusterNotebook.ts, which is server-only.
+export const LOG_PAGE = 100;
 
 // The Log card: who did what to which record. The entity word is the type as written, except two long names.
 const LOG_ENTITY_WORD: Record<string, string> = { role_in_ne: 'role', person_hide: 'hide' };
