@@ -1,8 +1,9 @@
 import { describe, test, expect, vi } from 'vitest';
 import { adminPersonLine, roleHoldingLine, holdingLabel, currentRolesLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin,
   invitationStatusWord, invitationLine, accountLine, accountRemovedNote, activeAccountCount, prefillEmail, adminPersonTag, removeAccessConfirm, validateInvite,
-  inviteRequestBody, cancelInvitationConfirm, splitInvitations, findAccounts, findPeople, hidesToLift } from './admin';
-import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary, HiddenPerson, MoveResult } from './clusterNotebook';
+  inviteRequestBody, cancelInvitationConfirm, splitInvitations, findAccounts, findPeople, hidesToLift,
+  logHeadline, logChanges, changeValueText, nextLogCursor, mergeLogPages } from './admin';
+import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary, HiddenPerson, MoveResult, LogEntry } from './clusterNotebook';
 
 const person = (ageCategory: AdminPerson['ageCategory'], placePath: string[]): AdminPerson => ({
   individual: { id: 'i1', firstName: 'Ana', familyName: 'Lopez', middleNames: null, nickname: null, place: null, placeSync: null, inSrp: true },
@@ -309,5 +310,42 @@ describe('findPeople', () => {
     const r = findPeople(many, '');
     expect(r.shown).toHaveLength(20);
     expect(r.matched).toBe(25);
+  });
+});
+
+const entry = (o: Partial<LogEntry> = {}): LogEntry => ({
+  id: 'e1', occurredAt: '2026-11-24T14:05:00Z', actor: summary('Ben', 'Okafor'), mutation: 'grantRole',
+  entityType: 'role_in_ne', entityId: 'r1', changeType: 'create', changes: { role: { old: null, new: 'CSO' } }, ...o });
+describe('logHeadline', () => {
+  test('who, what, on what', () => {
+    expect(logHeadline(entry())).toBe('Ben Okafor · grantRole · role r1');
+  });
+  test('no actor is the system; no mutation uses the change type', () => {
+    expect(logHeadline(entry({ actor: null, mutation: null, changeType: 'update', entityType: 'person_hide', entityId: 'h9' })))
+      .toBe('System · update · hide h9');
+  });
+});
+describe('logChanges and changeValueText', () => {
+  test('one row per field, in key order, values as text', () => {
+    expect(logChanges(entry({ changes: { name: { old: 'Elm', new: 'Elm St' }, active: { old: true, new: null } } })))
+      .toEqual([{ field: 'name', old: 'Elm', new: 'Elm St' }, { field: 'active', old: 'true', new: '—' }]);
+  });
+  test('objects and arrays as compact JSON; numbers as written', () => {
+    expect(changeValueText({ a: 1 })).toBe('{"a":1}');
+    expect(changeValueText([1, 'x'])).toBe('[1,"x"]');
+    expect(changeValueText(0)).toBe('0');
+    expect(changeValueText(undefined)).toBe('—');
+  });
+});
+describe('nextLogCursor and mergeLogPages', () => {
+  test('a full page gives the cursor of its last row; a short page ends', () => {
+    const full = Array.from({ length: 100 }, (_, n) => entry({ id: `e${n}`, occurredAt: `2026-11-24T14:${String(n % 60).padStart(2, '0')}:00Z` }));
+    expect(nextLogCursor(full)).toEqual({ before: full[99].occurredAt, beforeId: 'e99' });
+    expect(nextLogCursor(full.slice(0, 99))).toBeNull();
+    expect(nextLogCursor([])).toBeNull();
+  });
+  test('merging drops rows already shown', () => {
+    expect(mergeLogPages([entry({ id: 'a' }), entry({ id: 'b' })], [entry({ id: 'b' }), entry({ id: 'c' })]).map(e => e.id))
+      .toEqual(['a', 'b', 'c']);
   });
 });

@@ -7,6 +7,7 @@ import HiddenCard from './HiddenCard';
 import NotInSrpCard from './NotInSrpCard';
 import InviteCard from './InviteCard';
 import AccountsCard from './AccountsCard';
+import LogCard from './LogCard';
 
 interface AdminCluster { id: string; name: string }
 
@@ -94,6 +95,7 @@ export default function AdminClient() {
                 <RolesCard key={`roles:${c.name}`} cluster={c.name} />
                 <HiddenCard key={`hidden:${c.name}`} cluster={c.name} />
                 <NotInSrpCard key={`notinsrp:${c.name}`} cluster={c.name} />
+                <LogCard key={`log:${c.name}`} cluster={c.name} />
               </div>
             )}
           </div>

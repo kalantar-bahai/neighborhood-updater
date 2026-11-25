@@ -9,7 +9,7 @@ import {
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
   getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusPeopleFlags, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext,
-  getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople, getPeopleNotInSrp,
+  getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople, getPeopleNotInSrp, getChangeLog,
   getMe, inviteIndividual, resendInvitation, revokeInvitation, removeAccess, restoreAccess, getInvitations, getAccounts,
 } from './clusterNotebook';
 import type { Individual, PersonSummary, NucleusPerson, MoveResult, MoveContext, PersonDetails } from './clusterNotebook';
@@ -1150,6 +1150,27 @@ describe('admin client', () => {
     expect(q).toContain('peopleNotInSrp(clusterName: $clusterName)');
     expect(q).toContain('individual {');
     expect(q).toContain('ageCategory placePath hasAccess pendingInvitation { id expiresAt }');
+  });
+
+  describe('getChangeLog', () => {
+    test('first page sends clusterName and limit 100 only', async () => {
+      mockFetch.mockResolvedValue(jsonResponse({ data: { changeLog: [] } }));
+      expect(await getChangeLog('NC-215 Triangle')).toEqual([]);
+      const { vars, q } = norm(0);
+      expect(vars).toEqual({ clusterName: 'NC-215 Triangle', limit: 100 });
+      expect('before' in vars).toBe(false);
+      expect('beforeId' in vars).toBe(false);
+      expect(q).toContain('$limit: Int!');
+      expect(q).toContain('$before: DateTime');
+      expect(q).toContain('$beforeId: String');
+      expect(q).toContain('id occurredAt actor {');
+      expect(q).toContain('mutation entityType entityId changeType changes');
+    });
+    test('a page sends before and beforeId', async () => {
+      mockFetch.mockResolvedValue(jsonResponse({ data: { changeLog: [] } }));
+      await getChangeLog('NC-215 Triangle', { before: '2026-11-24T14:05:00Z', beforeId: 'e9' });
+      expect(norm(0).vars).toEqual({ clusterName: 'NC-215 Triangle', limit: 100, before: '2026-11-24T14:05:00Z', beforeId: 'e9' });
+    });
   });
 
   const INV = 'id individual {';

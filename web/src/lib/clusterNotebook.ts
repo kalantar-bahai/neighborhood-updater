@@ -879,6 +879,30 @@ export async function getPeopleNotInSrp(clusterName: string): Promise<AdminPerso
   return data.peopleNotInSrp;
 }
 
+export const LOG_PAGE = 100;
+
+// Confirmed with cluster-notebook 2026-11-25: `changes` is { field: { old, new } } (create: old null; delete: new null;
+// update: changed fields only). actor is null for the SRP sync, scripts, anything not done by a signed-in person.
+export interface LogEntry { id: string; occurredAt: string; actor: PersonSummary | null; mutation: string | null; entityType: string; entityId: string; changeType: string;
+  changes: Record<string, { old: unknown; new: unknown }> }
+
+// Confirmed with cluster-notebook 2026-11-25: newest first (occurredAt desc, id desc). Keyset: strictly older than
+// (before, beforeId), which are the last row's occurredAt and id. limit 1..500; beforeId without before is BAD_INPUT.
+// Same admin gate as hiddenPeople; unknown cluster is []. `changes` is a JSON scalar: no subselection.
+export async function getChangeLog(clusterName: string, page?: { before: string; beforeId: string }): Promise<LogEntry[]> {
+  const query = `
+    query GetChangeLog($clusterName: String!, $limit: Int!, $before: DateTime, $beforeId: String) {
+      changeLog(clusterName: $clusterName, limit: $limit, before: $before, beforeId: $beforeId) {
+        id occurredAt actor { ${PERSON_SUMMARY_SELECTION} } mutation entityType entityId changeType changes
+      }
+    }
+  `;
+  const variables: Record<string, unknown> = { clusterName, limit: LOG_PAGE };
+  if (page) { variables.before = page.before; variables.beforeId = page.beforeId; }
+  const data = await request<{ changeLog: LogEntry[] }>(query, variables);
+  return data.changeLog;
+}
+
 export interface AdminLocation { id: string; name: string; type: string }
 export interface RoleHolding { id: string; role: string; entity: AdminLocation | null; start: string | null }
 

@@ -1,6 +1,7 @@
 // Admin page (phase 1): pure decisions, tested in admin.test.ts.
 // Spec: docs/superpowers/specs/ (admin page design); plan: docs/superpowers/plans/2026-11-24-admin-page-phase1.md
-import type { AccountInfo, AdminCluster, AdminPerson, AdminPlace, HiddenPerson, Invitation, InvitationStatus, MoveResult, PersonDetails, RoleHolding } from './clusterNotebook';
+import type { AccountInfo, AdminCluster, AdminPerson, AdminPlace, HiddenPerson, Invitation, InvitationStatus, MoveResult, PersonDetails, RoleHolding, LogEntry } from './clusterNotebook';
+import { LOG_PAGE } from './clusterNotebook';
 import { AGE_LABELS, roleLabel } from './people';
 import { individualDisplayName } from './personName';
 
@@ -208,4 +209,35 @@ function matchesWords(text: string, search: string): boolean {
 export function hidesToLift(hidden: HiddenPerson[], results: MoveResult[]): { individualId: string; nucleusName: string }[] {
   const placed = new Set(results.filter(r => r.individual && (r.moved || r.code === 'ALREADY_THERE')).map(r => r.individual!.id));
   return hidden.filter(h => placed.has(h.individual.id)).map(h => ({ individualId: h.individual.id, nucleusName: h.nucleusName }));
+}
+
+// The Log card: who did what to which record. The entity word is the type as written, except two long names.
+const LOG_ENTITY_WORD: Record<string, string> = { role_in_ne: 'role', person_hide: 'hide' };
+
+export function logHeadline(e: LogEntry): string {
+  const who = e.actor ? individualDisplayName(e.actor) : 'System';
+  return `${who} · ${e.mutation ?? e.changeType} · ${LOG_ENTITY_WORD[e.entityType] ?? e.entityType} ${e.entityId}`;
+}
+
+export function changeValueText(v: unknown): string {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
+export function logChanges(e: LogEntry): { field: string; old: string; new: string }[] {
+  return Object.entries(e.changes).map(([field, c]) => ({ field, old: changeValueText(c.old), new: changeValueText(c.new) }));
+}
+
+// A full page may have more behind it; a short one is the end of the log.
+export function nextLogCursor(page: LogEntry[]): { before: string; beforeId: string } | null {
+  if (page.length < LOG_PAGE) return null;
+  const last = page[page.length - 1];
+  return { before: last.occurredAt, beforeId: last.id };
+}
+
+export function mergeLogPages(have: LogEntry[], page: LogEntry[]): LogEntry[] {
+  const seen = new Set(have.map(e => e.id));
+  return [...have, ...page.filter(e => !seen.has(e.id))];
 }
