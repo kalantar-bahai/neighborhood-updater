@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { NucleusSummary } from '@/types';
-import StaggeredConcentricDiagram, { type AlignedLabel } from './StaggeredConcentricDiagram';
+import ConcentricRainbow, { type AlignedLabel } from './ConcentricRainbow';
 import SrpBadge from './SrpBadge';
 import PageHeader, { HeaderButton } from './PageHeader';
 
@@ -55,7 +55,7 @@ type NineFieldKey = typeof NINE_FIELD_KEYS[number];
 // (confirmed with cluster-notebook 2026-10-08: most nuclei in dev data have
 // never set any of these nine, so a group containing only never-set nuclei
 // must read as "not set", not as a real, reported 0 -- see
-// nineFieldsToStaggeredLabels below for where that distinction surfaces).
+// nineFieldsToRainbowLabels below for where that distinction surfaces).
 function sumNineFields(rowsIn: NucleusSummary[]) {
   const sums = {} as Record<NineFieldKey, number>;
   const everSet = {} as Record<NineFieldKey, boolean>;
@@ -82,14 +82,14 @@ function findOverlappingPockets(rowsIn: NucleusSummary[]): string[] {
     .map(r => r.nucleus);
 }
 
-// Same inner -> outer order as DetailView's own staggeredLabels, minus the
+// Same inner -> outer order as DetailView's own rainbowLabels, minus the
 // per-nucleus worker-list onClicks (those drill into one nucleus's own
 // workers; a rollup across several nuclei has no single worker list to show).
-// A field nobody in the group ever set renders as '' -- formatNum already
-// turns that into "____", the same "not set" look DetailView itself uses for
-// one nucleus's own unset fields, so a never-set group reads as unset rather
-// than as a suspiciously-precise 0.
-function nineFieldsToStaggeredLabels({ sums, everSet }: ReturnType<typeof sumNineFields>): AlignedLabel[] {
+// A field nobody in the group ever set renders as '' -- the diagram shows that
+// as "not recorded", the same look DetailView itself uses for one nucleus's own
+// unset fields, so a never-set group reads as unset rather than as a
+// suspiciously-precise 0.
+function nineFieldsToRainbowLabels({ sums, everSet }: ReturnType<typeof sumNineFields>): AlignedLabel[] {
   const v = (key: NineFieldKey) => everSet[key] ? String(sums[key]) : '';
   return [
     { label: 'Accompanying',                          value: v('accompanying') },
@@ -155,7 +155,7 @@ function RollupCards({ rows: rowsIn, groupLabel, onCardClick }: {
           {/* Thumbnail of the same diagram the popup shows full-size -- compact
               drops the labels, which would shrink to illegible at this size. */}
           <div style={{ width: 70, margin: '0 auto' }}>
-            <StaggeredConcentricDiagram labels={nineFieldsToStaggeredLabels(sumNineFields(rowsIn))} compact />
+            <ConcentricRainbow labels={nineFieldsToRainbowLabels(sumNineFields(rowsIn))} compact />
           </div>
           <div style={{ fontSize: 12, textAlign: 'center', color: '#718096', marginTop: 2 }}>{nucleusCountLabel(rowsIn)}</div>
         </div>
@@ -191,7 +191,7 @@ export default function Picker({ rows, email, onSelect, onAdd, onAdmin }: Props)
   const [openLocalities, setOpenLocalities] = useState<Set<string>>(new Set());
   // Rollup-card popup (2026-10-08) -- null when closed. `rows` are the exact
   // nuclei the clicked card already summed, re-summed here into the nine-field
-  // totals the staggered diagram needs (the card itself only shows nuclei/act/
+  // totals the rainbow diagram needs (the card itself only shows nuclei/act/
   // part/FoF, not the nine fields, so this is computed on click, not upfront).
   const [popup, setPopup] = useState<{ title: string; rows: NucleusSummary[] } | null>(null);
 
@@ -446,7 +446,7 @@ export default function Picker({ rows, email, onSelect, onAdd, onAdmin }: Props)
               </div>
             );
           })()}
-          <StaggeredConcentricDiagram labels={nineFieldsToStaggeredLabels(sumNineFields(popup.rows))} />
+          <ConcentricRainbow labels={nineFieldsToRainbowLabels(sumNineFields(popup.rows))} />
         </div>
       </div>
     )}

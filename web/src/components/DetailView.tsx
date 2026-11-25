@@ -11,7 +11,7 @@ import PeopleCard from './PeopleCard';
 import ManageAccessCard from './ManageAccessCard';
 import { SrpDot } from './SrpBadge';
 import { canRenameNucleus, deleteNotice, pendingIdentityLocks, nextNameAfterRename, pushToSrpMode, srpDetailMessage, srpOutOfStepMessage } from '@/lib/srp';
-import StaggeredConcentricDiagram, { formatValue, type AlignedLabel } from './StaggeredConcentricDiagram';
+import ConcentricRainbow, { formatValue, type AlignedLabel } from './ConcentricRainbow';
 import { namedToShow } from '@/lib/people';
 
 interface Props {
@@ -410,7 +410,7 @@ const IcoDiagram2 = () => (
 
 const IcoDiagram3 = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6.5" strokeDasharray="2 2"/><circle cx="12" cy="12" r="3"/>
+    <path d="M2 19a10 10 0 0 1 20 0"/><path d="M6.5 19a5.5 5.5 0 0 1 11 0"/><path d="M2 19h20"/>
   </svg>
 );
 
@@ -567,8 +567,8 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
   );
 }
 
-// StaggeredConcentricDiagram (9-ring) moved to its own file, 2026-10-08, so
-// Picker.tsx can also render a rollup version of it from its own popup.
+// The 9-figure diagram (ConcentricRainbow, formerly the staggered 9-ring one) lives in its own file,
+// 2026-10-08, so Picker.tsx can also render a rollup version of it from its own popup.
 
 export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, onRenamed, canCreateInCluster, allNucleusNames, childCount, cardOpen, onCardOpenChange }: Props) {
   const { row } = detail;
@@ -593,9 +593,9 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // Which of the three concentric-circle diagrams the Concentric Circles card
   // currently shows -- replaces three separate full-screen modals (one per type,
   // each reachable only from its own page-header button) with one switcher inside
-  // the single card, 2026-10-08. Defaults to 'staggered', matching that diagram's
-  // prior status as the one already embedded directly in the card.
-  const [diagramType, setDiagramType] = useState<'simple' | 'aligned' | 'staggered'>('staggered');
+  // the single card, 2026-10-08. Defaults to 'rainbow' (the 9-figure diagram,
+  // drawn as half rings since 2026-11-25), the one already embedded directly in the card.
+  const [diagramType, setDiagramType] = useState<'simple' | 'aligned' | 'rainbow'>('rainbow');
   const [accompanierNames, setAccompanierNames] = useState<Worker[]>(() => detail.accompanierNames);
   const [showAccompaniersModal, setShowAccompaniersModal] = useState(false);
   const [protagonistNames, setProtagonistNames] = useState<Worker[]>(() => detail.protagonistNames);
@@ -881,7 +881,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // Innermost -> outermost, same values as the Aligned diagram's rings. Hosting
   // Devotional Meetings/Gatherings has a real mapping now (devotionalHosts,
   // 2026-10-07) -- was always blank before, no field existed for it yet.
-  const staggeredLabels: AlignedLabel[] = [
+  const rainbowLabels: AlignedLabel[] = [
     { label: 'Accompanying',                           value: form.accompanying, named: accompanierNames.length, onClick: editEstimate('accompanying') },
     { label: 'Helping Others',                          value: form.helpingOthers, named: protagonistNames.length, onClick: editEstimate('helpingOthers') },
     { label: 'Facilitating Ed. Act.',                   value: form.educationalFacilitators, named: counts.facilitating, onClick: editEstimate('educationalFacilitators') },
@@ -1181,7 +1181,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 {([
                   ['simple', IcoDiagram, 'Concentric Circles'],
                   ['aligned', IcoDiagram2, 'Concentric Circles (Aligned)'],
-                  ['staggered', IcoDiagram3, 'Concentric Circles (Staggered)'],
+                  ['rainbow', IcoDiagram3, 'Concentric Circles (Rainbow)'],
                 ] as const).map(([type, Icon, title]) => {
                   const active = diagramType === type;
                   return (
@@ -1204,7 +1204,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
               </div>
               {diagramType === 'simple' && <ConcentricDiagram data={diagramData} />}
               {diagramType === 'aligned' && <AlignedConcentricDiagram rings={alignedRings} residing={alignedResiding} />}
-              {diagramType === 'staggered' && <StaggeredConcentricDiagram labels={staggeredLabels} />}
+              {diagramType === 'rainbow' && <ConcentricRainbow labels={rainbowLabels} />}
               {estimateEdit && createPortal(
                 <div onClick={() => setEstimateEdit(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
                   <form

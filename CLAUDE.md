@@ -24,7 +24,7 @@ have a *parent nucleus* ("pocket"). *SRP* is the Statistical Report Program, the
 | `web/src/lib/data.ts` | Maps between the UI's row/form shape and cluster-notebook (`getRowData`, `saveRowData`, `createRowData`, `deleteRowData`). |
 | `web/src/lib/access.ts`, `config.ts` | Per-entity permissions (`getNucleusPermissions`); `INFORMAL_WORKER_TYPES`. |
 | `web/src/app/api/*/route.ts` | `initial-data`, `nucleus`, `workers`, `individuals`, `roles`. Every route checks Clerk auth and then permissions. |
-| `web/src/components/` | `AppClient` (shell), `Picker` ("My Nuclei" hierarchy + rollup cards), `DetailView` (the big per-nucleus page, ~1400 lines), `ManageAccessCard`, `WorkerListModal`, `CreateNucleusModal`, `StaggeredConcentricDiagram`. |
+| `web/src/components/` | `AppClient` (shell), `Picker` ("My Nuclei" hierarchy + rollup cards), `DetailView` (the big per-nucleus page, ~1400 lines), `ManageAccessCard`, `WorkerListModal`, `CreateNucleusModal`, `ConcentricRainbow` (the 9-figure diagram). |
 | `web/src/proxy.ts` | Clerk middleware. Next 16 uses `proxy.ts`, not `middleware.ts`. |
 | `web/src/app/privacy`, `terms` | Pages required for Google OAuth verification. The sign-in page links to both. |
 | `srp-cache/` | **Legacy** Python + Playwright scrapers for onlinesrp.org that write to Google Sheets. The web app no longer reads them. |
