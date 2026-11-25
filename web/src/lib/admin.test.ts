@@ -1,6 +1,6 @@
 import { describe, test, expect, vi } from 'vitest';
 import { adminPersonLine, roleHoldingLine, holdingLabel, currentRolesLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin,
-  invitationStatusWord, invitationLine, accountLine, accountRemovedNote, activeAccountCount, prefillEmail, adminPersonTag, removeAccessConfirm, validateInvite,
+  invitationStatusWord, invitationLine, accountLine, accountRemovedNote, activeAccountCount, prefillEmail, adminPersonTags, removeAccessConfirm, validateInvite,
   inviteRequestBody, cancelInvitationConfirm, splitInvitations, findAccounts, findPeople, hidesToLift,
   logHeadline, logChanges, changeValueText, nextLogCursor, mergeLogPages } from './admin';
 import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary, HiddenPerson, MoveResult, LogEntry } from './clusterNotebook';
@@ -160,16 +160,20 @@ describe('prefillEmail', () => {
   });
 });
 
-describe('adminPersonTag', () => {
-  const inv = { id: 'inv1', expiresAt: '2026-12-24T10:00:00Z' };
-  test('has access wins over invited', () => {
-    expect(adminPersonTag({ ...person(null, []), hasAccess: true, pendingInvitation: inv })).toBe('has access');
+describe('adminPersonTags', () => {
+  const base = person(null, []);
+  test('has access wins alone', () => {
+    expect(adminPersonTags({ ...base, hasAccess: true, accessRemovedAt: null, pendingInvitation: { id: 'i', expiresAt: '2026-12-24T10:00:00Z' } })).toEqual(['has access']);
   });
-  test('invited', () => {
-    expect(adminPersonTag({ ...person(null, []), pendingInvitation: inv })).toBe('invited');
+  test('removed and invited both show, removed first, with the date', () => {
+    expect(adminPersonTags({ ...base, accessRemovedAt: '2026-11-20T09:00:00Z', pendingInvitation: { id: 'i', expiresAt: '2026-12-20T00:00:00Z' } }))
+      .toEqual(['access removed Nov 20, 2026', 'invited']);
   });
-  test('none', () => {
-    expect(adminPersonTag(person(null, []))).toBeNull();
+  test('invited alone', () => {
+    expect(adminPersonTags({ ...base, pendingInvitation: { id: 'i', expiresAt: '2026-12-20T00:00:00Z' } })).toEqual(['invited']);
+  });
+  test('nothing for a plain person', () => {
+    expect(adminPersonTags(base)).toEqual([]);
   });
 });
 

@@ -9,7 +9,7 @@ import {
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
   getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusPeopleFlags, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext,
-  getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople, getPeopleNotInSrp, getChangeLog,
+  getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople, getPeopleNotInSrp, getRoleHoldersWithoutAccess, getChangeLog,
   getMe, inviteIndividual, resendInvitation, revokeInvitation, removeAccess, restoreAccess, getInvitations, getAccounts,
 } from './clusterNotebook';
 import type { Individual, PersonSummary, NucleusPerson, MoveResult, MoveContext, PersonDetails } from './clusterNotebook';
@@ -1150,6 +1150,17 @@ describe('admin client', () => {
     expect(q).toContain('peopleNotInSrp(clusterName: $clusterName)');
     expect(q).toContain('individual {');
     expect(q).toContain('ageCategory placePath hasAccess pendingInvitation { id expiresAt }');
+  });
+
+  test('getRoleHoldersWithoutAccess filters searchPeople to role holders with no account and selects roles', async () => {
+    const person = { individual: { id: 'i1' }, ageCategory: null, placePath: [], hasAccess: false, pendingInvitation: null, roles: [], accessRemovedAt: null };
+    mockFetch.mockResolvedValue(jsonResponse({ data: { searchPeople: [person] } }));
+    expect(await getRoleHoldersWithoutAccess('NC-215 Triangle')).toEqual([person]);
+    const { vars, q } = norm(0);
+    expect(vars).toEqual({ clusterName: 'NC-215 Triangle', search: '', limit: 1000, holdsRole: true, hasAccess: false });
+    expect(q).toContain('$search: String!, $limit: Int!, $holdsRole: Boolean, $hasAccess: Boolean');
+    expect(q).toContain('individual {');
+    expect(q).toContain('roles { id role entity { id name type } start } accessRemovedAt');
   });
 
   describe('getChangeLog', () => {

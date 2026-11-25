@@ -437,8 +437,8 @@ type Mutation {
 
 ## Admin page, Phase 3, confirmed with cluster-notebook 2026-11-25
 
-People not in SRP and the change log. Status: in production 2026-11-25. Part B below is proposed, not yet deployed;
-cluster-notebook will change existing queries rather than add new ones (owner 2026-11-25).
+People not in SRP and the change log. Status: in production 2026-11-25. Part B below is confirmed and deployed
+2026-11-25 (cluster-notebook 5a0b624); cluster-notebook changed existing queries rather than adding new ones (owner 2026-11-25).
 
 ```graphql
 peopleNotInSrp(clusterName: String!): [AdminPerson!]!
@@ -454,14 +454,22 @@ type LogEntry { id: String!  occurredAt: DateTime!  actor: PersonSummary  mutati
 - `actor` is null for the SRP sync, scripts, or anything not done by a signed-in person. `mutation` is the GraphQL mutation name or null.
 - Both: same admin gate as `hiddenPeople` (FORBIDDEN otherwise); unknown cluster gives `[]`.
 
-### Part B: proposed, not yet deployed
+### Part B: confirmed and deployed 2026-11-25 (cluster-notebook 5a0b624)
 
-Cluster-notebook will change existing queries rather than add new ones (owner 2026-11-25). Final names come from
-cluster-notebook when deployed; nothing here may be selected until then.
+All additive; nothing Part A calls changed.
 
-- `roleHoldersWithoutAccess(clusterName: String!): [AdminPerson!]!`: current formal roles (ATC, CSO, CIC, LSA, ATC-/CIC-Collaborator, ABM-Assistant, accompanier, contact) at live entities in the cluster, `hasAccess` false (removed-access people included), pending invitations included; ordered by family name, first name; same gate.
-- `AdminPerson.roles: [RoleHolding!]!` (same list and visibility as `individualRoles`).
-- `AdminPerson.accessRemovedAt: DateTime` (null unless their account is disabled).
-- `AdminPerson.createdAt: DateTime`, `AdminPerson.createdBy: PersonSummary` (null for SRP sync/scripts/before auditing).
-- `LogEntry.entityName: String` (best effort; null if the row is gone).
-- `AdminPerson.pendingInvitation` may be an expired invitation (`status: EXPIRED`).
+```graphql
+searchPeople(clusterName: String!, search: String! = "", limit: Int! = 20,
+             holdsRole: Boolean = null, hasAccess: Boolean = null): [AdminPerson!]!
+type AdminPerson { ...existing...  roles: [RoleHolding!]!  accessRemovedAt: DateTime
+                   createdAt: DateTime  createdBy: PersonSummary }
+type LogEntry { ...existing...  entityName: String }
+```
+
+- "Role holders without access" is `searchPeople(clusterName, search: "", limit: 1000, holdsRole: true, hasAccess: false)`. There is no maximum limit; the default stays 20. A null filter means no filter.
+- `holdsRole: true` is a current recognised role (not Administrator, not promoter/protagonist) at a live place in the cluster. `hasAccess: false` is no enabled account, so removed-access people are included.
+- `roles` lists every current role (informal ones included), with the same visibility as `individualRoles`.
+- `accessRemovedAt`: when the account was disabled; null if enabled or never had one.
+- `createdAt`: from the audit log, null before auditing began. `createdBy`: null for SRP sync, scripts, or before auditing.
+- `entityName`: place name; person name for individual, invitation and account; `"<person> · <role> at <place>"` for a role; `"<person> · hidden at <nucleus>"` for a hide; null if the row is gone.
+- `pendingInvitation` is null once an invitation expires (only pending, unexpired), so there is no "invitation expired" tag.

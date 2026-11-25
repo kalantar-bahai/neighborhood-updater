@@ -1,7 +1,7 @@
 // Admin page (phase 1): pure decisions, tested in admin.test.ts.
 // Spec: docs/superpowers/specs/ (admin page design); plan: docs/superpowers/plans/2026-11-24-admin-page-phase1.md
 import type { AccountInfo, AdminCluster, AdminPerson, AdminPlace, HiddenPerson, Invitation, InvitationStatus, MoveResult, PersonDetails, RoleHolding, LogEntry } from './clusterNotebook';
-import { AGE_LABELS, roleLabel } from './people';
+import { AGE_LABELS, formatDate, roleLabel } from './people';
 import { individualDisplayName } from './personName';
 
 // Names repeat, so a result shows age and the whole place path to tell two people apart.
@@ -120,9 +120,14 @@ export function prefillEmail(details: PersonDetails | null): string {
   return details?.emails[0]?.trim() ?? '';
 }
 
-export function adminPersonTag(p: AdminPerson): 'has access' | 'invited' | null {
-  if (p.hasAccess) return 'has access';
-  return p.pendingInvitation ? 'invited' : null;
+// Pills beside a person: "has access" alone, else "access removed <date>" and/or "invited". There is no "invitation
+// expired" tag: cluster-notebook sends pendingInvitation null once it expires (confirmed 2026-11-25).
+export function adminPersonTags(p: AdminPerson): string[] {
+  if (p.hasAccess) return ['has access'];
+  const tags: string[] = [];
+  if (p.accessRemovedAt) tags.push(`access removed ${formatDate(day(p.accessRemovedAt))}`);
+  if (p.pendingInvitation) tags.push('invited');
+  return tags;
 }
 
 export function removeAccessConfirm(name: string): string {

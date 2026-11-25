@@ -848,6 +848,10 @@ export async function getAdminClusters(): Promise<AdminCluster[]> {
 export interface AdminPerson { individual: PersonSummary; ageCategory: AgeCategory | null; placePath: string[]; hasAccess: boolean;
   // Confirmed with cluster-notebook 2026-11-24: the person's pending invitation, if any. Selected only by this admin search.
   pendingInvitation: { id: string; expiresAt: string } | null;
+  // Confirmed with cluster-notebook 2026-11-25 (5a0b624): selected only by getRoleHoldersWithoutAccess. accessRemovedAt
+  // is when the account was disabled (null if enabled or never had one); roles lists every current role.
+  roles?: RoleHolding[];
+  accessRemovedAt?: string | null;
 }
 
 const ADMIN_PERSON_SELECTION = `individual { ${PERSON_SUMMARY_SELECTION} } ageCategory placePath hasAccess pendingInvitation { id expiresAt }`;
@@ -878,6 +882,21 @@ export async function getPeopleNotInSrp(clusterName: string): Promise<AdminPerso
   `;
   const data = await request<{ peopleNotInSrp: AdminPerson[] }>(query, { clusterName });
   return data.peopleNotInSrp;
+}
+
+// Confirmed with cluster-notebook 2026-11-25 (5a0b624): holdsRole = a current recognised role (not Administrator,
+// promoter or protagonist) at a live place in the cluster; hasAccess false includes people whose access was removed.
+// No maximum limit, so 1000 reads them all; the card caps what it shows.
+export async function getRoleHoldersWithoutAccess(clusterName: string): Promise<AdminPerson[]> {
+  const query = `
+    query GetRoleHoldersWithoutAccess($clusterName: String!, $search: String!, $limit: Int!, $holdsRole: Boolean, $hasAccess: Boolean) {
+      searchPeople(clusterName: $clusterName, search: $search, limit: $limit, holdsRole: $holdsRole, hasAccess: $hasAccess) {
+        ${ADMIN_PERSON_SELECTION} roles { id role entity { id name type } start } accessRemovedAt
+      }
+    }
+  `;
+  const data = await request<{ searchPeople: AdminPerson[] }>(query, { clusterName, search: '', limit: 1000, holdsRole: true, hasAccess: false });
+  return data.searchPeople;
 }
 
 // Confirmed with cluster-notebook 2026-11-25: `changes` is { field: { old, new } } (create: old null; delete: new null;

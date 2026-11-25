@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { AdminPerson } from '@/lib/clusterNotebook';
-import { adminPersonLine, adminPersonTag } from '@/lib/admin';
+import { adminPersonLine, adminPersonTags } from '@/lib/admin';
 
 const DEBOUNCE_MS = 300;
 const TAG: React.CSSProperties = { fontSize: 11, color: '#4a5568', background: '#edf2f7', borderRadius: 8, padding: '1px 6px', whiteSpace: 'nowrap' };
@@ -60,7 +60,6 @@ export default function PersonFinder({ cluster, onPick }: { cluster: string; onP
       {results && results.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
           {results.map(p => {
-            const tag = adminPersonTag(p);
             return (
               <button
                 key={p.individual.id}
@@ -69,7 +68,7 @@ export default function PersonFinder({ cluster, onPick }: { cluster: string; onP
                 style={{ textAlign: 'left', background: 'white', border: '1px solid #cbd5e0', borderRadius: 6, padding: '6px 8px', fontSize: 14, cursor: 'pointer', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}
               >
                 <span>{adminPersonLine(p)}</span>
-                {tag && <span style={TAG}>{tag}</span>}
+                {adminPersonTags(p).map(t => <span key={t} style={TAG}>{t}</span>)}
               </button>
             );
           })}

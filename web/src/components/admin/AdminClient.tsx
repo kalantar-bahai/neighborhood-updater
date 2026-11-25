@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import PageHeader, { HeaderButton } from '../PageHeader';
 import RolesCard from './RolesCard';
 import HiddenCard from './HiddenCard';
 import NotInSrpCard from './NotInSrpCard';
-import InviteCard from './InviteCard';
+import InviteCard, { type InviteHandle } from './InviteCard';
+import NoAccountCard from './NoAccountCard';
 import AccountsCard from './AccountsCard';
 import LogCard from './LogCard';
 
@@ -34,6 +35,12 @@ export default function AdminClient() {
   // Open clusters, by name. Like the home page: one cluster is always open (no twisty); with several, each opens on
   // its own and starts closed. A closed cluster's cards unmount, which clears any picked person or open form.
   const [openClusters, setOpenClusters] = useState<Set<string>>(new Set());
+
+  // Each cluster's Invite card, so Invite… on the No account yet card can fill it in; and a counter per cluster that
+  // goes up when an invitation is sent, so the No account yet card re-reads.
+  const inviteRefs = useRef(new Map<string, InviteHandle | null>());
+  const [versions, setVersions] = useState<Record<string, number>>({});
+  const bump = (name: string) => setVersions(v => ({ ...v, [name]: (v[name] ?? 0) + 1 }));
 
   useEffect(() => {
     fetch('/api/admin/clusters')
@@ -90,7 +97,9 @@ export default function AdminClient() {
             {/* Cards are keyed by cluster, so each cluster has its own. */}
             {isOpen && (
               <div className="cluster-rows open" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6, marginBottom: 16 }}>
-                <InviteCard key={`invite:${c.name}`} cluster={c.name} />
+                <InviteCard key={`invite:${c.name}`} cluster={c.name} ref={h => { inviteRefs.current.set(c.name, h); }} onInvited={() => bump(c.name)} />
+                <NoAccountCard key={`noaccount:${c.name}`} cluster={c.name} version={versions[c.name] ?? 0}
+                  onInvite={p => inviteRefs.current.get(c.name)?.start(p)} />
                 <AccountsCard key={`accounts:${c.name}`} cluster={c.name} me={state.me} />
                 <RolesCard key={`roles:${c.name}`} cluster={c.name} />
                 <HiddenCard key={`hidden:${c.name}`} cluster={c.name} />
