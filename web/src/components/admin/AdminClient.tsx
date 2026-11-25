@@ -97,7 +97,7 @@ export default function AdminClient() {
             {/* Cards are keyed by cluster, so each cluster has its own. */}
             {isOpen && (
               <div className="cluster-rows open" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6, marginBottom: 16 }}>
-                <InviteCard key={`invite:${c.name}`} cluster={c.name} ref={h => { inviteRefs.current.set(c.name, h); }} onInvited={() => bump(c.name)} />
+                <InviteCard key={`invite:${c.name}`} cluster={c.name} ref={h => { inviteRefs.current.set(c.name, h); }} onInvitationsChanged={() => bump(c.name)} />
                 <NoAccountCard key={`noaccount:${c.name}`} cluster={c.name} version={versions[c.name] ?? 0}
                   onInvite={p => inviteRefs.current.get(c.name)?.start(p)} />
                 <AccountsCard key={`accounts:${c.name}`} cluster={c.name} me={state.me} />

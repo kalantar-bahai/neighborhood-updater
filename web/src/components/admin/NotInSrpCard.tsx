@@ -37,8 +37,8 @@ export default function NotInSrpCard({ cluster }: { cluster: string }) {
   const toggle = () => {
     const next = !open;
     setOpen(next);
-    // First open (or a retry after a failed read): fetch here, in the click, not in an effect.
-    if (next && !people) void load();
+    // Every open re-reads, in the click, not in an effect. Old rows stay until the new read lands.
+    if (next) void load();
   };
 
   const found = people && people.length > 0 ? findPeople(people, search, SHOWN) : null;
@@ -51,7 +51,12 @@ export default function NotInSrpCard({ cluster }: { cluster: string }) {
       </div>
       {open && (
         <div className="card-body">
-          {loadError && <div style={{ color: '#c53030', fontSize: 13 }}>{loadError}</div>}
+          {loadError && (
+            <div style={{ color: '#c53030', fontSize: 13, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span>{loadError}</span>
+              {!people && <button type="button" onClick={() => void load()} style={{ fontSize: 13, padding: '4px 12px', minHeight: 44, borderRadius: 6, cursor: 'pointer', border: '1px solid #cbd5e0', background: 'white', color: '#4a5568' }}>Try again</button>}
+            </div>
+          )}
           {!people && !loadError && <div style={{ fontSize: 12, color: '#718096' }}>Loading…</div>}
           {people && people.length === 0 && <div style={{ fontSize: 13, color: '#718096' }}>No one here is missing from SRP.</div>}
           {people && people.length > 0 && (
@@ -63,11 +68,12 @@ export default function NotInSrpCard({ cluster }: { cluster: string }) {
             <div style={{ fontSize: 12, color: '#718096' }}>Showing {found.shown.length} of {found.matched}. Search to find others.</div>
           )}
           {found && found.shown.map(p => {
+            const note = createdNote(p);
             return (
               <div key={p.individual.id} style={{ padding: '8px 0', borderTop: '1px solid #edf2f7', fontSize: 14, display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
                 <span>{adminPersonLine(p)}</span>
                 {adminPersonTags(p).map(t => <span key={t} style={TAG}>{t}</span>)}
-                {createdNote(p) && <div style={{ width: '100%', fontSize: 12, color: '#718096' }}>{createdNote(p)}</div>}
+                {note && <div style={{ width: '100%', fontSize: 12, color: '#718096' }}>{note}</div>}
               </div>
             );
           })}

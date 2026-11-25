@@ -26,11 +26,14 @@ type Outcome = { text: string; offerReplace: boolean } | null;
 // The login email is shown and sent only here; it is never written anywhere else.
 export interface InviteHandle { start(p: AdminPerson): void }
 
-export default function InviteCard({ cluster, ref, onInvited }: { cluster: string; ref?: React.Ref<InviteHandle>; onInvited?: () => void }) {
+export default function InviteCard({ cluster, ref, onInvitationsChanged }: { cluster: string; ref?: React.Ref<InviteHandle>; onInvitationsChanged?: () => void }) {
   const [open, setOpen] = useState(true);
   const rootRef = useRef<HTMLDivElement>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [sending, setSending] = useState(false);
+  // Mirrors `sending` so the imperative start() can read it without stale state.
+  const sendingRef = useRef(false);
+  const setSendingBoth = (v: boolean) => { sendingRef.current = v; setSending(v); };
   const [outcome, setOutcome] = useState<Outcome>(null);
   // "Invitation sent to {email}." Kept after the form closes, until the next pick.
   const [sent, setSent] = useState('');
@@ -81,7 +84,7 @@ export default function InviteCard({ cluster, ref, onInvited }: { cluster: strin
     emailTyped.current = false;
     // The email is replaced on every pick: empty now, then the person's first SRP email if they have one.
     setForm({ person: p, seq, email: '', value: 'none', days: '30', roles: null });
-    setOutcome(null); setSent(''); setSending(false);
+    setOutcome(null); setSent(''); setSendingBoth(false);
     try {
       const res = await fetch(`/api/admin/person?id=${encodeURIComponent(p.individual.id)}`);
       const data = await res.json();
@@ -99,13 +102,14 @@ export default function InviteCard({ cluster, ref, onInvited }: { cluster: strin
   // Invite… on another card: open this card, replace any half-filled form with that person (as Change person would), show it.
   useImperativeHandle(ref, () => ({
     start(p: AdminPerson) {
+      if (sendingRef.current) return;
       setOpen(true);
       void pick(p);
       rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     },
   }));
 
-  const changePerson = () => { pickSeq.current++; setForm(null); setOutcome(null); setSending(false); };
+  const changePerson = () => { pickSeq.current++; setForm(null); setOutcome(null); setSendingBoth(false); };
 
   // Any edit withdraws a stale "Replace their login?" offer, so a replace always re-sends what the admin last saw.
   const edit = (patch: Partial<Form>) => { setForm(f => f && { ...f, ...patch }); setOutcome(null); };
@@ -113,7 +117,7 @@ export default function InviteCard({ cluster, ref, onInvited }: { cluster: strin
   const invite = async (replaceExisting: boolean) => {
     if (!form || form.value === null || sending) return;
     const { seq, email } = form;
-    setSending(true); setOutcome(null); setSent('');
+    setSendingBoth(true); setOutcome(null); setSent('');
     let failure: Outcome = null;
     try {
       const res = await fetch('/api/admin/invitations', {
@@ -130,13 +134,13 @@ export default function InviteCard({ cluster, ref, onInvited }: { cluster: strin
       failure = { text: "Couldn't send the invitation. Please try again.", offerReplace: false };
     }
     // Sent, but the admin has since picked someone else: the form is theirs now, yet the lists must still re-read.
-    if (pickSeq.current !== seq) { if (!failure) onInvited?.(); return; }
-    setSending(false);
+    if (pickSeq.current !== seq) { if (!failure) { void reload(); onInvitationsChanged?.(); } return; }
+    setSendingBoth(false);
     if (failure) { setOutcome(failure); return; }
     pickSeq.current++;
     setForm(null); setSent(`Invitation sent to ${email.trim()}.`);
     void reload();
-    onInvited?.();
+    onInvitationsChanged?.();
   };
 
   const setBusyFor = (id: string, what: 'resend' | 'cancel' | null) =>
@@ -150,6 +154,7 @@ export default function InviteCard({ cluster, ref, onInvited }: { cluster: strin
     setBusyFor(i.id, action); setErrorFor(i.id, '');
     let failure = '';
     let reread = true;
+    let changed = action === 'cancel';
     try {
       const res = await fetch('/api/admin/invitations', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -160,13 +165,15 @@ export default function InviteCard({ cluster, ref, onInvited }: { cluster: strin
         failure = data.error || (action === 'resend' ? "Couldn't resend the invitation." : "Couldn't cancel the invitation.");
         // NOT_PENDING: it was accepted or expired meanwhile, so the list is out of date; re-read it.
         reread = data.code === 'NOT_PENDING';
+        changed = reread;
       }
     } catch {
       failure = action === 'resend' ? "Couldn't resend the invitation. Please try again." : "Couldn't cancel the invitation. Please try again.";
-      reread = false;
+      reread = false; changed = false;
     }
     if (failure) setErrorFor(i.id, failure);
     if (reread) await reload();
+    if (changed) onInvitationsChanged?.();
     setBusyFor(i.id, null);
   };
 

@@ -352,6 +352,16 @@ describe('logChanges and changeValueText', () => {
     expect(changeValueText(0)).toBe('0');
     expect(changeValueText(undefined)).toBe('—');
   });
+  test('an empty string reads as (blank)', () => {
+    expect(changeValueText('')).toBe('(blank)');
+  });
+  test('null changes give no rows', () => {
+    expect(logChanges(entry({ changes: null as unknown as LogEntry['changes'] }))).toEqual([]);
+  });
+  test('a null field value gives dashes; a string field value shows as the new text', () => {
+    expect(logChanges(entry({ changes: { a: null, b: 'plain' } as unknown as LogEntry['changes'] })))
+      .toEqual([{ field: 'a', old: '—', new: '—' }, { field: 'b', old: '—', new: 'plain' }]);
+  });
 });
 describe('nextLogCursor and mergeLogPages', () => {
   test('a full page gives the cursor of its last row; a short page ends', () => {

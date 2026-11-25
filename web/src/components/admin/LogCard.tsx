@@ -46,8 +46,8 @@ export default function LogCard({ cluster }: { cluster: string }) {
   const toggle = () => {
     const next = !open;
     setOpen(next);
-    // First open (or a retry after a failed first read): fetch here, in the click, not in an effect.
-    if (next && !entries && !loading) void load(null);
+    // Every open re-reads page one, in the click, not in an effect. Old rows stay until the new page lands.
+    if (next) void load(null);
   };
 
   const toggleRow = (id: string) =>
@@ -72,6 +72,9 @@ export default function LogCard({ cluster }: { cluster: string }) {
                   <div style={{ overflowWrap: 'anywhere' }}>{logHeadline(e)}</div>
                 </div>
                 {isOpen && (
+                  logChanges(e).length === 0 ? (
+                    <div style={{ fontSize: 12, color: '#718096', marginBottom: 8 }}>No field changes.</div>
+                  ) : (
                   <table style={{ fontSize: 12, width: '100%', marginBottom: 8, borderCollapse: 'collapse' }}>
                     <tbody>
                       {logChanges(e).map(c => (
@@ -82,6 +85,7 @@ export default function LogCard({ cluster }: { cluster: string }) {
                       ))}
                     </tbody>
                   </table>
+                  )
                 )}
               </div>
             );
@@ -96,7 +100,12 @@ export default function LogCard({ cluster }: { cluster: string }) {
             )
           )}
           {!entries && loading && <div style={{ fontSize: 12, color: '#718096' }}>Loading…</div>}
-          {error && <div style={{ color: '#c53030', fontSize: 13, marginTop: 6 }}>{error}</div>}
+          {error && (
+            <div style={{ color: '#c53030', fontSize: 13, marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span>{error}</span>
+              {!entries && <button type="button" onClick={() => void load(null)} style={BTN}>Try again</button>}
+            </div>
+          )}
         </div>
       )}
     </div>

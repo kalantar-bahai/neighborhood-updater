@@ -1,4 +1,4 @@
-// Admin page (phase 1): pure decisions, tested in admin.test.ts.
+// Admin page: pure decisions, tested in admin.test.ts.
 // Spec: docs/superpowers/specs/ (admin page design); plan: docs/superpowers/plans/2026-11-24-admin-page-phase1.md
 import type { AccountInfo, AdminCluster, AdminPerson, AdminPlace, HiddenPerson, Invitation, InvitationStatus, MoveResult, PersonDetails, RoleHolding, LogEntry } from './clusterNotebook';
 import { AGE_LABELS, formatDate, roleLabel } from './people';
@@ -120,8 +120,6 @@ export function prefillEmail(details: PersonDetails | null): string {
   return details?.emails[0]?.trim() ?? '';
 }
 
-// Pills beside a person: "has access" alone, else "access removed <date>" and/or "invited". There is no "invitation
-// expired" tag: cluster-notebook sends pendingInvitation null once it expires (confirmed 2026-11-25).
 // "added Nov 2, 2026 by Ben Okafor" on People not in SRP. createdBy is null for the SRP sync, scripts, or before auditing.
 export function createdNote(p: AdminPerson): string | null {
   if (!p.createdAt) return null;
@@ -129,6 +127,8 @@ export function createdNote(p: AdminPerson): string | null {
   return p.createdBy ? `added ${date} by ${individualDisplayName(p.createdBy)}` : `added ${date}`;
 }
 
+// Pills beside a person: "has access" alone, else "access removed <date>" and/or "invited". There is no "invitation
+// expired" tag: cluster-notebook sends pendingInvitation null once it expires (confirmed 2026-11-25).
 export function adminPersonTags(p: AdminPerson): string[] {
   if (p.hasAccess) return ['has access'];
   const tags: string[] = [];
@@ -236,13 +236,16 @@ export function logHeadline(e: LogEntry): string {
 
 export function changeValueText(v: unknown): string {
   if (v === null || v === undefined) return '—';
-  if (typeof v === 'string') return v;
+  if (typeof v === 'string') return v === '' ? '(blank)' : v;
   if (typeof v === 'object') return JSON.stringify(v);
   return String(v);
 }
 
 export function logChanges(e: LogEntry): { field: string; old: string; new: string }[] {
-  return Object.entries(e.changes).map(([field, c]) => ({ field, old: changeValueText(c.old), new: changeValueText(c.new) }));
+  return Object.entries(e.changes ?? {}).map(([field, c]) =>
+    c && typeof c === 'object' && !Array.isArray(c)
+      ? { field, old: changeValueText((c as { old?: unknown }).old), new: changeValueText((c as { new?: unknown }).new) }
+      : { field, old: '—', new: changeValueText(c) });
 }
 
 // A full page may have more behind it; a short one is the end of the log.
