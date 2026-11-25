@@ -49,6 +49,7 @@ export async function GET() {
       permissions[norm(cn.name)] = cn.myPermissions;
       const acts = Object.values(activitiesFromClusterNotebook(cn));
       return {
+        id:            cn.id,
         nucleus:       cn.name,
         parentNucleus: cn.parentNucleus?.name ?? '',
         grouping:      cn.cluster.groupOfClusters ?? '',
