@@ -19,6 +19,7 @@ export const SEARCH_LIMIT = 20;
 
 // Display order for known roles, with the label and icon each shows in the card.
 const ROLES: { role: string; label: string; icon: string }[] = [
+  { role: 'member', label: 'Member', icon: '👤' },
   { role: 'promoter', label: 'Promoting', icon: '📣' },
   { role: 'protagonist', label: 'Helping Others', icon: '👥' },
   { role: 'accompanier', label: 'Accompanying', icon: '🤝' },
@@ -59,6 +60,13 @@ export function sortRoles(roles: string[]): string[] {
   return [...known, ...other];
 }
 
+// Roles the editor offers: 'member' only on a nucleus that isn't an SRP home (there, belonging is the member role;
+// on a home nucleus it is residence), then the other known roles, then any other role the person already holds.
+export function editorRoleList(isHome: boolean, held: string[]): string[] {
+  const known = KNOWN_ROLES.filter(r => r !== 'member');
+  return sortRoles([...(isHome ? [] : ['member']), ...known, ...held]);
+}
+
 // The main filter follows the Overview card's order (owner, 2026-11-21): Promoting, Devotional host,
 // Participating, Facilitating, Helping Others, Accompanying; then Contact and any other role someone holds.
 // Every one of these always shows, so the list doesn't change from nucleus to nucleus.
@@ -72,10 +80,10 @@ const PRIMARY_FILTERS: { key: string; label: string }[] = [
 ];
 export function peopleFilters(rows: PersonRow[], isHome: boolean): { key: string; label: string }[] {
   const listed = PRIMARY_FILTERS.map(f => f.key);
-  const rest = sortRoles([...KNOWN_ROLES, ...rows.flatMap(r => r.roles)]).filter(role => !listed.includes(role));
+  const rest = sortRoles([...KNOWN_ROLES, ...rows.flatMap(r => r.roles)]).filter(role => role !== 'member' && !listed.includes(role));
   return [
     { key: 'all', label: 'All' },
-    ...(isHome ? [{ key: 'resident', label: RESIDENT.label }] : []),
+    ...(isHome ? [{ key: 'resident', label: RESIDENT.label }] : [{ key: 'member', label: roleLabel('member').label }]),
     ...PRIMARY_FILTERS,
     ...rest.map(role => ({ key: role, label: roleLabel(role).label })),
     { key: 'hidden', label: 'Hidden' },
@@ -153,11 +161,17 @@ export type MoveTarget = { id: string; name: string; path: string };
 
 const target = (p: PlaceSummary): MoveTarget => ({ id: p.id, name: p.name, path: placePath(p) });
 
-// here: this nucleus's Setting (move in). out: the parent nucleus's Setting when the parent is a home
-// nucleus in the same Locality, otherwise this Setting's Locality (move out). Both by id, never name.
-export function moveTargets(ctx: MoveContext): { here: MoveTarget | null; out: MoveTarget | null } {
+// Only an SRP home nucleus has people to move (isHome); any other nucleus has members instead.
+// here: this nucleus's own Setting (move in). out: where moving out goes, by id, never name:
+//  - in SRP: the parent's Setting when the parent is a home nucleus in the same Locality, else this Setting's Locality;
+//  - not in SRP (a home whose Setting SRP doesn't know): the SRP neighbourhood it stands in (srpPlace), named in srpAt.
+export function moveTargets(ctx: MoveContext): { here: MoveTarget | null; out: MoveTarget | null; srpAt: string | null } {
+  const none = { here: null, out: null, srpAt: null };
   const loc = ctx.location;
-  if (!loc || loc.type !== 'SETTING') return { here: null, out: null };
+  if (!ctx.isHome || !loc || loc.type !== 'SETTING') return none;
+  if (!ctx.inSrp) {
+    return { here: target(loc), out: ctx.srpPlace ? target(ctx.srpPlace) : null, srpAt: ctx.srpPlace?.name ?? null };
+  }
   const parent = ctx.parent?.location;
   let out: MoveTarget | null = null;
   if (ctx.parent?.inSrp && parent?.type === 'SETTING' && parent.localityId && parent.localityId === loc.localityId) {
@@ -165,14 +179,20 @@ export function moveTargets(ctx: MoveContext): { here: MoveTarget | null; out: M
   } else if (loc.localityId && loc.locality) {
     out = { id: loc.localityId, name: loc.locality, path: [loc.cluster, loc.locality].filter(Boolean).join(' › ') };
   }
-  return { here: target(loc), out };
+  return { here: target(loc), out, srpAt: null };
 }
 
 const REFUSALS: Record<string, string> = {
   FN_NOT_IN_LOCALITY: "That neighbourhood isn't in their locality",
   OUT_OF_SCOPE: "SRP doesn't let us change this person",
   NOT_IN_SRP_RECORDS: "SRP doesn't have this person",
+  HOUSEHOLD_MOVES_TOGETHER: 'Households move together',
 };
+
+// The reason words for a refused move, without the "undone" ending.
+export function refusalText(code: string | null): string {
+  return REFUSALS[code ?? ''] ?? `SRP refused the move (${code ?? 'no reason given'})`;
+}
 
 // What a row shows about the person's latest move. Keys off `code`, never the raw error text.
 export function syncNote(sync: PlaceSync | null): { tone: 'wait' | 'error'; text: string } | null {
@@ -182,7 +202,7 @@ export function syncNote(sync: PlaceSync | null): { tone: 'wait' | 'error'; text
     case 'in_flight':
       return { tone: 'wait', text: 'On its way to SRP' };
     case 'refused':
-      return { tone: 'error', text: `${REFUSALS[sync.code ?? ''] ?? `SRP refused the move (${sync.code ?? 'no reason given'})`}. The move was undone.` };
+      return { tone: 'error', text: `${refusalText(sync.code)}. The move was undone.` };
     case 'failed':
       return { tone: 'error', text: `Couldn't reach SRP: ${sync.code ?? 'unknown error'}` };
     default:

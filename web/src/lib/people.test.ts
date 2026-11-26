@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { namedToShow, editableRoles, moveTargets, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, formatDate, initials, activityLines, activitySummary, courseGroups, countPeople, AGE_FILTERS, peopleCountLabel, hideNote, hideRolesLine, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
+import { namedToShow, editableRoles, moveTargets, editorRoleList, refusalText, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, formatDate, initials, activityLines, activitySummary, courseGroups, countPeople, AGE_FILTERS, peopleCountLabel, hideNote, hideRolesLine, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
 import type { Participation, AgeCategory, DevotionalHostRole, MoveContext, PermissionSet, PersonDetails, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -58,7 +58,12 @@ describe('peopleFilters', () => {
     expect(peopleFilters(rows, true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'cso', 'hidden']);
   });
   test('non-home nucleus has no resident filter', () => {
-    expect(peopleFilters(rows, false).map(f => f.key)).toEqual(['all', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'cso', 'hidden']);
+    expect(peopleFilters(rows, false).map(f => f.key)).toEqual(['all', 'member', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'cso', 'hidden']);
+  });
+  test('member filter only off a home nucleus', () => {
+    expect(peopleFilters(rows, false)[1]).toEqual({ key: 'member', label: 'Member' });
+    expect(peopleFilters(rows, false).some(f => f.key === 'resident')).toBe(false);
+    expect(peopleFilters(rows, true).some(f => f.key === 'member')).toBe(false);
   });
   test('every known role shows even when nobody holds it', () => {
     expect(peopleFilters([], true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'hidden']);
@@ -262,7 +267,7 @@ const setting = (id: string, name: string, localityId: string, locality = 'Chape
 
 describe('moveTargets', () => {
   const here = setting('S1', 'Parkside', 'LOC1');
-  const ctx = (parent: MoveContext['parent'], location: PlaceSummary | null = here): MoveContext => ({ location, parent, isHome: false, inSrp: false, srpPlace: null });
+  const ctx = (parent: MoveContext['parent'], location: PlaceSummary | null = here): MoveContext => ({ location, parent, isHome: true, inSrp: true, srpPlace: null });
   test('here is this nucleus\'s Setting', () => {
     expect(moveTargets(ctx(null)).here).toEqual({ id: 'S1', name: 'Parkside', path: 'Chapel Hill › Chapelboro › Parkside' });
   });
@@ -277,11 +282,47 @@ describe('moveTargets', () => {
   });
   test('no targets when this nucleus is not at a Setting', () => {
     const loc: PlaceSummary = { id: 'LOC1', name: 'Chapelboro', type: 'LOCALITY', locality: null, cluster: 'Chapel Hill', localityId: null, homeNucleus: null };
-    expect(moveTargets(ctx(null, loc))).toEqual({ here: null, out: null });
-    expect(moveTargets(ctx(null, null))).toEqual({ here: null, out: null });
+    expect(moveTargets(ctx(null, loc))).toEqual({ here: null, out: null, srpAt: null });
+    expect(moveTargets(ctx(null, null))).toEqual({ here: null, out: null, srpAt: null });
   });
   test('no out target when the Setting has no locality id', () => {
     expect(moveTargets(ctx(null, { ...here, localityId: null })).out).toBeNull();
+  });
+  test('a non-home nucleus has no targets', () => {
+    expect(moveTargets({ ...ctx(null), isHome: false })).toEqual({ here: null, out: null, srpAt: null });
+  });
+  test('an SRP home has no srpAt', () => {
+    expect(moveTargets(ctx(null)).srpAt).toBeNull();
+  });
+  test('a home not in SRP moves out to the SRP neighbourhood it stands in', () => {
+    const carrboro: PlaceSummary = { id: 'loc-c', name: 'Carrboro', type: 'LOCALITY', locality: null, cluster: 'Chapel Hill', localityId: null, homeNucleus: null };
+    const r = moveTargets({ ...ctx(null), inSrp: false, srpPlace: carrboro });
+    expect(r.here?.id).toBe('S1');
+    expect(r.out?.id).toBe('loc-c');
+    expect(r.srpAt).toBe('Carrboro');
+  });
+});
+
+describe('editorRoleList', () => {
+  test('a home nucleus does not offer member', () => {
+    expect(editorRoleList(true, [])).toEqual(['promoter', 'protagonist', 'accompanier', 'contact']);
+  });
+  test('a non-home nucleus offers member first', () => {
+    expect(editorRoleList(false, [])).toEqual(['member', 'promoter', 'protagonist', 'accompanier', 'contact']);
+  });
+  test('held roles stay, others after known ones', () => {
+    expect(editorRoleList(false, ['contact', 'cso'])).toEqual(['member', 'promoter', 'protagonist', 'accompanier', 'contact', 'cso']);
+  });
+});
+
+describe('member role', () => {
+  test('label', () => {
+    expect(roleLabel('member')).toEqual({ label: 'Member', icon: '👤' });
+  });
+  test('refusalText gives the reason without the undone ending', () => {
+    expect(refusalText('HOUSEHOLD_MOVES_TOGETHER')).toBe('Households move together');
+    expect(syncNote({ status: 'refused', code: 'HOUSEHOLD_MOVES_TOGETHER' })?.text).toBe('Households move together. The move was undone.');
+    expect(refusalText(null)).toBe('SRP refused the move (no reason given)');
   });
 });
 
@@ -339,7 +380,7 @@ type PlaceSyncStatus = 'pending' | 'in_flight' | 'synced' | 'refused' | 'failed'
 describe('editableRoles', () => {
   test('known and held roles the caller may change', () => {
     const rows = [row('A', ['cso']), row('B', ['promoter'])];
-    expect(editableRoles(perms({ assignableRoles: ['accompanier', 'cso'] }), rows)).toEqual(['promoter', 'protagonist', 'accompanier', 'cso']);
+    expect(editableRoles(perms({ assignableRoles: ['accompanier', 'cso'] }), rows)).toEqual(['member', 'promoter', 'protagonist', 'accompanier', 'cso']);
     expect(editableRoles(perms({ canAssignRoles: false }), rows)).toEqual([]);
   });
 });
@@ -367,7 +408,7 @@ describe('activity filters', () => {
   const r = (name: string, participates: boolean, facilitates: boolean): PersonRow => ({ ...row(name, []), participates, facilitates });
   const rows = [r('A', true, false), r('B', false, true), r('C', true, true), r('D', false, false)];
   test('follow devotional host, always listed', () => {
-    expect(peopleFilters([], false).map(f => f.key).slice(2, 5)).toEqual(['devotional-host', 'participating', 'facilitating']);
+    expect(peopleFilters([], false).map(f => f.key).slice(3, 6)).toEqual(['devotional-host', 'participating', 'facilitating']);
     expect(peopleFilters([], false).find(f => f.key === 'facilitating')?.label).toBe('Facilitating');
   });
   test('keep those taking part or facilitating', () => {

@@ -6,7 +6,7 @@ import { PersonSrpDot } from './SrpBadge';
 import { PersonPanel, personDetailsView, type DetailsState } from './PersonPanel';
 import type { AgeCategory, PermissionSet, PersonDetails } from '@/lib/clusterNotebook';
 import {
-  AGE_FILTERS, AGE_LABELS, DEVOTIONAL_HOST, FACILITATES, KNOWN_ROLES, PARTICIPATES, activityLines, activitySummary, courseGroups, hideNote, hideRolesLine, peopleCountLabel, RESIDENT, canEditRole, filterPeople, isMoving, moveResultError,
+  AGE_FILTERS, AGE_LABELS, editorRoleList, DEVOTIONAL_HOST, FACILITATES, PARTICIPATES, activityLines, activitySummary, courseGroups, hideNote, hideRolesLine, peopleCountLabel, RESIDENT, canEditRole, filterPeople, isMoving, moveResultError,
   nextRoleIds, peopleFilters, placePath, roleLabel, rolesToClear, sortPeople, sortRoles, syncNote, type MoveTarget,
   type ChipState, type PersonRow,
 } from '@/lib/people';
@@ -222,7 +222,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
 
   // Roles offered in the editor: the known ones plus any this person already holds.
   function editorRoles(e: Editing): string[] {
-    return sortRoles([...KNOWN_ROLES, ...e.roles]);
+    return editorRoleList(isHome, e.roles);
   }
 
   // Resident can be ticked or unticked only where there is somewhere to move them.

@@ -7,4 +7,4 @@
 // fixed informal set) rather than naming recognized roles, because this route accepts
 // any role string -- naming recognized roles would silently fail-open for any real role
 // cluster-notebook adds that isn't in a hardcoded list here.
-export const INFORMAL_WORKER_TYPES = ['protagonist', 'promoter'] as const;
+export const INFORMAL_WORKER_TYPES = ['protagonist', 'promoter', 'member'] as const;
