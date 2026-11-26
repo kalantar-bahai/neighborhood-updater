@@ -182,6 +182,11 @@ export function moveTargets(ctx: MoveContext): { here: MoveTarget | null; out: M
   return { here: target(loc), out, srpAt: null };
 }
 
+// Shown when moving someone in to a Neighborhood SRP doesn't know yet: SRP keeps them at srpAt meanwhile.
+export function srpAtNote(srpAt: string | null): string | null {
+  return srpAt ? `In SRP they'll be at ${srpAt} until this nucleus is sent to SRP.` : null;
+}
+
 const REFUSALS: Record<string, string> = {
   FN_NOT_IN_LOCALITY: "That neighbourhood isn't in their locality",
   OUT_OF_SCOPE: "SRP doesn't let us change this person",

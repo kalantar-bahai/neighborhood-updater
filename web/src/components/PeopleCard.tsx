@@ -6,7 +6,7 @@ import { PersonSrpDot } from './SrpBadge';
 import { PersonPanel, personDetailsView, type DetailsState } from './PersonPanel';
 import type { AgeCategory, PermissionSet, PersonDetails } from '@/lib/clusterNotebook';
 import {
-  AGE_FILTERS, AGE_LABELS, editorRoleList, DEVOTIONAL_HOST, FACILITATES, PARTICIPATES, activityLines, activitySummary, courseGroups, hideNote, hideRolesLine, peopleCountLabel, RESIDENT, canEditRole, filterPeople, isMoving, moveResultError,
+  AGE_FILTERS, AGE_LABELS, editorRoleList, srpAtNote, DEVOTIONAL_HOST, FACILITATES, PARTICIPATES, activityLines, activitySummary, courseGroups, hideNote, hideRolesLine, peopleCountLabel, RESIDENT, canEditRole, filterPeople, isMoving, moveResultError,
   nextRoleIds, peopleFilters, placePath, roleLabel, rolesToClear, sortPeople, sortRoles, syncNote, type MoveTarget,
   type ChipState, type PersonRow,
 } from '@/lib/people';
@@ -41,7 +41,7 @@ type PendingMove = {
   // The nucleus they are leaving, its roles they hold that the caller may clear, and whether to keep them.
   oldNucleus: string | null; oldName: string; oldRoles: string[]; keep: boolean;
 };
-type Moves = { here: MoveTarget | null; out: MoveTarget | null };
+type Moves = { here: MoveTarget | null; out: MoveTarget | null; srpAt: string | null };
 // The open person's details. 'none' (a 404: not permitted, or not one of this nucleus's people) shows nothing.
 type Details = { personId: string; status: 'loading' | 'none' | 'error' | 'ok'; details?: PersonDetails; error?: string };
 
@@ -121,7 +121,7 @@ async function rolesAt(nucleus: string, personId: string): Promise<string[]> {
 
 export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, onRolesChanged }: Props) {
   const [rows, setRows] = useState<PersonRow[] | null>(null);
-  const [moves, setMoves] = useState<Moves>({ here: null, out: null });
+  const [moves, setMoves] = useState<Moves>({ here: null, out: null, srpAt: null });
   const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState('all');
   const [age, setAge] = useState<'all' | AgeCategory>('all');
@@ -149,7 +149,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
       .then(async res => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to load people');
-        if (live) { setRows(data.people); setMoves(data.move ?? { here: null, out: null }); setLoadError(''); }
+        if (live) { setRows(data.people); setMoves(data.move ?? { here: null, out: null, srpAt: null }); setLoadError(''); }
       })
       .catch((e: unknown) => { if (live) setLoadError(e instanceof Error ? e.message : String(e)); });
     return () => { live = false; };
@@ -368,6 +368,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     <div style={{ border: '1px solid #bee3f8', background: '#ebf8ff', borderRadius: 6, padding: 8, fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
       <div style={{ fontWeight: 600 }}>{m.kind === 'in' ? `Move ${e.name} here?` : `Move ${e.name} out of ${m.oldName}?`}</div>
       <div>{m.kind === 'in' ? `Lives in: ${e.placePath || 'not recorded'}` : `To: ${m.to.path}`}</div>
+      {m.kind === 'in' && srpAtNote(moves.srpAt) && <div>{srpAtNote(moves.srpAt)}</div>}
       {m.oldRoles.length > 0 && (
         <>
           <div>

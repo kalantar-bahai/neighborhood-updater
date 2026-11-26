@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { namedToShow, editableRoles, moveTargets, editorRoleList, refusalText, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, formatDate, initials, activityLines, activitySummary, courseGroups, countPeople, AGE_FILTERS, peopleCountLabel, hideNote, hideRolesLine, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
+import { namedToShow, editableRoles, moveTargets, editorRoleList, refusalText, srpAtNote, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, formatDate, initials, activityLines, activitySummary, courseGroups, countPeople, AGE_FILTERS, peopleCountLabel, hideNote, hideRolesLine, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
 import type { Participation, AgeCategory, DevotionalHostRole, MoveContext, PermissionSet, PersonDetails, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -319,6 +319,12 @@ describe('member role', () => {
   test('label', () => {
     expect(roleLabel('member')).toEqual({ label: 'Member', icon: '👤' });
   });
+  test('srpAtNote says where SRP has them until the nucleus is sent', () => {
+    expect(srpAtNote('Maple Grove')).toBe("In SRP they'll be at Maple Grove until this nucleus is sent to SRP.");
+    expect(srpAtNote(null)).toBeNull();
+    expect(srpAtNote('')).toBeNull();
+  });
+
   test('refusalText gives the reason without the undone ending', () => {
     expect(refusalText('HOUSEHOLD_MOVES_TOGETHER')).toBe('Households move together');
     expect(syncNote({ status: 'refused', code: 'HOUSEHOLD_MOVES_TOGETHER' })?.text).toBe('Households move together. The move was undone.');
