@@ -13,6 +13,7 @@ import { SrpDot } from './SrpBadge';
 import { canRenameNucleus, deleteNotice, pendingIdentityLocks, nextNameAfterRename, pushToSrpMode, srpDetailMessage, srpOutOfStepMessage } from '@/lib/srp';
 import ConcentricRainbow, { formatValue, type AlignedLabel } from './ConcentricRainbow';
 import { namedToShow } from '@/lib/people';
+import { identityControls, typeChangePrompt } from '@/lib/nucleusIdentity';
 
 interface Props {
   detail: NucleusDetail;
@@ -414,7 +415,6 @@ const IcoDiagram3 = () => (
   </svg>
 );
 
-const TYPE_OPTIONS  = ['', 'Neighborhood', 'Network', 'Population'];
 const STAGE_OPTIONS = ['', 'Potential/1', 'Initial/2', 'Emerging/3', 'Expanding/4', 'Advanced/5', 'Advanced+/6'];
 
 // Bounding box centered in 540×310 viewBox (70px h-margin, 55px v-margin each side).
@@ -607,8 +607,8 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const [promoterNames, setPromoterNames] = useState<Worker[]>(() => detail.promoterNames);
   // People SRP shows hosting devotionals, taking part in and facilitating activities: the "(x)" on those estimates.
   const counts = detail.peopleCounts;
-  // Residents only mean something on a home nucleus (only there can anyone be placed at its Setting).
-  const residentsNamed = detail.srp.isHome ? counts.residents : undefined;
+  // Members of this nucleus (residents on a Neighborhood), shown on every nucleus.
+  const residentsNamed = detail.memberCount;
   const [showPromotersModal, setShowPromotersModal] = useState(false);
   // Which cards are open lives in AppClient, so an in-place reload (Refresh, Push, Location
   // save), which remounts this view, keeps the cards the user had open.
@@ -753,6 +753,33 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
       }
     };
     void attempt();
+  }
+
+  // Type: changes to or from Neighborhood ask about members first (spec 2026-11-26, nucleus members).
+  // Crossing Neighborhood creates or archives the nucleus's Setting, so the view reloads to pick up
+  // isHome and the Locality/Location control -- except after Move them in, whose message would be
+  // lost to the reload's remount.
+  const [membersIn, setMembersIn] = useState<{ text: string } | null>(null);
+  function changeType(to: string) {
+    const from = form.nucleusType;
+    const prompt = typeChangePrompt({ from, to, isHome: detail.srp.isHome, memberCount: detail.memberCount });
+    if (prompt.kind === 'membersIn') { setMembersIn({ text: prompt.text }); return; }
+    if (prompt.kind === 'residentsOut' && !window.confirm(prompt.text)) return;
+    setAndSave('nucleusType', to, { identity: { nucleusType: to } }, 'Type', from === 'Neighborhood' || to === 'Neighborhood');
+  }
+  async function membersOnTypeChange(choice: 'MOVE_IN' | 'END') {
+    setMembersIn(null);
+    const moved = detail.memberCount;
+    setForm(f => ({ ...f, nucleusType: 'Neighborhood' }));
+    const result = await saveField({ identity: { nucleusType: 'Neighborhood', membersOnTypeChange: choice } }, 'Type');
+    if (!result.ok) {
+      // Refused as a whole (e.g. MOVE_REFUSED): nothing changed, so neither does Type.
+      setForm(f => ({ ...f, nucleusType: committedRef.current.nucleusType }));
+      return;
+    }
+    committedRef.current = { ...committedRef.current, nucleusType: 'Neighborhood' };
+    if (choice === 'MOVE_IN') setSaveStatus({ msg: `${moved} moved in; SRP is being updated`, type: 'success' });
+    else onReload();
   }
 
   // Rename: sends ONLY the name (saveRowData re-reads by the old name, so it must never be
@@ -910,6 +937,15 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
 
   const srpState = detail.srp.state;
   const srpMessage = srpState ? srpDetailMessage(srpState, detail.srp.action, detail.srp.srpName === row.nucleus) : null;
+  const controls = identityControls({
+    isHome: detail.srp.isHome,
+    inSrp: detail.srp.inSrp,
+    // While SRP works on this nucleus, its place and type stay put (cluster-notebook refuses moves: SRP_ACTION_PENDING).
+    pending: pendingLocks.location || pendingLocks.type,
+    canChangeIdentity: permissions.canChangeIdentity,
+    locationType: row.locationType,
+  });
+  const currentLocalityId = detail.locationOptions.find(l => l.name === form.locality)?.id ?? '';
   const locationSetting = row.locationType === 'SETTING'
     ? detail.locationOptions.flatMap(l => l.settings).find(st => st.name === row.locationName)
     : undefined;
@@ -1030,7 +1066,26 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   Nucleus (the name itself) is cluster-notebook's canonical identifier.
                   Confirmed with cluster-notebook 2026-11-18 (#39): updateNucleus { name } renames
                   any nucleus at once (a home nucleus's SRP rename follows); see canRenameNucleus. */}
-              {permissions.canChangeIdentity && srpState !== 'IN_SRP' && !pendingLocks.location ? (
+              {/* Confirmed with cluster-notebook 2026-11-26: a Neighborhood is always at its own Setting, so
+                  until it is in SRP it picks a Locality (localityId); only Network and Population nuclei
+                  choose the Cluster or a Locality as Location, never a Setting. See lib/nucleusIdentity. */}
+              {controls.place === 'locality' ? (
+                <div className="field">
+                  <label style={{ display: 'inline-flex', alignItems: 'center' }}>Locality{srpLabelExtra}</label>
+                  <select
+                    value={currentLocalityId}
+                    onChange={e => {
+                      const locality = detail.locationOptions.find(l => l.id === e.target.value);
+                      if (locality) setAndSave('locality', locality.name, { identity: { localityId: locality.id } }, 'Locality', true);
+                    }}
+                  >
+                    {!currentLocalityId && <option value="">—</option>}
+                    {detail.locationOptions.map(locality => (
+                      <option key={locality.id} value={locality.id}>{locality.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : controls.place === 'location' ? (
                 <div className="field">
                   <label style={{ display: 'inline-flex', alignItems: 'center' }}>Location{srpLabelExtra}</label>
                   <select
@@ -1039,12 +1094,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   >
                     <option value={form.cluster}>— This cluster ({form.cluster}) —</option>
                     {detail.locationOptions.map(locality => (
-                      <optgroup key={locality.name} label={locality.name}>
-                        <option value={locality.name}>{locality.name} (locality)</option>
-                        {locality.settings.map(setting => (
-                          <option key={setting.name} value={setting.name}>{setting.name}</option>
-                        ))}
-                      </optgroup>
+                      <option key={locality.name} value={locality.name}>{locality.name} (locality)</option>
                     ))}
                   </select>
                 </div>
@@ -1058,14 +1108,10 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 onChange={canRename ? v => set('nucleus', v) : undefined}
                 onBlur={canRename ? commitName : undefined}
               />
-              {/* Type is only ever freely settable at a CLUSTER or LOCALITY location --
-                  at a SETTING, cluster-notebook forces it to "Neighborhood" and now
-                  raises a real error if you try to set anything else (previously a
-                  silent revert, confirmed with cluster-notebook directly, 2026-10-08,
-                  commit c40fb54), so there's no point offering the control at all in
-                  that case -- show it readonly instead of letting the save fail. */}
-              {permissions.canChangeIdentity && form.locationType !== 'SETTING' && !pendingLocks.type
-                ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => setAndSave('nucleusType', v, { identity: { nucleusType: v } }, 'Type')} />
+              {/* Type: Neighborhood is offered only with a Locality, and changes to or from
+                  Neighborhood ask about members first (changeType, lib/nucleusIdentity). */}
+              {controls.typeOptions
+                ? <SelectField label="Type" value={form.nucleusType} options={controls.typeOptions} onChange={changeType} />
                 : <Field label="Type" value={form.nucleusType} readonly />
               }
               {permissions.canChangeIdentity
@@ -1120,26 +1166,35 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 <Field label="Parent Nucleus" value={form.parentNucleus} readonly />
               )}
             </div>
-            {/* Confirmed with cluster-notebook directly, 2026-10-08: permissions
-                follow nesting, so a pocket's own location doesn't affect whether
-                its parent's people can reach it. SRP sums only happen at a
-                Setting -- a pocket can no longer have "no location" at all
-                (commit c40fb54, same day, superseding their own earlier advice to
-                leave it empty), so the way to keep a pocket's counts out of SRP
-                sums now is to place it at the Cluster or a Locality specifically,
-                never the same Setting as its parent. Surfaced proactively whenever
-                a parent is set, not only once it's "wrong". */}
-            {form.parentNucleus && (
+            {/* Spec 2026-11-26 (nucleus members): a Neighborhood pocket's residents are placed, in SRP,
+                at its parent's neighbourhood until the pocket itself is sent to SRP. */}
+            {form.parentNucleus && detail.srp.isHome && srpState !== 'IN_SRP' && (
               <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>
-                This nucleus has a parent — give it the Cluster or a Locality (not a Setting) unless its counts should add to a neighbourhood separately.
+                Until this nucleus is in SRP, its residents count toward its parent&apos;s neighbourhood in SRP.
               </p>
             )}
-            {/* Setting-level Type is read-only above for everyone, but only the
-                people who could otherwise edit it need telling why. */}
-            {permissions.canChangeIdentity && form.locationType === 'SETTING' && (
-              <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>
-                This nucleus is at a Setting, so its type is fixed to Neighborhood. Move it to a Locality or the Cluster to set Network or Population instead.
-              </p>
+            {membersIn && createPortal(
+              <div onClick={() => setMembersIn(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+                <div
+                  role="dialog" aria-modal="true" aria-labelledby="members-in-text"
+                  onClick={e => e.stopPropagation()}
+                  style={{ background: 'white', borderRadius: 8, padding: 16, width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 10 }}
+                >
+                  <p id="members-in-text" style={{ margin: 0, fontSize: 14, color: '#2d3748' }}>{membersIn.text}</p>
+                  <button type="button" onClick={() => void membersOnTypeChange('MOVE_IN')} style={{ textAlign: 'left', padding: '8px 12px', borderRadius: 6, border: '1px solid #3182ce', background: '#3182ce', color: 'white', cursor: 'pointer' }}>
+                    <div style={{ fontWeight: 600 }}>Move them in</div>
+                    <div style={{ fontSize: 12 }}>each becomes a resident here; SRP is updated, and anyone SRP refuses goes back to where SRP has them</div>
+                  </button>
+                  <button type="button" onClick={() => void membersOnTypeChange('END')} style={{ textAlign: 'left', padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e0', background: 'white', color: '#2d3748', cursor: 'pointer' }}>
+                    <div style={{ fontWeight: 600 }}>End their memberships</div>
+                    <div style={{ fontSize: 12, color: '#718096' }}>nobody moves</div>
+                  </button>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button type="button" onClick={() => setMembersIn(null)} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #cbd5e0', background: 'white', color: '#4a5568', cursor: 'pointer' }}>Cancel</button>
+                  </div>
+                </div>
+              </div>,
+              document.body,
             )}
             {/* Confirmed with cluster-notebook 2026-11-16: moving a home nucleus is refused (SRP_IS_NEIGHBOURHOOD). */}
             {srpState === 'IN_SRP' && permissions.canChangeIdentity && (
