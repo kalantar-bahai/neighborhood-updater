@@ -45,3 +45,8 @@ export function typeChangePrompt(input: { from: string; to: string; isHome: bool
   }
   return { kind: 'none' };
 }
+
+// A nucleus with no type yet (older data) shows "Not set" (spec 2026-11-26); its value stays ''.
+export function typeLabel(nucleusType: string): string {
+  return nucleusType || 'Not set';
+}

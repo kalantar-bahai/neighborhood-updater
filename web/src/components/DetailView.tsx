@@ -13,7 +13,7 @@ import { SrpDot } from './SrpBadge';
 import { canRenameNucleus, deleteNotice, pendingIdentityLocks, nextNameAfterRename, pushToSrpMode, srpDetailMessage, srpOutOfStepMessage } from '@/lib/srp';
 import ConcentricRainbow, { formatValue, type AlignedLabel } from './ConcentricRainbow';
 import { namedToShow } from '@/lib/people';
-import { identityControls, typeChangePrompt } from '@/lib/nucleusIdentity';
+import { identityControls, typeChangePrompt, typeLabel } from '@/lib/nucleusIdentity';
 
 interface Props {
   detail: NucleusDetail;
@@ -23,7 +23,9 @@ interface Props {
   onBack: () => void;
   onSaved: (savedBy: string, savedAt: string) => void;
   // Re-fetches this nucleus (used after Push to SRP and by the PENDING "Refresh" link).
-  onReload: () => void;
+  // notice: a one-shot status shown by the reloaded view (it remounts, losing this one's state).
+  onReload: (notice?: string) => void;
+  initialNotice: string | null;
   // Called after a successful rename with the new name, so the shell reloads under it.
   onRenamed: (newName: string) => void;
   // True when the user can create a nucleus in this nucleus's cluster (the capability lives on the Cluster).
@@ -150,14 +152,15 @@ function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabe
   );
 }
 
-function SelectField({ label, value, options, onChange, fromSheet }: {
+function SelectField({ label, value, options, onChange, fromSheet, optionLabel }: {
   label: string; value: string; options: string[]; onChange: (v: string) => void; fromSheet?: boolean;
+  optionLabel?: (o: string) => string;
 }) {
   return (
     <div className={`field${fromSheet ? ' from-sheet' : ''}`}>
       <label>{label}</label>
       <select value={value || ''} onChange={e => onChange(e.target.value)}>
-        {options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
+        {options.map(o => <option key={o} value={o}>{optionLabel ? optionLabel(o) : o || '—'}</option>)}
       </select>
     </div>
   );
@@ -570,7 +573,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 // The 9-figure diagram (ConcentricRainbow, formerly the staggered 9-ring one) lives in its own file,
 // 2026-10-08, so Picker.tsx can also render a rollup version of it from its own popup.
 
-export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, onRenamed, canCreateInCluster, allNucleusNames, childCount, cardOpen, onCardOpenChange }: Props) {
+export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, initialNotice, onRenamed, canCreateInCluster, allNucleusNames, childCount, cardOpen, onCardOpenChange }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   // Baseline to diff a blur-triggered field's current value against, so clicking into
@@ -579,7 +582,8 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const committedRef = useRef<FormState>(rowToForm(row));
   const [saving, setSaving] = useState(false);
   const [pushing, setPushing] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<{ msg: string; type: 'idle' | 'success' | 'error' }>({ msg: '', type: 'idle' });
+  const [saveStatus, setSaveStatus] = useState<{ msg: string; type: 'idle' | 'success' | 'error' }>(
+    () => initialNotice ? { msg: initialNotice, type: 'success' } : { msg: '', type: 'idle' });
   // The most recent failed field save, so the status bar can offer a one-click Retry
   // instead of requiring the user to re-edit the field to re-trigger a blur.
   const [retry, setRetry] = useState<{ label: string; run: () => void } | null>(null);
@@ -757,8 +761,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
 
   // Type: changes to or from Neighborhood ask about members first (spec 2026-11-26, nucleus members).
   // Crossing Neighborhood creates or archives the nucleus's Setting, so the view reloads to pick up
-  // isHome and the Locality/Location control -- except after Move them in, whose message would be
-  // lost to the reload's remount.
+  // isHome, memberCount and the Locality/Location control; Move them in's message rides the reload.
   const [membersIn, setMembersIn] = useState<{ text: string } | null>(null);
   function changeType(to: string) {
     const from = form.nucleusType;
@@ -778,8 +781,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
       return;
     }
     committedRef.current = { ...committedRef.current, nucleusType: 'Neighborhood' };
-    if (choice === 'MOVE_IN') setSaveStatus({ msg: `${moved} moved in; SRP is being updated`, type: 'success' });
-    else onReload();
+    onReload(choice === 'MOVE_IN' ? `${moved} moved in; SRP is being updated` : undefined);
   }
 
   // Rename: sends ONLY the name (saveRowData re-reads by the old name, so it must never be
@@ -978,7 +980,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     <>
       <SrpDot state={srpState} action={detail.srp.action?.action} />
       {srpState === 'PENDING' && (
-        <button type="button" onClick={onReload} aria-label="Refresh SRP status" title="Refresh" style={{ background: 'none', border: 'none', padding: '0 4px', color: '#3182ce', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>↻</button>
+        <button type="button" onClick={() => onReload()} aria-label="Refresh SRP status" title="Refresh" style={{ background: 'none', border: 'none', padding: '0 4px', color: '#3182ce', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>↻</button>
       )}
     </>
   );
@@ -1111,8 +1113,8 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
               {/* Type: Neighborhood is offered only with a Locality, and changes to or from
                   Neighborhood ask about members first (changeType, lib/nucleusIdentity). */}
               {controls.typeOptions
-                ? <SelectField label="Type" value={form.nucleusType} options={controls.typeOptions} onChange={changeType} />
-                : <Field label="Type" value={form.nucleusType} readonly />
+                ? <SelectField label="Type" value={form.nucleusType} options={controls.typeOptions} onChange={changeType} optionLabel={typeLabel} />
+                : <Field label="Type" value={typeLabel(form.nucleusType)} readonly />
               }
               {permissions.canChangeIdentity
                 ? <SelectField label="Stage" value={form.stage} options={STAGE_OPTIONS} onChange={v => setAndSave('stage', v, { stage: v }, 'Stage')} />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { identityControls, typeChangePrompt } from './nucleusIdentity';
+import { identityControls, typeChangePrompt, typeLabel } from './nucleusIdentity';
 
 const base = { isHome: false, inSrp: false, pending: false, canChangeIdentity: true, locationType: 'LOCALITY' };
 
@@ -82,5 +82,14 @@ describe('typeChangePrompt', () => {
 
   it('asks nothing between Network and Population', () => {
     expect(typeChangePrompt({ from: 'Network', to: 'Population', isHome: false, memberCount: 9 })).toEqual({ kind: 'none' });
+  });
+});
+
+describe('typeLabel', () => {
+  it('shows a nucleus with no type as Not set', () => {
+    expect(typeLabel('')).toBe('Not set');
+  });
+  it('shows a type as itself', () => {
+    expect(typeLabel('Network')).toBe('Network');
   });
 });
