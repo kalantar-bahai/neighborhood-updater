@@ -1156,6 +1156,19 @@ describe('createRowData', () => {
     expect(mockUpdateNucleus).not.toHaveBeenCalled();
   });
 
+  test('without SRP, sends location and nucleusType Neighborhood in the follow-up patch', async () => {
+    mockCreateNucleus.mockResolvedValue({ lastUpdated: null } as never);
+    mockUpdateNucleus.mockResolvedValue(null);
+
+    await createRowData({
+      identity: { nucleus: 'Alpha', cluster: 'NC-1 Test', location: 'Elm Locality', nucleusType: 'Neighborhood' },
+    });
+
+    expect(mockCreateNucleus).toHaveBeenCalledWith('Alpha', 'NC-1 Test', undefined);
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', expect.objectContaining({ nucleusType: 'Neighborhood' }));
+    expect(mockUpdateNucleus.mock.calls[0][1]).toHaveProperty('locationName', 'Elm Locality');
+  });
+
   test('throws when nucleus name is missing', async () => {
     await expect(createRowData({ identity: { cluster: 'NC-215 Triangle' } }))
       .rejects.toThrow('Nucleus name is required');

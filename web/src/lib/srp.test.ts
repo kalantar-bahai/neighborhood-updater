@@ -150,12 +150,13 @@ describe('createPayload', () => {
     expect(createPayload({ ...base, createInSrp: true })).toEqual({ identity: { nucleus: 'Alpha', cluster: 'C', srpLocality: 'Elm Locality' } });
   });
   it('uses location otherwise', () => {
-    expect(createPayload({ ...base, createInSrp: false })).toEqual({ identity: { nucleus: 'Alpha', cluster: 'C', location: 'Elm Locality' } });
+    expect(createPayload({ ...base, createInSrp: false })).toEqual({ identity: { nucleus: 'Alpha', cluster: 'C', location: 'Elm Locality', nucleusType: 'Neighborhood' } });
   });
   it('omits locality when empty', () => {
     const r = createPayload({ ...base, locality: '', createInSrp: true });
     expect(r).toEqual({ identity: { nucleus: 'Alpha', cluster: 'C' } });
     expect('srpLocality' in r.identity).toBe(false);
+    expect('nucleusType' in r.identity).toBe(false);
   });
 });
 

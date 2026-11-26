@@ -10,7 +10,7 @@ interface Props {
   onCreated: (name: string) => void;
 }
 
-// Only what createNucleus needs: name, cluster, an optional locality and Create in SRP.
+// Only what createNucleus needs: name, cluster, a required locality and Create in SRP.
 // Everything else -- population, activities, narrative, worker roles like
 // Contact/Promoting/Helping/Accompanying/ABm Assistant -- can't be set until the
 // nucleus exists in cluster-notebook anyway (those all query/mutate by nucleus
@@ -31,7 +31,7 @@ export default function CreateNucleusModal({ clusterNames, onClose, onCreated }:
 
   const selectedLocality = localities.find(l => l.name === locality);
   const clash = findNameClash(nucleus, selectedLocality);
-  const canCreate = nucleus.trim() !== '' && cluster.trim() !== '' && !creating && !(createInSrp && clash);
+  const canCreate = nucleus.trim() !== '' && cluster.trim() !== '' && locality !== '' && !creating && !(createInSrp && clash);
 
   async function handleClusterChange(next: string) {
     setCluster(next);
@@ -134,11 +134,14 @@ export default function CreateNucleusModal({ clusterNames, onClose, onCreated }:
               <option value="">(loading…)</option>
             ) : (
               <>
-                <option value="">(none)</option>
+                <option value="">Select a locality…</option>
                 {localities.map(l => <option key={l.name} value={l.name}>{l.name}</option>)}
               </>
             )}
           </select>
+          {cluster && !loadingLocalities && !localityError && !locality && (
+            <div style={{ fontSize: 12, color: '#718096', marginTop: 4 }}>Choose a locality for this neighborhood.</div>
+          )}
           {localityError && <div style={{ color: '#e53e3e', fontSize: 13, marginTop: 4 }}>{localityError}</div>}
         </div>
 

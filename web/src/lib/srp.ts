@@ -125,19 +125,26 @@ export function pendingIdentityLocks(
   return { location: true, type: action === 'create' };
 }
 
+type CreateIdentity = { nucleus: string; cluster: string; location?: string; srpLocality?: string; nucleusType?: string };
+
+// Without SRP the nucleus is created, then moved to its Locality and typed Neighborhood in one
+// updateNucleus (cluster-notebook allows both together). With SRP, cluster-notebook places it and sets the type.
 export function createPayload(input: {
   name: string;
   cluster: string;
   locality: string;
   createInSrp: boolean;
-}): { identity: { nucleus: string; cluster: string; location?: string; srpLocality?: string } } {
-  const identity: { nucleus: string; cluster: string; location?: string; srpLocality?: string } = {
+}): { identity: CreateIdentity } {
+  const identity: CreateIdentity = {
     nucleus: input.name.trim(),
     cluster: input.cluster,
   };
   if (input.locality) {
     if (input.createInSrp) identity.srpLocality = input.locality;
-    else identity.location = input.locality;
+    else {
+      identity.location = input.locality;
+      identity.nucleusType = 'Neighborhood';
+    }
   }
   return { identity };
 }
