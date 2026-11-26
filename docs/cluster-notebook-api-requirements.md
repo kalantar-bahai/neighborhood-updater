@@ -492,3 +492,53 @@ type LogEntry { ...existing...  entityName: String }
 - **Still to do before names can repeat:** this app must stop looking nuclei up by name (switch to the id forms
   above, and stop keying permissions by lower-cased name). Then cluster-notebook narrows uniqueness to the locality
   and adds `NucleusPatch.locationId`, since setting names can repeat across localities too.
+
+## Members of a nucleus, confirmed with cluster-notebook 2026-11-26
+
+Design: `docs/superpowers/specs/2026-11-26-nucleus-members-design.md`. Not yet deployed. Selecting these fields before
+deploy breaks every read, so the app merges only after cluster-notebook confirms they are live.
+
+```graphql
+type Nucleus {
+  isHome: Boolean!        # has a Setting that is the home of an SRP neighbourhood
+  inSrp: Boolean!
+  memberCount: Int!
+  srpPlace: Location      # null unless isHome
+}
+type Location {
+  srpLinked: Boolean!
+  homeNucleusId: String
+}
+input NucleusPatch {
+  localityId: String
+  membersOnTypeChange: MembersOnTypeChange   # MOVE_IN | END
+}
+# LogEntry gains: reason: String, names: JSON!
+```
+
+- **Residence and membership.** A Neighborhood nucleus has its own Setting. Its residents are the people placed there,
+  linked or not. Network and Population nuclei have no Setting; their members hold the informal `member` role in
+  `updateNucleusWorkers`. A `member` role on a Neighborhood is refused.
+- **`isHome` and `inSrp`.** `isHome && !inSrp` is a Neighborhood that isn't in SRP yet. Residents there are placed at its
+  Setting locally, and SRP places them at the projected place until the nucleus is pushed.
+- **`srpPlace`** is null unless `isHome`. It is the nucleus's own Setting when that Setting is in SRP. Otherwise it is the
+  projection: the nearest ancestor in the same Locality whose Setting is linked, or else the Locality.
+- **`memberCount`** counts residents for a Neighborhood and current `member` holders for any other type. Each person
+  counts once, whatever roles they hold. Hidden people are left out.
+- **Interim locality rule** (for an app that still sends `locationName` or `locationId`). On a Neighborhood, a value that
+  points to a Locality acts as `localityId`. Pointing it at the Cluster gives `NEEDS_LOCALITY`. Pointing it at another
+  Setting is refused: `SRP_IS_NEIGHBOURHOOD` for a home that is in SRP, and `BAD_INPUT` otherwise.
+- **Error codes:**
+  - `HAS_MEMBERS {memberCount}`: a non-Neighborhood with members became a Neighborhood without `membersOnTypeChange`.
+  - `MOVE_REFUSED {people: [{id, code}]}`: `code` is `FORBIDDEN` or `OTHER_CLUSTER`. Only ids are listed, for privacy.
+    `MOVE_IN` is all-or-nothing, so nothing changed.
+  - `NEEDS_LOCALITY`: a Neighborhood needs a Locality.
+  - `MEMBER_ON_NEIGHBORHOOD`: a `member` role was granted on a Neighborhood.
+- **`MOVE_IN` results.** SRP refusals happen later, in the worker, so nothing reports them at once. Outcomes arrive on each
+  person's `placeSync`.
+- **Refused moves in the log.** The undo that follows an SRP refusal is audited with mutation `srpRefusedMove`, and
+  `reason` carries the refusal code. `names` maps every id in a row's `changes` to its current display name. Names are
+  resolved when the log is read, so a renamed place shows its current name. An id whose row is gone is left out of the
+  map, and the app shows the id.
+- **Type null.** A null `nucleusType` means "not decided yet". It is allowed only away from a Setting, and counts as not
+  a Neighborhood.
