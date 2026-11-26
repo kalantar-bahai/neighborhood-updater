@@ -106,7 +106,7 @@ describe('srpDetailMessage', () => {
 
 describe('findNameClash', () => {
   const loc: LocalityOption = {
-    name: 'Elm Locality',
+    id: 'L1', name: 'Elm Locality',
     settings: [
       { name: 'Elm Park', srpLinked: true, nuclei: ['Elm Park'] },
       { name: 'Oak Row', srpLinked: false, nuclei: ['Oak Row North'] },

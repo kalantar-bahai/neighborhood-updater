@@ -319,7 +319,7 @@ describe('findPeople', () => {
 
 const entry = (o: Partial<LogEntry> = {}): LogEntry => ({
   id: 'e1', occurredAt: '2026-11-24T14:05:00Z', actor: summary('Ben', 'Okafor'), mutation: 'grantRole',
-  entityType: 'role_in_ne', entityId: 'r1', changeType: 'create', changes: { role: { old: null, new: 'CSO' } }, ...o });
+  entityType: 'role_in_ne', entityId: 'r1', changeType: 'create', changes: { role: { old: null, new: 'CSO' } }, reason: null, names: {}, ...o });
 describe('logHeadline', () => {
   test('who, what, on what', () => {
     expect(logHeadline(entry())).toBe('Ben Okafor · grantRole · role r1');

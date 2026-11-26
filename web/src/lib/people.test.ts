@@ -262,7 +262,7 @@ const setting = (id: string, name: string, localityId: string, locality = 'Chape
 
 describe('moveTargets', () => {
   const here = setting('S1', 'Parkside', 'LOC1');
-  const ctx = (parent: MoveContext['parent'], location: PlaceSummary | null = here): MoveContext => ({ location, parent });
+  const ctx = (parent: MoveContext['parent'], location: PlaceSummary | null = here): MoveContext => ({ location, parent, isHome: false, inSrp: false, srpPlace: null });
   test('here is this nucleus\'s Setting', () => {
     expect(moveTargets(ctx(null)).here).toEqual({ id: 'S1', name: 'Parkside', path: 'Chapel Hill › Chapelboro › Parkside' });
   });

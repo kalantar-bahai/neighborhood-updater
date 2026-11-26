@@ -22,7 +22,8 @@ import { ClusterNotebookCodedError, ClusterNotebookForbiddenError } from './clus
 // "show the raw upstream message").
 // Coded errors (extensions.code other than FORBIDDEN): status + user-facing text.
 // A null message means "use the upstream message".
-const CODED_ERRORS: Record<string, { status: number; message: string | null }> = {
+// `message` may also be a function of the upstream extensions, for text that needs a count.
+const CODED_ERRORS: Record<string, { status: number; message: string | null | ((extensions: Record<string, unknown>) => string) }> = {
   NAME_TAKEN: { status: 409, message: 'That name is already used by another nucleus.' },
   SRP_NAME_CLASH: { status: 409, message: 'That name is already used in this locality (in SRP or here).' },
   SRP_ACTION_PENDING: { status: 409, message: 'An SRP change for this nucleus is still pending. Try again once it finishes.' },
@@ -52,6 +53,14 @@ const CODED_ERRORS: Record<string, { status: number; message: string | null }> =
   ALREADY_HAS_ACCESS: { status: 409, message: '{name} already has access.' },
   INVITATION_PENDING: { status: 409, message: 'An invitation is already pending; resend it instead.' },
   NOT_PENDING: { status: 409, message: 'This invitation is no longer pending.' },
+  // Confirmed with cluster-notebook (members of a nucleus; not deployed yet at time of writing).
+  HAS_MEMBERS: { status: 409, message: 'This nucleus has members. Choose whether to move them in or end their memberships.' },
+  MOVE_REFUSED: {
+    status: 409,
+    message: ext => `You can't move ${Array.isArray(ext.people) ? ext.people.length : 'some'} of its members (another cluster, or no permission). Nothing changed.`,
+  },
+  NEEDS_LOCALITY: { status: 400, message: 'Choose a locality first. A Neighborhood must be in a locality.' },
+  MEMBER_ON_NEIGHBORHOOD: { status: 400, message: "A Neighborhood's people are its residents. Tick Resident instead." },
   BAD_INPUT: { status: 400, message: null },
   CLERK_ERROR: { status: 502, message: "The invitation email couldn't be sent. Try again." },
   CLERK_NOT_CONFIGURED: { status: 503, message: "Invitations aren't set up yet." },
@@ -71,7 +80,8 @@ export function clusterNotebookErrorResponse(
   console.error('cluster-notebook call failed:', message, e instanceof Error && e.cause ? e.cause : '');
   if (e instanceof ClusterNotebookCodedError) {
     const mapped = CODED_ERRORS[e.code];
-    const text = opts.messages?.[e.code] ?? (mapped ? (mapped.message ?? e.upstreamMessage) : message);
+    const mappedText = typeof mapped?.message === 'function' ? mapped.message(e.extensions) : mapped?.message;
+    const text = opts.messages?.[e.code] ?? (mapped ? (mappedText ?? e.upstreamMessage) : message);
     return NextResponse.json(
       { error: opts.name !== undefined ? text.replace('{name}', opts.name) : text, code: e.code },
       { status: mapped?.status ?? 502 },
