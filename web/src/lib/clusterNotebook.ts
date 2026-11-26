@@ -151,8 +151,8 @@ export interface NucleusFields {
   // Optional: `inSrp` isn't on the cluster-notebook branch yet; `srpAction` is
   // optional here only so existing NucleusFields fixtures keep compiling.
   inSrp?: boolean;
-  // Confirmed with cluster-notebook (members of a nucleus; not deployed yet at time of writing): isHome is
-  // the home nucleus of its SRP neighbourhood; memberCount counts the nucleus's members; srpPlace is the
+  // Confirmed with cluster-notebook (members of a nucleus; not deployed yet at time of writing): isHome means the
+  // nucleus has its own Setting (any Neighborhood; inSrp = linked to SRP); memberCount counts the nucleus's members; srpPlace is the
   // SRP neighbourhood it is linked to. Optional for the same reason as inSrp: existing fixtures keep compiling.
   isHome?: boolean;
   memberCount?: number;
@@ -430,7 +430,7 @@ const NUCLEUS_FIELDS_SELECTION = 'stage locality populationMakeup population hou
   + 'inConversation inCommunityActivities protagonists devotionalHosts inEducationalActivities educationalFacilitators helpingOthers accompanying '
   + 'hasSocialAction socialActionDescription hasCommunityGatherings communityGatheringDescription narrative nucleusType '
   + 'cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers } parentNucleus { name } lastUpdated { at by } '
-  + 'location { name type } isHome memberCount srpPlace { id name } ' + SRP_SELECTION;
+  + 'location { name type } isHome memberCount ' + SRP_SELECTION;
 
 export async function getNucleusFields(nucleusName: string): Promise<NucleusFields | null> {
   const query = `

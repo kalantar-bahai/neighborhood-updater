@@ -328,7 +328,9 @@ describe('member role', () => {
   test('refusalText gives the reason without the undone ending', () => {
     expect(refusalText('HOUSEHOLD_MOVES_TOGETHER')).toBe('Households move together');
     expect(syncNote({ status: 'refused', code: 'HOUSEHOLD_MOVES_TOGETHER' })?.text).toBe('Households move together. The move was undone.');
-    expect(refusalText(null)).toBe('SRP refused the move (no reason given)');
+    expect(refusalText(null)).toBe('no reason given');
+    expect(refusalText('WEIRD_CODE')).toBe('WEIRD_CODE');
+    expect(syncNote({ status: 'refused', code: null })?.text).toBe('SRP refused the move (no reason given). The move was undone.');
   });
 });
 
@@ -460,11 +462,11 @@ describe('activityLines', () => {
 describe('countPeople', () => {
   test('hosts and co-hosts, participants, facilitators', () => {
     expect(countPeople([
-      { devotionalHost: 'HOST', participates: true, facilitates: false, isResident: true },
-      { devotionalHost: 'CO_HOST', participates: false, facilitates: true, isResident: false },
-      { devotionalHost: null, participates: true, facilitates: true, isResident: true },
-    ])).toEqual({ devotionalHosts: 2, participating: 2, facilitating: 2, residents: 2 });
-    expect(countPeople([])).toEqual({ devotionalHosts: 0, participating: 0, facilitating: 0, residents: 0 });
+      { devotionalHost: 'HOST', participates: true, facilitates: false },
+      { devotionalHost: 'CO_HOST', participates: false, facilitates: true },
+      { devotionalHost: null, participates: true, facilitates: true },
+    ])).toEqual({ devotionalHosts: 2, participating: 2, facilitating: 2 });
+    expect(countPeople([])).toEqual({ devotionalHosts: 0, participating: 0, facilitating: 0 });
   });
 });
 

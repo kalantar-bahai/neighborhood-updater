@@ -243,7 +243,7 @@ export function changeValueText(v: unknown): string {
 
 export function logChanges(e: LogEntry): { field: string; old: string; new: string }[] {
   // Ids that cluster-notebook named (places, people) read as names; the rest stay as written.
-  const show = (v: unknown) => (typeof v === 'string' && e.names?.[v]) || changeValueText(v);
+  const show = (v: unknown) => (typeof v === 'string' && Object.hasOwn(e.names ?? {}, v) && e.names[v]) || changeValueText(v);
   return Object.entries(e.changes ?? {}).map(([field, c]) =>
     c && typeof c === 'object' && !Array.isArray(c)
       ? { field, old: show((c as { old?: unknown }).old), new: show((c as { new?: unknown }).new) }
@@ -254,7 +254,7 @@ export function logChanges(e: LogEntry): { field: string; old: string; new: stri
 export function logRefusal(e: LogEntry): string | null {
   if (e.mutation !== 'srpRefusedMove') return null;
   const back = (e.changes?.location_id as { new?: unknown } | undefined)?.new;
-  const place = typeof back === 'string' ? (e.names?.[back] ?? back) : null;
+  const place = typeof back === 'string' ? (Object.hasOwn(e.names ?? {}, back) ? e.names[back] : back) : null;
   return `SRP refused the move: ${refusalText(e.reason)}.${place ? ` Back at ${place}.` : ''}`;
 }
 

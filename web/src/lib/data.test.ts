@@ -361,7 +361,7 @@ describe('getRowData', () => {
     expect(result?.contactNames).toEqual([{ id: '4', name: 'Dave', email: 'dave@x.com' }]);
     expect(result?.promoterNames).toEqual([{ id: '5', name: 'Erin', email: null }]);
     expect(mockGetNucleusPeopleFlags).toHaveBeenCalledWith('Alpha');
-    expect(result?.peopleCounts).toEqual({ devotionalHosts: 2, participating: 2, facilitating: 1, residents: 2 });
+    expect(result?.peopleCounts).toEqual({ devotionalHosts: 2, participating: 2, facilitating: 1 });
   });
 
   test('passes through lastUpdated from cluster-notebook', async () => {
@@ -486,7 +486,7 @@ describe('getRowData', () => {
     expect(result?.row.locationType).toBe('');
   });
 
-  test('srp.isHome comes from isHome (not inSrp); srpPlace is the name; memberCount is passed through', async () => {
+  test('srp.isHome comes from isHome (not inSrp); memberCount is passed through', async () => {
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
@@ -503,7 +503,6 @@ describe('getRowData', () => {
 
     expect(result?.srp.isHome).toBe(true);
     expect(result?.srp.inSrp).toBe(false);
-    expect(result?.srp.srpPlace).toBe('Carrboro');
     expect(result?.memberCount).toBe(3);
   });
 });

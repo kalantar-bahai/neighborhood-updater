@@ -348,13 +348,13 @@ describe('getNucleusFields', () => {
     expect(body.query).toContain('location { name type }');
   });
 
-  test('selects isHome, memberCount and srpPlace', async () => {
+  test('selects isHome and memberCount, not srpPlace', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: null } }));
     await getNucleusFields('Alpha');
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.query).toContain('isHome');
     expect(body.query).toContain('memberCount');
-    expect(body.query).toContain('srpPlace { id name }');
+    expect(body.query).not.toContain('srpPlace');
   });
 });
 
@@ -1092,9 +1092,9 @@ describe('SRP actions and coded errors', () => {
   });
 
   test('a coded error carries the full extensions (MOVE_REFUSED lists people)', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ errors: [{ message: 'x', extensions: { code: 'MOVE_REFUSED', people: ['a', 'b'] } }] }));
+    mockFetch.mockResolvedValue(jsonResponse({ errors: [{ message: 'x', extensions: { code: 'MOVE_REFUSED', people: [{ id: 'p1', code: 'FORBIDDEN' }, { id: 'p2', code: 'OTHER_CLUSTER' }] } }] }));
     const err = await createNucleus('Alpha', 'NC-1 Test').catch(e => e);
-    expect(err.extensions).toEqual({ code: 'MOVE_REFUSED', people: ['a', 'b'] });
+    expect(err.extensions).toEqual({ code: 'MOVE_REFUSED', people: [{ id: 'p1', code: 'FORBIDDEN' }, { id: 'p2', code: 'OTHER_CLUSTER' }] });
   });
 
   test('FORBIDDEN still throws ClusterNotebookForbiddenError', async () => {

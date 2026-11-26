@@ -60,8 +60,8 @@ export function sortRoles(roles: string[]): string[] {
   return [...known, ...other];
 }
 
-// Roles the editor offers: 'member' only on a nucleus that isn't an SRP home (there, belonging is the member role;
-// on a home nucleus it is residence), then the other known roles, then any other role the person already holds.
+// Roles the editor offers: 'member' only on a nucleus that has no Setting of its own (isHome: any Neighborhood; there, belonging is the member role;
+// on a Neighborhood it is residence), then the other known roles, then any other role the person already holds.
 export function editorRoleList(isHome: boolean, held: string[]): string[] {
   const known = KNOWN_ROLES.filter(r => r !== 'member');
   return sortRoles([...(isHome ? [] : ['member']), ...known, ...held]);
@@ -161,10 +161,10 @@ export type MoveTarget = { id: string; name: string; path: string };
 
 const target = (p: PlaceSummary): MoveTarget => ({ id: p.id, name: p.name, path: placePath(p) });
 
-// Only an SRP home nucleus has people to move (isHome); any other nucleus has members instead.
+// Only a nucleus with its own Setting (isHome: any Neighborhood; inSrp = linked to SRP) has people to move; any other nucleus has members instead.
 // here: this nucleus's own Setting (move in). out: where moving out goes, by id, never name:
 //  - in SRP: the parent's Setting when the parent is a home nucleus in the same Locality, else this Setting's Locality;
-//  - not in SRP (a home whose Setting SRP doesn't know): the SRP neighbourhood it stands in (srpPlace), named in srpAt.
+//  - not in SRP (a Neighborhood whose Setting SRP doesn't know): the SRP neighbourhood it stands in (srpPlace), named in srpAt.
 export function moveTargets(ctx: MoveContext): { here: MoveTarget | null; out: MoveTarget | null; srpAt: string | null } {
   const none = { here: null, out: null, srpAt: null };
   const loc = ctx.location;
@@ -196,7 +196,7 @@ const REFUSALS: Record<string, string> = {
 
 // The reason words for a refused move, without the "undone" ending.
 export function refusalText(code: string | null): string {
-  return REFUSALS[code ?? ''] ?? `SRP refused the move (${code ?? 'no reason given'})`;
+  return REFUSALS[code ?? ''] ?? code ?? 'no reason given';
 }
 
 // What a row shows about the person's latest move. Keys off `code`, never the raw error text.
@@ -207,7 +207,7 @@ export function syncNote(sync: PlaceSync | null): { tone: 'wait' | 'error'; text
     case 'in_flight':
       return { tone: 'wait', text: 'On its way to SRP' };
     case 'refused':
-      return { tone: 'error', text: `${refusalText(sync.code)}. The move was undone.` };
+      return { tone: 'error', text: `${REFUSALS[sync.code ?? ''] ?? `SRP refused the move (${sync.code ?? 'no reason given'})`}. The move was undone.` };
     case 'failed':
       return { tone: 'error', text: `Couldn't reach SRP: ${sync.code ?? 'unknown error'}` };
     default:
@@ -246,14 +246,12 @@ export function editableRoles(p: PermissionSet, rows: PersonRow[]): string[] {
 // you something: when it differs from the typed number. Nothing typed and no one named shows nothing.
 // How many of the nucleus's people SRP shows hosting a devotional gathering (hosts and co-hosts), taking part in
 // and facilitating an activity: the "(x)" after those Overview estimates.
-// residents: placed at this nucleus's Setting (only ever on a home nucleus), the "(n)" after In Conversation.
-export type PeopleCounts = { devotionalHosts: number; participating: number; facilitating: number; residents: number };
-export function countPeople(people: Pick<NucleusPerson, 'devotionalHost' | 'participates' | 'facilitates' | 'isResident'>[]): PeopleCounts {
+export type PeopleCounts = { devotionalHosts: number; participating: number; facilitating: number };
+export function countPeople(people: Pick<NucleusPerson, 'devotionalHost' | 'participates' | 'facilitates'>[]): PeopleCounts {
   return {
     devotionalHosts: people.filter(p => p.devotionalHost !== null).length,
     participating: people.filter(p => p.participates).length,
     facilitating: people.filter(p => p.facilitates).length,
-    residents: people.filter(p => p.isResident).length,
   };
 }
 

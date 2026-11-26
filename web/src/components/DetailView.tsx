@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { NucleusDetail, NucleusRow, Activity } from '@/types';
 import type { Worker } from '@/types';
 import type { PermissionSet } from '@/lib/access';
-import type { LastUpdated, LocalityOption } from '@/lib/clusterNotebook';
+import type { LastUpdated } from '@/lib/clusterNotebook';
 import WorkerListModal from './WorkerListModal';
 import PeopleCard from './PeopleCard';
 import ManageAccessCard from './ManageAccessCard';
@@ -56,31 +56,6 @@ function computedPct(connected: string, total: string): string {
 }
 
 function isValidInt(v: string) { return !v || /^\d+$/.test(v.trim()); }
-
-// Surfaces the two consequences cluster-notebook described directly, 2026-10-08,
-// for whichever Setting is currently chosen (a Locality-only or cluster-level
-// choice has neither): other nuclei already there (their counts get SUMMED
-// together in SRP, which double-counts if this nucleus's people are a subset of
-// theirs) and a Setting that isn't linked to SRP yet (entered numbers stay local
-// for now). `ownNucleusName` is filtered out of "already has" -- a nucleus already
-// placed at this Setting isn't "sharing" with itself. The `!locationName` guard is
-// defensive, not expected in practice -- every nucleus has a location now (commit
-// c40fb54, same day), so this should only ever trigger for a handful of already-
-// archived nuclei that predate that rule.
-function locationWarningFor(locationName: string, options: LocalityOption[], ownNucleusName: string): string | null {
-  if (!locationName) return null;
-  for (const locality of options) {
-    for (const setting of locality.settings) {
-      if (setting.name !== locationName) continue;
-      const others = setting.nuclei.filter(n => n !== ownNucleusName);
-      if (others.length > 0) {
-        return `This Setting already has ${others.join(', ')} — your counts will be summed together in SRP.`;
-      }
-      return setting.srpLinked ? null : 'This Setting isn’t linked to SRP yet — entered numbers will stay local for now.';
-    }
-  }
-  return null;
-}
 
 // The three actually-editable Activity fields -- excludes isOverridden, which is
 // server-computed display state, never something a blur/change event commits.
@@ -763,6 +738,14 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // Crossing Neighborhood creates or archives the nucleus's Setting, so the view reloads to pick up
   // isHome, memberCount and the Locality/Location control; Move them in's message rides the reload.
   const [membersIn, setMembersIn] = useState<{ text: string } | null>(null);
+  // Escape cancels the dialog; the listener lives only while it is open, and setState runs in the handler.
+  const membersDialogOpen = membersIn !== null;
+  useEffect(() => {
+    if (!membersDialogOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMembersIn(null); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [membersDialogOpen]);
   function changeType(to: string) {
     const from = form.nucleusType;
     const prompt = typeChangePrompt({ from, to, isHome: detail.srp.isHome, memberCount: detail.memberCount });
@@ -781,7 +764,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
       return;
     }
     committedRef.current = { ...committedRef.current, nucleusType: 'Neighborhood' };
-    onReload(choice === 'MOVE_IN' ? `${moved} moved in; SRP is being updated` : undefined);
+    onReload(choice === 'MOVE_IN' ? `${moved} moved in; SRP is being updated` : 'Memberships ended');
   }
 
   // Rename: sends ONLY the name (saveRowData re-reads by the old name, so it must never be
@@ -1008,8 +991,6 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     }
   }
 
-  const locationWarning = locationWarningFor(form.locationName, detail.locationOptions, row.nucleus);
-
   return (
     <>
       <div className="page-header">
@@ -1170,7 +1151,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             </div>
             {/* Spec 2026-11-26 (nucleus members): a Neighborhood pocket's residents are placed, in SRP,
                 at its parent's neighbourhood until the pocket itself is sent to SRP. */}
-            {form.parentNucleus && detail.srp.isHome && srpState !== 'IN_SRP' && (
+            {form.parentNucleus && detail.srp.isHome && !detail.srp.inSrp && (
               <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>
                 Until this nucleus is in SRP, its residents count toward its parent&apos;s neighbourhood in SRP.
               </p>
@@ -1201,7 +1182,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             {/* Confirmed with cluster-notebook 2026-11-16: moving a home nucleus is refused (SRP_IS_NEIGHBOURHOOD). */}
             {srpState === 'IN_SRP' && permissions.canChangeIdentity && (
               <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>
-                Location can&apos;t be changed while this nucleus is in SRP.
+                {controls.place === 'locality' ? 'Locality' : 'Location'} and Type can&apos;t be changed while this nucleus is in SRP.
               </p>
             )}
             {srpMessage && <p style={{ fontSize: 12, color: '#c53030', margin: '4px 0 0' }}>{srpMessage}</p>}
@@ -1212,11 +1193,6 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   {pushing ? 'Sending…' : 'Push to SRP'}
                 </button>
               </div>
-            )}
-            {locationWarning && (
-              <p style={{ fontSize: 12, color: '#975a16', background: '#fffaf0', border: '1px solid #f6e05e', borderRadius: 6, padding: '6px 10px', margin: '4px 0 0' }}>
-                {locationWarning}
-              </p>
             )}
           </div>}
         </div>

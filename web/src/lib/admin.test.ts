@@ -376,6 +376,18 @@ describe('logChanges names and logRefusal', () => {
     expect(logRefusal(entry({ mutation: 'srpRefusedMove', reason: 'HOUSEHOLD_MOVES_TOGETHER', changes: moved, names: { b2: 'Carrboro' } })))
       .toBe('SRP refused the move: Households move together. Back at Carrboro.');
   });
+  test('an unknown code or no reason reads cleanly', () => {
+    expect(logRefusal(entry({ mutation: 'srpRefusedMove', reason: 'WEIRD_CODE', changes: moved, names: { b2: 'Carrboro' } })))
+      .toBe('SRP refused the move: WEIRD_CODE. Back at Carrboro.');
+    expect(logRefusal(entry({ mutation: 'srpRefusedMove', reason: null, changes: moved, names: { b2: 'Carrboro' } })))
+      .toBe('SRP refused the move: no reason given. Back at Carrboro.');
+  });
+  test('a value that is an Object.prototype key is not mapped through names', () => {
+    expect(logChanges(entry({ changes: { role: { old: 'constructor', new: 'toString' } }, names: {} })))
+      .toEqual([{ field: 'role', old: 'constructor', new: 'toString' }]);
+    expect(logRefusal(entry({ mutation: 'srpRefusedMove', reason: 'X', changes: { location_id: { old: 'a1', new: 'constructor' } }, names: {} })))
+      .toBe('SRP refused the move: X. Back at constructor.');
+  });
   test('other mutations have no refusal', () => {
     expect(logRefusal(entry({ mutation: 'moveIndividuals', changes: moved }))).toBeNull();
   });

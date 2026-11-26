@@ -213,7 +213,6 @@ export async function getRowData(nucleusName: string) {
       srpName: nucleusFields?.srpName ?? null,
       isHome: nucleusFields?.isHome === true,
       inSrp: nucleusFields?.inSrp === true,
-      srpPlace: nucleusFields?.srpPlace?.name ?? null,
     },
     memberCount: nucleusFields?.memberCount ?? 0,
   };

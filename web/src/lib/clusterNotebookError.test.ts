@@ -59,7 +59,7 @@ describe('clusterNotebookErrorResponse', () => {
   });
 
   test('MOVE_REFUSED counts the people from extensions.people', async () => {
-    const err = new ClusterNotebookCodedError('m', 'MOVE_REFUSED', 'u', { people: ['a', 'b'] });
+    const err = new ClusterNotebookCodedError('m', 'MOVE_REFUSED', 'u', { people: [{ id: 'p1', code: 'FORBIDDEN' }, { id: 'p2', code: 'OTHER_CLUSTER' }] });
     const res = clusterNotebookErrorResponse(err);
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "You can't move 2 of its members (another cluster, or no permission). Nothing changed.", code: 'MOVE_REFUSED' });

@@ -122,9 +122,9 @@ export interface Worker {
 
 export interface NucleusDetail {
   row: NucleusRow;
-  // isHome: the home nucleus of an SRP neighbourhood (cluster-notebook isHome), whatever its SRP state.
-  // inSrp: cluster-notebook's inSrp flag. srpPlace: the name of the SRP place it is linked to.
-  srp: { state: SrpState | null; action: SrpAction | null; srpName: string | null; isHome: boolean; inSrp: boolean; srpPlace: string | null };
+  // isHome: has its own Setting (any Neighborhood; cluster-notebook isHome), whatever its SRP state.
+  // inSrp: linked to SRP (cluster-notebook's inSrp flag).
+  srp: { state: SrpState | null; action: SrpAction | null; srpName: string | null; isHome: boolean; inSrp: boolean };
   // Members of this nucleus; 0 when cluster-notebook reports none (a count of people, not a "not recorded" estimate).
   memberCount: number;
   accompanierNames: Worker[];

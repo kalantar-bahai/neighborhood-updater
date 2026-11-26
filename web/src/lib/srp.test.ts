@@ -11,7 +11,8 @@ describe('srpStateFor', () => {
     expect(srpStateFor('Neighborhood', true, null)).toBe('IN_SRP');
     expect(srpStateFor('Neighborhood', false, null)).toBe('LOCAL_ONLY');
     expect(srpStateFor('Neighborhood', false, undefined)).toBe('LOCAL_ONLY');
-    expect(srpStateFor('', false, null)).toBe('LOCAL_ONLY');
+    expect(srpStateFor('', false, null)).toBeNull();
+    expect(srpStateFor('  ', true, null)).toBeNull();
     expect(srpStateFor(' neighborhood ', true, null)).toBe('IN_SRP');
   });
   it('maps action status', () => {
@@ -70,9 +71,9 @@ describe('srpBadge', () => {
 describe('srpDetailMessage', () => {
   it('explains refused create', () => {
     expect(srpDetailMessage('REFUSED', act({ status: 'refused', error: 'Name taken' })))
-      .toBe('SRP refused this: Name taken. Rename it or move it to another locality to try again.');
+      .toBe('SRP refused this: Name taken. Rename it, move it to another locality, or change its type to try again.');
     expect(srpDetailMessage('REFUSED', act({ status: 'refused' })))
-      .toBe('SRP refused this. Rename it or move it to another locality to try again.');
+      .toBe('SRP refused this. Rename it, move it to another locality, or change its type to try again.');
   });
   it('gives no message for a given-up create', () => {
     expect(srpDetailMessage('LOCAL_ONLY', act({ status: 'refused', error: 'Name taken' }))).toBeNull();

@@ -500,7 +500,7 @@ deploy breaks every read, so the app merges only after cluster-notebook confirms
 
 ```graphql
 type Nucleus {
-  isHome: Boolean!        # has a Setting that is the home of an SRP neighbourhood
+  isHome: Boolean!        # has its own Setting (any Neighborhood); inSrp = that Setting is linked to SRP
   inSrp: Boolean!
   memberCount: Int!
   srpPlace: Location      # null unless isHome
