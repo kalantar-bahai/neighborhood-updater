@@ -1418,7 +1418,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 onNumChange={v => set('hhNum', v)} onNumBlur={() => commitField('hhNum', 'Households Connected', true)} readonly={!canWrite} pctReadonly numInteger
               />
             </div>
-            <FamiliesList nucleus={row.nucleus} refreshKey={peopleRefresh + peopleChanged} />
+            <FamiliesList nucleus={row.nucleus} refreshKey={peopleRefresh + peopleChanged} canEdit={permissions.canWrite} onChanged={() => setPeopleRefresh(n => n + 1)} />
           </div>}
         </div>
 
