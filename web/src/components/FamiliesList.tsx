@@ -13,7 +13,7 @@ type FamilyAction =
   | { action: 'remove'; householdId: string; individualId: string }
   | { action: 'contact'; householdId: string; individualId: string };
 
-const smallBtn = { minHeight: 44, padding: '4px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer', border: '1px solid #cbd5e0', background: 'white', color: '#2a4365' } as const;
+const smallBtn = (disabled: boolean) => ({ minHeight: 44, padding: '4px 12px', borderRadius: 6, fontSize: 13, cursor: disabled ? 'default' : 'pointer', border: '1px solid #cbd5e0', background: 'white', color: disabled ? '#a0aec0' : '#2a4365' }) as const;
 
 export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }: { nucleus: string; refreshKey: number; canEdit: boolean; onChanged: () => void }) {
   const [families, setFamilies] = useState<FamilyEntry[] | null>(null);
@@ -25,14 +25,14 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
 
-  async function run(key: string, body: FamilyAction) {
+  async function run(key: string, body: FamilyAction, personName?: string) {
     setSavingKey(key);
     setErrors(prev => ({ ...prev, [key]: '' }));
     try {
       const res = await fetch('/api/families', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nucleus, ...body }),
+        body: JSON.stringify({ nucleus, ...(personName ? { personName } : {}), ...body }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) setErrors(prev => ({ ...prev, [key]: data.error || 'Could not save that change.' }));
@@ -53,7 +53,7 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
       return;
     }
     if (c.fromHouseholdId && c.familyTitle !== c.name && !window.confirm(moveConfirmText(c.name, c.familyTitle))) return;
-    run(entry.key, { action: 'add', householdId: entry.householdId!, individualId: c.id, ...(c.fromHouseholdId ? { fromHouseholdId: c.fromHouseholdId } : {}) });
+    run(entry.key, { action: 'add', householdId: entry.householdId!, individualId: c.id, ...(c.fromHouseholdId ? { fromHouseholdId: c.fromHouseholdId } : {}) }, c.name);
   }
 
   useEffect(() => {
@@ -98,6 +98,9 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
       {shown.length === 0 && query.trim() && (
         <div style={{ fontSize: 13, color: '#718096', marginTop: 10 }}>No family has anyone by that name.</div>
       )}
+      {families.length === 0 && !query.trim() && (
+        <div style={{ fontSize: 13, color: '#718096', marginTop: 10 }}>No people in this nucleus yet.</div>
+      )}
       <div style={{ marginTop: 8 }}>
         {shown.map(f => {
           const open = openKeys.has(f.key);
@@ -123,27 +126,30 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
               </button>
               {open && (
                 <div style={{ padding: '0 4px 10px 23px', fontSize: 13, color: '#4a5568' }}>
-                  {f.members.map(m => (
-                    <div key={m.id} style={{ padding: '2px 0' }}>
-                      {m.isContact ? '★ ' : ''}{m.name}<PersonSrpDot inSrp={m.inSrp} />
-                      {canEdit && isHousehold && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-                          {!m.isContact && (
-                            <button type="button" disabled={busy} style={smallBtn}
-                              onClick={() => run(f.key, { action: 'contact', householdId: f.householdId!, individualId: m.id })}>Make contact</button>
-                          )}
-                          <button type="button" disabled={busy || !canRemoveMember(f, m.id)} style={smallBtn}
-                            onClick={() => run(f.key, { action: 'remove', householdId: f.householdId!, individualId: m.id })}>Remove</button>
-                          {!canRemoveMember(f, m.id) && (
-                            <span style={{ fontSize: 12, color: '#718096' }}>To remove {m.name}, make someone else the contact first.</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                  {f.members.map(m => {
+                    const removable = canRemoveMember(f, m.id);
+                    return (
+                      <div key={m.id} style={{ padding: '2px 0' }}>
+                        {m.isContact ? '★ ' : ''}{m.name}<PersonSrpDot inSrp={m.inSrp} />
+                        {canEdit && isHousehold && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+                            {!m.isContact && (
+                              <button type="button" disabled={busy} style={smallBtn(busy)}
+                                onClick={() => run(f.key, { action: 'contact', householdId: f.householdId!, individualId: m.id }, m.name)}>Make contact</button>
+                            )}
+                            <button type="button" disabled={busy || !removable} style={smallBtn(busy || !removable)}
+                              onClick={() => run(f.key, { action: 'remove', householdId: f.householdId!, individualId: m.id }, m.name)}>Remove</button>
+                            {!removable && (
+                              <span style={{ fontSize: 12, color: '#718096' }}>To remove {m.name}, make someone else the contact first.</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                   {hidden && <div style={{ color: '#718096', marginTop: 2 }}>{hidden}</div>}
                   {canEdit && (
-                    <button type="button" disabled={busy} style={{ ...smallBtn, marginTop: 6 }}
+                    <button type="button" disabled={busy} style={{ ...smallBtn(busy), marginTop: 6 }}
                       onClick={() => setPicker({ entry: f, mode: isHousehold ? 'add' : 'start' })}>
                       {isHousehold ? 'Add someone…' : 'Start a family with…'}
                     </button>

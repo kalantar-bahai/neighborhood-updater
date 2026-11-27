@@ -68,11 +68,11 @@ const CODED_ERRORS: Record<string, { status: number; message: string | null | ((
   PARENT_OTHER_CLUSTER: { status: 400, message: 'A parent nucleus must be in the same cluster.' },
   // Confirmed with cluster-notebook 2026-11-27: household edits. Refusals are 409s because the app's list was stale
   // (it re-reads after any of them); CONTACT_MUST_STAY and DIFFERENT_PLACE are rules the person can act on.
-  CONTACT_MUST_STAY: { status: 409, message: "That person is their family's contact. Make someone else the contact first." },
-  ALREADY_IN_HOUSEHOLD: { status: 409, message: "That person's family changed. The list has been refreshed; try again." },
-  NOT_IN_HOUSEHOLD: { status: 409, message: "That person's family changed. The list has been refreshed; try again." },
-  NOT_A_MEMBER: { status: 409, message: "That person isn't in this family any more. The list has been refreshed." },
-  DIFFERENT_PLACE: { status: 409, message: 'That person lives somewhere else. Move them here first (People card).' },
+  CONTACT_MUST_STAY: { status: 409, message: "{name} is their family's contact. Make someone else the contact first." },
+  ALREADY_IN_HOUSEHOLD: { status: 409, message: "{name}'s family changed. The list has been refreshed; try again." },
+  NOT_IN_HOUSEHOLD: { status: 409, message: "{name}'s family changed. The list has been refreshed; try again." },
+  NOT_A_MEMBER: { status: 409, message: "{name} isn't in this family any more. The list has been refreshed." },
+  DIFFERENT_PLACE: { status: 409, message: '{name} lives somewhere else. Move them here first (People card).' },
   HOUSEHOLD_NOT_FOUND: { status: 409, message: 'That family or person no longer exists. The list has been refreshed.' },
   INDIVIDUAL_NOT_FOUND: { status: 409, message: 'That family or person no longer exists. The list has been refreshed.' },
   // Confirmed with cluster-notebook 2026-11-27 (their #60): a new parent needs edit rights on it, since its contacts and
@@ -83,7 +83,7 @@ const CODED_ERRORS: Record<string, { status: number; message: string | null | ((
   CLERK_NOT_CONFIGURED: { status: 503, message: "Invitations aren't set up yet." },
 };
 
-// Options let a route word its own 403 (`forbidden`), fill the "{name}" placeholder (`name`, ALREADY_HAS_ACCESS),
+// Options let a route word its own 403 (`forbidden`), fill the "{name}" placeholder (`name`; "That person" when absent),
 // and reword a coded error where the global text would be wrong (`messages`, keyed by code; status and code stay).
 export function clusterNotebookErrorResponse(
   e: unknown, opts: { forbidden?: string; name?: string; messages?: Partial<Record<string, string>> } = {},
@@ -98,9 +98,13 @@ export function clusterNotebookErrorResponse(
   if (e instanceof ClusterNotebookCodedError) {
     const mapped = CODED_ERRORS[e.code];
     const mappedText = typeof mapped?.message === 'function' ? mapped.message(e.extensions) : mapped?.message;
-    const text = opts.messages?.[e.code] ?? (mapped ? (mappedText ?? e.upstreamMessage) : message);
+    // "{name}" is filled only in text from this file (the table or a route's own `messages`), never in raw upstream text.
+    const name = opts.name ?? 'That person';
+    const fill = (s: string) => s.replaceAll('{name}', () => name);
+    const own = opts.messages?.[e.code] ?? mappedText;
+    const text = own != null ? fill(own) : mapped ? e.upstreamMessage : message;
     return NextResponse.json(
-      { error: opts.name !== undefined ? text.replace('{name}', opts.name) : text, code: e.code },
+      { error: text, code: e.code },
       { status: mapped?.status ?? 502 },
     );
   }

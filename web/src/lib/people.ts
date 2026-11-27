@@ -1,7 +1,7 @@
 // People card (phase 1): pure decisions, tested in people.test.ts.
 // Spec: docs/superpowers/specs/2026-11-18-people-card-design.md
 // Age, devotional host, details (phase A) and activities (phase B): docs/superpowers/specs/2026-11-20-people-card-details-design.md.
-import type { AgeCategory, PersonHide, DevotionalHostRole, MoveContext, Participation, MoveResult, NucleusPerson, Household, PermissionSet, PersonDetails, PlaceSummary, PlaceSync } from './clusterNotebook';
+import type { PersonSummary, AgeCategory, PersonHide, DevotionalHostRole, MoveContext, Participation, MoveResult, NucleusPerson, Household, PermissionSet, PersonDetails, PlaceSummary, PlaceSync } from './clusterNotebook';
 import { individualDisplayName } from './personName';
 import { INFORMAL_WORKER_TYPES } from './config';
 
@@ -41,6 +41,16 @@ export const AGE_LABELS: Record<AgeCategory, string> = {
 export function placePath(place: Pick<PlaceSummary, 'name' | 'type' | 'cluster' | 'locality'> | null): string {
   if (!place) return '';
   return [place.cluster, place.locality, place.name].filter(Boolean).join(' › ');
+}
+
+// One search result as the client gets it (GET /api/individuals).
+export function toFoundIndividual(ind: PersonSummary & { household?: Household | null }) {
+  return {
+    id: ind.id, name: individualDisplayName(ind), place: placePath(ind.place),
+    // For a move in: their current place's home nucleus, to ask about their roles there.
+    homeNucleus: ind.place?.homeNucleus ?? null, placeId: ind.place?.id ?? null,
+    household: ind.household ?? null,
+  };
 }
 
 export function roleLabel(role: string): { label: string; icon: string | null } {

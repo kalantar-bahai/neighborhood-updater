@@ -651,6 +651,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
       // Keep only the newest answer; on failure the old counts stay until the next change or a reload.
       if (!res.ok || seq !== countsSeq.current) return;
       const data = await res.json();
+      if (seq !== countsSeq.current) return;
       setMemberCount(data.memberCount);
       setNamed(data.namedCounts);
       setTotals(data.activityTotals ?? null);

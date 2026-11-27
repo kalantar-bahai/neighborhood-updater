@@ -42,7 +42,7 @@ describe('clusterNotebookErrorResponse', () => {
     ['ENTITY_REQUIRED', 400, 'Choose where the role applies.'],
     ['NOT_FOUND', 404, 'Not found.'],
     ['EMAIL_IN_USE', 409, 'This address belongs to someone else.'],
-    ['ALREADY_HAS_ACCESS', 409, '{name} already has access.'],
+    ['ALREADY_HAS_ACCESS', 409, 'That person already has access.'],
     ['INVITATION_PENDING', 409, 'An invitation is already pending; resend it instead.'],
     ['NOT_PENDING', 409, 'This invitation is no longer pending.'],
     ['BAD_INPUT', 400, 'upstream: 3 groups in use'],
@@ -90,6 +90,24 @@ describe('clusterNotebookErrorResponse', () => {
     const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('m', 'ALREADY_HAS_ACCESS', 'u'), { name: 'Ana Lopez' });
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: 'Ana Lopez already has access.', code: 'ALREADY_HAS_ACCESS' });
+  });
+
+  test('household messages use the name when given, "That person" otherwise', async () => {
+    const err = () => new ClusterNotebookCodedError('m', 'NOT_IN_HOUSEHOLD', 'u');
+    expect((await clusterNotebookErrorResponse(err(), { name: 'Test Person' }).json()).error).toBe("Test Person's family changed. The list has been refreshed; try again.");
+    expect((await clusterNotebookErrorResponse(err()).json()).error).toBe("That person's family changed. The list has been refreshed; try again.");
+  });
+
+  test('inserts the name literally, even with $ patterns', async () => {
+    const err = new ClusterNotebookCodedError('m', 'ALREADY_HAS_ACCESS', 'u');
+    expect((await clusterNotebookErrorResponse(err, { name: 'A $& B' }).json()).error).toBe('A $& B already has access.');
+  });
+
+  test('leaves "{name}" in raw upstream messages alone', async () => {
+    const raw = new ClusterNotebookCodedError('m', 'BAD_INPUT', '{name} is wrong');
+    expect((await clusterNotebookErrorResponse(raw, { name: 'Ana' }).json()).error).toBe('{name} is wrong');
+    const unmapped = new ClusterNotebookCodedError('{name} broke', 'SOMETHING_NEW', 'u');
+    expect((await clusterNotebookErrorResponse(unmapped, { name: 'Ana' }).json()).error).toBe('{name} broke');
   });
 
   test('the accounts route rewords SELF_LOCKOUT; the global text stays elsewhere', async () => {
