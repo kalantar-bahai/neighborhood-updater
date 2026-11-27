@@ -15,6 +15,7 @@ import { childTree } from '@/lib/children';
 import ManageAccessCard from './ManageAccessCard';
 import { SrpDot } from './SrpBadge';
 import { canRenameNucleus, deleteNotice, pendingIdentityLocks, nextNameAfterRename, pushToSrpMode, srpDetailMessage, srpOutOfStepMessage } from '@/lib/srp';
+import FamiliesList from './FamiliesList';
 import ConcentricRainbow, { formatValue, type AlignedLabel } from './ConcentricRainbow';
 import { groupCountsNote, namedToShow } from '@/lib/people';
 import { identityControls, typeChangePrompt, typeLabel } from '@/lib/nucleusIdentity';
@@ -1414,6 +1415,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 onNumChange={v => set('hhNum', v)} onNumBlur={() => commitField('hhNum', 'Households Connected', true)} readonly={!canWrite} pctReadonly numInteger
               />
             </div>
+            <FamiliesList nucleus={row.nucleus} />
           </div>}
         </div>
 
