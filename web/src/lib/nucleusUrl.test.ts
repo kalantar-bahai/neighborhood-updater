@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nucleusIdFromSearch, nucleusHref, nucleusFromUrl } from './nucleusUrl';
+import { nucleusIdFromSearch, spaceIdFromSearch, nucleusHref, nucleusFromUrl } from './nucleusUrl';
 
 const rows = [
   { id: 'id-a', nucleus: 'Riverside' },
@@ -18,6 +18,16 @@ describe('nucleusIdFromSearch', () => {
   });
 });
 
+describe('spaceIdFromSearch', () => {
+  it('reads the space id from the query string', () => {
+    expect(spaceIdFromSearch('?nucleus=a&space=s1')).toBe('s1');
+  });
+  it('is null when there is none, or it is blank', () => {
+    expect(spaceIdFromSearch('?nucleus=a')).toBeNull();
+    expect(spaceIdFromSearch('?space=%20')).toBeNull();
+  });
+});
+
 describe('nucleusHref', () => {
   it('puts the id in the address, encoded', () => {
     expect(nucleusHref('id-a')).toBe('/?nucleus=id-a');
@@ -25,6 +35,12 @@ describe('nucleusHref', () => {
   });
   it('is the home page with no id', () => {
     expect(nucleusHref(null)).toBe('/');
+  });
+  it('adds the space after the nucleus when given one', () => {
+    expect(nucleusHref('a', 's1')).toBe('/?nucleus=a&space=s1');
+  });
+  it('ignores the space when there is no nucleus', () => {
+    expect(nucleusHref(null, 's1')).toBe('/');
   });
 });
 

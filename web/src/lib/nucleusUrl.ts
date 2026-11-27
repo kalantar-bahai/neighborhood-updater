@@ -4,14 +4,25 @@
 // point at the wrong nucleus.
 
 const PARAM = 'nucleus';
+const SPACE_PARAM = 'space';
 
 export function nucleusIdFromSearch(search: string): string | null {
   const id = new URLSearchParams(search).get(PARAM)?.trim();
   return id ? id : null;
 }
 
-export function nucleusHref(id: string | null): string {
-  return id ? `/?${new URLSearchParams({ [PARAM]: id })}` : '/';
+// A space's page is the nucleus page with the space in the address too. Without a nucleus there is nothing to
+// put the space under, so the space is dropped.
+export function spaceIdFromSearch(search: string): string | null {
+  const id = new URLSearchParams(search).get(SPACE_PARAM)?.trim();
+  return id ? id : null;
+}
+
+export function nucleusHref(id: string | null, spaceId?: string | null): string {
+  if (!id) return '/';
+  const params = new URLSearchParams({ [PARAM]: id });
+  if (spaceId) params.set(SPACE_PARAM, spaceId);
+  return `/?${params}`;
 }
 
 export type UrlNucleus = { kind: 'none' } | { kind: 'open'; name: string } | { kind: 'missing' };
