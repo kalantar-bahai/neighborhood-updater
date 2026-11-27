@@ -84,3 +84,16 @@
 - `toFoundIndividual` passes `household` through, with null when it's absent.
 
 **Verify:** `npx tsc --noEmit`, `npm test`, and eslint on the changed files. All must exit 0.
+
+### Task 4: An honest SRP badge
+
+**Owner:** families edited here show "Waiting for SRP" indefinitely, because nothing writes households to SRP yet.
+
+**Change:** `srpBadge('WAITING')` returns `Not in SRP yet`, replacing `Waiting for SRP`. LOCAL_ONLY's `Only in Nucleus Assistant` stays.
+
+**Files:**
+- `web/src/lib/households.ts` and its test.
+- Any hard-coded copy in the components.
+- The `Waiting for SRP` text in `docs/superpowers/specs/2026-11-27-households-step2-design.md`, with a dated note.
+
+**Verify:** `npm test` and `npx tsc --noEmit` must exit 0.
