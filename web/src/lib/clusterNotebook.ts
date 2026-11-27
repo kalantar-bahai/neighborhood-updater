@@ -650,7 +650,9 @@ export interface PersonHide { hiddenAt: string; hiddenBy: PersonSummary | null; 
 export interface NucleusPerson {
   individual: PersonSummary & { household?: Household | null }; address: string | null; roles: string[]; isResident: boolean;
   ageCategory: AgeCategory | null; devotionalHost: DevotionalHostRole | null;
-  participates: boolean; facilitates: boolean; participation: Participation[];
+  // Confirmed with cluster-notebook 2026-11-27 (#66): inSpaces = named on a live record of any of this nucleus's
+  // spaces, archived spaces included.
+  participates: boolean; inSpaces: boolean; facilitates: boolean; participation: Participation[];
   hidden: boolean; hide: PersonHide | null;
 }
 const PARTICIPATION_SELECTION = 'activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current studyItemShortName personCompleted';
@@ -715,7 +717,7 @@ export async function getNucleusHouseholds(nucleusName: string): Promise<Househo
   return data.nucleus?.namedHouseholds ?? null;
 }
 
-const NUCLEUS_PERSON_SELECTION = `individual { ${HOUSEHOLD_PERSON_SELECTION} } address roles isResident ageCategory devotionalHost participates facilitates participation { ${PARTICIPATION_SELECTION} } hidden hide { hiddenAt reason hiddenBy { ${PERSON_SUMMARY_SELECTION} } }`;
+const NUCLEUS_PERSON_SELECTION = `individual { ${HOUSEHOLD_PERSON_SELECTION} } address roles isResident ageCategory devotionalHost participates inSpaces facilitates participation { ${PARTICIPATION_SELECTION} } hidden hide { hiddenAt reason hiddenBy { ${PERSON_SUMMARY_SELECTION} } }`;
 
 // Everyone connected to the nucleus: role holders here, plus residents on a home nucleus.
 // Includes hidden people (flagged `hidden`); `hide` is only filled for callers who can edit.
