@@ -98,6 +98,18 @@ describe('clusterNotebookErrorResponse', () => {
     expect((await clusterNotebookErrorResponse(err()).json()).error).toBe("That person's family changed. The list has been refreshed; try again.");
   });
 
+  test('inserts the name literally, even with $ patterns', async () => {
+    const err = new ClusterNotebookCodedError('m', 'ALREADY_HAS_ACCESS', 'u');
+    expect((await clusterNotebookErrorResponse(err, { name: 'A $& B' }).json()).error).toBe('A $& B already has access.');
+  });
+
+  test('leaves "{name}" in raw upstream messages alone', async () => {
+    const raw = new ClusterNotebookCodedError('m', 'BAD_INPUT', '{name} is wrong');
+    expect((await clusterNotebookErrorResponse(raw, { name: 'Ana' }).json()).error).toBe('{name} is wrong');
+    const unmapped = new ClusterNotebookCodedError('{name} broke', 'SOMETHING_NEW', 'u');
+    expect((await clusterNotebookErrorResponse(unmapped, { name: 'Ana' }).json()).error).toBe('{name} broke');
+  });
+
   test('the accounts route rewords SELF_LOCKOUT; the global text stays elsewhere', async () => {
     const err = () => new ClusterNotebookCodedError('m', 'SELF_LOCKOUT', 'u');
     const res = clusterNotebookErrorResponse(err(), { messages: ACCOUNT_MESSAGES });

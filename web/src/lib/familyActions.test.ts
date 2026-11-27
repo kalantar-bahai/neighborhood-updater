@@ -37,9 +37,9 @@ describe('parseAction', () => {
     expect(parseAction({ action: 'add', householdId: 'h', individualId: 'i', fromHouseholdId: '' })).toBe('Invalid fromHouseholdId');
   });
   test('rejects a non-object body', () => {
-    expect(typeof parseAction(null as never)).toBe('string');
-    expect(typeof parseAction('x' as never)).toBe('string');
-    expect(typeof parseAction(undefined as never)).toBe('string');
+    expect(parseAction(null)).toBe('Invalid body');
+    expect(parseAction('x')).toBe('Invalid body');
+    expect(parseAction(undefined)).toBe('Invalid body');
   });
 });
 

@@ -98,9 +98,13 @@ export function clusterNotebookErrorResponse(
   if (e instanceof ClusterNotebookCodedError) {
     const mapped = CODED_ERRORS[e.code];
     const mappedText = typeof mapped?.message === 'function' ? mapped.message(e.extensions) : mapped?.message;
-    const text = opts.messages?.[e.code] ?? (mapped ? (mappedText ?? e.upstreamMessage) : message);
+    // "{name}" is filled only in text from this file (the table or a route's own `messages`), never in raw upstream text.
+    const name = opts.name ?? 'That person';
+    const fill = (s: string) => s.replaceAll('{name}', () => name);
+    const own = opts.messages?.[e.code] ?? mappedText;
+    const text = own != null ? fill(own) : mapped ? e.upstreamMessage : message;
     return NextResponse.json(
-      { error: text.replaceAll('{name}', opts.name ?? 'That person'), code: e.code },
+      { error: text, code: e.code },
       { status: mapped?.status ?? 502 },
     );
   }

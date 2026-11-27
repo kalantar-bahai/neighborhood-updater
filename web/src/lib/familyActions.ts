@@ -8,8 +8,9 @@ export type FamilyAction =
 export const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
 
 // Strict body validation: returns the typed action, or a message for a 400.
-export function parseAction(body: Record<string, unknown>): FamilyAction | string {
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) return 'Invalid body';
+export function parseAction(input: unknown): FamilyAction | string {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) return 'Invalid body';
+  const body = input as Record<string, unknown>;
   switch (body.action) {
     case 'create': {
       const { contactId, memberIds } = body;
