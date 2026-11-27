@@ -48,11 +48,21 @@ describe('clusterNotebookErrorResponse', () => {
     ['BAD_INPUT', 400, 'upstream: 3 groups in use'],
     ['CLERK_ERROR', 502, "The invitation email couldn't be sent. Try again."],
     ['CLERK_NOT_CONFIGURED', 503, "Invitations aren't set up yet."],
+    ['HAS_MEMBERS', 409, 'This nucleus has members. Choose whether to move them in or end their memberships.'],
+    ['NEEDS_LOCALITY', 400, 'Choose a locality first. A Neighborhood must be in a locality.'],
+    ['MEMBER_ON_NEIGHBORHOOD', 400, "A Neighborhood's people are its residents. Tick Resident instead."],
     ['SOMETHING_NEW', 502, 'cluster-notebook GraphQL error: upstream: 3 groups in use'],
   ])('maps coded error %s to status %i with { error, code }', async (code, status, error) => {
     const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('cluster-notebook GraphQL error: upstream: 3 groups in use', code, 'upstream: 3 groups in use'));
     expect(res.status).toBe(status);
     expect(await res.json()).toEqual({ error, code });
+  });
+
+  test('MOVE_REFUSED counts the people from extensions.people', async () => {
+    const err = new ClusterNotebookCodedError('m', 'MOVE_REFUSED', 'u', { people: [{ id: 'p1', code: 'FORBIDDEN' }, { id: 'p2', code: 'OTHER_CLUSTER' }] });
+    const res = clusterNotebookErrorResponse(err);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "You can't move 2 of its members (another cluster, or no permission). Nothing changed.", code: 'MOVE_REFUSED' });
   });
 
   test.each(['SRP_IS_NEIGHBOURHOOD'])('%s shows the raw upstream text without the log prefix', async (code) => {

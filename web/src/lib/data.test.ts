@@ -132,7 +132,7 @@ describe('getRowData', () => {
   });
 
   // A home nucleus with a rename waiting is PENDING, but its residents still belong to it.
-  test('isHome follows inSrp even while an SRP change is pending', async () => {
+  test('isHome follows the isHome field even while an SRP change is pending', async () => {
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
@@ -142,7 +142,7 @@ describe('getRowData', () => {
       narrative: null, nucleusType: 'Neighborhood', parentNucleus: null,
       cluster: { name: 'NC-1 Test', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null, location: null,
-      inSrp: true,
+      inSrp: true, isHome: true,
       srpAction: { action: 'rename', status: 'pending', requestedAt: '2026-11-18T00:00:00Z', error: null, individuals: null, activities: null, srpChanged: false },
     });
 
@@ -361,7 +361,7 @@ describe('getRowData', () => {
     expect(result?.contactNames).toEqual([{ id: '4', name: 'Dave', email: 'dave@x.com' }]);
     expect(result?.promoterNames).toEqual([{ id: '5', name: 'Erin', email: null }]);
     expect(mockGetNucleusPeopleFlags).toHaveBeenCalledWith('Alpha');
-    expect(result?.peopleCounts).toEqual({ devotionalHosts: 2, participating: 2, facilitating: 1, residents: 2 });
+    expect(result?.peopleCounts).toEqual({ devotionalHosts: 2, participating: 2, facilitating: 1 });
   });
 
   test('passes through lastUpdated from cluster-notebook', async () => {
@@ -453,7 +453,7 @@ describe('getRowData', () => {
       lastUpdated: null,
       location: { name: 'Main St Setting', type: 'SETTING' },
     });
-    const options = [{ name: 'Carrboro', settings: [{ name: 'Main St Setting', srpLinked: true, nuclei: ['Alpha'] }] }];
+    const options = [{ id: 'L1', name: 'Carrboro', settings: [{ name: 'Main St Setting', srpLinked: true, nuclei: ['Alpha'] }] }];
     mockGetLocationOptions.mockResolvedValue(options);
 
     const result = await getRowData('Alpha');
@@ -485,6 +485,26 @@ describe('getRowData', () => {
     expect(result?.row.locationName).toBe('');
     expect(result?.row.locationType).toBe('');
   });
+
+  test('srp.isHome comes from isHome (not inSrp); memberCount is passed through', async () => {
+    mockGetNucleusFields.mockResolvedValue({
+      stage: null, locality: null, populationMakeup: null,
+      population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
+      inConversation: null, inCommunityActivities: null, protagonists: null, devotionalHosts: null,
+      inEducationalActivities: null, educationalFacilitators: null, helpingOthers: null, accompanying: null,
+      hasSocialAction: null, socialActionDescription: null, hasCommunityGatherings: null, communityGatheringDescription: null,
+      narrative: null, nucleusType: null, parentNucleus: null,
+      cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
+      lastUpdated: null, location: null,
+      isHome: true, inSrp: false, memberCount: 3, srpPlace: { id: 'P1', name: 'Carrboro' },
+    });
+
+    const result = await getRowData('Alpha');
+
+    expect(result?.srp.isHome).toBe(true);
+    expect(result?.srp.inSrp).toBe(false);
+    expect(result?.memberCount).toBe(3);
+  });
 });
 
 describe('saveRowData', () => {
@@ -507,6 +527,24 @@ describe('saveRowData', () => {
     await saveRowData('Alpha', { identity: { name: ' Beta ' } });
 
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { name: 'Beta' });
+  });
+
+  test('maps identity.localityId to patch.localityId', async () => {
+    mockUpdateNucleus.mockResolvedValue(null as never);
+    mockUpdateActivitySummary.mockResolvedValue(null);
+
+    await saveRowData('Alpha', { identity: { localityId: 'loc-1' } });
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { localityId: 'loc-1' });
+  });
+
+  test('maps identity.membersOnTypeChange alongside nucleusType', async () => {
+    mockUpdateNucleus.mockResolvedValue(null as never);
+    mockUpdateActivitySummary.mockResolvedValue(null);
+
+    await saveRowData('Alpha', { identity: { nucleusType: 'Neighborhood', membersOnTypeChange: 'MOVE_IN' } });
+
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { nucleusType: 'Neighborhood', membersOnTypeChange: 'MOVE_IN' });
   });
 
   test('ignores a blank identity.name', async () => {
@@ -1115,6 +1153,19 @@ describe('createRowData', () => {
 
     expect(mockCreateNucleus).toHaveBeenCalledWith('Alpha', 'NC-1 Test', 'Elm Locality');
     expect(mockUpdateNucleus).not.toHaveBeenCalled();
+  });
+
+  test('without SRP, sends location and nucleusType Neighborhood in the follow-up patch', async () => {
+    mockCreateNucleus.mockResolvedValue({ lastUpdated: null } as never);
+    mockUpdateNucleus.mockResolvedValue(null);
+
+    await createRowData({
+      identity: { nucleus: 'Alpha', cluster: 'NC-1 Test', location: 'Elm Locality', nucleusType: 'Neighborhood' },
+    });
+
+    expect(mockCreateNucleus).toHaveBeenCalledWith('Alpha', 'NC-1 Test', undefined);
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', expect.objectContaining({ nucleusType: 'Neighborhood' }));
+    expect(mockUpdateNucleus.mock.calls[0][1]).toHaveProperty('locationName', 'Elm Locality');
   });
 
   test('throws when nucleus name is missing', async () => {

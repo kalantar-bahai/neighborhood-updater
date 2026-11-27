@@ -23,6 +23,8 @@ export default function AppClient() {
   const [selectedNucleus, setSelectedNucleus] = useState<string | null>(null);
   // Bumped on every successful (re)load so DetailView remounts with fresh form state.
   const [detailVersion, setDetailVersion] = useState(0);
+  // A one-shot status for the DetailView a reload mounts (e.g. "3 moved in; SRP is being updated").
+  const [reloadNotice, setReloadNotice] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [creatingNew, setCreatingNew] = useState(false);
   // Card open/closed state for the open nucleus. Kept here, not in DetailView, so it survives
@@ -84,6 +86,7 @@ export default function AppClient() {
     setLoadingDetail(true);
     setSelectedNucleus(name);
     setDetail(null);
+    setReloadNotice(null);
     fetch(`/api/nucleus?name=${encodeURIComponent(name)}`)
       .then(r => r.json())
       .then(data => {
@@ -96,13 +99,14 @@ export default function AppClient() {
   }
 
   // In-place reload (Refresh, Push to SRP, Delete): no full-page "Loading..." flash.
-  function reloadNucleus(name: string) {
+  function reloadNucleus(name: string, notice?: string) {
     fetch(`/api/nucleus?name=${encodeURIComponent(name)}`)
       .then(async r => {
         const outcome = reloadOutcome(r.status);
         if (outcome === 'gone') { handleBack(); return; }
         const data = await r.json();
         if (outcome === 'error' || data.error) { setError(data.error || 'Failed to load nucleus.'); return; }
+        setReloadNotice(notice ?? null);
         setDetail(data);
         setDetailVersion(v => v + 1);
       })
@@ -154,7 +158,8 @@ export default function AppClient() {
         showBack={initialData.rows.length > 1}
         onBack={handleBack}
         onSaved={() => {}}
-        onReload={() => reloadNucleus(selectedNucleus)}
+        onReload={notice => reloadNucleus(selectedNucleus, notice)}
+        initialNotice={reloadNotice}
         onRenamed={(newName) => { setDetail(null); setSelectedNucleus(newName); setLoadingDetail(true); loadInitialData(newName); }}
         canCreateInCluster={initialData.clusterNames.includes(detail.row.cluster)}
         allNucleusNames={initialData.rows.map(r => r.nucleus)}

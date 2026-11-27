@@ -3,7 +3,7 @@ import type { LocalityOption, PermissionSet, SrpAction } from './clusterNotebook
 export type SrpState = 'IN_SRP' | 'PENDING' | 'REFUSED' | 'FAILED' | 'LOCAL_ONLY';
 
 // Confirmed with cluster-notebook 2026-11-16 (corrected): inSrp is current truth; srpAction is an attempted change — refused/failed rename|delete leaves the nucleus in SRP.
-// Only neighborhoods (an empty type means Neighborhood, as in Picker's typeKey) are tracked in SRP.
+// Only Neighborhoods are tracked in SRP (spec 2026-11-26, nucleus members): no type counts as not a Neighborhood.
 export function srpStateFor(
   nucleusType: string,
   inSrp: boolean | undefined,
@@ -11,7 +11,7 @@ export function srpStateFor(
   locationType?: string,
 ): SrpState | null {
   const type = nucleusType.trim().toLowerCase();
-  if (type !== '' && type !== 'neighborhood') return null;
+  if (type !== 'neighborhood') return null;
   if (srpAction) {
     // Confirmed with cluster-notebook 2026-11-17: srpChanged=true on a failed action means SRP may already hold the change — show as check-SRP regardless of inSrp.
     if (srpAction.status === 'failed' && srpAction.srpChanged === true) return 'FAILED';
@@ -24,7 +24,8 @@ export function srpStateFor(
         if (srpAction.action === 'create') {
           // Confirmed with cluster-notebook 2026-11-16: after moving a refused-create nucleus to its
           // Cluster, srpAction stays {create, refused}; showing it as Not in SRP is our UI call.
-          // Moving to the Cluster is how a user gives up on SRP.
+          // Only a nucleus with no type, or one that isn't a Neighborhood, can be at its Cluster; for
+          // those, moving there is how a user gives up on SRP. A Neighborhood can't move to the Cluster.
           if (locationType === 'CLUSTER') return 'LOCAL_ONLY';
           return srpAction.status === 'refused' ? 'REFUSED' : 'FAILED';
         }
@@ -68,7 +69,7 @@ export function srpDetailMessage(state: SrpState, srpAction: SrpAction | null | 
     case 'create': {
       if (state === 'LOCAL_ONLY') return null;
       if (!refused) return 'Something went wrong sending this to SRP. Contact an admin.';
-      const hint = 'Rename it or move it to another locality to try again.';
+      const hint = 'Rename it, move it to another locality, or change its type to try again.';
       return error ? `SRP refused this: ${error}. ${hint}` : `SRP refused this. ${hint}`;
     }
     case 'rename':
@@ -125,19 +126,29 @@ export function pendingIdentityLocks(
   return { location: true, type: action === 'create' };
 }
 
+type CreateIdentity = { nucleus: string; cluster: string; localityId?: string; srpLocality?: string; nucleusType?: string };
+
+// Without SRP the nucleus is created, then given its Locality and typed Neighborhood in one updateNucleus, which
+// leaves it at its own unlinked Setting there. The Locality goes by id: confirmed with cluster-notebook 2026-11-26,
+// names aren't unique and locationName can pick the wrong place (their #41). With SRP, cluster-notebook places it
+// and sets the type (srpLocalityName is still a name).
 export function createPayload(input: {
   name: string;
   cluster: string;
   locality: string;
+  localityId: string;
   createInSrp: boolean;
-}): { identity: { nucleus: string; cluster: string; location?: string; srpLocality?: string } } {
-  const identity: { nucleus: string; cluster: string; location?: string; srpLocality?: string } = {
+}): { identity: CreateIdentity } {
+  const identity: CreateIdentity = {
     nucleus: input.name.trim(),
     cluster: input.cluster,
   };
   if (input.locality) {
     if (input.createInSrp) identity.srpLocality = input.locality;
-    else identity.location = input.locality;
+    else {
+      identity.localityId = input.localityId;
+      identity.nucleusType = 'Neighborhood';
+    }
   }
   return { identity };
 }
@@ -176,6 +187,7 @@ export function pushToSrpMode(input: {
   srpName: string | null;
   locationType: string;
   settingLinked: boolean | undefined;
+  isHome: boolean;
   canCreateInCluster: boolean;
 }): 'create' | 'newNeighbourhood' | 'resendName' | null {
   if (!input.canCreateInCluster) return null;
@@ -183,6 +195,9 @@ export function pushToSrpMode(input: {
     return input.srpName && input.srpName !== input.name ? 'resendName' : null;
   }
   if (input.state !== 'LOCAL_ONLY') return null;
+  // Confirmed with cluster-notebook 2026-11-26: an unpushed Neighborhood is at its own unlinked Setting; pushing creates
+  // its FN. Decided from isHome, so Push doesn't depend on finding that Setting in the locality list.
+  if (input.isHome) return 'create';
   if (input.locationType === 'LOCALITY') return 'create';
   if (input.locationType === 'SETTING' && input.settingLinked === false) return 'create';
   if (input.locationType === 'SETTING' && input.settingLinked === true) return 'newNeighbourhood';

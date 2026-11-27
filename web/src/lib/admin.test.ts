@@ -2,7 +2,7 @@ import { describe, test, expect, vi } from 'vitest';
 import { adminPersonLine, roleHoldingLine, holdingLabel, currentRolesLine, endRoleConfirm, placeTree, moveTargets, isAdminOf, lookupIsAdmin,
   invitationStatusWord, invitationLine, accountLine, accountRemovedNote, activeAccountCount, prefillEmail, adminPersonTags, removeAccessConfirm, validateInvite,
   inviteRequestBody, cancelInvitationConfirm, splitInvitations, findAccounts, findPeople, hidesToLift,
-  logHeadline, logChanges, changeValueText, nextLogCursor, mergeLogPages, createdNote } from './admin';
+  logHeadline, logChanges, logRefusal, changeValueText, nextLogCursor, mergeLogPages, createdNote } from './admin';
 import type { AdminPerson, AdminPlace, RoleHolding, Invitation, AccountInfo, PersonDetails, PersonSummary, HiddenPerson, MoveResult, LogEntry } from './clusterNotebook';
 
 const person = (ageCategory: AdminPerson['ageCategory'], placePath: string[]): AdminPerson => ({
@@ -319,7 +319,7 @@ describe('findPeople', () => {
 
 const entry = (o: Partial<LogEntry> = {}): LogEntry => ({
   id: 'e1', occurredAt: '2026-11-24T14:05:00Z', actor: summary('Ben', 'Okafor'), mutation: 'grantRole',
-  entityType: 'role_in_ne', entityId: 'r1', changeType: 'create', changes: { role: { old: null, new: 'CSO' } }, ...o });
+  entityType: 'role_in_ne', entityId: 'r1', changeType: 'create', changes: { role: { old: null, new: 'CSO' } }, reason: null, names: {}, ...o });
 describe('logHeadline', () => {
   test('who, what, on what', () => {
     expect(logHeadline(entry())).toBe('Ben Okafor · grantRole · role r1');
@@ -361,6 +361,35 @@ describe('logChanges and changeValueText', () => {
   test('a null field value gives dashes; a string field value shows as the new text', () => {
     expect(logChanges(entry({ changes: { a: null, b: 'plain' } as unknown as LogEntry['changes'] })))
       .toEqual([{ field: 'a', old: '—', new: '—' }, { field: 'b', old: '—', new: 'plain' }]);
+  });
+});
+describe('logChanges names and logRefusal', () => {
+  const moved = { location_id: { old: 'a1', new: 'b2' } };
+  test('ids that have a name are shown as the name', () => {
+    expect(logChanges(entry({ changes: moved, names: { a1: 'Royal Park', b2: 'Carrboro' } })))
+      .toEqual([{ field: 'location_id', old: 'Royal Park', new: 'Carrboro' }]);
+  });
+  test('ids without a name stay as written', () => {
+    expect(logChanges(entry({ changes: moved, names: {} }))).toEqual([{ field: 'location_id', old: 'a1', new: 'b2' }]);
+  });
+  test('a refused move says why and where it went back to', () => {
+    expect(logRefusal(entry({ mutation: 'srpRefusedMove', reason: 'HOUSEHOLD_MOVES_TOGETHER', changes: moved, names: { b2: 'Carrboro' } })))
+      .toBe('SRP refused the move: Households move together. Back at Carrboro.');
+  });
+  test('an unknown code or no reason reads cleanly', () => {
+    expect(logRefusal(entry({ mutation: 'srpRefusedMove', reason: 'WEIRD_CODE', changes: moved, names: { b2: 'Carrboro' } })))
+      .toBe('SRP refused the move: WEIRD_CODE. Back at Carrboro.');
+    expect(logRefusal(entry({ mutation: 'srpRefusedMove', reason: null, changes: moved, names: { b2: 'Carrboro' } })))
+      .toBe('SRP refused the move: no reason given. Back at Carrboro.');
+  });
+  test('a value that is an Object.prototype key is not mapped through names', () => {
+    expect(logChanges(entry({ changes: { role: { old: 'constructor', new: 'toString' } }, names: {} })))
+      .toEqual([{ field: 'role', old: 'constructor', new: 'toString' }]);
+    expect(logRefusal(entry({ mutation: 'srpRefusedMove', reason: 'X', changes: { location_id: { old: 'a1', new: 'constructor' } }, names: {} })))
+      .toBe('SRP refused the move: X. Back at constructor.');
+  });
+  test('other mutations have no refusal', () => {
+    expect(logRefusal(entry({ mutation: 'moveIndividuals', changes: moved }))).toBeNull();
   });
 });
 describe('nextLogCursor and mergeLogPages', () => {

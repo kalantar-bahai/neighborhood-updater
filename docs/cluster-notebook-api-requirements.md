@@ -492,3 +492,76 @@ type LogEntry { ...existing...  entityName: String }
 - **Still to do before names can repeat:** this app must stop looking nuclei up by name (switch to the id forms
   above, and stop keying permissions by lower-cased name). Then cluster-notebook narrows uniqueness to the locality
   and adds `NucleusPatch.locationId`, since setting names can repeat across localities too.
+
+## Members of a nucleus, confirmed with cluster-notebook 2026-11-26
+
+Design: `docs/superpowers/specs/2026-11-26-nucleus-members-design.md`. Not yet deployed. Selecting these fields before
+deploy breaks every read, so the app merges only after cluster-notebook confirms they are live.
+
+```graphql
+type Nucleus {
+  isHome: Boolean!        # has its own Setting (any Neighborhood); inSrp = that Setting is linked to SRP
+  inSrp: Boolean!
+  memberCount: Int!
+  srpPlace: Location      # null unless isHome
+}
+type Location {
+  srpLinked: Boolean!
+  homeNucleusId: String
+}
+input NucleusPatch {
+  localityId: String
+  membersOnTypeChange: MembersOnTypeChange   # MOVE_IN | END
+}
+# LogEntry gains: reason: String, names: JSON!
+```
+
+- **Residence and membership.** A Neighborhood nucleus has its own Setting. Its residents are the people placed there,
+  linked or not. Network and Population nuclei have no Setting; their members hold the informal `member` role in
+  `updateNucleusWorkers`. A `member` role on a Neighborhood is refused.
+- **`isHome` and `inSrp`.** `isHome && !inSrp` is a Neighborhood that isn't in SRP yet. Residents there are placed at its
+  Setting locally, and SRP places them at the projected place until the nucleus is pushed.
+- **`srpPlace`** is null unless `isHome`. It is the nucleus's own Setting when that Setting is in SRP. Otherwise it is the
+  projection: the nearest ancestor in the same Locality whose Setting is linked, or else the Locality.
+- **`memberCount`** counts residents for a Neighborhood and current `member` holders for any other type. Each person
+  counts once, whatever roles they hold. Hidden people are left out.
+- **Interim locality rule** (for an app that still sends `locationName` or `locationId`). On a Neighborhood, a value that
+  points to a Locality acts as `localityId`. Pointing it at the Cluster gives `NEEDS_LOCALITY`. Pointing it at another
+  Setting is refused: `SRP_IS_NEIGHBOURHOOD` for a home that is in SRP, and `BAD_INPUT` otherwise.
+- **Error codes:**
+  - `HAS_MEMBERS {memberCount}`: a non-Neighborhood with members became a Neighborhood without `membersOnTypeChange`.
+  - `MOVE_REFUSED {people: [{id, code}]}`: `code` is `FORBIDDEN` or `OTHER_CLUSTER`. Only ids are listed, for privacy.
+    `MOVE_IN` is all-or-nothing, so nothing changed.
+  - `NEEDS_LOCALITY`: a Neighborhood needs a Locality.
+  - `MEMBER_ON_NEIGHBORHOOD`: a `member` role was granted on a Neighborhood.
+- **`MOVE_IN` results.** SRP refusals happen later, in the worker, so nothing reports them at once. Outcomes arrive on each
+  person's `placeSync`.
+- **Refused moves in the log.** The undo that follows an SRP refusal is audited with mutation `srpRefusedMove`, and
+  `reason` carries the refusal code. `names` maps every id in a row's `changes` to its current display name. Names are
+  resolved when the log is read, so a renamed place shows its current name. An id whose row is gone is left out of the
+  map, and the app shows the id.
+- **Type null.** A null `nucleusType` means "not decided yet". It is allowed only away from a Setting, and counts as not
+  a Neighborhood.
+- **Behaviour updates, confirmed with cluster-notebook later on 2026-11-26:**
+  - **`Location.homeNucleus`** is now set for unlinked Settings too, so having a `homeNucleus` no longer means "in SRP".
+    Use `srpLinked` or `Nucleus.inSrp` to tell. The app uses `homeNucleus` only to find a person's previous nucleus when
+    they move in.
+  - **A Neighborhood's location is always its own Setting**, including migrated ones that used to sit at a Locality.
+    Re-sending that Setting as `locationName` does nothing.
+  - **Any other Setting given as `locationName` is `BAD_INPUT`**, and so is moving a nucleus onto another nucleus's
+    linked Setting.
+  - **`moveIndividuals`** accepts a Locality, any linked Setting, or an unlinked Setting that has a home nucleus.
+  - **Pushing an untyped nucleus at a Locality** first makes it a Neighborhood with its own Setting. If it has members,
+    the push is refused with `HAS_MEMBERS`. The app doesn't offer Push for an untyped nucleus.
+    - **What the app does:** Push is offered for any `isHome && !inSrp` nucleus, as a create, whatever its Setting.
+  - **Pushing a Neighborhood** moves each resident's whole SRP household into the new FN (owner's decision).
+  - **A move that leaves SRP's placement unchanged** is not sent to SRP. `placeSync` shows it as synced, with code
+    `UNCHANGED_IN_SRP`.
+  - **`createNucleus` with `srpLocalityName`** returns the new nucleus's own Setting as `location` (type `SETTING`).
+  - **Creating a Neighborhood without SRP:** after `createNucleus(name, clusterName)`, one `updateNucleus` with
+    `{nucleusType: "Neighborhood", localityId}` leaves it a Neighborhood at its own unlinked Setting in that Locality,
+    as a single savepointed change. Send `localityId`, not `locationName`: `locationName` is looked up by name across
+    Clusters, Localities and Settings, and names aren't unique (cluster-notebook #41).
+  - **`getLocationOptions`** lists every Setting under a readable Locality, including an unpushed Neighborhood's own
+    Setting (`srpLinked: false`, `nuclei: [its name]`). Archived Settings are left out (cluster-notebook's members
+    branch, 2026-11-26).

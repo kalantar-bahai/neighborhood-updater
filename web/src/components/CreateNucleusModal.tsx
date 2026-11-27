@@ -10,7 +10,7 @@ interface Props {
   onCreated: (name: string) => void;
 }
 
-// Only what createNucleus needs: name, cluster, an optional locality and Create in SRP.
+// Only what createNucleus needs: name, cluster, a required locality and Create in SRP.
 // Everything else -- population, activities, narrative, worker roles like
 // Contact/Promoting/Helping/Accompanying/ABm Assistant -- can't be set until the
 // nucleus exists in cluster-notebook anyway (those all query/mutate by nucleus
@@ -20,7 +20,8 @@ interface Props {
 export default function CreateNucleusModal({ clusterNames, onClose, onCreated }: Props) {
   const [nucleus, setNucleus] = useState('');
   const [cluster, setCluster] = useState('');
-  const [locality, setLocality] = useState('');
+  // The chosen Locality's id: names may repeat across localities.
+  const [localityId, setLocalityId] = useState('');
   const [localities, setLocalities] = useState<LocalityOption[]>([]);
   const [loadingLocalities, setLoadingLocalities] = useState(false);
   const [localityError, setLocalityError] = useState('');
@@ -29,13 +30,14 @@ export default function CreateNucleusModal({ clusterNames, onClose, onCreated }:
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
-  const selectedLocality = localities.find(l => l.name === locality);
+  const selectedLocality = localities.find(l => l.id === localityId);
+  const locality = selectedLocality?.name ?? '';
   const clash = findNameClash(nucleus, selectedLocality);
-  const canCreate = nucleus.trim() !== '' && cluster.trim() !== '' && !creating && !(createInSrp && clash);
+  const canCreate = nucleus.trim() !== '' && cluster.trim() !== '' && locality !== '' && !creating && !(createInSrp && clash);
 
   async function handleClusterChange(next: string) {
     setCluster(next);
-    setLocality('');
+    setLocalityId('');
     setLocalities([]);
     setCreateInSrp(false);
     setLocalityError('');
@@ -66,7 +68,7 @@ export default function CreateNucleusModal({ clusterNames, onClose, onCreated }:
       const res = await fetch('/api/nucleus', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formData: createPayload({ name: nucleus, cluster, locality, createInSrp }) }),
+        body: JSON.stringify({ formData: createPayload({ name: nucleus, cluster, locality, localityId, createInSrp }) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Create failed');
@@ -125,20 +127,23 @@ export default function CreateNucleusModal({ clusterNames, onClose, onCreated }:
         <div className="field" style={{ marginBottom: 12 }}>
           <label>Locality</label>
           <select
-            value={locality}
+            value={localityId}
             disabled={loadingLocalities || !cluster}
-            onChange={e => { setLocality(e.target.value); if (!e.target.value) setCreateInSrp(false); }}
+            onChange={e => { setLocalityId(e.target.value); if (!e.target.value) setCreateInSrp(false); }}
             style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 14, boxSizing: 'border-box', background: 'white' }}
           >
             {loadingLocalities ? (
               <option value="">(loading…)</option>
             ) : (
               <>
-                <option value="">(none)</option>
-                {localities.map(l => <option key={l.name} value={l.name}>{l.name}</option>)}
+                <option value="">Select a locality…</option>
+                {localities.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </>
             )}
           </select>
+          {cluster && !loadingLocalities && !localityError && !locality && (
+            <div style={{ fontSize: 12, color: '#718096', marginTop: 4 }}>Choose a locality for this neighborhood.</div>
+          )}
           {localityError && <div style={{ color: '#e53e3e', fontSize: 13, marginTop: 4 }}>{localityError}</div>}
         </div>
 

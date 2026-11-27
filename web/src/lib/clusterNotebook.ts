@@ -44,7 +44,7 @@ const PERMISSION_SET_SELECTION = 'canRead canWrite canChangeIdentity canDelete c
 
 interface GraphQLResponse<T> {
   data?: T;
-  errors?: { message: string; extensions?: { code?: string } }[];
+  errors?: { message: string; extensions?: { code?: string; [k: string]: unknown } }[];
 }
 
 // Thrown instead of a plain Error when cluster-notebook rejects a call for
@@ -59,7 +59,8 @@ export class ClusterNotebookForbiddenError extends Error {}
 export class ClusterNotebookCodedError extends Error {
   // `message` carries the "cluster-notebook GraphQL error: " prefix for logs;
   // `upstreamMessage` is the raw first-error text, safe to show to users.
-  constructor(message: string, public code: string, public upstreamMessage: string) {
+  // `extensions` is the full upstream extensions object (e.g. MOVE_REFUSED lists `people`).
+  constructor(message: string, public code: string, public upstreamMessage: string, public extensions: Record<string, unknown> = {}) {
     super(message);
   }
 }
@@ -92,7 +93,7 @@ async function request<T>(query: string, variables: Record<string, unknown>): Pr
     const message = `cluster-notebook GraphQL error: ${json.errors.map(e => e.message).join('; ')}`;
     const code = json.errors[0]?.extensions?.code;
     if (typeof code === 'string' && code) {
-      throw new ClusterNotebookCodedError(message, code, json.errors[0].message);
+      throw new ClusterNotebookCodedError(message, code, json.errors[0].message, json.errors[0].extensions ?? {});
     }
     throw new Error(message);
   }
@@ -150,6 +151,12 @@ export interface NucleusFields {
   // Optional: `inSrp` isn't on the cluster-notebook branch yet; `srpAction` is
   // optional here only so existing NucleusFields fixtures keep compiling.
   inSrp?: boolean;
+  // Confirmed with cluster-notebook (members of a nucleus; not deployed yet at time of writing): isHome means the
+  // nucleus has its own Setting (any Neighborhood; inSrp = linked to SRP); memberCount counts the nucleus's members; srpPlace is the
+  // SRP neighbourhood it is linked to. Optional for the same reason as inSrp: existing fixtures keep compiling.
+  isHome?: boolean;
+  memberCount?: number;
+  srpPlace?: { id: string; name: string } | null;
   // Confirmed with cluster-notebook 2026-11-18 (#39): SRP's last-known name for a home nucleus's FN; null unless inSrp.
   srpName?: string | null;
   srpAction?: SrpAction | null;
@@ -323,6 +330,7 @@ export interface SettingOption {
   nuclei: string[];
 }
 export interface LocalityOption {
+  id: string;
   name: string;
   settings: SettingOption[];
 }
@@ -331,7 +339,7 @@ export async function getLocationOptions(clusterName: string): Promise<LocalityO
   const query = `
     query GetLocationOptions($clusterName: String) {
       clusters(name: $clusterName) {
-        localities { name settings { name srpLinked nuclei } }
+        localities { id name settings { name srpLinked nuclei } }
       }
     }
   `;
@@ -422,7 +430,7 @@ const NUCLEUS_FIELDS_SELECTION = 'stage locality populationMakeup population hou
   + 'inConversation inCommunityActivities protagonists devotionalHosts inEducationalActivities educationalFacilitators helpingOthers accompanying '
   + 'hasSocialAction socialActionDescription hasCommunityGatherings communityGatheringDescription narrative nucleusType '
   + 'cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers } parentNucleus { name } lastUpdated { at by } '
-  + 'location { name type } ' + SRP_SELECTION;
+  + 'location { name type } isHome memberCount ' + SRP_SELECTION;
 
 export async function getNucleusFields(nucleusName: string): Promise<NucleusFields | null> {
   const query = `
@@ -456,6 +464,11 @@ export async function updateNucleus(
     hasCommunityGatherings?: boolean | null; communityGatheringDescription?: string;
     narrative?: string;
     nucleusType?: string;
+    // Members of a nucleus (not deployed yet): localityId places a nucleus in a locality (NEEDS_LOCALITY when
+    // a Neighborhood has none); membersOnTypeChange says what to do with members when the type changes
+    // (HAS_MEMBERS when omitted and there are some).
+    localityId?: string;
+    membersOnTypeChange?: 'MOVE_IN' | 'END';
     // Added 2026-09-14 -- a plain string (unlike the `parentNucleus { name }` query
     // field), not nested. null clears the parent; an unknown name throws a real
     // error rather than silently no-opping.
@@ -706,7 +719,10 @@ export async function moveIndividuals(individualIds: string[], locationId: strin
 }
 
 // Where a nucleus is, and its parent, to work out where "move out" goes. null when not found.
-export interface MoveContext { location: PlaceSummary | null; parent: { inSrp: boolean; location: PlaceSummary | null } | null }
+export interface MoveContext {
+  location: PlaceSummary | null; parent: { inSrp: boolean; location: PlaceSummary | null } | null;
+  isHome: boolean; inSrp: boolean; srpPlace: PlaceSummary | null;
+}
 
 export async function getMoveContext(nucleusName: string): Promise<MoveContext | null> {
   const query = `
@@ -714,12 +730,14 @@ export async function getMoveContext(nucleusName: string): Promise<MoveContext |
       nucleus(name: $name) {
         location { ${PLACE_SELECTION} }
         parentNucleus { inSrp location { ${PLACE_SELECTION} } }
+        isHome inSrp srpPlace { ${PLACE_SELECTION} }
       }
     }
   `;
-  const data = await request<{ nucleus: { location: PlaceSummary | null; parentNucleus: MoveContext['parent'] } | null }>(query, { name: nucleusName });
+  const data = await request<{ nucleus: (Omit<MoveContext, 'parent'> & { parentNucleus: MoveContext['parent'] }) | null }>(query, { name: nucleusName });
   if (!data.nucleus) return null;
-  return { location: data.nucleus.location, parent: data.nucleus.parentNucleus };
+  const n = data.nucleus;
+  return { location: n.location, parent: n.parentNucleus, isHome: n.isHome, inSrp: n.inSrp, srpPlace: n.srpPlace };
 }
 
 // Intentionally dumb on cluster-notebook's side: `name` becomes the entire
@@ -911,7 +929,11 @@ export interface LogEntry { id: string; occurredAt: string; actor: PersonSummary
   changes: Record<string, { old: unknown; new: unknown }>;
   // Confirmed with cluster-notebook 2026-11-25: the place, person, invitation or account name (or a role/hide
   // description); null if the row is gone. The Log card's headline uses it.
-  entityName?: string | null }
+  entityName?: string | null;
+  // Members of a nucleus (not deployed yet): why the change was made (null if none given), and id -> display
+  // name for the ids that appear in `changes`.
+  reason: string | null;
+  names: Record<string, string> }
 
 // Confirmed with cluster-notebook 2026-11-25: newest first (occurredAt desc, id desc). Keyset: strictly older than
 // (before, beforeId), which are the last row's occurredAt and id. limit 1..500; beforeId without before is BAD_INPUT.
@@ -920,7 +942,7 @@ export async function getChangeLog(clusterName: string, page?: { before: string;
   const query = `
     query GetChangeLog($clusterName: String!, $limit: Int!, $before: DateTime, $beforeId: String) {
       changeLog(clusterName: $clusterName, limit: $limit, before: $before, beforeId: $beforeId) {
-        id occurredAt actor { ${PERSON_SUMMARY_SELECTION} } mutation entityType entityId changeType changes entityName
+        id occurredAt actor { ${PERSON_SUMMARY_SELECTION} } mutation entityType entityId changeType changes entityName reason names
       }
     }
   `;

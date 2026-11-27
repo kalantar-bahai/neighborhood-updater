@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import type { LogEntry } from '@/lib/clusterNotebook';
-import { logHeadline, logChanges, nextLogCursor, mergeLogPages } from '@/lib/admin';
+import { logHeadline, logChanges, logRefusal, nextLogCursor, mergeLogPages } from '@/lib/admin';
 
 const BTN: React.CSSProperties = { fontSize: 13, padding: '4px 12px', minHeight: 44, borderRadius: 6, cursor: 'pointer', border: '1px solid #cbd5e0', background: 'white', color: '#4a5568' };
 
@@ -70,6 +70,7 @@ export default function LogCard({ cluster }: { cluster: string }) {
                 <div onClick={() => toggleRow(e.id)} style={{ padding: '8px 0', cursor: 'pointer', fontSize: 14 }}>
                   <div style={{ fontSize: 12, color: '#718096' }}>{when(e.occurredAt)}</div>
                   <div style={{ overflowWrap: 'anywhere' }}>{logHeadline(e)}</div>
+                  {logRefusal(e) && <div style={{ fontSize: 12, color: '#c53030' }}>{logRefusal(e)}</div>}
                 </div>
                 {isOpen && (
                   logChanges(e).length === 0 ? (

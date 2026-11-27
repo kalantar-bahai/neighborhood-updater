@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { NucleusDetail, NucleusRow, Activity } from '@/types';
 import type { Worker } from '@/types';
 import type { PermissionSet } from '@/lib/access';
-import type { LastUpdated, LocalityOption } from '@/lib/clusterNotebook';
+import type { LastUpdated } from '@/lib/clusterNotebook';
 import WorkerListModal from './WorkerListModal';
 import PeopleCard from './PeopleCard';
 import ManageAccessCard from './ManageAccessCard';
@@ -13,6 +13,7 @@ import { SrpDot } from './SrpBadge';
 import { canRenameNucleus, deleteNotice, pendingIdentityLocks, nextNameAfterRename, pushToSrpMode, srpDetailMessage, srpOutOfStepMessage } from '@/lib/srp';
 import ConcentricRainbow, { formatValue, type AlignedLabel } from './ConcentricRainbow';
 import { namedToShow } from '@/lib/people';
+import { identityControls, typeChangePrompt, typeLabel } from '@/lib/nucleusIdentity';
 
 interface Props {
   detail: NucleusDetail;
@@ -22,7 +23,9 @@ interface Props {
   onBack: () => void;
   onSaved: (savedBy: string, savedAt: string) => void;
   // Re-fetches this nucleus (used after Push to SRP and by the PENDING "Refresh" link).
-  onReload: () => void;
+  // notice: a one-shot status shown by the reloaded view (it remounts, losing this one's state).
+  onReload: (notice?: string) => void;
+  initialNotice: string | null;
   // Called after a successful rename with the new name, so the shell reloads under it.
   onRenamed: (newName: string) => void;
   // True when the user can create a nucleus in this nucleus's cluster (the capability lives on the Cluster).
@@ -53,31 +56,6 @@ function computedPct(connected: string, total: string): string {
 }
 
 function isValidInt(v: string) { return !v || /^\d+$/.test(v.trim()); }
-
-// Surfaces the two consequences cluster-notebook described directly, 2026-10-08,
-// for whichever Setting is currently chosen (a Locality-only or cluster-level
-// choice has neither): other nuclei already there (their counts get SUMMED
-// together in SRP, which double-counts if this nucleus's people are a subset of
-// theirs) and a Setting that isn't linked to SRP yet (entered numbers stay local
-// for now). `ownNucleusName` is filtered out of "already has" -- a nucleus already
-// placed at this Setting isn't "sharing" with itself. The `!locationName` guard is
-// defensive, not expected in practice -- every nucleus has a location now (commit
-// c40fb54, same day), so this should only ever trigger for a handful of already-
-// archived nuclei that predate that rule.
-function locationWarningFor(locationName: string, options: LocalityOption[], ownNucleusName: string): string | null {
-  if (!locationName) return null;
-  for (const locality of options) {
-    for (const setting of locality.settings) {
-      if (setting.name !== locationName) continue;
-      const others = setting.nuclei.filter(n => n !== ownNucleusName);
-      if (others.length > 0) {
-        return `This Setting already has ${others.join(', ')} — your counts will be summed together in SRP.`;
-      }
-      return setting.srpLinked ? null : 'This Setting isn’t linked to SRP yet — entered numbers will stay local for now.';
-    }
-  }
-  return null;
-}
 
 // The three actually-editable Activity fields -- excludes isOverridden, which is
 // server-computed display state, never something a blur/change event commits.
@@ -149,14 +127,15 @@ function Field({ label, value, onChange, onBlur, readonly, type, integer, onLabe
   );
 }
 
-function SelectField({ label, value, options, onChange, fromSheet }: {
+function SelectField({ label, value, options, onChange, fromSheet, optionLabel }: {
   label: string; value: string; options: string[]; onChange: (v: string) => void; fromSheet?: boolean;
+  optionLabel?: (o: string) => string;
 }) {
   return (
     <div className={`field${fromSheet ? ' from-sheet' : ''}`}>
       <label>{label}</label>
       <select value={value || ''} onChange={e => onChange(e.target.value)}>
-        {options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
+        {options.map(o => <option key={o} value={o}>{optionLabel ? optionLabel(o) : o || '—'}</option>)}
       </select>
     </div>
   );
@@ -414,7 +393,6 @@ const IcoDiagram3 = () => (
   </svg>
 );
 
-const TYPE_OPTIONS  = ['', 'Neighborhood', 'Network', 'Population'];
 const STAGE_OPTIONS = ['', 'Potential/1', 'Initial/2', 'Emerging/3', 'Expanding/4', 'Advanced/5', 'Advanced+/6'];
 
 // Bounding box centered in 540×310 viewBox (70px h-margin, 55px v-margin each side).
@@ -570,7 +548,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 // The 9-figure diagram (ConcentricRainbow, formerly the staggered 9-ring one) lives in its own file,
 // 2026-10-08, so Picker.tsx can also render a rollup version of it from its own popup.
 
-export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, onRenamed, canCreateInCluster, allNucleusNames, childCount, cardOpen, onCardOpenChange }: Props) {
+export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, initialNotice, onRenamed, canCreateInCluster, allNucleusNames, childCount, cardOpen, onCardOpenChange }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   // Baseline to diff a blur-triggered field's current value against, so clicking into
@@ -579,7 +557,8 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const committedRef = useRef<FormState>(rowToForm(row));
   const [saving, setSaving] = useState(false);
   const [pushing, setPushing] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<{ msg: string; type: 'idle' | 'success' | 'error' }>({ msg: '', type: 'idle' });
+  const [saveStatus, setSaveStatus] = useState<{ msg: string; type: 'idle' | 'success' | 'error' }>(
+    () => initialNotice ? { msg: initialNotice, type: 'success' } : { msg: '', type: 'idle' });
   // The most recent failed field save, so the status bar can offer a one-click Retry
   // instead of requiring the user to re-edit the field to re-trigger a blur.
   const [retry, setRetry] = useState<{ label: string; run: () => void } | null>(null);
@@ -607,8 +586,19 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const [promoterNames, setPromoterNames] = useState<Worker[]>(() => detail.promoterNames);
   // People SRP shows hosting devotionals, taking part in and facilitating activities: the "(x)" on those estimates.
   const counts = detail.peopleCounts;
-  // Residents only mean something on a home nucleus (only there can anyone be placed at its Setting).
-  const residentsNamed = detail.srp.isHome ? counts.residents : undefined;
+  // Members of this nucleus (residents on a Neighborhood), shown on every nucleus. Kept in state so a change on the
+  // People card shows at once (owner 2026-11-26); refreshMemberCount re-reads it from cluster-notebook.
+  const [memberCount, setMemberCount] = useState(detail.memberCount);
+  const memberCountSeq = useRef(0);
+  async function refreshMemberCount() {
+    const seq = ++memberCountSeq.current;
+    try {
+      const res = await fetch(`/api/nucleus?name=${encodeURIComponent(row.nucleus)}`);
+      // Keep only the newest answer; on failure the old count stays until the next change or a reload.
+      if (res.ok && seq === memberCountSeq.current) setMemberCount((await res.json()).memberCount);
+    } catch { /* as above */ }
+  }
+  const residentsNamed = memberCount;
   const [showPromotersModal, setShowPromotersModal] = useState(false);
   // Which cards are open lives in AppClient, so an in-place reload (Refresh, Push, Location
   // save), which remounts this view, keeps the cards the user had open.
@@ -753,6 +743,39 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
       }
     };
     void attempt();
+  }
+
+  // Type: changes to or from Neighborhood ask about members first (spec 2026-11-26, nucleus members).
+  // Crossing Neighborhood creates or archives the nucleus's Setting, so the view reloads to pick up
+  // isHome, memberCount and the Locality/Location control; Move them in's message rides the reload.
+  const [membersIn, setMembersIn] = useState<{ text: string } | null>(null);
+  // Escape cancels the dialog; the listener lives only while it is open, and setState runs in the handler.
+  const membersDialogOpen = membersIn !== null;
+  useEffect(() => {
+    if (!membersDialogOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMembersIn(null); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [membersDialogOpen]);
+  function changeType(to: string) {
+    const from = form.nucleusType;
+    const prompt = typeChangePrompt({ from, to, isHome: detail.srp.isHome, memberCount });
+    if (prompt.kind === 'membersIn') { setMembersIn({ text: prompt.text }); return; }
+    if (prompt.kind === 'residentsOut' && !window.confirm(prompt.text)) return;
+    setAndSave('nucleusType', to, { identity: { nucleusType: to } }, 'Type', from === 'Neighborhood' || to === 'Neighborhood');
+  }
+  async function membersOnTypeChange(choice: 'MOVE_IN' | 'END') {
+    setMembersIn(null);
+    const moved = memberCount;
+    setForm(f => ({ ...f, nucleusType: 'Neighborhood' }));
+    const result = await saveField({ identity: { nucleusType: 'Neighborhood', membersOnTypeChange: choice } }, 'Type');
+    if (!result.ok) {
+      // Refused as a whole (e.g. MOVE_REFUSED): nothing changed, so neither does Type.
+      setForm(f => ({ ...f, nucleusType: committedRef.current.nucleusType }));
+      return;
+    }
+    committedRef.current = { ...committedRef.current, nucleusType: 'Neighborhood' };
+    onReload(choice === 'MOVE_IN' ? `${moved} moved in; SRP is being updated` : 'Memberships ended');
   }
 
   // Rename: sends ONLY the name (saveRowData re-reads by the old name, so it must never be
@@ -910,6 +933,15 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
 
   const srpState = detail.srp.state;
   const srpMessage = srpState ? srpDetailMessage(srpState, detail.srp.action, detail.srp.srpName === row.nucleus) : null;
+  const controls = identityControls({
+    isHome: detail.srp.isHome,
+    inSrp: detail.srp.inSrp,
+    // While SRP works on this nucleus, its place and type stay put (cluster-notebook refuses moves: SRP_ACTION_PENDING).
+    pending: pendingLocks.location || pendingLocks.type,
+    canChangeIdentity: permissions.canChangeIdentity,
+    locationType: row.locationType,
+  });
+  const currentLocalityId = detail.locationOptions.find(l => l.name === form.locality)?.id ?? '';
   const locationSetting = row.locationType === 'SETTING'
     ? detail.locationOptions.flatMap(l => l.settings).find(st => st.name === row.locationName)
     : undefined;
@@ -919,6 +951,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     srpName: detail.srp.srpName,
     locationType: row.locationType,
     settingLinked: locationSetting?.srpLinked,
+    isHome: detail.srp.isHome,
     canCreateInCluster,
   });
   // Bumped when a name list changes in a WorkerListModal, so the People card re-reads.
@@ -942,7 +975,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     <>
       <SrpDot state={srpState} action={detail.srp.action?.action} />
       {srpState === 'PENDING' && (
-        <button type="button" onClick={onReload} aria-label="Refresh SRP status" title="Refresh" style={{ background: 'none', border: 'none', padding: '0 4px', color: '#3182ce', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>↻</button>
+        <button type="button" onClick={() => onReload()} aria-label="Refresh SRP status" title="Refresh" style={{ background: 'none', border: 'none', padding: '0 4px', color: '#3182ce', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>↻</button>
       )}
     </>
   );
@@ -969,8 +1002,6 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
       setPushing(false);
     }
   }
-
-  const locationWarning = locationWarningFor(form.locationName, detail.locationOptions, row.nucleus);
 
   return (
     <>
@@ -1030,7 +1061,26 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   Nucleus (the name itself) is cluster-notebook's canonical identifier.
                   Confirmed with cluster-notebook 2026-11-18 (#39): updateNucleus { name } renames
                   any nucleus at once (a home nucleus's SRP rename follows); see canRenameNucleus. */}
-              {permissions.canChangeIdentity && srpState !== 'IN_SRP' && !pendingLocks.location ? (
+              {/* Confirmed with cluster-notebook 2026-11-26: a Neighborhood is always at its own Setting, so
+                  until it is in SRP it picks a Locality (localityId); only Network and Population nuclei
+                  choose the Cluster or a Locality as Location, never a Setting. See lib/nucleusIdentity. */}
+              {controls.place === 'locality' ? (
+                <div className="field">
+                  <label style={{ display: 'inline-flex', alignItems: 'center' }}>Locality{srpLabelExtra}</label>
+                  <select
+                    value={currentLocalityId}
+                    onChange={e => {
+                      const locality = detail.locationOptions.find(l => l.id === e.target.value);
+                      if (locality) setAndSave('locality', locality.name, { identity: { localityId: locality.id } }, 'Locality', true);
+                    }}
+                  >
+                    {!currentLocalityId && <option value="">—</option>}
+                    {detail.locationOptions.map(locality => (
+                      <option key={locality.id} value={locality.id}>{locality.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : controls.place === 'location' ? (
                 <div className="field">
                   <label style={{ display: 'inline-flex', alignItems: 'center' }}>Location{srpLabelExtra}</label>
                   <select
@@ -1039,12 +1089,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   >
                     <option value={form.cluster}>— This cluster ({form.cluster}) —</option>
                     {detail.locationOptions.map(locality => (
-                      <optgroup key={locality.name} label={locality.name}>
-                        <option value={locality.name}>{locality.name} (locality)</option>
-                        {locality.settings.map(setting => (
-                          <option key={setting.name} value={setting.name}>{setting.name}</option>
-                        ))}
-                      </optgroup>
+                      <option key={locality.name} value={locality.name}>{locality.name} (locality)</option>
                     ))}
                   </select>
                 </div>
@@ -1058,15 +1103,11 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 onChange={canRename ? v => set('nucleus', v) : undefined}
                 onBlur={canRename ? commitName : undefined}
               />
-              {/* Type is only ever freely settable at a CLUSTER or LOCALITY location --
-                  at a SETTING, cluster-notebook forces it to "Neighborhood" and now
-                  raises a real error if you try to set anything else (previously a
-                  silent revert, confirmed with cluster-notebook directly, 2026-10-08,
-                  commit c40fb54), so there's no point offering the control at all in
-                  that case -- show it readonly instead of letting the save fail. */}
-              {permissions.canChangeIdentity && form.locationType !== 'SETTING' && !pendingLocks.type
-                ? <SelectField label="Type" value={form.nucleusType} options={TYPE_OPTIONS} onChange={v => setAndSave('nucleusType', v, { identity: { nucleusType: v } }, 'Type')} />
-                : <Field label="Type" value={form.nucleusType} readonly />
+              {/* Type: Neighborhood is offered only with a Locality, and changes to or from
+                  Neighborhood ask about members first (changeType, lib/nucleusIdentity). */}
+              {controls.typeOptions
+                ? <SelectField label="Type" value={form.nucleusType} options={controls.typeOptions} onChange={changeType} optionLabel={typeLabel} />
+                : <Field label="Type" value={typeLabel(form.nucleusType)} readonly />
               }
               {permissions.canChangeIdentity
                 ? <SelectField label="Stage" value={form.stage} options={STAGE_OPTIONS} onChange={v => setAndSave('stage', v, { stage: v }, 'Stage')} />
@@ -1120,31 +1161,40 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 <Field label="Parent Nucleus" value={form.parentNucleus} readonly />
               )}
             </div>
-            {/* Confirmed with cluster-notebook directly, 2026-10-08: permissions
-                follow nesting, so a pocket's own location doesn't affect whether
-                its parent's people can reach it. SRP sums only happen at a
-                Setting -- a pocket can no longer have "no location" at all
-                (commit c40fb54, same day, superseding their own earlier advice to
-                leave it empty), so the way to keep a pocket's counts out of SRP
-                sums now is to place it at the Cluster or a Locality specifically,
-                never the same Setting as its parent. Surfaced proactively whenever
-                a parent is set, not only once it's "wrong". */}
-            {form.parentNucleus && (
+            {/* Spec 2026-11-26 (nucleus members): a Neighborhood pocket's residents are placed, in SRP,
+                at its parent's neighbourhood until the pocket itself is sent to SRP. */}
+            {form.parentNucleus && detail.srp.isHome && !detail.srp.inSrp && (
               <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>
-                This nucleus has a parent — give it the Cluster or a Locality (not a Setting) unless its counts should add to a neighbourhood separately.
+                Until this nucleus is in SRP, its residents count toward its parent&apos;s neighbourhood in SRP.
               </p>
             )}
-            {/* Setting-level Type is read-only above for everyone, but only the
-                people who could otherwise edit it need telling why. */}
-            {permissions.canChangeIdentity && form.locationType === 'SETTING' && (
-              <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>
-                This nucleus is at a Setting, so its type is fixed to Neighborhood. Move it to a Locality or the Cluster to set Network or Population instead.
-              </p>
+            {membersIn && createPortal(
+              <div onClick={() => setMembersIn(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+                <div
+                  role="dialog" aria-modal="true" aria-labelledby="members-in-text"
+                  onClick={e => e.stopPropagation()}
+                  style={{ background: 'white', borderRadius: 8, padding: 16, width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 10 }}
+                >
+                  <p id="members-in-text" style={{ margin: 0, fontSize: 14, color: '#2d3748' }}>{membersIn.text}</p>
+                  <button type="button" onClick={() => void membersOnTypeChange('MOVE_IN')} style={{ textAlign: 'left', padding: '8px 12px', borderRadius: 6, border: '1px solid #3182ce', background: '#3182ce', color: 'white', cursor: 'pointer' }}>
+                    <div style={{ fontWeight: 600 }}>Move them in</div>
+                    <div style={{ fontSize: 12 }}>each becomes a resident here; SRP is updated, and anyone SRP refuses goes back to where SRP has them</div>
+                  </button>
+                  <button type="button" onClick={() => void membersOnTypeChange('END')} style={{ textAlign: 'left', padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e0', background: 'white', color: '#2d3748', cursor: 'pointer' }}>
+                    <div style={{ fontWeight: 600 }}>End their memberships</div>
+                    <div style={{ fontSize: 12, color: '#718096' }}>nobody moves</div>
+                  </button>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button type="button" onClick={() => setMembersIn(null)} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #cbd5e0', background: 'white', color: '#4a5568', cursor: 'pointer' }}>Cancel</button>
+                  </div>
+                </div>
+              </div>,
+              document.body,
             )}
             {/* Confirmed with cluster-notebook 2026-11-16: moving a home nucleus is refused (SRP_IS_NEIGHBOURHOOD). */}
             {srpState === 'IN_SRP' && permissions.canChangeIdentity && (
               <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>
-                Location can&apos;t be changed while this nucleus is in SRP.
+                {controls.place === 'locality' ? 'Locality' : 'Location'} and Type can&apos;t be changed while this nucleus is in SRP.
               </p>
             )}
             {srpMessage && <p style={{ fontSize: 12, color: '#c53030', margin: '4px 0 0' }}>{srpMessage}</p>}
@@ -1155,11 +1205,6 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   {pushing ? 'Sending…' : 'Push to SRP'}
                 </button>
               </div>
-            )}
-            {locationWarning && (
-              <p style={{ fontSize: 12, color: '#975a16', background: '#fffaf0', border: '1px solid #f6e05e', borderRadius: 6, padding: '6px 10px', margin: '4px 0 0' }}>
-                {locationWarning}
-              </p>
             )}
           </div>}
         </div>
@@ -1242,7 +1287,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             <span><span style={{ fontSize: 11, marginRight: 6 }}>{peopleOpen ? '▼' : '▶'}</span>People</span>
           </div>
           {peopleOpen && <div className="card-body">
-            <PeopleCard nucleus={row.nucleus} isHome={detail.srp.isHome} permissions={permissions} refreshKey={peopleRefresh} onRolesChanged={refreshRoleLists} />
+            <PeopleCard nucleus={row.nucleus} isHome={detail.srp.isHome} permissions={permissions} refreshKey={peopleRefresh} onRolesChanged={refreshRoleLists} onPeopleChanged={refreshMemberCount} />
           </div>}
         </div>
 

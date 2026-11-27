@@ -211,8 +211,10 @@ export async function getRowData(nucleusName: string) {
       state: srpStateFor(nucleusFields?.nucleusType ?? '', nucleusFields?.inSrp, nucleusFields?.srpAction ?? null, nucleusFields?.location?.type),
       action: nucleusFields?.srpAction ?? null,
       srpName: nucleusFields?.srpName ?? null,
-      isHome: nucleusFields?.inSrp === true,
+      isHome: nucleusFields?.isHome === true,
+      inSrp: nucleusFields?.inSrp === true,
     },
+    memberCount: nucleusFields?.memberCount ?? 0,
   };
 }
 
@@ -243,7 +245,7 @@ interface FormDataInput {
   presence?: string; notesPresence?: string;
   gatherings?: string; notesGatherings?: string;
   narrative?: string;
-  identity?: { nucleusType?: string; parentNucleus?: string; location?: string; srpLocality?: string; name?: string };
+  identity?: { nucleusType?: string; parentNucleus?: string; location?: string; srpLocality?: string; name?: string; localityId?: string; membersOnTypeChange?: 'MOVE_IN' | 'END' };
 }
 
 // Shared between createRowData and saveRowData -- each of the four activity
@@ -294,6 +296,8 @@ function nucleusPatchFromFormData(d: FormDataInput) {
     hasCommunityGatherings?: boolean | null; communityGatheringDescription?: string;
     narrative?: string;
     nucleusType?: string;
+    localityId?: string;
+    membersOnTypeChange?: 'MOVE_IN' | 'END';
     parentNucleusName?: string | null;
     locationName?: string | null;
   } = {};
@@ -328,6 +332,8 @@ function nucleusPatchFromFormData(d: FormDataInput) {
   // Locality/Setting) it belongs to itself, and rejects a Nucleus name here (that's
   // parentNucleus's job, confirmed with cluster-notebook directly, 2026-10-08).
   if (d.identity && d.identity.location !== undefined) nucleusPatch.locationName = d.identity.location || null;
+  if (d.identity?.localityId) nucleusPatch.localityId = d.identity.localityId;
+  if (d.identity?.membersOnTypeChange) nucleusPatch.membersOnTypeChange = d.identity.membersOnTypeChange;
   // Rename: a blank name is not a rename.
   const newName = d.identity?.name?.trim();
   if (newName) nucleusPatch.name = newName;

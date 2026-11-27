@@ -347,6 +347,15 @@ describe('getNucleusFields', () => {
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.query).toContain('location { name type }');
   });
+
+  test('selects isHome and memberCount, not srpPlace', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: null } }));
+    await getNucleusFields('Alpha');
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('isHome');
+    expect(body.query).toContain('memberCount');
+    expect(body.query).not.toContain('srpPlace');
+  });
 });
 
 describe('getLocationOptions', () => {
@@ -355,7 +364,7 @@ describe('getLocationOptions', () => {
       data: {
         clusters: [{
           localities: [{
-            name: 'Carrboro',
+            id: 'L1', name: 'Carrboro',
             settings: [
               { name: 'Main St Setting', srpLinked: true, nuclei: ['Alpha'] },
               { name: 'Oak Grove', srpLinked: false, nuclei: [] },
@@ -368,7 +377,7 @@ describe('getLocationOptions', () => {
     const result = await getLocationOptions('NC-215 Triangle');
 
     expect(result).toEqual([{
-      name: 'Carrboro',
+      id: 'L1', name: 'Carrboro',
       settings: [
         { name: 'Main St Setting', srpLinked: true, nuclei: ['Alpha'] },
         { name: 'Oak Grove', srpLinked: false, nuclei: [] },
@@ -376,7 +385,7 @@ describe('getLocationOptions', () => {
     }]);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables).toEqual({ clusterName: 'NC-215 Triangle' });
-    expect(body.query).toContain('localities { name settings { name srpLinked nuclei } }');
+    expect(body.query).toContain('localities { id name settings { name srpLinked nuclei } }');
   });
 
   test('returns an empty array when the cluster has no readable localities', async () => {
@@ -861,8 +870,9 @@ describe('getMoveContext', () => {
     const ctx: MoveContext = {
       location: { id: 'S1', name: 'Parkside', type: 'SETTING', locality: 'Chapelboro', cluster: 'Chapel Hill', localityId: 'L1', homeNucleus: 'Alpha' },
       parent: { inSrp: true, location: null },
+      isHome: true, inSrp: false, srpPlace: null,
     };
-    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { location: ctx.location, parentNucleus: ctx.parent } } }));
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { location: ctx.location, parentNucleus: ctx.parent, isHome: true, inSrp: false, srpPlace: null } } }));
 
     expect(await getMoveContext('Alpha')).toEqual(ctx);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
@@ -870,6 +880,7 @@ describe('getMoveContext', () => {
     const q = (body.query as string).replace(/\s+/g, ' ');
     expect(q).toContain('location { id name type locality cluster localityId homeNucleus }');
     expect(q).toContain('parentNucleus { inSrp location { id name type locality cluster localityId homeNucleus } }');
+    expect(q).toContain('isHome inSrp srpPlace { id name type locality cluster localityId homeNucleus }');
   });
 
   test('returns null when the nucleus is not found', async () => {
@@ -1080,6 +1091,12 @@ describe('SRP actions and coded errors', () => {
     expect(err).not.toBeInstanceOf(ClusterNotebookForbiddenError);
   });
 
+  test('a coded error carries the full extensions (MOVE_REFUSED lists people)', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ errors: [{ message: 'x', extensions: { code: 'MOVE_REFUSED', people: [{ id: 'p1', code: 'FORBIDDEN' }, { id: 'p2', code: 'OTHER_CLUSTER' }] } }] }));
+    const err = await createNucleus('Alpha', 'NC-1 Test').catch(e => e);
+    expect(err.extensions).toEqual({ code: 'MOVE_REFUSED', people: [{ id: 'p1', code: 'FORBIDDEN' }, { id: 'p2', code: 'OTHER_CLUSTER' }] });
+  });
+
   test('FORBIDDEN still throws ClusterNotebookForbiddenError', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ errors: [{ message: 'x', extensions: { code: 'FORBIDDEN' } }] }));
     await expect(createNucleus('Alpha', 'NC-1 Test')).rejects.toBeInstanceOf(ClusterNotebookForbiddenError);
@@ -1176,7 +1193,7 @@ describe('admin client', () => {
       expect(q).toContain('$before: DateTime');
       expect(q).toContain('$beforeId: String');
       expect(q).toContain('id occurredAt actor {');
-      expect(q).toContain('mutation entityType entityId changeType changes entityName');
+      expect(q).toContain('mutation entityType entityId changeType changes entityName reason names');
     });
     test('a page sends before and beforeId', async () => {
       mockFetch.mockResolvedValue(jsonResponse({ data: { changeLog: [] } }));
