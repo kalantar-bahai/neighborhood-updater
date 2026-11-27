@@ -6,6 +6,7 @@ import { parentOptions } from '@/lib/nucleusIdentity';
 import { nucleusFromUrl, nucleusHref } from '@/lib/nucleusUrl';
 import type { PermissionSet } from '@/lib/access';
 import { effectivePermissions, reloadOutcome } from '@/lib/srp';
+import { readViewState, writeViewState } from '@/lib/viewState';
 import Picker from './Picker';
 import DetailView from './DetailView';
 import CreateNucleusModal from './CreateNucleusModal';
@@ -30,12 +31,27 @@ export default function AppClient() {
   const [creatingNew, setCreatingNew] = useState(false);
   // What is open on each page (cards and bars on a nucleus, clusters/localities/bars on the list; key '' is the
   // list) and where it was scrolled, so going to a child and coming back (in-app or browser Back) finds the page
-  // as it was (owner, 2026-11-27). Kept for this tab only; a refresh starts afresh. Also survives the remount on
-  // an in-place reload. viewRef is the page shown now; restoreRef the page whose scroll to put back once it shows.
-  const [openByView, setOpenByView] = useState<Record<string, Record<string, boolean>>>({});
-  const scrollByView = useRef<Record<string, number>>({});
-  const viewRef = useRef('');
-  const restoreRef = useRef<string | null>(null);
+  // as it was (owner, 2026-11-27). Saved in the tab's sessionStorage (lib/viewState.ts), so a reload does too.
+  // Also survives the remount on an in-place reload. viewRef is the page shown now (null until the first shows);
+  // restoreRef the page whose scroll to put back once it shows ('' at first: a reload on the list).
+  const [openByView, setOpenByView] = useState<Record<string, Record<string, boolean>>>(
+    () => typeof window === 'undefined' ? {} : readViewState().open);
+  const scrollByView = useRef<Record<string, number> | null>(null);
+  const viewRef = useRef<string | null>(null);
+  const restoreRef = useRef<string | null>('');
+  const openRef = useRef(openByView);
+  openRef.current = openByView;
+
+  function scrolls(): Record<string, number> {
+    if (scrollByView.current === null) scrollByView.current = readViewState().scroll;
+    return scrollByView.current;
+  }
+
+  // The page shown now's scroll, then everything, into the tab's storage.
+  function saveViewState() {
+    if (viewRef.current !== null) scrolls()[viewRef.current] = window.scrollY;
+    writeViewState({ open: openRef.current, scroll: scrolls() });
+  }
 
   function setOpen(view: string, key: string, open: boolean) {
     setOpenByView(v => ({ ...v, [view]: { ...v[view], [key]: open } }));
@@ -43,8 +59,8 @@ export default function AppClient() {
 
   // Leaving the page shown now for `next`: remember its scroll, and put back `next`'s once it shows.
   function goToView(next: string) {
-    scrollByView.current[viewRef.current] = window.scrollY;
-    viewRef.current = next;
+    saveViewState();
+    viewRef.current = null;
     restoreRef.current = next;
   }
   // Shown above the list when the address named a nucleus this user can't open (removed, or no access).
@@ -88,7 +104,12 @@ export default function AppClient() {
     // We put the scroll back ourselves (below), after the page's data is in; the browser would do it too early.
     window.history.scrollRestoration = 'manual';
     loadInitialData();
+    // A reload or closing the tab: keep where the page is scrolled.
+    window.addEventListener('pagehide', saveViewState);
+    return () => window.removeEventListener('pagehide', saveViewState);
   }, []);
+
+  useEffect(() => { writeViewState({ open: openByView, scroll: scrolls() }); }, [openByView]);
 
   useEffect(() => {
     const view = restoreRef.current;
@@ -96,7 +117,8 @@ export default function AppClient() {
     const shown = view === '' ? initialData !== null && selectedNucleus === null : detail !== null && !loadingDetail;
     if (!shown) return;
     restoreRef.current = null;
-    const y = scrollByView.current[view] ?? 0;
+    viewRef.current = view;
+    const y = scrolls()[view] ?? 0;
     requestAnimationFrame(() => window.scrollTo(0, y));
   }, [initialData, selectedNucleus, detail, loadingDetail]);
 
