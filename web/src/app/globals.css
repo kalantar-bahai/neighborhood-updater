@@ -235,6 +235,7 @@
 .parent-name:hover { color: #3182ce; }
 .pocket-rows { display: none; margin-bottom: 4px; }
 .pocket-rows.open { display: block; }
+.nested-group { margin-left: 16px; }
 .picker-item {
   background: white;
   border: 1px solid #e2e8f0;

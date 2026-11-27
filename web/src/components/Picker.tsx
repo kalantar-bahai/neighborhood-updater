@@ -3,23 +3,20 @@
 import React, { useState } from 'react';
 import { NucleusSummary } from '@/types';
 import ConcentricRainbow, { type AlignedLabel } from './ConcentricRainbow';
-import SrpBadge from './SrpBadge';
+import NucleusListRow from './NucleusListRow';
+import NucleusGroup, { type OpenState } from './NucleusGroup';
+import { childTree, rootOf, type ChildNode } from '@/lib/children';
 import PageHeader, { HeaderButton } from './PageHeader';
 
 interface Props {
   rows: NucleusSummary[];
   email: string;
   onSelect: (name: string) => void;
+  // Which clusters, localities and parent bars are open; kept by AppClient so coming back to the list finds
+  // them as they were (owner, 2026-11-27).
+  openState: OpenState;
   onAdd?: () => void;
   onAdmin?: () => void;
-}
-
-function typeBadgeStyle(nucleusType: string): React.CSSProperties {
-  const t = (nucleusType || '').toLowerCase();
-  if (t === 'neighborhood') return { background: '#bee3f8', color: '#2c5282' };
-  if (t === 'network')      return { background: '#c6f6d5', color: '#276749' };
-  if (t === 'population')   return { background: '#e9d8fd', color: '#553c9a' };
-  return {};
 }
 
 // Exact styling the old bottom-of-page by-type cards used (removed 2026-10-08) --
@@ -185,10 +182,7 @@ function RollupCards({ rows: rowsIn, groupLabel, onCardClick }: {
   );
 }
 
-export default function Picker({ rows, email, onSelect, onAdd, onAdmin }: Props) {
-  const [openClusters, setOpenClusters] = useState<Set<string>>(new Set());
-  const [openPockets, setOpenPockets] = useState<Set<string>>(new Set());
-  const [openLocalities, setOpenLocalities] = useState<Set<string>>(new Set());
+export default function Picker({ rows, email, onSelect, openState, onAdd, onAdmin }: Props) {
   // Rollup-card popup (2026-10-08) -- null when closed. `rows` are the exact
   // nuclei the clicked card already summed, re-summed here into the nine-field
   // totals the rainbow diagram needs (the card itself only shows nuclei/act/
@@ -199,103 +193,36 @@ export default function Picker({ rows, email, onSelect, onAdd, onAdmin }: Props)
     setPopup({ title, rows: rowsIn });
   }
 
-  function toggleCluster(key: string) {
-    setOpenClusters(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
-  }
+  function toggle(key: string) { openState.onOpenChange(key, !openState.open[key]); }
 
-  function togglePocket(key: string) {
-    setOpenPockets(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
-  }
-
-  function toggleLocality(key: string) {
-    setOpenLocalities(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
-  }
-
-  function NeighborhoodItem({ r, isPocket }: { r: NucleusSummary; isPocket: boolean }) {
-    return (
-      <div className={`picker-item${isPocket ? ' pocket-item' : ''}`} onClick={() => onSelect(r.nucleus)}>
-        <div>
-          <div className="name">{r.nucleus}</div>
-          <div className="sub">{r.locality}</div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {r.stage && <span className="stage-badge" style={typeBadgeStyle(r.nucleusType)}>{r.stage}</span>}
-          <SrpBadge state={r.srpState} action={r.srpAction ?? undefined} />
-        </div>
-      </div>
-    );
-  }
-
+  // A nucleus with no parent is a row, or a bar over its children (any depth, see childTree). Children whose
+  // parent isn't in this bucket keep a bar named after that parent, which can't be opened from here.
   function renderClusterContent(clusterRows: NucleusSummary[], keyPrefix: string) {
-    const parentMap: Record<string, NucleusSummary[]> = {};
-    const parentOrder: string[] = [];
-    const standaloneMap: Record<string, NucleusSummary> = {};
-
+    const names = new Set(clusterRows.map(r => r.nucleus));
+    const entries: Array<{ name: string; row?: NucleusSummary; nodes: ChildNode[] }> = [];
     clusterRows.forEach(r => {
-      const p = (r.parentNucleus || '').trim();
-      if (!p) {
-        standaloneMap[r.nucleus] = r;
-      } else {
-        if (!parentMap[p]) { parentMap[p] = []; parentOrder.push(p); }
-        parentMap[p].push(r);
-      }
+      if (!(r.parentNucleus || '').trim()) entries.push({ name: r.nucleus, row: r, nodes: childTree(clusterRows, r.nucleus) });
     });
-    parentOrder.forEach(p => delete standaloneMap[p]);
-
-    const entries: Array<{ type: 'standalone'; row: NucleusSummary } | { type: 'parent'; name: string }> = [];
-    Object.values(standaloneMap).forEach(row => entries.push({ type: 'standalone', row }));
-    parentOrder.forEach(name => entries.push({ type: 'parent', name }));
-    entries.sort((a, b) => a.type === 'standalone' && b.type === 'standalone'
-      ? a.row.nucleus.localeCompare(b.row.nucleus)
-      : (a.type === 'standalone' ? a.row.nucleus : a.name)
-          .localeCompare(b.type === 'standalone' ? b.row.nucleus : b.name));
-
-    return entries.map(entry => {
-      if (entry.type === 'standalone') {
-        return <NeighborhoodItem key={entry.row.nucleus} r={entry.row} isPocket={false} />;
-      }
-      const parentName = entry.name;
-      const pocketKey = `${keyPrefix}__${parentName}`;
-      const isPocketOpen = openPockets.has(pocketKey);
-      const parentRow = clusterRows.find(r => r.nucleus === parentName && !r.parentNucleus);
-
-      return (
-        <div key={parentName}>
-          <div className="parent-item">
-            <span
-              className={`parent-arrow${isPocketOpen ? ' open' : ''}`}
-              onClick={() => togglePocket(pocketKey)}
-            >▶</span>
-            <span className="parent-name" onClick={() => parentRow && onSelect(parentName)}>
-              {parentName}
-            </span>
-            {parentRow?.stage && <span className="stage-badge" style={typeBadgeStyle(parentRow.nucleusType)}>{parentRow.stage}</span>}
-          </div>
-          <div className={`pocket-rows${isPocketOpen ? ' open' : ''}`}>
-            {parentMap[parentName].map(r => (
-              <NeighborhoodItem key={r.nucleus} r={r} isPocket />
-            ))}
-          </div>
-        </div>
-      );
-    });
+    new Set(clusterRows.map(r => (r.parentNucleus || '').trim()).filter(p => p && !names.has(p)))
+      .forEach(p => entries.push({ name: p, nodes: childTree(clusterRows, p) }));
+    entries.sort((x, y) => x.name.localeCompare(y.name));
+    return entries.map(e => e.row && e.nodes.length === 0
+      ? <NucleusListRow key={e.name} r={e.row} isPocket={false} onSelect={onSelect} />
+      : <NucleusGroup key={e.name} label={e.name} row={e.row} nodes={e.nodes} onSelect={onSelect} openState={openState} keyPrefix={keyPrefix} />);
   }
 
   // New locality level, 2026-10-08, sitting between Cluster and the existing
   // parent/pocket nesting above: no-locality nuclei first, then real localities
-  // alphabetically. A pocket buckets under its PARENT's locality, not its own --
-  // cluster-notebook recommends a pocket have no locality at all (it's meant to be
-  // covered by the parent's), so bucketing it by its own locality would split it
-  // from the very parent it's supposed to nest under. Falls back to the pocket's
+  // alphabetically. A pocket buckets under its topmost parent's locality, not its
+  // own -- cluster-notebook recommends a pocket have no locality at all (it's meant
+  // to be covered by the parent's), so bucketing it by its own locality would split
+  // it from the very parent it's supposed to nest under. Falls back to the pocket's
   // own locality if the parent isn't found in this same cluster (shouldn't happen
-  // for real data). Each bucket still gets passed whole into renderClusterContent,
-  // so that function's own parent/pocket nesting needs no changes at all.
+  // for real data).
   function renderLocalityGroups(clusterRows: NucleusSummary[], keyPrefix: string) {
+    // The top of a child's chain (any depth), so grandchildren bucket with the nucleus they nest under.
     function effectiveLocality(r: NucleusSummary): string {
-      const parentName = (r.parentNucleus || '').trim();
-      if (!parentName) return (r.locality || '').trim();
-      const parent = clusterRows.find(p => p.nucleus === parentName);
-      return ((parent ? parent.locality : r.locality) || '').trim();
+      return (rootOf(clusterRows, r).locality || '').trim();
     }
 
     const localityOrder: string[] = [];
@@ -318,12 +245,12 @@ export default function Picker({ rows, email, onSelect, onAdd, onAdmin }: Props)
     return localityOrder.map(loc => {
       const localityRows = localityMap[loc];
       const localityKey = `${keyPrefix}__loc_${loc || '(none)'}`;
-      const isOpen = isSingleLocality || openLocalities.has(localityKey);
+      const isOpen = isSingleLocality || !!openState.open[localityKey];
       return (
         <div key={localityKey}>
           <div
             className="cluster-header"
-            onClick={isSingleLocality ? undefined : () => toggleLocality(localityKey)}
+            onClick={isSingleLocality ? undefined : () => toggle(localityKey)}
             style={isSingleLocality ? { paddingLeft: 20, cursor: 'default' } : { paddingLeft: 20 }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -393,13 +320,13 @@ export default function Picker({ rows, email, onSelect, onAdd, onAdmin }: Props)
             {gEntry.clusterOrder.map(clusterName => {
               const clusterRows = gEntry.clusterMap[clusterName];
               const clusterKey = `${gName}__${clusterName}`;
-              const isClusterOpen = isSingleCluster || openClusters.has(clusterKey);
+              const isClusterOpen = isSingleCluster || !!openState.open[clusterKey];
 
               return (
                 <div key={clusterKey}>
                   <div
                     className="cluster-header"
-                    onClick={isSingleCluster ? undefined : () => toggleCluster(clusterKey)}
+                    onClick={isSingleCluster ? undefined : () => toggle(clusterKey)}
                     style={isSingleCluster ? { cursor: 'default' } : undefined}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
