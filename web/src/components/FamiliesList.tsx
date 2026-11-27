@@ -5,7 +5,7 @@ import { PersonSrpDot } from './SrpBadge';
 import { filterFamilies, hiddenText, sizeText, type FamilyEntry } from '@/lib/households';
 
 // The Families card's list: households (and people with no household), searchable by anyone in them.
-export default function FamiliesList({ nucleus }: { nucleus: string }) {
+export default function FamiliesList({ nucleus, refreshKey }: { nucleus: string; refreshKey: number }) {
   const [families, setFamilies] = useState<FamilyEntry[] | null>(null);
   const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState('');
@@ -21,7 +21,7 @@ export default function FamiliesList({ nucleus }: { nucleus: string }) {
       })
       .catch((e: unknown) => { if (live) setLoadError(e instanceof Error ? e.message : String(e)); });
     return () => { live = false; };
-  }, [nucleus]);
+  }, [nucleus, refreshKey]);
 
   if (loadError) return <div style={{ fontSize: 13, color: '#c53030', marginTop: 12 }}>{loadError}</div>;
   if (!families) return <div style={{ fontSize: 13, color: '#718096', marginTop: 12 }}>Loading families…</div>;

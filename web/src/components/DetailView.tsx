@@ -1034,6 +1034,9 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   ) : null;
   // Bumped when a name list changes in a WorkerListModal, so the People card re-reads.
   const [peopleRefresh, setPeopleRefresh] = useState(0);
+  // Bumped when the People card itself changes people (move, hide), so the Families card re-reads.
+  const [peopleChanged, setPeopleChanged] = useState(0);
+  function handlePeopleChanged() { setPeopleChanged(n => n + 1); void refreshCounts(); }
   // After the People card changes roles, re-read just those name lists (no page reload, so the
   // card keeps its filter, search and any error message).
   const roleListSetters: Record<string, (w: Worker[]) => void> = {
@@ -1385,7 +1388,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             <span><span style={{ fontSize: 11, marginRight: 6 }}>{peopleOpen ? '▼' : '▶'}</span>People</span>
           </div>
           {peopleOpen && <div className="card-body">
-            <PeopleCard nucleus={row.nucleus} isHome={detail.srp.isHome} permissions={permissions} refreshKey={peopleRefresh} onRolesChanged={refreshRoleLists} onPeopleChanged={refreshCounts} />
+            <PeopleCard nucleus={row.nucleus} isHome={detail.srp.isHome} permissions={permissions} refreshKey={peopleRefresh} onRolesChanged={refreshRoleLists} onPeopleChanged={handlePeopleChanged} />
           </div>}
         </div>
 
@@ -1415,7 +1418,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 onNumChange={v => set('hhNum', v)} onNumBlur={() => commitField('hhNum', 'Households Connected', true)} readonly={!canWrite} pctReadonly numInteger
               />
             </div>
-            <FamiliesList nucleus={row.nucleus} />
+            <FamiliesList nucleus={row.nucleus} refreshKey={peopleRefresh + peopleChanged} />
           </div>}
         </div>
 

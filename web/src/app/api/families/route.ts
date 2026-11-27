@@ -15,10 +15,10 @@ export async function GET(req: NextRequest) {
   const name = req.nextUrl.searchParams.get('nucleus');
   if (!name) return NextResponse.json({ error: 'Missing nucleus' }, { status: 400 });
 
-  const permissions = await getNucleusPermissions(name);
-  if (!permissions.canRead) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-
   try {
+    const permissions = await getNucleusPermissions(name);
+    if (!permissions.canRead) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+
     const [households, people] = await Promise.all([getNucleusHouseholds(name), getNucleusPeople(name)]);
     if (!households || !people) return NextResponse.json({ error: `Not found: ${name}` }, { status: 404 });
     return NextResponse.json({ families: familyEntries(households, people) });
