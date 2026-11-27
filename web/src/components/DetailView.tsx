@@ -28,6 +28,8 @@ interface Props {
   initialNotice: string | null;
   // Called after a successful rename with the new name, so the shell reloads under it.
   onRenamed: (newName: string) => void;
+  // Opens another nucleus the way the home list does (Back returns here).
+  onOpenNucleus: (name: string) => void;
   // True when the user can create a nucleus in this nucleus's cluster (the capability lives on the Cluster).
   canCreateInCluster: boolean;
   // Backs the Parent Nucleus picker's suggestions (2026-10-08) -- every nucleus
@@ -548,7 +550,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 // The 9-figure diagram (ConcentricRainbow, formerly the staggered 9-ring one) lives in its own file,
 // 2026-10-08, so Picker.tsx can also render a rollup version of it from its own popup.
 
-export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, initialNotice, onRenamed, canCreateInCluster, allNucleusNames, childCount, cardOpen, onCardOpenChange }: Props) {
+export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, initialNotice, onRenamed, onOpenNucleus, canCreateInCluster, allNucleusNames, childCount, cardOpen, onCardOpenChange }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   // Baseline to diff a blur-triggered field's current value against, so clicking into
@@ -954,6 +956,15 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     isHome: detail.srp.isHome,
     canCreateInCluster,
   });
+  // "Open ↗" beside Parent Nucleus, so the parent opens without going home first (owner 2026-11-26). Only for a
+  // parent this user can read: allNucleusNames is their readable list.
+  const parentName = form.parentNucleus.trim();
+  const openParent = parentName && parentName !== row.nucleus && allNucleusNames.includes(parentName) ? (
+    <button type="button" onClick={() => onOpenNucleus(parentName)} aria-label={`Open ${parentName}`} title={`Open ${parentName}`}
+      style={{ background: 'none', border: 'none', padding: '0 4px', marginLeft: 4, color: '#3182ce', cursor: 'pointer', fontSize: 12 }}>
+      Open ↗
+    </button>
+  ) : null;
   // Bumped when a name list changes in a WorkerListModal, so the People card re-reads.
   const [peopleRefresh, setPeopleRefresh] = useState(0);
   // After the People card changes roles, re-read just those name lists (no page reload, so the
@@ -1145,7 +1156,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             <div className="field-grid-2">
               {permissions.canChangeIdentity ? (
                 <div className="field">
-                  <label>Parent Nucleus</label>
+                  <label style={{ display: 'inline-flex', alignItems: 'center' }}>Parent Nucleus{openParent}</label>
                   <input
                     list="parent-nucleus-options"
                     value={form.parentNucleus}
@@ -1158,7 +1169,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   </datalist>
                 </div>
               ) : (
-                <Field label="Parent Nucleus" value={form.parentNucleus} readonly />
+                <Field label="Parent Nucleus" labelExtra={openParent} value={form.parentNucleus} readonly />
               )}
             </div>
             {/* Spec 2026-11-26 (nucleus members): a Neighborhood pocket's residents are placed, in SRP,

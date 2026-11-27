@@ -161,6 +161,7 @@ export default function AppClient() {
         onReload={notice => reloadNucleus(selectedNucleus, notice)}
         initialNotice={reloadNotice}
         onRenamed={(newName) => { setDetail(null); setSelectedNucleus(newName); setLoadingDetail(true); loadInitialData(newName); }}
+        onOpenNucleus={(name) => { setCardOpen({}); setAddress(name, initialData.rows, 'push'); loadNucleus(name); }}
         canCreateInCluster={initialData.clusterNames.includes(detail.row.cluster)}
         allNucleusNames={initialData.rows.map(r => r.nucleus)}
         childCount={initialData.rows.filter(r => r.parentNucleus === selectedNucleus).length}
