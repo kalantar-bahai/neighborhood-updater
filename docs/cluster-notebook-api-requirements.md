@@ -565,3 +565,39 @@ input NucleusPatch {
   - **`getLocationOptions`** lists every Setting under a readable Locality, including an unpushed Neighborhood's own
     Setting (`srpLinked: false`, `nuclei: [its name]`). Archived Settings are left out (cluster-notebook's members
     branch, 2026-11-26).
+
+## Named counts (the Overview's "(x)"), agreed with cluster-notebook 2026-11-27
+
+Not yet deployed. Selecting `namedCounts` before then breaks every nucleus read, so the app merges only after
+cluster-notebook confirms it is live.
+
+```graphql
+type Nucleus { namedCounts: NamedCounts! }
+type NamedCounts {
+  inConversation: Int!            # residents (Neighborhood) or members (other types)
+  inEducationalActivities: Int!   # "In core activity": people taking part in an educational activity
+  educationalFacilitators: Int!   # people facilitating one
+  devotionalHosts: Int!           # hosts and co-hosts of a devotional gathering
+  protagonists: Int!              # "Promoting": promoter role holders
+  helpingOthers: Int!             # "Helping Others": protagonist role holders
+  accompanying: Int!              # accompanier role holders
+  nucleiCounted: Int!             # how many nuclei the counts cover; 1 = just this one
+}
+```
+
+- **cluster-notebook owns every rule** and the app passes no switches. The app shows these as they come. A rule
+  change, for example who counts or which nuclei, needs no app change.
+- **Scope (owner):** a Neighborhood plus all its Neighborhood descendants, recursively. The walk passes only through
+  Neighborhoods and skips archived nuclei. A Network or Population nucleus counts only itself.
+- **Each person counts once** across the scope. Today's data has no overlaps, but they can happen: someone who holds
+  a role on the parent and lives in a child is among both nuclei's people, and a role can be held on two nuclei.
+  Residents never overlap.
+- **Hidden people:** a person counts if they qualify at any nucleus in scope where they aren't hidden (owner: "not
+  ideal but acceptable for now").
+- **Nuclei the caller can't read** are still counted. These are counts, never names (owner).
+- **Not affected:**
+  - `inCommunityActivities` ("Participating") has no named count.
+  - Activity summaries stay per nucleus; they use a different counting strategy (owner).
+  - `memberCount` stays this nucleus's own; the app uses it for the type-change prompts.
+- **Cost:** about 7 SQL statements whatever the group size. The app re-reads `memberCount` and `namedCounts` after
+  every change on the page, through `GET /api/nucleus/counts`.

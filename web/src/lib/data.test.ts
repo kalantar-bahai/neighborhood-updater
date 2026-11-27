@@ -10,7 +10,6 @@ vi.mock('./clusterNotebook', async (importOriginal) => ({
   getNucleusFields: vi.fn(),
   updateNucleus: vi.fn(),
   getNucleusWorkers: vi.fn(),
-  getNucleusPeopleFlags: vi.fn(),
   createNucleus: vi.fn(),
   deleteNucleus: vi.fn(),
   getLocationOptions: vi.fn(),
@@ -18,7 +17,7 @@ vi.mock('./clusterNotebook', async (importOriginal) => ({
 }));
 
 import {
-  getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus, getNucleusWorkers, getNucleusPeopleFlags, createNucleus, deleteNucleus,
+  getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus, getNucleusWorkers, createNucleus, deleteNucleus,
   getLocationOptions, ClusterNotebookCodedError,
 } from './clusterNotebook';
 import { getRowData, saveRowData, createRowData, deleteRowData } from './data';
@@ -28,17 +27,17 @@ const mockUpdateActivitySummary = vi.mocked(updateActivitySummary);
 const mockGetNucleusFields = vi.mocked(getNucleusFields);
 const mockUpdateNucleus = vi.mocked(updateNucleus);
 const mockGetNucleusWorkers = vi.mocked(getNucleusWorkers);
-const mockGetNucleusPeopleFlags = vi.mocked(getNucleusPeopleFlags);
 const mockCreateNucleus = vi.mocked(createNucleus);
 const mockDeleteNucleus = vi.mocked(deleteNucleus);
 const mockGetLocationOptions = vi.mocked(getLocationOptions);
+
+const NAMED = { inConversation: 37, inEducationalActivities: 15, educationalFacilitators: 6, devotionalHosts: 5, protagonists: 0, helpingOthers: 1, accompanying: 2, nucleiCounted: 4 };
 
 describe('getRowData', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: no workers, for tests that don't care about the worker lists specifically.
     mockGetNucleusWorkers.mockResolvedValue([]);
-    mockGetNucleusPeopleFlags.mockResolvedValue([]);
     // Default: no location options, for tests that don't care about the location
     // picker specifically.
     mockGetLocationOptions.mockResolvedValue([]);
@@ -342,11 +341,6 @@ describe('getRowData', () => {
       if (role === 'promoter') return [{ id: '5', firstName: 'Erin', email: null, ...blank }];
       return [];
     });
-    mockGetNucleusPeopleFlags.mockResolvedValue([
-      { devotionalHost: 'HOST', participates: true, facilitates: false, isResident: true },
-      { devotionalHost: 'CO_HOST', participates: true, facilitates: true, isResident: false },
-      { devotionalHost: null, participates: false, facilitates: false, isResident: true },
-    ]);
 
     const result = await getRowData('Alpha');
 
@@ -360,8 +354,7 @@ describe('getRowData', () => {
     expect(result?.abmAssistantNames).toEqual([{ id: '3', name: 'Carol', email: null }]);
     expect(result?.contactNames).toEqual([{ id: '4', name: 'Dave', email: 'dave@x.com' }]);
     expect(result?.promoterNames).toEqual([{ id: '5', name: 'Erin', email: null }]);
-    expect(mockGetNucleusPeopleFlags).toHaveBeenCalledWith('Alpha');
-    expect(result?.peopleCounts).toEqual({ devotionalHosts: 2, participating: 2, facilitating: 1 });
+    expect('peopleCounts' in (result ?? {})).toBe(false);
   });
 
   test('passes through lastUpdated from cluster-notebook', async () => {
@@ -486,7 +479,7 @@ describe('getRowData', () => {
     expect(result?.row.locationType).toBe('');
   });
 
-  test('srp.isHome comes from isHome (not inSrp); memberCount is passed through', async () => {
+  test('srp.isHome comes from isHome (not inSrp); memberCount and namedCounts are passed through', async () => {
     mockGetNucleusFields.mockResolvedValue({
       stage: null, locality: null, populationMakeup: null,
       population: null, households: null, connectedPopulation: null, connectedHouseholds: null,
@@ -497,6 +490,7 @@ describe('getRowData', () => {
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null, location: null,
       isHome: true, inSrp: false, memberCount: 3, srpPlace: { id: 'P1', name: 'Carrboro' },
+      namedCounts: NAMED,
     });
 
     const result = await getRowData('Alpha');
@@ -504,6 +498,8 @@ describe('getRowData', () => {
     expect(result?.srp.isHome).toBe(true);
     expect(result?.srp.inSrp).toBe(false);
     expect(result?.memberCount).toBe(3);
+    // The (x) counts come from cluster-notebook as they are (owner 2026-11-27): no counting here.
+    expect(result?.namedCounts).toEqual(NAMED);
   });
 });
 

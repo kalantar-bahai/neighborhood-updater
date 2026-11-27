@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { namedToShow, editableRoles, moveTargets, editorRoleList, refusalText, srpAtNote, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, formatDate, initials, activityLines, activitySummary, courseGroups, countPeople, AGE_FILTERS, peopleCountLabel, hideNote, hideRolesLine, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
+import { namedToShow, editableRoles, moveTargets, editorRoleList, refusalText, srpAtNote, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, formatDate, initials, activityLines, activitySummary, courseGroups, groupCountsNote, AGE_FILTERS, peopleCountLabel, hideNote, hideRolesLine, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
 import type { Participation, AgeCategory, DevotionalHostRole, MoveContext, PermissionSet, PersonDetails, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -459,17 +459,6 @@ describe('activityLines', () => {
   });
 });
 
-describe('countPeople', () => {
-  test('hosts and co-hosts, participants, facilitators', () => {
-    expect(countPeople([
-      { devotionalHost: 'HOST', participates: true, facilitates: false },
-      { devotionalHost: 'CO_HOST', participates: false, facilitates: true },
-      { devotionalHost: null, participates: true, facilitates: true },
-    ])).toEqual({ devotionalHosts: 2, participating: 2, facilitating: 2 });
-    expect(countPeople([])).toEqual({ devotionalHosts: 0, participating: 0, facilitating: 0 });
-  });
-});
-
 describe('peopleCountLabel', () => {
   test('whole list, narrowed list, one person', () => {
     expect(peopleCountLabel(85, 85)).toBe('85 people');
@@ -576,5 +565,17 @@ describe('courseGroups', () => {
     ])[0].chips;
     expect(c.title).toBe("Teaching Children's Classes, Grade 1");
     expect(c.lines).toEqual(['Took part · Carrboro · 2024-01-10 → 2024-06-02 (completed)', 'Facilitated · Carrboro · 2025-09-01 → now']);
+  });
+});
+
+describe('groupCountsNote', () => {
+  test('nothing when the counts cover just this nucleus', () => {
+    expect(groupCountsNote(1)).toBeNull();
+    expect(groupCountsNote(0)).toBeNull();
+    expect(groupCountsNote(undefined)).toBeNull();
+  });
+  test('names how many neighborhoods below are included', () => {
+    expect(groupCountsNote(2)).toBe('Counts in parentheses include the 1 neighborhood under this one.');
+    expect(groupCountsNote(4)).toBe('Counts in parentheses include the 3 neighborhoods under this one.');
   });
 });

@@ -5,14 +5,14 @@ import { createPortal } from 'react-dom';
 import { NucleusDetail, NucleusRow, Activity } from '@/types';
 import type { Worker } from '@/types';
 import type { PermissionSet } from '@/lib/access';
-import type { LastUpdated } from '@/lib/clusterNotebook';
+import type { LastUpdated, NamedCounts } from '@/lib/clusterNotebook';
 import WorkerListModal from './WorkerListModal';
 import PeopleCard from './PeopleCard';
 import ManageAccessCard from './ManageAccessCard';
 import { SrpDot } from './SrpBadge';
 import { canRenameNucleus, deleteNotice, pendingIdentityLocks, nextNameAfterRename, pushToSrpMode, srpDetailMessage, srpOutOfStepMessage } from '@/lib/srp';
 import ConcentricRainbow, { formatValue, type AlignedLabel } from './ConcentricRainbow';
-import { namedToShow } from '@/lib/people';
+import { groupCountsNote, namedToShow } from '@/lib/people';
 import { identityControls, typeChangePrompt, typeLabel } from '@/lib/nucleusIdentity';
 
 interface Props {
@@ -586,21 +586,28 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const [contactNames, setContactNames] = useState<Worker[]>(() => detail.contactNames);
   const [showContactModal, setShowContactModal] = useState(false);
   const [promoterNames, setPromoterNames] = useState<Worker[]>(() => detail.promoterNames);
-  // People SRP shows hosting devotionals, taking part in and facilitating activities: the "(x)" on those estimates.
-  const counts = detail.peopleCounts;
-  // Members of this nucleus (residents on a Neighborhood), shown on every nucleus. Kept in state so a change on the
-  // People card shows at once (owner 2026-11-26); refreshMemberCount re-reads it from cluster-notebook.
+  // memberCount: this nucleus's own members (residents on a Neighborhood), for the type-change prompts.
+  // named: the "(x)" beside each Overview estimate, counted by cluster-notebook over this nucleus and its
+  // Neighborhood descendants (owner 2026-11-27). Both are re-read after each change on the page, so the figures
+  // update at once (owner 2026-11-26).
   const [memberCount, setMemberCount] = useState(detail.memberCount);
-  const memberCountSeq = useRef(0);
-  async function refreshMemberCount() {
-    const seq = ++memberCountSeq.current;
+  const [named, setNamed] = useState<NamedCounts | null>(detail.namedCounts);
+  const countsSeq = useRef(0);
+  async function refreshCounts() {
+    const seq = ++countsSeq.current;
     try {
-      const res = await fetch(`/api/nucleus?name=${encodeURIComponent(row.nucleus)}`);
-      // Keep only the newest answer; on failure the old count stays until the next change or a reload.
-      if (res.ok && seq === memberCountSeq.current) setMemberCount((await res.json()).memberCount);
+      const res = await fetch(`/api/nucleus/counts?name=${encodeURIComponent(row.nucleus)}`);
+      // Keep only the newest answer; on failure the old counts stay until the next change or a reload.
+      if (!res.ok || seq !== countsSeq.current) return;
+      const data = await res.json();
+      setMemberCount(data.memberCount);
+      setNamed(data.namedCounts);
     } catch { /* as above */ }
   }
-  const residentsNamed = memberCount;
+  // undefined shows no "(x)".
+  const nc = (key: Exclude<keyof NamedCounts, 'nucleiCounted'>) => named?.[key];
+  const groupNote = groupCountsNote(named?.nucleiCounted);
+  const groupNoteLine = groupNote && <p style={{ fontSize: 12, color: '#718096', margin: '4px 0 0' }}>{groupNote}</p>;
   const [showPromotersModal, setShowPromotersModal] = useState(false);
   // Which cards are open lives in AppClient, so an in-place reload (Refresh, Push, Location
   // save), which remounts this view, keeps the cards the user had open.
@@ -880,26 +887,26 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // Overview card's labels.
   const diagramData = [
     { label: 'Residing',      value: form.totalPop, onClick: editEstimate('totalPop') },
-    { label: 'Connected',     value: form.inConversation, named: residentsNamed, onClick: editEstimate('inConversation') },
+    { label: 'Connected',     value: form.inConversation, named: nc('inConversation'), onClick: editEstimate('inConversation') },
     { label: 'Participating', value: form.inCommunityActivities, onClick: editEstimate('inCommunityActivities') },
-    { label: 'Helping Others', value: form.helpingOthers, named: protagonistNames.length, onClick: editEstimate('helpingOthers') },
-    { label: 'Accompanying',  value: form.accompanying, named: accompanierNames.length, onClick: editEstimate('accompanying') },
+    { label: 'Helping Others', value: form.helpingOthers, named: nc('helpingOthers'), onClick: editEstimate('helpingOthers') },
+    { label: 'Accompanying',  value: form.accompanying, named: nc('accompanying'), onClick: editEstimate('accompanying') },
   ];
 
   const alignedResiding = { label: 'Residing', value: form.totalPop, onClick: editEstimate('totalPop') };
   const alignedRings: AlignedRingContent[] = [
-    { single: { label: 'In conversation', value: form.inConversation, named: residentsNamed, onClick: editEstimate('inConversation') } },
+    { single: { label: 'In conversation', value: form.inConversation, named: nc('inConversation'), onClick: editEstimate('inConversation') } },
     {
-      right: { label: 'In core activity', value: form.inEducationalActivities, named: counts.participating, onClick: editEstimate('inEducationalActivities') },
+      right: { label: 'In core activity', value: form.inEducationalActivities, named: nc('inEducationalActivities'), onClick: editEstimate('inEducationalActivities') },
       left:  { label: 'Participating',    value: form.inCommunityActivities, onClick: editEstimate('inCommunityActivities') },
     },
     {
-      right: { label: 'Facilitating', value: form.educationalFacilitators, named: counts.facilitating, onClick: editEstimate('educationalFacilitators') },
-      left:  { label: 'Promoting',    value: form.protagonists, named: promoterNames.length, onClick: editEstimate('protagonists') },
+      right: { label: 'Facilitating', value: form.educationalFacilitators, named: nc('educationalFacilitators'), onClick: editEstimate('educationalFacilitators') },
+      left:  { label: 'Promoting',    value: form.protagonists, named: nc('protagonists'), onClick: editEstimate('protagonists') },
     },
     {
-      right: { label: 'Accompanying', value: form.accompanying, named: accompanierNames.length, onClick: editEstimate('accompanying') },
-      left:  { label: 'Helping Others', value: form.helpingOthers, named: protagonistNames.length, onClick: editEstimate('helpingOthers') },
+      right: { label: 'Accompanying', value: form.accompanying, named: nc('accompanying'), onClick: editEstimate('accompanying') },
+      left:  { label: 'Helping Others', value: form.helpingOthers, named: nc('helpingOthers'), onClick: editEstimate('helpingOthers') },
     },
   ];
 
@@ -907,14 +914,14 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // Devotional Meetings/Gatherings has a real mapping now (devotionalHosts,
   // 2026-10-07) -- was always blank before, no field existed for it yet.
   const rainbowLabels: AlignedLabel[] = [
-    { label: 'Accompanying',                           value: form.accompanying, named: accompanierNames.length, onClick: editEstimate('accompanying') },
-    { label: 'Helping Others',                          value: form.helpingOthers, named: protagonistNames.length, onClick: editEstimate('helpingOthers') },
-    { label: 'Facilitating Ed. Act.',                   value: form.educationalFacilitators, named: counts.facilitating, onClick: editEstimate('educationalFacilitators') },
-    { label: 'Participating in Ed. Act.',               value: form.inEducationalActivities, named: counts.participating, onClick: editEstimate('inEducationalActivities') },
-    { label: 'Hosting Devotional Meetings/Gatherings',  value: form.devotionalHosts, named: counts.devotionalHosts, onClick: editEstimate('devotionalHosts') },
-    { label: 'Protagonists/Promoting',                  value: form.protagonists, named: promoterNames.length, onClick: editEstimate('protagonists') },
+    { label: 'Accompanying',                           value: form.accompanying, named: nc('accompanying'), onClick: editEstimate('accompanying') },
+    { label: 'Helping Others',                          value: form.helpingOthers, named: nc('helpingOthers'), onClick: editEstimate('helpingOthers') },
+    { label: 'Facilitating Ed. Act.',                   value: form.educationalFacilitators, named: nc('educationalFacilitators'), onClick: editEstimate('educationalFacilitators') },
+    { label: 'Participating in Ed. Act.',               value: form.inEducationalActivities, named: nc('inEducationalActivities'), onClick: editEstimate('inEducationalActivities') },
+    { label: 'Hosting Devotional Meetings/Gatherings',  value: form.devotionalHosts, named: nc('devotionalHosts'), onClick: editEstimate('devotionalHosts') },
+    { label: 'Protagonists/Promoting',                  value: form.protagonists, named: nc('protagonists'), onClick: editEstimate('protagonists') },
     { label: 'Participating',                           value: form.inCommunityActivities, onClick: editEstimate('inCommunityActivities') },
-    { label: 'In Conversation',                         value: form.inConversation, named: residentsNamed, onClick: editEstimate('inConversation') },
+    { label: 'In Conversation',                         value: form.inConversation, named: nc('inConversation'), onClick: editEstimate('inConversation') },
     { label: 'Population/Residing',                     value: form.totalPop, onClick: editEstimate('totalPop') },
   ];
 
@@ -1261,6 +1268,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
               {diagramType === 'simple' && <ConcentricDiagram data={diagramData} />}
               {diagramType === 'aligned' && <AlignedConcentricDiagram rings={alignedRings} residing={alignedResiding} />}
               {diagramType === 'rainbow' && <ConcentricRainbow labels={rainbowLabels} />}
+              {groupNoteLine}
               {estimateEdit && createPortal(
                 <div onClick={() => setEstimateEdit(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
                   <form
@@ -1298,7 +1306,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             <span><span style={{ fontSize: 11, marginRight: 6 }}>{peopleOpen ? '▼' : '▶'}</span>People</span>
           </div>
           {peopleOpen && <div className="card-body">
-            <PeopleCard nucleus={row.nucleus} isHome={detail.srp.isHome} permissions={permissions} refreshKey={peopleRefresh} onRolesChanged={refreshRoleLists} onPeopleChanged={refreshMemberCount} />
+            <PeopleCard nucleus={row.nucleus} isHome={detail.srp.isHome} permissions={permissions} refreshKey={peopleRefresh} onRolesChanged={refreshRoleLists} onPeopleChanged={refreshCounts} />
           </div>}
         </div>
 
@@ -1437,11 +1445,12 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             <span><span style={{ fontSize: 11, marginRight: 6 }}>{overviewOpen ? '▼' : '▶'}</span>Overview</span>
           </div>
           {overviewOpen && <div className="card-body">
+            {groupNoteLine}
             <div className="field-grid-3">
               <Field label="Total Population" value={form.totalPop} onChange={v => set('totalPop', v)} onBlur={() => commitField('totalPop', 'Total Population', true)} readonly={!canWrite} integer />
               <Field
                 label="In Conversation"
-                value={form.inConversation} onChange={v => set('inConversation', v)} onBlur={() => commitField('inConversation', 'In Conversation', true)} readonly={!canWrite} integer named={residentsNamed}
+                value={form.inConversation} onChange={v => set('inConversation', v)} onBlur={() => commitField('inConversation', 'In Conversation', true)} readonly={!canWrite} integer named={nc('inConversation')}
                 info="Estimated number of individuals with whom there is some contact or conversation in the neighborhood, but who do not yet participate regularly in activities or collective spaces."
               />
               <Field
@@ -1456,36 +1465,36 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   of the number itself now -- see this card's own comment above. */}
               <Field
                 label="Promoting"
-                value={form.protagonists} onChange={v => set('protagonists', v)} onBlur={() => commitField('protagonists', 'Promoting', true)} readonly={!canWrite} integer named={promoterNames.length}
+                value={form.protagonists} onChange={v => set('protagonists', v)} onBlur={() => commitField('protagonists', 'Promoting', true)} readonly={!canWrite} integer named={nc('protagonists')}
                 onLabelClick={permissions.canAssignRoles ? () => setShowPromotersModal(true) : undefined}
                 info="Estimated number of individuals promoting various aspects of community life such as parents encouraging participation, junior youth bringing friends, or youth inviting peers. It also includes promoting collective spaces such as festivals, Summer of Service, family gatherings, and various logistical assistance such as providing food, giving rides, serving others, etc."
               />
               <Field
                 label="Hosting Devotional Gatherings"
-                value={form.devotionalHosts} onChange={v => set('devotionalHosts', v)} onBlur={() => commitField('devotionalHosts', 'Hosting Devotional Gatherings', true)} readonly={!canWrite} integer named={counts.devotionalHosts}
+                value={form.devotionalHosts} onChange={v => set('devotionalHosts', v)} onBlur={() => commitField('devotionalHosts', 'Hosting Devotional Gatherings', true)} readonly={!canWrite} integer named={nc('devotionalHosts')}
                 info="Estimated number of individuals who are sharing prayers with others, with family members, and inviting others to attend devotional meetings or gatherings. Examples include where prayers are shared in home visits, community gatherings, festivals, and educational activities."
               />
               <Field
                 label="In Educational Activity"
-                value={form.inEducationalActivities} onChange={v => set('inEducationalActivities', v)} onBlur={() => commitField('inEducationalActivities', 'In Educational Activity', true)} readonly={!canWrite} integer named={counts.participating}
+                value={form.inEducationalActivities} onChange={v => set('inEducationalActivities', v)} onBlur={() => commitField('inEducationalActivities', 'In Educational Activity', true)} readonly={!canWrite} integer named={nc('inEducationalActivities')}
                 info="Estimated number of children, junior youth, youth, and adults participating in educational activities in various modalities and forms: children’s classes, junior youth groups, and study circles."
               />
             </div>
             <div className="field-grid-3">
               <Field
                 label="Facilitating Educational Activity"
-                value={form.educationalFacilitators} onChange={v => set('educationalFacilitators', v)} onBlur={() => commitField('educationalFacilitators', 'Facilitating Educational Activity', true)} readonly={!canWrite} integer named={counts.facilitating}
+                value={form.educationalFacilitators} onChange={v => set('educationalFacilitators', v)} onBlur={() => commitField('educationalFacilitators', 'Facilitating Educational Activity', true)} readonly={!canWrite} integer named={nc('educationalFacilitators')}
                 info="Estimated number of individuals who facilitate or share the content of the institute’s educational programs, in various forms, approaches, methods, and modalities, to all ages in the neighborhood."
               />
               <Field
                 label="Helping Others"
-                value={form.helpingOthers} onChange={v => set('helpingOthers', v)} onBlur={() => commitField('helpingOthers', 'Helping Others', true)} readonly={!canWrite} integer named={protagonistNames.length}
+                value={form.helpingOthers} onChange={v => set('helpingOthers', v)} onBlur={() => commitField('helpingOthers', 'Helping Others', true)} readonly={!canWrite} integer named={nc('helpingOthers')}
                 onLabelClick={permissions.canAssignRoles ? () => setShowProtagonistsModal(true) : undefined}
                 info="Estimated number of individuals who assist others in taking initial steps in serving others. For example, one may walk with another to do home visits, to share a prayer, to learn a quotation, to introduce the institute’s programs, or other acts of service."
               />
               <Field
                 label="Accompanying"
-                value={form.accompanying} onChange={v => set('accompanying', v)} onBlur={() => commitField('accompanying', 'Accompanying', true)} readonly={!canWrite} integer named={accompanierNames.length}
+                value={form.accompanying} onChange={v => set('accompanying', v)} onBlur={() => commitField('accompanying', 'Accompanying', true)} readonly={!canWrite} integer named={nc('accompanying')}
                 onLabelClick={permissions.canAssignRoles && permissions.assignableRoles.includes('accompanier') ? () => setShowAccompaniersModal(true) : undefined}
                 info="Estimated number of individuals who have gained a measure of experience from the institute’s courses alongside acts of service, whose actions are motivated by a desire to see capacity develop in others and to foster friendships founded on cooperation and reciprocity."
               />
@@ -1585,7 +1594,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           role="accompanier"
           nucleus={row.nucleus}
           workers={accompanierNames}
-          onChange={workers => { setAccompanierNames(workers); setPeopleRefresh(n => n + 1); }}
+          onChange={workers => { setAccompanierNames(workers); setPeopleRefresh(n => n + 1); refreshCounts(); }}
           onClose={() => setShowAccompaniersModal(false)}
         />
       )}
@@ -1597,7 +1606,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           nucleus={row.nucleus}
           workers={protagonistNames}
           importWorkers={accompanierNames}
-          onChange={workers => { setProtagonistNames(workers); setPeopleRefresh(n => n + 1); }}
+          onChange={workers => { setProtagonistNames(workers); setPeopleRefresh(n => n + 1); refreshCounts(); }}
           onClose={() => setShowProtagonistsModal(false)}
         />
       )}
@@ -1608,7 +1617,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           role="abm-assistant"
           nucleus={row.nucleus}
           workers={abmAssistantNames}
-          onChange={workers => { setAbmAssistantNames(workers); setPeopleRefresh(n => n + 1); }}
+          onChange={workers => { setAbmAssistantNames(workers); setPeopleRefresh(n => n + 1); refreshCounts(); }}
           onClose={() => setShowAbmAssistantModal(false)}
         />
       )}
@@ -1620,7 +1629,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           nucleus={row.nucleus}
           workers={contactNames}
           single
-          onChange={workers => { setContactNames(workers); setPeopleRefresh(n => n + 1); }}
+          onChange={workers => { setContactNames(workers); setPeopleRefresh(n => n + 1); refreshCounts(); }}
           onClose={() => setShowContactModal(false)}
         />
       )}
@@ -1631,7 +1640,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           role="promoter"
           nucleus={row.nucleus}
           workers={promoterNames}
-          onChange={workers => { setPromoterNames(workers); setPeopleRefresh(n => n + 1); }}
+          onChange={workers => { setPromoterNames(workers); setPeopleRefresh(n => n + 1); refreshCounts(); }}
           onClose={() => setShowPromotersModal(false)}
         />
       )}

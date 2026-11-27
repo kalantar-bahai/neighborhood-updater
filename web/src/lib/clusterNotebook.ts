@@ -145,6 +145,16 @@ export interface SrpAction {
   srpChanged: boolean;
 }
 
+// The "(x)" beside each Overview estimate: counts of named people. Confirmed with cluster-notebook 2026-11-27: every
+// rule is theirs (which nuclei: a Neighborhood plus all its Neighborhood descendants; each person once; hides),
+// so the app shows these as they come. Keys are the Overview estimate fields; nucleiCounted is how many nuclei the
+// counts cover (1 = just this one). memberCount stays this nucleus's own, for the type-change prompts.
+export type NamedCounts = {
+  inConversation: number; inEducationalActivities: number; educationalFacilitators: number; devotionalHosts: number;
+  protagonists: number; helpingOthers: number; accompanying: number; nucleiCounted: number;
+};
+const NAMED_COUNTS_SELECTION = 'namedCounts { inConversation inEducationalActivities educationalFacilitators devotionalHosts protagonists helpingOthers accompanying nucleiCounted }';
+
 const SRP_SELECTION = 'inSrp srpName srpAction { action status requestedAt error individuals activities srpChanged }';
 
 export interface NucleusFields {
@@ -156,6 +166,7 @@ export interface NucleusFields {
   // SRP neighbourhood it is linked to. Optional for the same reason as inSrp: existing fixtures keep compiling.
   isHome?: boolean;
   memberCount?: number;
+  namedCounts?: NamedCounts;
   srpPlace?: { id: string; name: string } | null;
   // Confirmed with cluster-notebook 2026-11-18 (#39): SRP's last-known name for a home nucleus's FN; null unless inSrp.
   srpName?: string | null;
@@ -430,7 +441,7 @@ const NUCLEUS_FIELDS_SELECTION = 'stage locality populationMakeup population hou
   + 'inConversation inCommunityActivities protagonists devotionalHosts inEducationalActivities educationalFacilitators helpingOthers accompanying '
   + 'hasSocialAction socialActionDescription hasCommunityGatherings communityGatheringDescription narrative nucleusType '
   + 'cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers } parentNucleus { name } lastUpdated { at by } '
-  + 'location { name type } isHome memberCount ' + SRP_SELECTION;
+  + 'location { name type } isHome memberCount ' + NAMED_COUNTS_SELECTION + ' ' + SRP_SELECTION;
 
 export async function getNucleusFields(nucleusName: string): Promise<NucleusFields | null> {
   const query = `
@@ -644,16 +655,16 @@ export async function searchIndividuals(nucleusName: string, search?: string, li
   return data.individuals;
 }
 
-// Just the flags the Overview counts, for the same people as getNucleusPeople (no names, no activity lists).
-// null when the nucleus isn't found.
-export async function getNucleusPeopleFlags(nucleusName: string): Promise<Pick<NucleusPerson, 'devotionalHost' | 'participates' | 'facilitates' | 'isResident'>[] | null> {
+// Just the counts, re-read after each change on the page so the "(x)" figures update at once. null when the
+// nucleus isn't found.
+export async function getNucleusCounts(nucleusName: string): Promise<{ memberCount: number; namedCounts: NamedCounts } | null> {
   const query = `
-    query NucleusPeopleFlags($name: String!) {
-      nucleus(name: $name) { people { devotionalHost participates facilitates isResident } }
+    query NucleusCounts($name: String!) {
+      nucleus(name: $name) { memberCount ${NAMED_COUNTS_SELECTION} }
     }
   `;
-  const data = await request<{ nucleus: { people: Pick<NucleusPerson, 'devotionalHost' | 'participates' | 'facilitates' | 'isResident'>[] } | null }>(query, { name: nucleusName });
-  return data.nucleus?.people ?? null;
+  const data = await request<{ nucleus: { memberCount: number; namedCounts: NamedCounts } | null }>(query, { name: nucleusName });
+  return data.nucleus;
 }
 
 const NUCLEUS_PERSON_SELECTION = `individual { ${PERSON_SUMMARY_SELECTION} } roles isResident ageCategory devotionalHost participates facilitates participation { ${PARTICIPATION_SELECTION} } hidden hide { hiddenAt reason hiddenBy { ${PERSON_SUMMARY_SELECTION} } }`;
