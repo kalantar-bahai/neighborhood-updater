@@ -641,3 +641,26 @@ type ActivityCounts { number: Int  participants: Int  participantsFof: Int }
   - A child not yet pushed to SRP has its SRP activities in the parent's FN, so they show on the parent, and are still counted once.
   - Participants are counted once per activity, as SRP does.
   - A group total typed into a parent's own cells would be counted twice. The card says so in the "This nucleus" view.
+
+## Households, step 1, confirmed with cluster-notebook 2026-11-27
+
+Households are read-only in this step. They were built in cluster-notebook PR #62.
+
+```graphql
+Nucleus.namedHouseholds: [Household!]!
+PersonSummary.household: Household        # null: the person is in no household
+type Household {
+  id: String!
+  size: Int!
+  contact: PersonSummary                  # null if the caller can't read the contact
+  members: [PersonSummary!]!
+  address: String
+}
+```
+
+- **Address:** it is filled only on `Nucleus.namedHouseholds`. It is always null on `PersonSummary.household`.
+- **Person's household:** null means the person is in none.
+- **Contact:** null when the caller can't read the contact.
+- **Read in:** `getNucleusHouseholds` (the nucleus query), and `household` on each person in `getNucleusPeople` and `getHiddenPeople`.
+- **NucleusPerson.address:** confirmed with cluster-notebook 2026-11-27 (PR #63). It is free text, as SRP holds it. It sits beside `individual` on a nucleus person, not inside it. It is null unless the caller may see person details at that nucleus, or when none is recorded. For a household member it equals the contact's address.
+- **Selection:** the app reads only `id firstName familyName middleNames nickname inSrp` for the contact and members. It does not read `place`.

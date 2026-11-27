@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PersonSrpDot } from './SrpBadge';
 import { PersonPanel, personDetailsView, type DetailsState } from './PersonPanel';
-import type { AgeCategory, PermissionSet, PersonDetails } from '@/lib/clusterNotebook';
+import type { AgeCategory, Household, PermissionSet, PersonDetails } from '@/lib/clusterNotebook';
+import { householdMove } from '@/lib/households';
+import { HouseholdMoveNote } from './HouseholdMoveNote';
 import {
   AGE_FILTERS, AGE_LABELS, editorRoleList, srpAtNote, DEVOTIONAL_HOST, FACILITATES, PARTICIPATES, activityLines, activitySummary, courseGroups, hideNote, hideRolesLine, peopleCountLabel, RESIDENT, canEditRole, filterPeople, isMoving, moveResultError,
   nextRoleIds, peopleFilters, placePath, roleLabel, rolesToClear, sortPeople, sortRoles, syncNote, type MoveTarget,
@@ -30,13 +32,14 @@ interface Props {
   onPeopleChanged: () => void;
 }
 
-type Found = { id: string; name: string; place: string; homeNucleus: string | null };
+type Found = { id: string; name: string; place: string; homeNucleus: string | null; household?: Household | null };
 // The person being edited: an existing row, or someone just found or created.
 type Editing = {
   id: string; name: string; roles: string[]; isResident: boolean; isNew: boolean;
   placePath: string; homeNucleus: string | null;
   // Picked while hidden here through "+ Add": Save unhides them first (picking says they belong here).
   unhideFirst: boolean;
+  household?: Household | null;
 };
 // A move waiting for the person to confirm it.
 type PendingMove = {
@@ -220,7 +223,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
 
   const fromRow = (r: PersonRow): Editing => ({
     id: r.id, name: r.name, roles: r.roles, isResident: r.isResident, isNew: false,
-    placePath: placePath(r.place), homeNucleus: r.place?.homeNucleus ?? null, unhideFirst: false,
+    placePath: placePath(r.place), homeNucleus: r.place?.homeNucleus ?? null, unhideFirst: false, household: r.household,
   });
 
   // Roles offered in the editor: the known ones plus any this person already holds.
@@ -370,7 +373,9 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
   // Sorting by first name until the owner decides what sort they want (2026-11-21).
   const shown = sortPeople(filterPeople(rows, activeFilter, search, age), 'first');
 
-  const confirmMove = (e: Editing, m: PendingMove) => (
+  const confirmMove = (e: Editing, m: PendingMove) => {
+    const hm = householdMove(e.household, e.id);
+    return (
     <div style={{ border: '1px solid #bee3f8', background: '#ebf8ff', borderRadius: 6, padding: 8, fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
       <div style={{ fontWeight: 600 }}>{m.kind === 'in' ? `Move ${e.name} here?` : `Move ${e.name} out of ${m.oldName}?`}</div>
       <div>{m.kind === 'in' ? `Lives in: ${e.placePath || 'not recorded'}` : `To: ${m.to.path}`}</div>
@@ -387,12 +392,14 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
           </label>
         </>
       )}
+      {hm && <HouseholdMoveNote move={hm} name={e.name} />}
       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-        <button type="button" disabled={saving} onClick={() => finish(e, m)} style={btn('#3182ce', 'white')}>{saving ? 'Moving…' : 'Move'}</button>
+        <button type="button" disabled={saving} onClick={() => finish(e, m)} style={btn('#3182ce', 'white')}>{saving ? 'Moving…' : hm ? `Move all ${hm.total} people` : 'Move'}</button>
         <button type="button" disabled={saving} onClick={() => setPendingMove(null)} style={btn('white', '#4a5568', '#cbd5e0')}>Cancel</button>
       </div>
     </div>
-  );
+    );
+  };
 
   const editor = (e: Editing) => (
     <div style={{ padding: '8px 0 4px', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -629,7 +636,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
             if (existing) { setFilter(existing.hidden ? 'hidden' : 'all'); setAge('all'); setSearch(''); }
             startEdit(existing
               ? { ...fromRow(existing), unhideFirst: existing.hidden }
-              : { id: p.id, name: p.name, roles: [], isResident: false, isNew: true, placePath: p.place, homeNucleus: p.homeNucleus, unhideFirst: false });
+              : { id: p.id, name: p.name, roles: [], isResident: false, isNew: true, placePath: p.place, homeNucleus: p.homeNucleus, unhideFirst: false, household: p.household });
           }}
         />
       )}

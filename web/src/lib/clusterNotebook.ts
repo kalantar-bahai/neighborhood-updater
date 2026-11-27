@@ -643,13 +643,22 @@ export interface Participation {
 // hide is null unless the person is hidden AND the caller can edit the nucleus.
 export interface PersonHide { hiddenAt: string; hiddenBy: PersonSummary | null; reason: string | null }
 export interface NucleusPerson {
-  individual: PersonSummary; roles: string[]; isResident: boolean;
+  individual: PersonSummary & { household?: Household | null }; address: string | null; roles: string[]; isResident: boolean;
   ageCategory: AgeCategory | null; devotionalHost: DevotionalHostRole | null;
   participates: boolean; facilitates: boolean; participation: Participation[];
   hidden: boolean; hide: PersonHide | null;
 }
 const PARTICIPATION_SELECTION = 'activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current studyItemShortName personCompleted';
 const PLACE_SELECTION = 'id name type locality cluster localityId homeNucleus';
+// Confirmed with cluster-notebook 2026-11-27 (their PR #62): contact is null when the contact is unreadable to the
+// caller. address is filled only on Nucleus.namedHouseholds and is always null on PersonSummary.household, where a
+// null household means the person is in none.
+export type HouseholdMember = PersonName & { inSrp: boolean };
+export interface Household {
+  id: string; contact: HouseholdMember | null; members: HouseholdMember[]; size: number; address: string | null;
+}
+const HOUSEHOLD_MEMBER_SELECTION = `${PERSON_NAME_SELECTION} inSrp`;
+const HOUSEHOLD_FIELDS = `id size address contact { ${HOUSEHOLD_MEMBER_SELECTION} } members { ${HOUSEHOLD_MEMBER_SELECTION} }`;
 const PERSON_SUMMARY_SELECTION = `${PERSON_NAME_SELECTION} inSrp place { ${PLACE_SELECTION} } placeSync { status code }`;
 
 // individualDisplayName lives in personName.ts so browser code can use it without importing this
@@ -659,13 +668,14 @@ export { individualDisplayName } from './personName';
 // Everyone placed in the cluster containing nucleusName (needs WRITE on the nucleus; a reader
 // gets []), ordered by family then first name -- confirmed with cluster-notebook 2026-11-18. Never
 // notebook-wide. `search` is optional token matching across name fields; `limit` caps the result.
-export async function searchIndividuals(nucleusName: string, search?: string, limit?: number): Promise<PersonSummary[]> {
+// Each result carries their household (null when none) so a move in can warn who comes along.
+export async function searchIndividuals(nucleusName: string, search?: string, limit?: number): Promise<(PersonSummary & { household?: Household | null })[]> {
   const query = `
     query SearchIndividuals($nucleusName: String!, $search: String, $limit: Int) {
-      individuals(nucleusName: $nucleusName, search: $search, limit: $limit) { ${PERSON_SUMMARY_SELECTION} }
+      individuals(nucleusName: $nucleusName, search: $search, limit: $limit) { ${PERSON_SUMMARY_SELECTION} household { ${HOUSEHOLD_FIELDS} } }
     }
   `;
-  const data = await request<{ individuals: PersonSummary[] }>(query, { nucleusName, search: search ?? null, limit: limit ?? null });
+  const data = await request<{ individuals: (PersonSummary & { household?: Household | null })[] }>(query, { nucleusName, search: search ?? null, limit: limit ?? null });
   return data.individuals;
 }
 
@@ -682,7 +692,20 @@ export async function getNucleusCounts(nucleusName: string): Promise<NucleusCoun
   return data.nucleus;
 }
 
-const NUCLEUS_PERSON_SELECTION = `individual { ${PERSON_SUMMARY_SELECTION} } roles isResident ageCategory devotionalHost participates facilitates participation { ${PARTICIPATION_SELECTION} } hidden hide { hiddenAt reason hiddenBy { ${PERSON_SUMMARY_SELECTION} } }`;
+// A person's households are read together with the person; only id size contact members are used there.
+const HOUSEHOLD_PERSON_SELECTION = `${PERSON_SUMMARY_SELECTION} household { ${HOUSEHOLD_FIELDS} }`;
+// The nucleus's named households. null when the nucleus isn't found.
+export async function getNucleusHouseholds(nucleusName: string): Promise<Household[] | null> {
+  const query = `
+    query GetNucleusHouseholds($name: String!) {
+      nucleus(name: $name) { namedHouseholds { ${HOUSEHOLD_FIELDS} } }
+    }
+  `;
+  const data = await request<{ nucleus: { namedHouseholds: Household[] } | null }>(query, { name: nucleusName });
+  return data.nucleus?.namedHouseholds ?? null;
+}
+
+const NUCLEUS_PERSON_SELECTION = `individual { ${HOUSEHOLD_PERSON_SELECTION} } address roles isResident ageCategory devotionalHost participates facilitates participation { ${PARTICIPATION_SELECTION} } hidden hide { hiddenAt reason hiddenBy { ${PERSON_SUMMARY_SELECTION} } }`;
 
 // Everyone connected to the nucleus: role holders here, plus residents on a home nucleus.
 // Includes hidden people (flagged `hidden`); `hide` is only filled for callers who can edit.
@@ -1040,7 +1063,7 @@ export async function endRole(roleId: string): Promise<boolean> {
   return data.endRole;
 }
 
-export interface HiddenPerson { individual: PersonSummary; nucleusName: string; roles: string[]; isResident: boolean; hide: PersonHide }
+export interface HiddenPerson { individual: PersonSummary & { household?: Household | null }; nucleusName: string; roles: string[]; isResident: boolean; hide: PersonHide }
 
 // Confirmed with cluster-notebook 2026-11-24: an Administrator or a CSO of the cluster can read, unhide and
 // move anyone hidden in it (they inherit WRITE down from the cluster).
@@ -1048,7 +1071,7 @@ export async function getHiddenPeople(clusterName: string): Promise<HiddenPerson
   const query = `
     query GetHiddenPeople($clusterName: String!) {
       hiddenPeople(clusterName: $clusterName) {
-        individual { ${PERSON_SUMMARY_SELECTION} } nucleusName roles isResident hide { hiddenAt reason hiddenBy { ${PERSON_SUMMARY_SELECTION} } }
+        individual { ${HOUSEHOLD_PERSON_SELECTION} } nucleusName roles isResident hide { hiddenAt reason hiddenBy { ${PERSON_SUMMARY_SELECTION} } }
       }
     }
   `;
