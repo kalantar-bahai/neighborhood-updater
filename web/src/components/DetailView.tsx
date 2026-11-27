@@ -19,6 +19,7 @@ import FamiliesList from './FamiliesList';
 import ConcentricRainbow, { formatValue, type AlignedLabel } from './ConcentricRainbow';
 import { groupCountsNote, namedToShow } from '@/lib/people';
 import { identityControls, typeChangePrompt, typeLabel } from '@/lib/nucleusIdentity';
+import ParticipationCard from './ParticipationCard';
 
 interface Props {
   detail: NucleusDetail;
@@ -52,6 +53,8 @@ interface Props {
   // Open/closed state per card, keyed by card name; a missing key means the card's default.
   cardOpen: Record<string, boolean>;
   onCardOpenChange: (key: string, open: boolean) => void;
+  // Opens a participation space's page (Back returns here).
+  onOpenSpace: (spaceId: string) => void;
 }
 
 type FormState = NucleusRow;
@@ -599,7 +602,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 // The 9-figure diagram (ConcentricRainbow, formerly the staggered 9-ring one) lives in its own file,
 // 2026-10-08, so Picker.tsx can also render a rollup version of it from its own popup.
 
-export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, initialNotice, onRenamed, onOpenNucleus, canCreateInCluster, allNucleusNames, parentChoices, childCount, rows, addChild, cardOpen, onCardOpenChange }: Props) {
+export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, initialNotice, onRenamed, onOpenNucleus, canCreateInCluster, allNucleusNames, parentChoices, childCount, rows, addChild, cardOpen, onCardOpenChange, onOpenSpace }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   // Baseline to diff a blur-triggered field's current value against, so clicking into
@@ -688,6 +691,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const [activitiesGroup, setActivitiesGroup] = card('activitiesGroup', false);
   const groupOption = groupLabel(totals?.nucleiCounted);
   const showGroup = groupOption !== null && activitiesGroup;
+  const [participationOpen, setParticipationOpen] = card('participation', false);
   const [detailsOpen, setDetailsOpen] = card('details', true);
   const [narrativeOpen, setNarrativeOpen] = card('narrative', true);
   const [deleteInput, setDeleteInput] = useState('');
@@ -1481,6 +1485,9 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             </>}
           </div>}
         </div>
+
+        {/* Participation */}
+        <ParticipationCard nucleus={row.nucleus} canWrite={permissions.canWrite} open={participationOpen} onOpenChange={setParticipationOpen} onOpenSpace={onOpenSpace} />
 
         {/* Additional Details */}
         <div className="card">

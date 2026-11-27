@@ -242,6 +242,7 @@ export default function AppClient() {
         childCount={initialData.rows.filter(r => r.parentNucleus === selectedNucleus).length}
         rows={initialData.rows}
         addChild={addChild}
+        onOpenSpace={() => {}} // Task 7
         cardOpen={openByView[selectedNucleus] ?? {}}
         onCardOpenChange={(key, open) => setOpen(selectedNucleus, key, open)}
       />
