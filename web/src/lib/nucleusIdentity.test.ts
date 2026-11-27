@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { identityControls, typeChangePrompt, typeLabel } from './nucleusIdentity';
+import { identityControls, parentOptions, typeChangePrompt, typeLabel } from './nucleusIdentity';
 
 const base = { isHome: false, inSrp: false, pending: false, canChangeIdentity: true, locationType: 'LOCALITY' };
 
@@ -91,5 +91,28 @@ describe('typeLabel', () => {
   });
   it('shows a type as itself', () => {
     expect(typeLabel('Network')).toBe('Network');
+  });
+});
+
+describe('parentOptions', () => {
+  const rows = [
+    { nucleus: 'Top', parentNucleus: '', cluster: 'C1' },
+    { nucleus: 'Child', parentNucleus: 'Top', cluster: 'C1' },
+    { nucleus: 'Grandchild', parentNucleus: 'Child', cluster: 'C1' },
+    { nucleus: 'Sibling', parentNucleus: '', cluster: 'C1' },
+    { nucleus: 'Elsewhere', parentNucleus: '', cluster: 'C2' },
+  ];
+  it('leaves out the nucleus itself, its descendants, and other clusters', () => {
+    expect(parentOptions(rows, 'Top', 'C1')).toEqual(['Sibling']);
+    expect(parentOptions(rows, 'Child', 'C1')).toEqual(['Sibling', 'Top']);
+    expect(parentOptions(rows, 'Grandchild', 'C1')).toEqual(['Child', 'Sibling', 'Top']);
+  });
+  it('survives a cycle already in the data', () => {
+    const loop = [
+      { nucleus: 'A', parentNucleus: 'B', cluster: 'C1' },
+      { nucleus: 'B', parentNucleus: 'A', cluster: 'C1' },
+      { nucleus: 'D', parentNucleus: '', cluster: 'C1' },
+    ];
+    expect(parentOptions(loop, 'A', 'C1')).toEqual(['D']);
   });
 });

@@ -50,3 +50,17 @@ export function typeChangePrompt(input: { from: string; to: string; isHome: bool
 export function typeLabel(nucleusType: string): string {
   return nucleusType || 'Not set';
 }
+
+// The Parent Nucleus picker's suggestions: nuclei in the same cluster, leaving out this nucleus and everything under it,
+// which cluster-notebook refuses (PARENT_CYCLE, PARENT_OTHER_CLUSTER; owner's rules, 2026-11-27). Sorted by name.
+export function parentOptions(rows: { nucleus: string; parentNucleus: string; cluster: string }[], nucleus: string, cluster: string): string[] {
+  const excluded = new Set([nucleus]);
+  // Walk down from this nucleus; the Set stops a loop already in the data.
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const r of rows) {
+      if (!excluded.has(r.nucleus) && excluded.has(r.parentNucleus)) { excluded.add(r.nucleus); grew = true; }
+    }
+  }
+  return rows.filter(r => r.cluster === cluster && !excluded.has(r.nucleus)).map(r => r.nucleus).sort((a, b) => a.localeCompare(b));
+}

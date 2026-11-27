@@ -601,3 +601,14 @@ type NamedCounts {
   - `memberCount` stays this nucleus's own; the app uses it for the type-change prompts.
 - **Cost:** about 7 SQL statements whatever the group size. The app re-reads `memberCount` and `namedCounts` after
   every change on the page, through `GET /api/nucleus/counts`.
+
+## Parent nucleus rules, confirmed with cluster-notebook 2026-11-27
+
+These are the owner's rules. `updateNucleus` refuses:
+- **`PARENT_CYCLE`:** a parent that is the nucleus itself or one of its descendants.
+- **`PARENT_OTHER_CLUSTER`:** a parent in another cluster. Also: moving a nucleus to another cluster while it has a
+  parent or children in this one.
+
+The app's Parent Nucleus picker suggests only nuclei in the same cluster, leaving out the nucleus and its descendants
+(`parentOptions` in `web/src/lib/nucleusIdentity.ts`). The field is free text, though, so a refused value can still
+be typed, and the two codes have messages.

@@ -51,6 +51,8 @@ describe('clusterNotebookErrorResponse', () => {
     ['HAS_MEMBERS', 409, 'This nucleus has members. Choose whether to move them in or end their memberships.'],
     ['NEEDS_LOCALITY', 400, 'Choose a locality first. A Neighborhood must be in a locality.'],
     ['MEMBER_ON_NEIGHBORHOOD', 400, "A Neighborhood's people are its residents. Tick Resident instead."],
+    ['PARENT_CYCLE', 400, "A nucleus can't be its own parent, or be placed under one of its own pockets."],
+    ['PARENT_OTHER_CLUSTER', 400, 'A parent nucleus must be in the same cluster.'],
     ['SOMETHING_NEW', 502, 'cluster-notebook GraphQL error: upstream: 3 groups in use'],
   ])('maps coded error %s to status %i with { error, code }', async (code, status, error) => {
     const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('cluster-notebook GraphQL error: upstream: 3 groups in use', code, 'upstream: 3 groups in use'));
