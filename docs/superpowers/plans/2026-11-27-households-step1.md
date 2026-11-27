@@ -185,3 +185,52 @@
   - Moving a member of a multi-person household shows the note and `Move all N people`.
   - Moving someone with no household shows today's plain `Move`.
 - [ ] **Step 6: Commit when the owner asks.** Use `feat: Families card lists households; moves warn who comes along`.
+
+### Task 5: Addresses for everyone; sort by family name or address (owner, 2026-11-27)
+
+**Owner:**
+- "default sort by family name but want to be able to sort by address".
+- For people not in a household: "they have an address; show it".
+
+**Backend:** cluster-notebook PR #63 adds `NucleusPerson.address: String`.
+- It is free text, as SRP holds it.
+- It is null unless the caller may see person details at that nucleus, or when none is recorded.
+- For a household member it equals the contact's address.
+
+**Files:**
+- Modify:
+  - `web/src/lib/clusterNotebook.ts`: add `address` to `NUCLEUS_PERSON_SELECTION`, and `address: string | null` to `NucleusPerson`.
+  - `web/src/lib/households.ts`
+  - `web/src/components/FamiliesList.tsx`
+  - `docs/cluster-notebook-api-requirements.md`: a line in the Households section.
+- Test: `web/src/lib/households.test.ts`, `web/src/lib/clusterNotebook.test.ts`
+
+**Interfaces:**
+- `FamilyEntry` gains `familyName: string` and `firstName: string`, the sort keys.
+  - A household uses its contact's names, else the first member's, else `''`.
+  - A one-person entry uses that person's names.
+- A one-person entry's `address` = `person.address ?? null`.
+- `export type FamilySort = 'name' | 'address'`
+- `export function sortFamilies(entries: FamilyEntry[], by: FamilySort): FamilyEntry[]` returns a new array.
+  - `'name'`: by `familyName`, then `firstName`, then `title`, case-insensitively with `localeCompare`.
+  - `'address'`: parse `^\s*(\d+)\s+(.*)$` from the address.
+    - A parsed address sorts by its street text (the rest, lowercased), then its number numerically.
+    - An address with no leading number sorts by its whole lowercased text, among the streets.
+    - Entries with a null or blank address go last, ordered among themselves by name.
+- `familyEntries` returns entries sorted with `sortFamilies(…, 'name')`, replacing its title sort.
+
+- [ ] **Step 1: Write the failing tests.**
+  - A one-person entry carries `person.address`.
+  - Name sort:
+    - "Ada Zed" (solo) sorts next to "Zed household";
+    - a family name tie is broken by first name.
+  - Address sort:
+    - `['120 Oak Ridge Ct', '34 Birch Ln', '118 Oak Ridge Ct', null, 'Rural Route 5']` → `34 Birch Ln`, `118 Oak Ridge Ct`, `120 Oak Ridge Ct`, `Rural Route 5`, then the null.
+    - "rural route 5" sorts after "oak ridge ct" by text.
+    - A blank address counts as null.
+  - The `getNucleusPeople` query contains ` address `.
+- [ ] **Step 2: Run them; they FAIL.**
+- [ ] **Step 3: Implement.**
+  - FamiliesList gets a "Sort by" control with two options, `Family name` and `Address`, as 44px-tall pill buttons with `aria-pressed`. `Family name` is the default.
+  - The sort applies after search filtering.
+- [ ] **Step 4: Check that `npx tsc --noEmit`, eslint on the changed files, and `npm test` all exit 0. Validate the queries against :8123.**
