@@ -1,11 +1,10 @@
 import {
   getActivitySummaries, updateActivitySummary, getNucleusFields, updateNucleus,
-  getNucleusWorkers, getNucleusPeopleFlags, individualDisplayName, createNucleus, deleteNucleus, getLocationOptions,
+  getNucleusWorkers, individualDisplayName, createNucleus, deleteNucleus, getLocationOptions,
 } from './clusterNotebook';
 import type { ActivitySummary, ActivitySummaries, ActivityType, NucleusFields, Individual } from './clusterNotebook';
 import type { Activity, Worker } from '@/types';
 import { srpStateFor } from './srp';
-import { countPeople } from './people';
 
 // Lets callers (route handlers) distinguish error cases (e.g. 409 vs 400)
 // without an `as any` cast on `.code`.
@@ -163,13 +162,12 @@ function toWorkers(individuals: Individual[]): Worker[] {
 }
 
 export async function getRowData(nucleusName: string) {
-  const [accompanierWorkers, protagonistWorkers, abmAssistantWorkers, contactWorkers, promoterWorkers, peopleFlags, activitySummaries, nucleusFields] = await Promise.all([
+  const [accompanierWorkers, protagonistWorkers, abmAssistantWorkers, contactWorkers, promoterWorkers, activitySummaries, nucleusFields] = await Promise.all([
     getNucleusWorkers(nucleusName, 'accompanier'),
     getNucleusWorkers(nucleusName, 'protagonist'),
     getNucleusWorkers(nucleusName, 'abm-assistant'),
     getNucleusWorkers(nucleusName, 'contact'),
     getNucleusWorkers(nucleusName, 'promoter'),
-    getNucleusPeopleFlags(nucleusName),
     getActivitySummaries(nucleusName),
     getNucleusFields(nucleusName),
   ]);
@@ -204,7 +202,7 @@ export async function getRowData(nucleusName: string) {
     abmAssistantNames: toWorkers(abmAssistantWorkers),
     contactNames: toWorkers(contactWorkers),
     promoterNames: toWorkers(promoterWorkers),
-    peopleCounts: countPeople(peopleFlags ?? []),
+    namedCounts: nucleusFields?.namedCounts ?? null,
     lastUpdated: nucleusFields?.lastUpdated ?? null,
     locationOptions,
     srp: {

@@ -1,7 +1,6 @@
 import type { PermissionSet } from './lib/access';
-import type { LastUpdated, LocalityOption, SrpAction } from './lib/clusterNotebook';
+import type { LastUpdated, LocalityOption, NamedCounts, SrpAction } from './lib/clusterNotebook';
 import type { SrpState } from './lib/srp';
-import type { PeopleCounts } from './lib/people';
 
 export interface Activity {
   act: string;
@@ -133,8 +132,9 @@ export interface NucleusDetail {
   // At most one entry -- Contact is a single-person role, unlike the other three.
   contactNames: Worker[];
   promoterNames: Worker[];
-  // From the People list: devotional hosts, participants and facilitators SRP knows (lib/people countPeople).
-  peopleCounts: PeopleCounts;
+  // The "(x)" beside each Overview estimate, counted by cluster-notebook (see NamedCounts). null only if it
+  // didn't come back, and then no "(x)" shows.
+  namedCounts: NamedCounts | null;
   // Real, persisted "who/when last changed anything on this page" from
   // cluster-notebook's audit log -- aggregated across the Nucleus's own fields and
   // all four activity summaries (confirmed 2026-10-04). Null only when no audit row

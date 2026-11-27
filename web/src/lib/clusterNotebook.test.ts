@@ -8,7 +8,7 @@ import {
   getActivitySummaries, updateActivitySummary, getAllNuclei, getNucleusFields, updateNucleus,
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
-  getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusPeopleFlags, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext,
+  getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusCounts, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext,
   getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople, getPeopleNotInSrp, getRoleHoldersWithoutAccess, getChangeLog,
   getMe, inviteIndividual, resendInvitation, revokeInvitation, removeAccess, restoreAccess, getInvitations, getAccounts,
 } from './clusterNotebook';
@@ -775,18 +775,19 @@ describe('createIndividual', () => {
   });
 });
 
-describe('getNucleusPeopleFlags', () => {
-  test('selects only the three flags and returns them', async () => {
-    const people = [{ devotionalHost: 'HOST', participates: true, facilitates: false, isResident: true }];
-    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { people } } }));
-    expect(await getNucleusPeopleFlags('Alpha')).toEqual(people);
+describe('getNucleusCounts', () => {
+  const namedCounts = { inConversation: 37, inEducationalActivities: 15, educationalFacilitators: 6, devotionalHosts: 5, protagonists: 0, helpingOthers: 0, accompanying: 1, nucleiCounted: 4 };
+  test('asks for memberCount and every named count, and returns them', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { memberCount: 5, namedCounts } } }));
+    expect(await getNucleusCounts('Alpha')).toEqual({ memberCount: 5, namedCounts });
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables).toEqual({ name: 'Alpha' });
-    expect((body.query as string).replace(/\s+/g, ' ')).toContain('nucleus(name: $name) { people { devotionalHost participates facilitates isResident } }');
+    expect((body.query as string).replace(/\s+/g, ' ')).toContain(
+      'nucleus(name: $name) { memberCount namedCounts { inConversation inEducationalActivities educationalFacilitators devotionalHosts protagonists helpingOthers accompanying nucleiCounted } }');
   });
   test('null when the nucleus is not found', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: null } }));
-    expect(await getNucleusPeopleFlags('Nonexistent')).toBeNull();
+    expect(await getNucleusCounts('Nonexistent')).toBeNull();
   });
 });
 
