@@ -155,6 +155,19 @@ export type NamedCounts = {
 };
 const NAMED_COUNTS_SELECTION = 'namedCounts { inConversation inEducationalActivities educationalFacilitators devotionalHosts protagonists helpingOthers accompanying nucleiCounted }';
 
+// Group activity totals for the activities card's "With N under it" view. Confirmed with cluster-notebook 2026-11-27
+// (their PR #61): each figure sums every nucleus's effective value (override, else SRP-derived) over this nucleus and
+// all its live descendants of any type; null when no nucleus in the tree has one. nucleiCounted - 1 is how many are
+// under it, a different N from namedCounts.nucleiCounted (Neighborhood descendants only). The owner chose summing.
+export interface ActivityCounts { number: number | null; participants: number | null; participantsFof: number | null }
+export interface ActivityTotals {
+  nucleiCounted: number;
+  devotionalGathering: ActivityCounts; childrensClasses: ActivityCounts;
+  juniorYouthGroups: ActivityCounts; studyCircles: ActivityCounts;
+}
+const ACTIVITY_COUNTS = '{ number participants participantsFof }';
+const ACTIVITY_TOTALS_SELECTION = `activityTotals { nucleiCounted devotionalGathering ${ACTIVITY_COUNTS} childrensClasses ${ACTIVITY_COUNTS} juniorYouthGroups ${ACTIVITY_COUNTS} studyCircles ${ACTIVITY_COUNTS} }`;
+
 const SRP_SELECTION = 'inSrp srpName srpAction { action status requestedAt error individuals activities srpChanged }';
 
 export interface NucleusFields {
@@ -167,6 +180,7 @@ export interface NucleusFields {
   isHome?: boolean;
   memberCount?: number;
   namedCounts?: NamedCounts;
+  activityTotals?: ActivityTotals;
   srpPlace?: { id: string; name: string } | null;
   // Confirmed with cluster-notebook 2026-11-18 (#39): SRP's last-known name for a home nucleus's FN; null unless inSrp.
   srpName?: string | null;
@@ -441,7 +455,7 @@ const NUCLEUS_FIELDS_SELECTION = 'stage locality populationMakeup population hou
   + 'inConversation inCommunityActivities protagonists devotionalHosts inEducationalActivities educationalFacilitators helpingOthers accompanying '
   + 'hasSocialAction socialActionDescription hasCommunityGatherings communityGatheringDescription narrative nucleusType '
   + 'cluster { name groupOfClusters growthMilestone auxiliaryBoardMembers } parentNucleus { name } lastUpdated { at by } '
-  + 'location { name type } isHome memberCount ' + NAMED_COUNTS_SELECTION + ' ' + SRP_SELECTION;
+  + 'location { name type } isHome memberCount ' + NAMED_COUNTS_SELECTION + ' ' + ACTIVITY_TOTALS_SELECTION + ' ' + SRP_SELECTION;
 
 export async function getNucleusFields(nucleusName: string): Promise<NucleusFields | null> {
   const query = `
@@ -657,13 +671,14 @@ export async function searchIndividuals(nucleusName: string, search?: string, li
 
 // Just the counts, re-read after each change on the page so the "(x)" figures update at once. null when the
 // nucleus isn't found.
-export async function getNucleusCounts(nucleusName: string): Promise<{ memberCount: number; namedCounts: NamedCounts } | null> {
+export type NucleusCounts = { memberCount: number; namedCounts: NamedCounts; activityTotals: ActivityTotals };
+export async function getNucleusCounts(nucleusName: string): Promise<NucleusCounts | null> {
   const query = `
     query NucleusCounts($name: String!) {
-      nucleus(name: $name) { memberCount ${NAMED_COUNTS_SELECTION} }
+      nucleus(name: $name) { memberCount ${NAMED_COUNTS_SELECTION} ${ACTIVITY_TOTALS_SELECTION} }
     }
   `;
-  const data = await request<{ nucleus: { memberCount: number; namedCounts: NamedCounts } | null }>(query, { name: nucleusName });
+  const data = await request<{ nucleus: NucleusCounts | null }>(query, { name: nucleusName });
   return data.nucleus;
 }
 

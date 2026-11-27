@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom';
 import { NucleusDetail, NucleusRow, Activity, NucleusSummary } from '@/types';
 import type { Worker } from '@/types';
 import type { PermissionSet } from '@/lib/access';
-import type { LastUpdated, NamedCounts } from '@/lib/clusterNotebook';
+import type { ActivityCounts, ActivityTotals, LastUpdated, NamedCounts } from '@/lib/clusterNotebook';
+import { countText, groupLabel, sumCounts } from '@/lib/activityTotals';
 import WorkerListModal from './WorkerListModal';
 import PeopleCard from './PeopleCard';
 import { NucleusGroupRows, type AddChild } from './NucleusGroup';
@@ -333,6 +334,44 @@ function ActRow({ label, userVals, onChange, onBlur, readonly, highlightOverride
   );
 }
 
+// The activities card's group view: cluster-notebook's sums over this nucleus and every nucleus under it, read-only.
+// Blank means no nucleus in the group has that figure recorded.
+function GroupActivitiesTable({ totals }: { totals: ActivityTotals }) {
+  const under = totals.nucleiCounted - 1;
+  const educational = [totals.childrensClasses, totals.juniorYouthGroups, totals.studyCircles];
+  const row = (label: string, c: ActivityCounts, total = false) => (
+    <tr className={total ? 'total-row' : undefined}>
+      <td className="row-label" style={total ? undefined : { textAlign: 'right', paddingLeft: 4, paddingRight: 10 }}>{label}</td>
+      <td><input className="plain" type="text" value={countText(c.number)} readOnly /></td>
+      <td><input className="plain" type="text" value={countText(c.participants)} readOnly /></td>
+      <td><input className="plain" type="text" value={countText(c.participantsFof)} readOnly /></td>
+    </tr>
+  );
+  return <>
+    <div className="sync-note">
+      Totals for this nucleus and the {under} {under === 1 ? 'nucleus' : 'nuclei'} under it. Read-only.
+    </div>
+    <div className="act-table-wrap">
+      <table className="act-table">
+        <thead>
+          <tr>
+            <th className="left">Activity</th>
+            <th>Number</th><th>Participants</th><th>Friends of the Faith</th>
+          </tr>
+        </thead>
+        <tbody>
+          {row("Children's Classes", totals.childrensClasses)}
+          {row('Junior Youth Groups', totals.juniorYouthGroups)}
+          {row('Study Circles', totals.studyCircles)}
+          {row('Total Educational Activities', sumCounts(educational), true)}
+          {row('Devotional Gatherings', totals.devotionalGathering)}
+          {row('Total Activities', sumCounts([...educational, totals.devotionalGathering]), true)}
+        </tbody>
+      </table>
+    </div>
+  </>;
+}
+
 function TotalRow({ label, totals }: { label: string; totals: { act: number; part: number; fof: number } }) {
   return (
     <tr className="total-row">
@@ -601,6 +640,8 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // update at once (owner 2026-11-26).
   const [memberCount, setMemberCount] = useState(detail.memberCount);
   const [named, setNamed] = useState<NamedCounts | null>(detail.namedCounts);
+  // The activities card's group totals (owner 2026-11-27), re-read with the counts, so an activity save shows at once.
+  const [totals, setTotals] = useState<ActivityTotals | null>(detail.activityTotals);
   const countsSeq = useRef(0);
   async function refreshCounts() {
     const seq = ++countsSeq.current;
@@ -611,6 +652,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
       const data = await res.json();
       setMemberCount(data.memberCount);
       setNamed(data.namedCounts);
+      setTotals(data.activityTotals ?? null);
     } catch { /* as above */ }
   }
   // undefined shows no "(x)".
@@ -640,6 +682,10 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const [peopleOpen, setPeopleOpen] = card('people', false);
   const [familiesOpen, setFamiliesOpen] = card('families', true);
   const [activitiesOpen, setActivitiesOpen] = card('activities', true);
+  // "This nucleus" (editable, the default) or the group's totals; kept with the page state like the open cards.
+  const [activitiesGroup, setActivitiesGroup] = card('activitiesGroup', false);
+  const groupOption = groupLabel(totals?.nucleiCounted);
+  const showGroup = groupOption !== null && activitiesGroup;
   const [detailsOpen, setDetailsOpen] = card('details', true);
   const [narrativeOpen, setNarrativeOpen] = card('narrative', true);
   const [deleteInput, setDeleteInput] = useState('');
@@ -862,6 +908,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     const attempt = async () => {
       const result = await saveField({ activities: { [actKey]: { [field]: value } } }, label);
       if (result.ok) {
+        void refreshCounts();
         committedRef.current = {
           ...committedRef.current,
           activities: result.activities ?? {
@@ -1380,9 +1427,24 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             <span><span style={{ fontSize: 11, marginRight: 6 }}>{activitiesOpen ? '▼' : '▶'}</span>Educational Activities &amp; Devotionals</span>
           </div>
           {activitiesOpen && <div className="card-body">
+            {groupOption && (
+              <div className="toggle-row" role="group" aria-label="Which numbers to show">
+                <button className={`tb${showGroup ? '' : ' on'}`} aria-pressed={!showGroup} onClick={() => setActivitiesGroup(false)}>This nucleus</button>
+                <button className={`tb${showGroup ? ' on' : ''}`} aria-pressed={showGroup} onClick={() => setActivitiesGroup(true)}>{groupOption}</button>
+              </div>
+            )}
+            {showGroup && totals ? (
+              <GroupActivitiesTable totals={totals} />
+            ) : <>
             <div className="sync-note">
               Numbers come from cluster-notebook. Amber rows are manually overridden.
             </div>
+            {/* A group total typed into a parent's own cells would be counted twice (cluster-notebook, 2026-11-27). */}
+            {groupOption && (
+              <div className="sync-note">
+                These are this nucleus&apos;s own numbers. Don&apos;t enter the group&apos;s totals here — they&apos;re under “{groupOption}”.
+              </div>
+            )}
             <div className="act-table-wrap">
               <table className="act-table">
                 <thead>
@@ -1405,6 +1467,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                 </tbody>
               </table>
             </div>
+            </>}
           </div>}
         </div>
 

@@ -192,6 +192,7 @@
 .toggle-row { display: flex; gap: 6px; margin-bottom: 8px; }
 .tb { padding: 4px 14px; border-radius: 20px; border: 1px solid #cbd5e0; background: white; font-size: 12px; cursor: pointer; color: #718096; }
 .tb.yes { background: #c6f6d5; border-color: #9ae6b4; color: #276749; font-weight: 700; }
+.tb.on { background: #ebf4ff; border-color: #90cdf4; color: #2b6cb0; font-weight: 700; }
 .tb.no { background: #fed7d7; border-color: #feb2b2; color: #9b2c2c; font-weight: 700; }
 .detail-item textarea { width: 100%; border: 1px solid #cbd5e0; border-radius: 6px; padding: 7px 9px; font-size: 12px; font-family: inherit; resize: vertical; min-height: 52px; }
 

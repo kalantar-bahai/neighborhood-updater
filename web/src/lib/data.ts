@@ -203,6 +203,7 @@ export async function getRowData(nucleusName: string) {
     contactNames: toWorkers(contactWorkers),
     promoterNames: toWorkers(promoterWorkers),
     namedCounts: nucleusFields?.namedCounts ?? null,
+    activityTotals: nucleusFields?.activityTotals ?? null,
     lastUpdated: nucleusFields?.lastUpdated ?? null,
     locationOptions,
     srp: {
