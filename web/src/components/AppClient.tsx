@@ -211,9 +211,11 @@ export default function AppClient() {
       onCreated={(name) => { setCreating(null); loadInitialData(name, 'push'); }}
     />
   );
-  // "+ Add" under a parent: in the parent's cluster, if the user can create there (owner, 2026-11-27).
+  // "+ Add" under a parent: only when the user can create in the parent's cluster and edit the parent itself
+  // (owner, 2026-11-27; cluster-notebook refuses the rest with PARENT_FORBIDDEN).
+  const canEdit = (name: string) => !!initialData.access.permissions[norm(name)]?.canWrite;
   const addChild: AddChild = {
-    can: parent => { const p = childPreset(initialData.rows, parent); return !!p && initialData.clusterNames.includes(p.cluster); },
+    can: parent => { const p = childPreset(initialData.rows, parent); return !!p && initialData.clusterNames.includes(p.cluster) && canEdit(parent); },
     open: parent => { const p = childPreset(initialData.rows, parent); if (p) setCreating({ preset: p }); },
   };
 
@@ -236,7 +238,7 @@ export default function AppClient() {
         onOpenNucleus={(name) => { setAddress(name, initialData.rows, 'push'); loadNucleus(name); }}
         canCreateInCluster={initialData.clusterNames.includes(detail.row.cluster)}
         allNucleusNames={initialData.rows.map(r => r.nucleus)}
-        parentChoices={parentOptions(initialData.rows, selectedNucleus, detail.row.cluster)}
+        parentChoices={parentOptions(initialData.rows, selectedNucleus, detail.row.cluster, canEdit)}
         childCount={initialData.rows.filter(r => r.parentNucleus === selectedNucleus).length}
         rows={initialData.rows}
         addChild={addChild}

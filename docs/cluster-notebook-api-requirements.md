@@ -609,9 +609,19 @@ These are the owner's rules. `updateNucleus` refuses:
 - **`PARENT_OTHER_CLUSTER`:** a parent in another cluster. Also: moving a nucleus to another cluster while it has a
   parent or children in this one.
 
-The app's Parent Nucleus picker suggests only nuclei in the same cluster, leaving out the nucleus and its descendants
-(`parentOptions` in `web/src/lib/nucleusIdentity.ts`). The field is free text, though, so a refused value can still
-be typed, and the two codes have messages.
+- **`PARENT_FORBIDDEN`** (cluster-notebook #60): a new parent the caller can't edit. The parent's contacts and
+  accompaniers gain access to the child, so this needs edit rights on the parent. Re-setting the current parent or
+  clearing it needs none. Checked after the two above.
+
+**Create under a parent** (cluster-notebook #60): `createNucleus(name, clusterName, srpLocalityName?, parentNucleusId?)`
+creates the nucleus under that parent in one all-or-nothing call; any refusal creates nothing. Without
+`srpLocalityName` it is placed at the parent's Locality, or the Cluster if the parent has none. An unknown parent id is
+an uncoded error. The app's "+ Add" on a parent uses this (`createRowData`), so there is no separate parent patch.
+
+The app's Parent Nucleus picker suggests only nuclei in the same cluster that the user can edit (`canWrite`), leaving
+out the nucleus and its descendants (`parentOptions` in `web/src/lib/nucleusIdentity.ts`). "+ Add" on a parent shows
+only when the user can create in the cluster and edit the parent. The field is free text, though, so a refused value
+can still be typed, and the three codes have messages.
 
 ## Activity totals (the activities card's group view), confirmed with cluster-notebook 2026-11-27
 

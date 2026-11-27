@@ -244,7 +244,7 @@ interface FormDataInput {
   presence?: string; notesPresence?: string;
   gatherings?: string; notesGatherings?: string;
   narrative?: string;
-  identity?: { nucleusType?: string; parentNucleus?: string; location?: string; srpLocality?: string; name?: string; localityId?: string; membersOnTypeChange?: 'MOVE_IN' | 'END' };
+  identity?: { nucleusType?: string; parentNucleus?: string; parentNucleusId?: string; location?: string; srpLocality?: string; name?: string; localityId?: string; membersOnTypeChange?: 'MOVE_IN' | 'END' };
 }
 
 // Shared between createRowData and saveRowData -- each of the four activity
@@ -357,7 +357,8 @@ export async function createRowData(formData: Record<string, unknown>) {
   // name arrives as a ClusterNotebookCodedError (NAME_TAKEN), which the route maps to a 409.
   // With srpLocality, cluster-notebook places the nucleus itself, so any location is ignored.
   const srpLocality = ((d.identity?.srpLocality) || '').trim();
-  const created = await createNucleus(newNucleus, clusterName, srpLocality || undefined);
+  const parentNucleusId = ((d.identity?.parentNucleusId) || '').trim();
+  const created = await createNucleus(newNucleus, clusterName, srpLocality || undefined, parentNucleusId || undefined);
   if (created === null) {
     throw new CodedError(`cluster-notebook has no cluster named "${clusterName}" — nucleus not created`, 'BAD_CLUSTER');
   }

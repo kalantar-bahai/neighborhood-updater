@@ -92,7 +92,7 @@ export default function CreateNucleusModal({ clusterNames, onClose, onCreated, p
       const res = await fetch('/api/nucleus', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formData: createPayload({ name: nucleus, cluster, locality, localityId, createInSrp, parent: preset?.parent }) }),
+        body: JSON.stringify({ formData: createPayload({ name: nucleus, cluster, locality, localityId, createInSrp, parentId: preset?.parentId }) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Create failed');
