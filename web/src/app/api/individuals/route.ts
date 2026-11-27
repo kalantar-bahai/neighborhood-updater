@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getNucleusPermissions } from '@/lib/access';
 import { searchIndividuals, createIndividual, individualDisplayName } from '@/lib/clusterNotebook';
 import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
-import { SEARCH_LIMIT, limitResults, placePath } from '@/lib/people';
+import { SEARCH_LIMIT, limitResults, toFoundIndividual } from '@/lib/people';
 
 // Both routes require write access -- searching/creating individuals only happens while
 // adding someone to a nucleus. The search covers everyone placed in the cluster (owner,
@@ -24,12 +24,7 @@ export async function GET(req: NextRequest) {
   try {
     const { items, more } = limitResults(await searchIndividuals(nucleus, search, SEARCH_LIMIT + 1));
     return NextResponse.json({
-      individuals: items.map(ind => ({
-        id: ind.id, name: individualDisplayName(ind), place: placePath(ind.place),
-        // For a move in: their current place's home nucleus, to ask about their roles there.
-        homeNucleus: ind.place?.homeNucleus ?? null, placeId: ind.place?.id ?? null,
-        household: ind.household ?? null,
-      })),
+      individuals: items.map(toFoundIndividual),
       more,
     });
   } catch (e: unknown) {

@@ -11,6 +11,7 @@ import {
 } from '@/lib/clusterNotebook';
 import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
 import { familyEntries } from '@/lib/households';
+import { isId, parseAction, parsePersonName } from '@/lib/familyActions';
 
 // The Families card's list: one entry per household, plus one per visible person with no household.
 export async function GET(req: NextRequest) {
@@ -32,49 +33,6 @@ export async function GET(req: NextRequest) {
   } catch (e: unknown) {
     return clusterNotebookErrorResponse(e);
   }
-}
-
-type FamilyAction =
-  | { action: 'create'; contactId: string; memberIds: string[] }
-  | { action: 'add'; householdId: string; individualId: string; fromHouseholdId?: string }
-  | { action: 'remove'; householdId: string; individualId: string }
-  | { action: 'contact'; householdId: string; individualId: string };
-
-const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
-
-// Strict body validation: returns the typed action, or a message for a 400.
-function parseAction(body: Record<string, unknown>): FamilyAction | string {
-  switch (body.action) {
-    case 'create': {
-      const { contactId, memberIds } = body;
-      if (!isId(contactId)) return 'Missing contactId';
-      if (!Array.isArray(memberIds) || memberIds.length === 0 || !memberIds.every(isId)) {
-        return 'memberIds must be a non-empty list of ids';
-      }
-      return { action: 'create', contactId, memberIds };
-    }
-    case 'add': {
-      const { householdId, individualId, fromHouseholdId } = body;
-      if (!isId(householdId) || !isId(individualId)) return 'Missing householdId or individualId';
-      if (fromHouseholdId !== undefined && !isId(fromHouseholdId)) return 'Invalid fromHouseholdId';
-      return { action: 'add', householdId, individualId, fromHouseholdId };
-    }
-    case 'remove':
-    case 'contact': {
-      const { householdId, individualId } = body;
-      if (!isId(householdId) || !isId(individualId)) return 'Missing householdId or individualId';
-      return { action: body.action, householdId, individualId };
-    }
-    default:
-      return 'Unknown action';
-  }
-}
-
-// Display-only name of the person the action is about, for error messages. Never used for authorization.
-function parsePersonName(v: unknown): string | undefined {
-  if (typeof v !== 'string') return undefined;
-  const t = v.trim();
-  return t && t.length <= 200 ? t : undefined;
 }
 
 // Household edits from the Families card: create, add a member, remove a member, set the contact.

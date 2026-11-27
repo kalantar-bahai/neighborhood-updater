@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { namedToShow, editableRoles, moveTargets, editorRoleList, refusalText, srpAtNote, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, formatDate, initials, activityLines, activitySummary, courseGroups, groupCountsNote, AGE_FILTERS, peopleCountLabel, hideNote, hideRolesLine, nextRoleIds, toPersonRow, limitResults, SEARCH_LIMIT, type PersonRow } from './people';
+import { namedToShow, editableRoles, moveTargets, editorRoleList, refusalText, srpAtNote, syncNote, moveResultError, rolesToClear, isMoving, sortPeople, placePath, roleLabel, canEditRole, peopleFilters, filterPeople, detailsView, formatDate, initials, activityLines, activitySummary, courseGroups, groupCountsNote, AGE_FILTERS, peopleCountLabel, hideNote, hideRolesLine, nextRoleIds, toPersonRow, limitResults, toFoundIndividual, SEARCH_LIMIT, type PersonRow } from './people';
 import type { Participation, AgeCategory, DevotionalHostRole, MoveContext, PermissionSet, PersonDetails, PlaceSummary } from './clusterNotebook';
 
 const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
@@ -578,5 +578,21 @@ describe('groupCountsNote', () => {
   test('names how many neighborhoods below are included', () => {
     expect(groupCountsNote(2)).toBe('Counts in parentheses include the 1 neighborhood under this one.');
     expect(groupCountsNote(4)).toBe('Counts in parentheses include the 3 neighborhoods under this one.');
+  });
+});
+
+describe('toFoundIndividual', () => {
+  const base = { id: 'i1', firstName: 'Ana', familyName: 'Lopez', middleNames: null, nickname: null, placeSync: null, inSrp: false };
+  test('passes household through', () => {
+    const household = { id: 'h1' } as never;
+    expect(toFoundIndividual({ ...base, place: null, household }).household).toBe(household);
+  });
+  test('household is null when absent', () => {
+    expect(toFoundIndividual({ ...base, place: null }).household).toBeNull();
+  });
+  test('maps name and place, with nulls when unplaced', () => {
+    expect(toFoundIndividual({ ...base, place: null })).toEqual({
+      id: 'i1', name: 'Ana Lopez', place: '', homeNucleus: null, placeId: null, household: null,
+    });
   });
 });
