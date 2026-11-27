@@ -8,7 +8,7 @@ import {
   getActivitySummaries, updateActivitySummary, getAllNuclei, getNucleusFields, updateNucleus,
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
-  getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusCounts, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext,
+  getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusCounts, getNucleusHouseholds, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext,
   getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople, getPeopleNotInSrp, getRoleHoldersWithoutAccess, getChangeLog,
   getMe, inviteIndividual, resendInvitation, revokeInvitation, removeAccess, restoreAccess, getInvitations, getAccounts,
 } from './clusterNotebook';
@@ -802,6 +802,27 @@ describe('getNucleusCounts', () => {
   });
 });
 
+describe('getNucleusHouseholds', () => {
+  const member = (id: string, firstName: string) => ({ id, firstName, familyName: 'Testperson', middleNames: null, nickname: null, inSrp: true });
+  test('asks for the named households with contact and members, and returns them unchanged', async () => {
+    const households = [
+      { id: 'H1', size: 3, address: '1 Test Lane', contact: member('1', 'Ana'), members: [member('1', 'Ana'), member('2', 'Ben')] },
+      { id: 'H2', size: 1, address: null, contact: null, members: [] },
+    ];
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { namedHouseholds: households } } }));
+    expect(await getNucleusHouseholds('Alpha')).toEqual(households);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.variables).toEqual({ name: 'Alpha' });
+    const query = (body.query as string).replace(/\s+/g, ' ');
+    expect(query).toContain('nucleus(name: $name) { namedHouseholds { id size address contact {');
+    expect(query).toContain('members {');
+  });
+  test('null when the nucleus is not found', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: null } }));
+    expect(await getNucleusHouseholds('Nonexistent')).toBeNull();
+  });
+});
+
 describe('getNucleusPeople', () => {
   test('returns the people connected to the nucleus', async () => {
     const person: NucleusPerson = {
@@ -817,7 +838,7 @@ describe('getNucleusPeople', () => {
     expect(result).toEqual([person]);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables).toEqual({ name: 'Alpha' });
-    expect((body.query as string).replace(/\s+/g, ' ')).toContain('people(includeHidden: true) { individual { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } roles isResident ageCategory devotionalHost participates facilitates participation { activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current studyItemShortName personCompleted } hidden hide { hiddenAt reason hiddenBy { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } } }');
+    expect((body.query as string).replace(/\s+/g, ' ')).toContain('people(includeHidden: true) { individual { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } household { id size address contact { id firstName familyName middleNames nickname inSrp } members { id firstName familyName middleNames nickname inSrp } } } roles isResident ageCategory devotionalHost participates facilitates participation { activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current studyItemShortName personCompleted } hidden hide { hiddenAt reason hiddenBy { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } } }');
   });
 
   test('returns null when the nucleus is not found', async () => {
@@ -1322,6 +1343,7 @@ describe('admin client', () => {
     expect(vars).toEqual({ clusterName: 'Testville' });
     expect(q).toContain('hiddenPeople(clusterName: $clusterName)');
     expect(q).toContain('nucleusName roles isResident hide { hiddenAt reason hiddenBy {');
+    expect(q).toContain('household { id size address');
   });
 
   test('getPersonDetails with null nucleus omits the variable and the argument', async () => {
