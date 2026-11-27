@@ -25,14 +25,14 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
 
-  async function run(key: string, body: FamilyAction) {
+  async function run(key: string, body: FamilyAction, personName: string) {
     setSavingKey(key);
     setErrors(prev => ({ ...prev, [key]: '' }));
     try {
       const res = await fetch('/api/families', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nucleus, ...body }),
+        body: JSON.stringify({ nucleus, personName, ...body }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) setErrors(prev => ({ ...prev, [key]: data.error || 'Could not save that change.' }));
@@ -49,11 +49,11 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
     const { entry, mode } = picker;
     setPicker(null);
     if (mode === 'start') {
-      run(entry.key, { action: 'create', contactId: entry.members[0].id, memberIds: [c.id] });
+      run(entry.key, { action: 'create', contactId: entry.members[0].id, memberIds: [c.id] }, c.name);
       return;
     }
     if (c.fromHouseholdId && c.familyTitle !== c.name && !window.confirm(moveConfirmText(c.name, c.familyTitle))) return;
-    run(entry.key, { action: 'add', householdId: entry.householdId!, individualId: c.id, ...(c.fromHouseholdId ? { fromHouseholdId: c.fromHouseholdId } : {}) });
+    run(entry.key, { action: 'add', householdId: entry.householdId!, individualId: c.id, ...(c.fromHouseholdId ? { fromHouseholdId: c.fromHouseholdId } : {}) }, c.name);
   }
 
   useEffect(() => {
@@ -130,10 +130,10 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
                         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
                           {!m.isContact && (
                             <button type="button" disabled={busy} style={smallBtn}
-                              onClick={() => run(f.key, { action: 'contact', householdId: f.householdId!, individualId: m.id })}>Make contact</button>
+                              onClick={() => run(f.key, { action: 'contact', householdId: f.householdId!, individualId: m.id }, m.name)}>Make contact</button>
                           )}
                           <button type="button" disabled={busy || !canRemoveMember(f, m.id)} style={smallBtn}
-                            onClick={() => run(f.key, { action: 'remove', householdId: f.householdId!, individualId: m.id })}>Remove</button>
+                            onClick={() => run(f.key, { action: 'remove', householdId: f.householdId!, individualId: m.id }, m.name)}>Remove</button>
                           {!canRemoveMember(f, m.id) && (
                             <span style={{ fontSize: 12, color: '#718096' }}>To remove {m.name}, make someone else the contact first.</span>
                           )}

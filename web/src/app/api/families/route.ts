@@ -70,6 +70,13 @@ function parseAction(body: Record<string, unknown>): FamilyAction | string {
   }
 }
 
+// Display-only name of the person the action is about, for error messages. Never used for authorization.
+function parsePersonName(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const t = v.trim();
+  return t && t.length <= 200 ? t : undefined;
+}
+
 // Household edits from the Families card: create, add a member, remove a member, set the contact.
 const FORBIDDEN_TEXT = "You can't change this family.";
 
@@ -114,6 +121,6 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ household });
   } catch (e: unknown) {
-    return clusterNotebookErrorResponse(e, { forbidden: FORBIDDEN_TEXT });
+    return clusterNotebookErrorResponse(e, { forbidden: FORBIDDEN_TEXT, name: parsePersonName(record.personName) });
   }
 }
