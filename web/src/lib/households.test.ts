@@ -7,7 +7,7 @@ const mem = (id: string, firstName: string, familyName: string): HouseholdMember
 } as HouseholdMember);
 
 const hh = (id: string, members: HouseholdMember[], size = members.length, contactIdx: number | null = 0): Household => ({
-  id, contact: contactIdx === null ? null : members[contactIdx], members, size, address: null,
+  id, contact: contactIdx === null ? null : members[contactIdx], members, size, address: null, srpState: 'LOCAL_ONLY',
 });
 
 const person = (m: HouseholdMember, household: Household | null | undefined, hidden = false): NucleusPerson =>
