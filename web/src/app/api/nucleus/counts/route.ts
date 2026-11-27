@@ -4,7 +4,7 @@ import { getNucleusPermissions } from '@/lib/access';
 import { getNucleusCounts } from '@/lib/clusterNotebook';
 import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
 
-// The nucleus's member count and the Overview's "(x)" counts, re-read by the page after each change on it so
+// The nucleus's member count, the Overview's "(x)" counts and the activities card's group totals, re-read by the page after each change on it so
 // those figures update at once. Much cheaper than GET /api/nucleus, which reads the whole page.
 export async function GET(req: NextRequest) {
   const { userId } = await auth();

@@ -612,3 +612,32 @@ These are the owner's rules. `updateNucleus` refuses:
 The app's Parent Nucleus picker suggests only nuclei in the same cluster, leaving out the nucleus and its descendants
 (`parentOptions` in `web/src/lib/nucleusIdentity.ts`). The field is free text, though, so a refused value can still
 be typed, and the two codes have messages.
+
+## Activity totals (the activities card's group view), confirmed with cluster-notebook 2026-11-27
+
+The owner decided that activity figures roll up by summing, over every nucleus under this one. It was built in cluster-notebook PR #61.
+
+```graphql
+Nucleus.activityTotals: ActivityTotals!
+type ActivityTotals {
+  nucleiCounted: Int!
+  devotionalGathering: ActivityCounts!
+  childrensClasses: ActivityCounts!
+  juniorYouthGroups: ActivityCounts!
+  studyCircles: ActivityCounts!
+}
+type ActivityCounts { number: Int  participants: Int  participantsFof: Int }
+```
+
+- **Scope:** this nucleus plus all its live descendants, recursively, **of any type**. The "(x)" named counts cover Neighborhood descendants only.
+  - Archived nuclei are skipped. Archiving moves a nucleus's children up to its parent, so no subtree is lost.
+  - Children the caller can't read are counted. The totals carry no names.
+- **Figures:** each is the sum of each in-scope nucleus's effective value, using the same per-field precedence (override, else SRP-derived) as its own ActivitySummary.
+  - A figure is null when no in-scope nucleus has a value for it.
+  - A nucleus with no open activities and no override contributes null, not 0.
+- **Counting:** `nucleiCounted - 1` is the "With N under it" count. It is a different N from `namedCounts.nucleiCounted`.
+- **Read in:** both the nucleus query and the counts refresh (`/api/nucleus/counts`), which runs after each activity save. It's a fixed 3 database queries whatever the tree size.
+- **Known limits:**
+  - A child not yet pushed to SRP has its SRP activities in the parent's FN, so they show on the parent, and are still counted once.
+  - Participants are counted once per activity, as SRP does.
+  - A group total typed into a parent's own cells would be counted twice. The card says so in the "This nucleus" view.

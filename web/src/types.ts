@@ -1,5 +1,5 @@
 import type { PermissionSet } from './lib/access';
-import type { LastUpdated, LocalityOption, NamedCounts, SrpAction } from './lib/clusterNotebook';
+import type { ActivityTotals, LastUpdated, LocalityOption, NamedCounts, SrpAction } from './lib/clusterNotebook';
 import type { SrpState } from './lib/srp';
 
 export interface Activity {
@@ -135,6 +135,9 @@ export interface NucleusDetail {
   // The "(x)" beside each Overview estimate, counted by cluster-notebook (see NamedCounts). null only if it
   // didn't come back, and then no "(x)" shows.
   namedCounts: NamedCounts | null;
+  // Group sums for the activities card's "With N under it" view (see ActivityTotals). null only if it didn't
+  // come back, and then the card has no switch.
+  activityTotals: ActivityTotals | null;
   // Real, persisted "who/when last changed anything on this page" from
   // cluster-notebook's audit log -- aggregated across the Nucleus's own fields and
   // all four activity summaries (confirmed 2026-10-04). Null only when no audit row

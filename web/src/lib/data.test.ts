@@ -31,6 +31,13 @@ const mockCreateNucleus = vi.mocked(createNucleus);
 const mockDeleteNucleus = vi.mocked(deleteNucleus);
 const mockGetLocationOptions = vi.mocked(getLocationOptions);
 
+const TOTALS = {
+  nucleiCounted: 3,
+  devotionalGathering: { number: 1, participants: 8, participantsFof: null },
+  childrensClasses: { number: null, participants: null, participantsFof: null },
+  juniorYouthGroups: { number: 2, participants: 9, participantsFof: 4 },
+  studyCircles: { number: 0, participants: 0, participantsFof: 0 },
+};
 const NAMED = { inConversation: 37, inEducationalActivities: 15, educationalFacilitators: 6, devotionalHosts: 5, protagonists: 0, helpingOthers: 1, accompanying: 2, nucleiCounted: 4 };
 
 describe('getRowData', () => {
@@ -490,7 +497,7 @@ describe('getRowData', () => {
       cluster: { name: 'NC-215 Triangle', groupOfClusters: null, growthMilestone: null, auxiliaryBoardMembers: null },
       lastUpdated: null, location: null,
       isHome: true, inSrp: false, memberCount: 3, srpPlace: { id: 'P1', name: 'Carrboro' },
-      namedCounts: NAMED,
+      namedCounts: NAMED, activityTotals: TOTALS,
     });
 
     const result = await getRowData('Alpha');
@@ -500,6 +507,8 @@ describe('getRowData', () => {
     expect(result?.memberCount).toBe(3);
     // The (x) counts come from cluster-notebook as they are (owner 2026-11-27): no counting here.
     expect(result?.namedCounts).toEqual(NAMED);
+    // So are the group activity totals, nulls kept as null.
+    expect(result?.activityTotals).toEqual(TOTALS);
   });
 });
 

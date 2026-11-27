@@ -777,13 +777,24 @@ describe('createIndividual', () => {
 
 describe('getNucleusCounts', () => {
   const namedCounts = { inConversation: 37, inEducationalActivities: 15, educationalFacilitators: 6, devotionalHosts: 5, protagonists: 0, helpingOthers: 0, accompanying: 1, nucleiCounted: 4 };
-  test('asks for memberCount and every named count, and returns them', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { memberCount: 5, namedCounts } } }));
-    expect(await getNucleusCounts('Alpha')).toEqual({ memberCount: 5, namedCounts });
+  const activityTotals = {
+    nucleiCounted: 4,
+    devotionalGathering: { number: 2, participants: null, participantsFof: 0 },
+    childrensClasses: { number: 3, participants: 20, participantsFof: 6 },
+    juniorYouthGroups: { number: null, participants: null, participantsFof: null },
+    studyCircles: { number: 1, participants: 5, participantsFof: 1 },
+  };
+  test('asks for memberCount, every named count and the activity totals, and returns them', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { memberCount: 5, namedCounts, activityTotals } } }));
+    expect(await getNucleusCounts('Alpha')).toEqual({ memberCount: 5, namedCounts, activityTotals });
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables).toEqual({ name: 'Alpha' });
-    expect((body.query as string).replace(/\s+/g, ' ')).toContain(
-      'nucleus(name: $name) { memberCount namedCounts { inConversation inEducationalActivities educationalFacilitators devotionalHosts protagonists helpingOthers accompanying nucleiCounted } }');
+    const query = (body.query as string).replace(/\s+/g, ' ');
+    expect(query).toContain(
+      'nucleus(name: $name) { memberCount namedCounts { inConversation inEducationalActivities educationalFacilitators devotionalHosts protagonists helpingOthers accompanying nucleiCounted }');
+    const counts = '{ number participants participantsFof }';
+    expect(query).toContain(
+      `activityTotals { nucleiCounted devotionalGathering ${counts} childrensClasses ${counts} juniorYouthGroups ${counts} studyCircles ${counts} }`);
   });
   test('null when the nucleus is not found', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: null } }));
