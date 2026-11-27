@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { PersonSrpDot } from './SrpBadge';
-import { filterFamilies, hiddenText, sizeText, type FamilyEntry } from '@/lib/households';
+import { filterFamilies, hiddenText, sizeText, sortFamilies, type FamilyEntry, type FamilySort } from '@/lib/households';
 
 // The Families card's list: households (and people with no household), searchable by anyone in them.
 export default function FamiliesList({ nucleus, refreshKey }: { nucleus: string; refreshKey: number }) {
   const [families, setFamilies] = useState<FamilyEntry[] | null>(null);
   const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState('');
+  const [sortBy, setSortBy] = useState<FamilySort>('name');
   const [openKeys, setOpenKeys] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
@@ -26,7 +27,7 @@ export default function FamiliesList({ nucleus, refreshKey }: { nucleus: string;
   if (loadError) return <div style={{ fontSize: 13, color: '#c53030', marginTop: 12 }}>{loadError}</div>;
   if (!families) return <div style={{ fontSize: 13, color: '#718096', marginTop: 12 }}>Loading families…</div>;
 
-  const shown = filterFamilies(families, query);
+  const shown = sortFamilies(filterFamilies(families, query), sortBy);
 
   return (
     <div style={{ marginTop: 16 }}>
@@ -38,6 +39,18 @@ export default function FamiliesList({ nucleus, refreshKey }: { nucleus: string;
         onChange={e => setQuery(e.target.value)}
         style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 14 }}
       />
+      <div role="group" aria-label="Sort by" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+        <span style={{ fontSize: 12, color: '#718096' }}>Sort by</span>
+        {([['name', 'Family name'], ['address', 'Address']] as const).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={sortBy === value}
+            onClick={() => setSortBy(value)}
+            style={{ minHeight: 44, padding: '4px 14px', borderRadius: 22, fontSize: 13, cursor: 'pointer', border: '1px solid #cbd5e0', background: sortBy === value ? '#bee3f8' : 'white', color: sortBy === value ? '#2a4365' : '#4a5568', fontWeight: sortBy === value ? 700 : 400 }}
+          >{label}</button>
+        ))}
+      </div>
       {shown.length === 0 && query.trim() && (
         <div style={{ fontSize: 13, color: '#718096', marginTop: 10 }}>No family has anyone by that name.</div>
       )}

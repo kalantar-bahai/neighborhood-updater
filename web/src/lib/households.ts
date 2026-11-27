@@ -6,7 +6,9 @@ import { individualDisplayName } from './personName';
 export type FamilyMember = { id: string; name: string; inSrp: boolean; isContact: boolean };
 export type FamilyEntry = {
   key: string; title: string; address: string | null; size: number; members: FamilyMember[]; hidden: number;
+  familyName: string; firstName: string; // sort keys
 };
+export type FamilySort = 'name' | 'address';
 
 export function familyTitle(h: Household): string {
   if (h.size === 1 && h.contact) return individualDisplayName(h.contact);
@@ -28,13 +30,39 @@ export function familyEntries(households: Household[], people: NucleusPerson[]):
     size: h.size,
     members: h.members.map((m) => toMember(m, m.id === h.contact?.id)),
     hidden: h.size - h.members.length,
+    familyName: (h.contact ?? h.members[0])?.familyName ?? '',
+    firstName: (h.contact ?? h.members[0])?.firstName ?? '',
   }));
   for (const p of people) {
     if (p.hidden || p.individual.household) continue;
     const m = toMember(p.individual, false);
-    entries.push({ key: `person:${p.individual.id}`, title: m.name, address: null, size: 1, members: [m], hidden: 0 });
+    entries.push({ key: `person:${p.individual.id}`, title: m.name, address: p.address ?? null, size: 1, members: [m], hidden: 0,
+      familyName: p.individual.familyName ?? '', firstName: p.individual.firstName ?? '',
+    });
   }
-  return entries.sort((a, b) => a.title.localeCompare(b.title));
+  return sortFamilies(entries, 'name');
+}
+
+const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+const byName = (a: FamilyEntry, b: FamilyEntry) =>
+  cmp(a.familyName, b.familyName) || cmp(a.firstName, b.firstName) || cmp(a.title, b.title);
+
+// Street text first, then house number numerically; no leading number sorts by its whole text.
+function addressKey(address: string | null): { street: string; num: number } | null {
+  const text = address?.trim();
+  if (!text) return null;
+  const m = /^\s*(\d+)\s+(.*)$/.exec(text);
+  return m ? { street: m[2].toLowerCase(), num: Number(m[1]) } : { street: text.toLowerCase(), num: 0 };
+}
+
+export function sortFamilies(entries: FamilyEntry[], by: FamilySort): FamilyEntry[] {
+  if (by === 'name') return [...entries].sort(byName);
+  return [...entries].sort((a, b) => {
+    const ka = addressKey(a.address);
+    const kb = addressKey(b.address);
+    if (!ka || !kb) return ka ? -1 : kb ? 1 : byName(a, b);
+    return ka.street.localeCompare(kb.street) || ka.num - kb.num || byName(a, b);
+  });
 }
 
 export function filterFamilies(entries: FamilyEntry[], query: string): FamilyEntry[] {

@@ -643,7 +643,7 @@ export interface Participation {
 // hide is null unless the person is hidden AND the caller can edit the nucleus.
 export interface PersonHide { hiddenAt: string; hiddenBy: PersonSummary | null; reason: string | null }
 export interface NucleusPerson {
-  individual: PersonSummary & { household?: Household | null }; roles: string[]; isResident: boolean;
+  individual: PersonSummary & { household?: Household | null }; address: string | null; roles: string[]; isResident: boolean;
   ageCategory: AgeCategory | null; devotionalHost: DevotionalHostRole | null;
   participates: boolean; facilitates: boolean; participation: Participation[];
   hidden: boolean; hide: PersonHide | null;
@@ -705,7 +705,7 @@ export async function getNucleusHouseholds(nucleusName: string): Promise<Househo
   return data.nucleus?.namedHouseholds ?? null;
 }
 
-const NUCLEUS_PERSON_SELECTION = `individual { ${HOUSEHOLD_PERSON_SELECTION} } roles isResident ageCategory devotionalHost participates facilitates participation { ${PARTICIPATION_SELECTION} } hidden hide { hiddenAt reason hiddenBy { ${PERSON_SUMMARY_SELECTION} } }`;
+const NUCLEUS_PERSON_SELECTION = `individual { ${HOUSEHOLD_PERSON_SELECTION} } address roles isResident ageCategory devotionalHost participates facilitates participation { ${PARTICIPATION_SELECTION} } hidden hide { hiddenAt reason hiddenBy { ${PERSON_SUMMARY_SELECTION} } }`;
 
 // Everyone connected to the nucleus: role holders here, plus residents on a home nucleus.
 // Includes hidden people (flagged `hidden`); `hide` is only filled for callers who can edit.

@@ -830,7 +830,7 @@ describe('getNucleusPeople', () => {
   test('returns the people connected to the nucleus', async () => {
     const person: NucleusPerson = {
       individual: { id: '7', firstName: 'Ana', familyName: 'Lopez', middleNames: null, nickname: null, place: { id: 'S1', name: 'Parkside', type: 'SETTING', locality: 'Chapelboro', cluster: 'Chapel Hill', localityId: 'L1', homeNucleus: 'Alpha' }, placeSync: { status: 'pending', code: null }, inSrp: false },
-      roles: ['promoter'], isResident: true, ageCategory: null, devotionalHost: null,
+      address: null, roles: ['promoter'], isResident: true, ageCategory: null, devotionalHost: null,
       participates: true, facilitates: false, hidden: false, hide: null,
       participation: [{ activityId: 'A1', activityType: 'sc', heldAt: 'Parkside', role: 'PARTICIPANT', studyItem: 'Book 1', studyItemTitle: 'Reflections on the Life of the Spirit', startDate: '2026-01-05', endDate: null, completed: false, current: true, studyItemShortName: 'B1', personCompleted: null }],
     };
@@ -841,7 +841,7 @@ describe('getNucleusPeople', () => {
     expect(result).toEqual([person]);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables).toEqual({ name: 'Alpha' });
-    expect((body.query as string).replace(/\s+/g, ' ')).toContain('people(includeHidden: true) { individual { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } household { id size address contact { id firstName familyName middleNames nickname inSrp } members { id firstName familyName middleNames nickname inSrp } } } roles isResident ageCategory devotionalHost participates facilitates participation { activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current studyItemShortName personCompleted } hidden hide { hiddenAt reason hiddenBy { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } } }');
+    expect((body.query as string).replace(/\s+/g, ' ')).toContain('people(includeHidden: true) { individual { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } household { id size address contact { id firstName familyName middleNames nickname inSrp } members { id firstName familyName middleNames nickname inSrp } } } address roles isResident ageCategory devotionalHost participates facilitates participation { activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current studyItemShortName personCompleted } hidden hide { hiddenAt reason hiddenBy { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } } }');
   });
 
   test('returns null when the nucleus is not found', async () => {
@@ -984,6 +984,7 @@ describe('updateNucleusWorkers', () => {
 describe('hideIndividual / unhideIndividual', () => {
   const person = {
     individual: { id: '7', firstName: 'Ana', familyName: 'Lopez', middleNames: null, nickname: null, place: null, placeSync: null, inSrp: false },
+    address: null,
     roles: [], isResident: true, ageCategory: null, devotionalHost: null, participates: false, facilitates: false,
     participation: [], hidden: true, hide: { hiddenAt: '2026-11-23T10:00:00Z', reason: 'Moved away', hiddenBy: null },
   } as NucleusPerson;

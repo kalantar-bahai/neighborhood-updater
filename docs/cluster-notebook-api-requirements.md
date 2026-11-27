@@ -662,4 +662,5 @@ type Household {
 - **Person's household:** null means the person is in none.
 - **Contact:** null when the caller can't read the contact.
 - **Read in:** `getNucleusHouseholds` (the nucleus query), and `household` on each person in `getNucleusPeople` and `getHiddenPeople`.
+- **NucleusPerson.address:** confirmed with cluster-notebook 2026-11-27 (PR #63). It is free text, as SRP holds it. It sits beside `individual` on a nucleus person, not inside it. It is null unless the caller may see person details at that nucleus, or when none is recorded. For a household member it equals the contact's address.
 - **Selection:** the app reads only `id firstName familyName middleNames nickname inSrp` for the contact and members. It does not read `place`.
