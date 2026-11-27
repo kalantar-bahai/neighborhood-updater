@@ -161,6 +161,11 @@ describe('createPayload', () => {
     expect('srpLocality' in r.identity).toBe(false);
     expect('nucleusType' in r.identity).toBe(false);
   });
+  it('a child carries its parent, with or without SRP', () => {
+    expect(createPayload({ ...base, createInSrp: false, parent: 'Elm Park' }).identity.parentNucleus).toBe('Elm Park');
+    expect(createPayload({ ...base, createInSrp: true, parent: 'Elm Park' }).identity.parentNucleus).toBe('Elm Park');
+    expect('parentNucleus' in createPayload({ ...base, createInSrp: false }).identity).toBe(false);
+  });
 });
 
 describe('reloadOutcome', () => {

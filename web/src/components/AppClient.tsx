@@ -10,6 +10,8 @@ import { readViewState, writeViewState } from '@/lib/viewState';
 import Picker from './Picker';
 import DetailView from './DetailView';
 import CreateNucleusModal from './CreateNucleusModal';
+import type { AddChild } from './NucleusGroup';
+import { childPreset, type CreatePreset } from '@/lib/createPreset';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
 
@@ -28,7 +30,8 @@ export default function AppClient() {
   // A one-shot status for the DetailView a reload mounts (e.g. "3 moved in; SRP is being updated").
   const [reloadNotice, setReloadNotice] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [creatingNew, setCreatingNew] = useState(false);
+  // The new-nucleus form, when open: `preset` is what its "+ Add" already knew (none from the corner button).
+  const [creating, setCreating] = useState<{ preset?: CreatePreset } | null>(null);
   // What is open on each page (cards and bars on a nucleus, clusters/localities/bars on the list; key '' is the
   // list) and where it was scrolled, so going to a child and coming back (in-app or browser Back) finds the page
   // as it was (owner, 2026-11-27). Saved in the tab's sessionStorage (lib/viewState.ts), so a reload does too.
@@ -200,10 +203,25 @@ export default function AppClient() {
     return <div className="loading-state">Loading...</div>;
   }
 
+  const createModal = creating && (
+    <CreateNucleusModal
+      clusterNames={initialData.clusterNames}
+      preset={creating.preset}
+      onClose={() => setCreating(null)}
+      onCreated={(name) => { setCreating(null); loadInitialData(name, 'push'); }}
+    />
+  );
+  // "+ Add" under a parent: in the parent's cluster, if the user can create there (owner, 2026-11-27).
+  const addChild: AddChild = {
+    can: parent => { const p = childPreset(initialData.rows, parent); return !!p && initialData.clusterNames.includes(p.cluster); },
+    open: parent => { const p = childPreset(initialData.rows, parent); if (p) setCreating({ preset: p }); },
+  };
+
   if (detail && selectedNucleus) {
     const perms = initialData.access.permissions[norm(selectedNucleus)] ?? NO_ACCESS;
     const permissions = effectivePermissions(perms, detail.srp.state, detail.srp.action?.action);
     return (
+      <>
       <DetailView
         key={`${selectedNucleus}:${detailVersion}`}
         detail={detail}
@@ -221,9 +239,12 @@ export default function AppClient() {
         parentChoices={parentOptions(initialData.rows, selectedNucleus, detail.row.cluster)}
         childCount={initialData.rows.filter(r => r.parentNucleus === selectedNucleus).length}
         rows={initialData.rows}
+        addChild={addChild}
         cardOpen={openByView[selectedNucleus] ?? {}}
         onCardOpenChange={(key, open) => setOpen(selectedNucleus, key, open)}
       />
+      {createModal}
+      </>
     );
   }
 
@@ -252,17 +273,14 @@ export default function AppClient() {
         email={initialData.email}
         onSelect={(name) => { setAddress(name, initialData.rows, 'push'); loadNucleus(name); }}
         openState={{ open: openByView[''] ?? {}, onOpenChange: (key, open) => setOpen('', key, open) }}
-        onAdd={canCreateNucleus ? () => setCreatingNew(true) : undefined}
+        onAdd={canCreateNucleus ? () => setCreating({}) : undefined}
+        canCreateIn={cluster => initialData.clusterNames.includes(cluster)}
+        onAddIn={preset => setCreating({ preset })}
+        addChild={addChild}
         onAdmin={initialData.isAdmin ? () => window.location.href = '/admin' : undefined}
       />
 
-      {creatingNew && (
-        <CreateNucleusModal
-          clusterNames={initialData.clusterNames}
-          onClose={() => setCreatingNew(false)}
-          onCreated={(name) => { setCreatingNew(false); loadInitialData(name, 'push'); }}
-        />
-      )}
+      {createModal}
     </>
   );
 }

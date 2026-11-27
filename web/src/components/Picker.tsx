@@ -4,7 +4,9 @@ import React, { useState } from 'react';
 import { NucleusSummary } from '@/types';
 import ConcentricRainbow, { type AlignedLabel } from './ConcentricRainbow';
 import NucleusListRow from './NucleusListRow';
-import NucleusGroup, { type OpenState } from './NucleusGroup';
+import NucleusGroup, { type AddChild, type OpenState } from './NucleusGroup';
+import AddHere from './AddHere';
+import type { CreatePreset } from '@/lib/createPreset';
 import { childTree, rootOf, type ChildNode } from '@/lib/children';
 import PageHeader, { HeaderButton } from './PageHeader';
 
@@ -16,6 +18,10 @@ interface Props {
   // them as they were (owner, 2026-11-27).
   openState: OpenState;
   onAdd?: () => void;
+  // "+ Add" on the cluster, locality and parent bars, in clusters the user can create in (owner, 2026-11-27).
+  canCreateIn: (cluster: string) => boolean;
+  onAddIn: (preset: CreatePreset) => void;
+  addChild: AddChild;
   onAdmin?: () => void;
 }
 
@@ -186,7 +192,7 @@ function RollupCards({ rows: rowsIn, groupLabel, onCardClick }: {
   );
 }
 
-export default function Picker({ rows, email, onSelect, openState, onAdd, onAdmin }: Props) {
+export default function Picker({ rows, email, onSelect, openState, onAdd, canCreateIn, onAddIn, addChild, onAdmin }: Props) {
   // Rollup-card popup (2026-10-08) -- null when closed. `rows` are the exact
   // nuclei the clicked card already summed, re-summed here into the nine-field
   // totals the rainbow diagram needs (the card itself only shows nuclei/act/
@@ -212,7 +218,7 @@ export default function Picker({ rows, email, onSelect, openState, onAdd, onAdmi
     entries.sort((x, y) => x.name.localeCompare(y.name));
     return entries.map(e => e.row && e.nodes.length === 0
       ? <NucleusListRow key={e.name} r={e.row} isPocket={false} onSelect={onSelect} />
-      : <NucleusGroup key={e.name} label={e.name} row={e.row} nodes={e.nodes} onSelect={onSelect} openState={openState} keyPrefix={keyPrefix} />);
+      : <NucleusGroup key={e.name} label={e.name} row={e.row} nodes={e.nodes} onSelect={onSelect} openState={openState} keyPrefix={keyPrefix} addChild={addChild} />);
   }
 
   // New locality level, 2026-10-08, sitting between Cluster and the existing
@@ -223,7 +229,7 @@ export default function Picker({ rows, email, onSelect, openState, onAdd, onAdmi
   // it from the very parent it's supposed to nest under. Falls back to the pocket's
   // own locality if the parent isn't found in this same cluster (shouldn't happen
   // for real data).
-  function renderLocalityGroups(clusterRows: NucleusSummary[], keyPrefix: string) {
+  function renderLocalityGroups(clusterRows: NucleusSummary[], keyPrefix: string, clusterName: string) {
     // The top of a child's chain (any depth), so grandchildren bucket with the nucleus they nest under.
     function effectiveLocality(r: NucleusSummary): string {
       return (rootOf(clusterRows, r).locality || '').trim();
@@ -260,6 +266,10 @@ export default function Picker({ rows, email, onSelect, openState, onAdd, onAdmi
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {!isSingleLocality && <span className={`cluster-arrow${isOpen ? ' open' : ''}`}>▶</span>}
               <span className="cluster-name">{loc || '(No Locality)'}</span>
+              {/* No "+ Add" on "(No Locality)": the form needs a locality. */}
+              {loc && canCreateIn(clusterName) && (
+                <AddHere where={loc} onClick={() => onAddIn({ cluster: clusterName, locality: loc })} />
+              )}
             </div>
             <span className="cluster-count">{nucleusCountLabel(localityRows)}</span>
           </div>
@@ -336,13 +346,14 @@ export default function Picker({ rows, email, onSelect, openState, onAdd, onAdmi
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       {!isSingleCluster && <span className={`cluster-arrow${isClusterOpen ? ' open' : ''}`}>▶</span>}
                       <span className="cluster-name">{clusterName}</span>
+                      {canCreateIn(clusterName) && <AddHere where={clusterName} onClick={() => onAddIn({ cluster: clusterName })} />}
                     </div>
                     <span className="cluster-count">{nucleusCountLabel(clusterRows)}</span>
                   </div>
 
                   <div className={`cluster-rows${isClusterOpen ? ' open' : ''}`}>
                     {SHOW_ROLLUP_CARDS && isClusterOpen && <RollupCards rows={clusterRows} groupLabel={clusterName} onCardClick={openRollupPopup} />}
-                    {renderLocalityGroups(clusterRows, clusterKey)}
+                    {renderLocalityGroups(clusterRows, clusterKey, clusterName)}
                   </div>
                 </div>
               );

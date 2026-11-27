@@ -8,7 +8,8 @@ import type { PermissionSet } from '@/lib/access';
 import type { LastUpdated, NamedCounts } from '@/lib/clusterNotebook';
 import WorkerListModal from './WorkerListModal';
 import PeopleCard from './PeopleCard';
-import { NucleusGroupRows } from './NucleusGroup';
+import { NucleusGroupRows, type AddChild } from './NucleusGroup';
+import AddHere from './AddHere';
 import { childTree } from '@/lib/children';
 import ManageAccessCard from './ManageAccessCard';
 import { SrpDot } from './SrpBadge';
@@ -44,6 +45,8 @@ interface Props {
   childCount: number;
   // Every nucleus the user can see, for the Child nuclei card.
   rows: NucleusSummary[];
+  // "+ Add" on the Child nuclei card and its nested parent bars (owner, 2026-11-27).
+  addChild: AddChild;
   // Open/closed state per card, keyed by card name; a missing key means the card's default.
   cardOpen: Record<string, boolean>;
   onCardOpenChange: (key: string, open: boolean) => void;
@@ -556,7 +559,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 // The 9-figure diagram (ConcentricRainbow, formerly the staggered 9-ring one) lives in its own file,
 // 2026-10-08, so Picker.tsx can also render a rollup version of it from its own popup.
 
-export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, initialNotice, onRenamed, onOpenNucleus, canCreateInCluster, allNucleusNames, parentChoices, childCount, rows, cardOpen, onCardOpenChange }: Props) {
+export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, initialNotice, onRenamed, onOpenNucleus, canCreateInCluster, allNucleusNames, parentChoices, childCount, rows, addChild, cardOpen, onCardOpenChange }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   // Baseline to diff a blur-triggered field's current value against, so clicking into
@@ -625,6 +628,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const [identityOpen, setIdentityOpen] = card('identity', false);
   const [childrenOpen, setChildrenOpen] = card('children', false);
   const childNodes = childTree(rows, detail.row.nucleus);
+  const canAddChild = addChild.can(detail.row.nucleus);
   // Open by default, right after Identity; the Overview moved after Narrative, closed (owner, 2026-11-23).
   const [diagramCardOpen, setDiagramCardOpen] = card('diagram', true);
   const [accessOpen, setAccessOpen] = card('access', false);
@@ -1236,13 +1240,21 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
         </div>
 
         {/* Child nuclei: a card like the others, closed at first, listing the children the way the home page does
-            (owner, 2026-11-27). No children, no card. */}
-        {childNodes.length > 0 && (
+            (owner, 2026-11-27). Shown when there are children or the user can add one; the title carries the
+            count, so "· 0" says there are none yet. */}
+        {(childNodes.length > 0 || canAddChild) && (
           <div className="card">
             <div className="card-header" onClick={() => setChildrenOpen(o => !o)} style={{ cursor: 'pointer', userSelect: 'none' }}>
-              <span><span style={{ fontSize: 11, marginRight: 6 }}>{childrenOpen ? '▼' : '▶'}</span>Child nuclei</span>
+              <span style={{ display: 'flex', alignItems: 'center' }}>
+                <span style={{ fontSize: 11, marginRight: 6 }}>{childrenOpen ? '▼' : '▶'}</span>Child nuclei · {childNodes.length}
+                {canAddChild && <AddHere where={detail.row.nucleus} onClick={() => addChild.open(detail.row.nucleus)} />}
+              </span>
             </div>
-            {childrenOpen && <div className="card-body"><NucleusGroupRows nodes={childNodes} onSelect={onOpenNucleus} openState={{ open: cardOpen, onOpenChange: onCardOpenChange }} keyPrefix="children" /></div>}
+            {childrenOpen && childNodes.length > 0 && (
+              <div className="card-body">
+                <NucleusGroupRows nodes={childNodes} onSelect={onOpenNucleus} openState={{ open: cardOpen, onOpenChange: onCardOpenChange }} keyPrefix="children" addChild={addChild} />
+              </div>
+            )}
           </div>
         )}
 
