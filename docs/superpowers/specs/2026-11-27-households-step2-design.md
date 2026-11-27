@@ -42,7 +42,7 @@ Editing shows only to callers with `canWrite` on the nucleus. The server's FORBI
    - It sends `createHousehold(contactId, [picked])`.
    - Picking someone already in a family offers to move them, as above, by removing them from that family and then creating this one. Builder's call: if the backend can't make this atomic, offer only people with no family here and say so.
 4. **A badge on the family row:**
-   - `WAITING` shows "Waiting for SRP".
+   - `WAITING` shows "Not in SRP yet". (owner, 2026-11-27: renamed because nothing writes households to SRP yet, so it never clears on its own)
    - `LOCAL_ONLY` shows "Only in Nucleus Assistant".
    - `IN_SRP` shows nothing.
 5. **After any change,** the list re-reads, so sort, counts and badges stay right. The People card's household data refreshes too.

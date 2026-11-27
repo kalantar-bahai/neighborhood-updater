@@ -105,7 +105,7 @@ export function householdMove(h: Household | null | undefined, movingId: string)
 }
 
 export function srpBadge(state: HouseholdSrpState | null): string | null {
-  if (state === 'WAITING') return 'Waiting for SRP';
+  if (state === 'WAITING') return 'Not in SRP yet';
   if (state === 'LOCAL_ONLY') return 'Only in Nucleus Assistant';
   return null;
 }

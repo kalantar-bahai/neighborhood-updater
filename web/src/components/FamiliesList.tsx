@@ -126,7 +126,7 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
               </button>
               {open && (
                 <div style={{ padding: '0 4px 10px 23px', fontSize: 13, color: '#4a5568' }}>
-                  {f.members.map(m => (
+                  {f.members.map(m => { const removable = canRemoveMember(f, m.id); return (
                     <div key={m.id} style={{ padding: '2px 0' }}>
                       {m.isContact ? '★ ' : ''}{m.name}<PersonSrpDot inSrp={m.inSrp} />
                       {canEdit && isHousehold && (
@@ -135,16 +135,16 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
                             <button type="button" disabled={busy} style={smallBtn(busy)}
                               onClick={() => run(f.key, { action: 'contact', householdId: f.householdId!, individualId: m.id }, m.name)}>Make contact</button>
                           )}
-                          <button type="button" disabled={busy || !canRemoveMember(f, m.id)} style={smallBtn(busy || !canRemoveMember(f, m.id))}
+                          <button type="button" disabled={busy || !removable} style={smallBtn(busy || !removable)}
                             onClick={() => run(f.key, { action: 'remove', householdId: f.householdId!, individualId: m.id }, m.name)}>Remove</button>
-                          {!canRemoveMember(f, m.id) && (
+                          {!removable && (
                             <span style={{ fontSize: 12, color: '#718096' }}>To remove {m.name}, make someone else the contact first.</span>
                           )}
                         </div>
                       )}
                     </div>
-                  ))}
-                  {hidden && <div style={{ color: '#718096', marginTop: 2 }}>{hidden}</div>}
+                  ); })}
+                  {hidden &&<div style={{ color: '#718096', marginTop: 2 }}>{hidden}</div>}
                   {canEdit && (
                     <button type="button" disabled={busy} style={{ ...smallBtn(busy), marginTop: 6 }}
                       onClick={() => setPicker({ entry: f, mode: isHousehold ? 'add' : 'start' })}>

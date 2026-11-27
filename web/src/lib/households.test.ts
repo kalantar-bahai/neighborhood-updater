@@ -128,7 +128,7 @@ describe('sortFamilies', () => {
 
 describe('srpBadge', () => {
   it('maps states to copy', () => {
-    expect(srpBadge('WAITING')).toBe('Waiting for SRP');
+    expect(srpBadge('WAITING')).toBe('Not in SRP yet');
     expect(srpBadge('LOCAL_ONLY')).toBe('Only in Nucleus Assistant');
     expect(srpBadge('IN_SRP')).toBeNull();
     expect(srpBadge(null)).toBeNull();
