@@ -61,6 +61,11 @@ const CODED_ERRORS: Record<string, { status: number; message: string | null | ((
   },
   NEEDS_LOCALITY: { status: 400, message: 'Choose a locality first. A Neighborhood must be in a locality.' },
   MEMBER_ON_NEIGHBORHOOD: { status: 400, message: "A Neighborhood's people are its residents. Tick Resident instead." },
+  // Confirmed with cluster-notebook 2026-11-27 (owner's rules): a parent can't be the nucleus or one of its descendants,
+  // and must be in the same cluster (also refused: moving a nucleus to another cluster while it has a parent or
+  // children in this one).
+  PARENT_CYCLE: { status: 400, message: "A nucleus can't be its own parent, or be placed under one of its own pockets." },
+  PARENT_OTHER_CLUSTER: { status: 400, message: 'A parent nucleus must be in the same cluster.' },
   BAD_INPUT: { status: 400, message: null },
   CLERK_ERROR: { status: 502, message: "The invitation email couldn't be sent. Try again." },
   CLERK_NOT_CONFIGURED: { status: 503, message: "Invitations aren't set up yet." },

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { InitialData, NucleusDetail, NucleusSummary } from '@/types';
+import { parentOptions } from '@/lib/nucleusIdentity';
 import { nucleusFromUrl, nucleusHref } from '@/lib/nucleusUrl';
 import type { PermissionSet } from '@/lib/access';
 import { effectivePermissions, reloadOutcome } from '@/lib/srp';
@@ -164,6 +165,7 @@ export default function AppClient() {
         onOpenNucleus={(name) => { setCardOpen({}); setAddress(name, initialData.rows, 'push'); loadNucleus(name); }}
         canCreateInCluster={initialData.clusterNames.includes(detail.row.cluster)}
         allNucleusNames={initialData.rows.map(r => r.nucleus)}
+        parentChoices={parentOptions(initialData.rows, selectedNucleus, detail.row.cluster)}
         childCount={initialData.rows.filter(r => r.parentNucleus === selectedNucleus).length}
         cardOpen={cardOpen}
         onCardOpenChange={(key, open) => setCardOpen(c => ({ ...c, [key]: open }))}

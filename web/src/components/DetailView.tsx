@@ -29,6 +29,8 @@ interface Props {
   // Called after a successful rename with the new name, so the shell reloads under it.
   onRenamed: (newName: string) => void;
   // Opens another nucleus the way the home list does (Back returns here).
+  // The Parent Nucleus picker's suggestions (lib/nucleusIdentity parentOptions).
+  parentChoices: string[];
   onOpenNucleus: (name: string) => void;
   // True when the user can create a nucleus in this nucleus's cluster (the capability lives on the Cluster).
   canCreateInCluster: boolean;
@@ -550,7 +552,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 // The 9-figure diagram (ConcentricRainbow, formerly the staggered 9-ring one) lives in its own file,
 // 2026-10-08, so Picker.tsx can also render a rollup version of it from its own popup.
 
-export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, initialNotice, onRenamed, onOpenNucleus, canCreateInCluster, allNucleusNames, childCount, cardOpen, onCardOpenChange }: Props) {
+export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, initialNotice, onRenamed, onOpenNucleus, canCreateInCluster, allNucleusNames, parentChoices, childCount, cardOpen, onCardOpenChange }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   // Baseline to diff a blur-triggered field's current value against, so clicking into
@@ -1172,7 +1174,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                     onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                   />
                   <datalist id="parent-nucleus-options">
-                    {allNucleusNames.filter(n => n !== row.nucleus).map(n => <option key={n} value={n} />)}
+                    {parentChoices.map(n => <option key={n} value={n} />)}
                   </datalist>
                 </div>
               ) : (
