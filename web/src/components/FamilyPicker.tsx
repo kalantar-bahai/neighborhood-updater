@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { inFamilyText, sortCandidates, type Candidate, type FamilySort } from '@/lib/households';
+import { inFamilyText, matchesCandidate, sortCandidates, type Candidate, type FamilySort } from '@/lib/households';
 
 // A bottom sheet for choosing a person to add to, or start, a family. Portaled because cards clip overflow.
 export default function FamilyPicker({ title, note, candidates, onPick, onClose }: {
@@ -13,7 +13,7 @@ export default function FamilyPicker({ title, note, candidates, onPick, onClose 
   const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => { searchRef.current?.focus(); }, []);
   const q = query.trim().toLowerCase();
-  const shown = sortCandidates(q ? candidates.filter(c => c.name.toLowerCase().includes(q)) : candidates, sortBy);
+  const shown = sortCandidates(q ? candidates.filter(c => matchesCandidate(c, q)) : candidates, sortBy);
 
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>

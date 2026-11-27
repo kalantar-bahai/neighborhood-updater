@@ -9,7 +9,7 @@ export function HouseholdMoveNote({ move, name }: { move: HouseholdMove; name: s
       <div style={{ fontWeight: 600, color: '#744210' }}>Their whole household moves with them</div>
       <div>In SRP a household always moves together. These people move too:</div>
       <ul style={{ margin: 0, paddingLeft: 18 }}>
-        {move.others.map((n, i) => <li key={i}>{n}</li>)}
+        {move.others.map((n, i) => <li key={`${i}-${n}`}>{n}</li>)}
         {hidden && <li>{hidden}</li>}
       </ul>
       <div>

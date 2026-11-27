@@ -13,7 +13,7 @@ type FamilyAction =
   | { action: 'remove'; householdId: string; individualId: string }
   | { action: 'contact'; householdId: string; individualId: string };
 
-const smallBtn = { minHeight: 44, padding: '4px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer', border: '1px solid #cbd5e0', background: 'white', color: '#2a4365' } as const;
+const smallBtn = (disabled: boolean) => ({ minHeight: 44, padding: '4px 12px', borderRadius: 6, fontSize: 13, cursor: disabled ? 'default' : 'pointer', border: '1px solid #cbd5e0', background: 'white', color: disabled ? '#a0aec0' : '#2a4365' }) as const;
 
 export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }: { nucleus: string; refreshKey: number; canEdit: boolean; onChanged: () => void }) {
   const [families, setFamilies] = useState<FamilyEntry[] | null>(null);
@@ -98,6 +98,9 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
       {shown.length === 0 && query.trim() && (
         <div style={{ fontSize: 13, color: '#718096', marginTop: 10 }}>No family has anyone by that name.</div>
       )}
+      {families.length === 0 && !query.trim() && (
+        <div style={{ fontSize: 13, color: '#718096', marginTop: 10 }}>No people in this nucleus yet.</div>
+      )}
       <div style={{ marginTop: 8 }}>
         {shown.map(f => {
           const open = openKeys.has(f.key);
@@ -129,10 +132,10 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
                       {canEdit && isHousehold && (
                         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
                           {!m.isContact && (
-                            <button type="button" disabled={busy} style={smallBtn}
+                            <button type="button" disabled={busy} style={smallBtn(busy)}
                               onClick={() => run(f.key, { action: 'contact', householdId: f.householdId!, individualId: m.id }, m.name)}>Make contact</button>
                           )}
-                          <button type="button" disabled={busy || !canRemoveMember(f, m.id)} style={smallBtn}
+                          <button type="button" disabled={busy || !canRemoveMember(f, m.id)} style={smallBtn(busy || !canRemoveMember(f, m.id))}
                             onClick={() => run(f.key, { action: 'remove', householdId: f.householdId!, individualId: m.id }, m.name)}>Remove</button>
                           {!canRemoveMember(f, m.id) && (
                             <span style={{ fontSize: 12, color: '#718096' }}>To remove {m.name}, make someone else the contact first.</span>
@@ -143,7 +146,7 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
                   ))}
                   {hidden && <div style={{ color: '#718096', marginTop: 2 }}>{hidden}</div>}
                   {canEdit && (
-                    <button type="button" disabled={busy} style={{ ...smallBtn, marginTop: 6 }}
+                    <button type="button" disabled={busy} style={{ ...smallBtn(busy), marginTop: 6 }}
                       onClick={() => setPicker({ entry: f, mode: isHousehold ? 'add' : 'start' })}>
                       {isHousehold ? 'Add someone…' : 'Start a family with…'}
                     </button>
