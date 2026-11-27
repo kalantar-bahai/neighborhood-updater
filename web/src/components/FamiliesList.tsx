@@ -9,7 +9,7 @@ export default function FamiliesList({ nucleus }: { nucleus: string }) {
   const [families, setFamilies] = useState<FamilyEntry[] | null>(null);
   const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState('');
-  const [openKey, setOpenKey] = useState<string | null>(null);
+  const [openKeys, setOpenKeys] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     let live = true;
@@ -36,21 +36,21 @@ export default function FamiliesList({ nucleus }: { nucleus: string }) {
         placeholder="Find a family by anyone in it"
         value={query}
         onChange={e => setQuery(e.target.value)}
-        style={{ width: '100%', boxSizing: 'border-box', minHeight: 40, padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 14 }}
+        style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 14 }}
       />
       {shown.length === 0 && query.trim() && (
         <div style={{ fontSize: 13, color: '#718096', marginTop: 10 }}>No family has anyone by that name.</div>
       )}
       <div style={{ marginTop: 8 }}>
         {shown.map(f => {
-          const open = openKey === f.key;
+          const open = openKeys.has(f.key);
           const hidden = hiddenText(f.hidden);
           return (
             <div key={f.key} style={{ borderBottom: '1px solid #e2e8f0' }}>
               <button
                 type="button"
                 aria-expanded={open}
-                onClick={() => setOpenKey(open ? null : f.key)}
+                onClick={() => setOpenKeys(prev => { const next = new Set(prev); if (!next.delete(f.key)) next.add(f.key); return next; })}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 44, padding: '6px 4px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}
               >
                 <span style={{ fontSize: 11, color: '#4a5568' }}>{open ? '▼' : '▶'}</span>
