@@ -689,3 +689,8 @@ Household.srpState: HouseholdSrpState!   # IN_SRP | WAITING | LOCAL_ONLY
   - `HOUSEHOLD_NOT_FOUND`, `INDIVIDUAL_NOT_FOUND`: the family or person no longer exists.
   - `FORBIDDEN` is unchanged (403).
 - **srpState:** it is selected wherever `Household` is read (people, hidden people, search, `namedHouseholds`).
+- **Moving a person who is in a household:** confirmed with cluster-notebook 2026-11-27 (PR #65).
+  - `moveIndividuals` with `withHousehold` moves every member of one of their households, including members the caller can't read.
+  - Without `withHousehold` it returns `HOUSEHOLD_MOVES_TOGETHER`, and nobody moves.
+  - It is FORBIDDEN unless the caller may move every member.
+  - The app always sends `withHousehold: true`.

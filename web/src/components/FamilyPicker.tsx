@@ -1,27 +1,31 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { sortCandidates, type Candidate, type FamilySort } from '@/lib/households';
+import { inFamilyText, sortCandidates, type Candidate, type FamilySort } from '@/lib/households';
 
 // A bottom sheet for choosing a person to add to, or start, a family. Portaled because cards clip overflow.
-export default function FamilyPicker({ title, candidates, onPick, onClose }: {
-  title: string; candidates: Candidate[]; onPick: (c: Candidate) => void; onClose: () => void;
+export default function FamilyPicker({ title, note, candidates, onPick, onClose }: {
+  title: string; note?: string; candidates: Candidate[]; onPick: (c: Candidate) => void; onClose: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState<FamilySort>('name');
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { searchRef.current?.focus(); }, []);
   const q = query.trim().toLowerCase();
   const shown = sortCandidates(q ? candidates.filter(c => c.name.toLowerCase().includes(q)) : candidates, sortBy);
 
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
       <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} />
-      <div role="dialog" aria-label={title} style={{ position: 'relative', background: 'white', borderRadius: '12px 12px 0 0', maxHeight: '80vh', display: 'flex', flexDirection: 'column', padding: 12 }}>
+      <div role="dialog" aria-modal="true" aria-label={title} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }} style={{ position: 'relative', background: 'white', borderRadius: '12px 12px 0 0', maxHeight: '80vh', display: 'flex', flexDirection: 'column', padding: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#2d3748' }}>{title}</div>
           <button type="button" aria-label="Close" onClick={onClose} style={{ minWidth: 44, minHeight: 44, background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#4a5568' }}>×</button>
         </div>
+        {note && <div style={{ fontSize: 12, color: '#718096', marginBottom: 6 }}>{note}</div>}
         <input
+          ref={searchRef}
           type="search"
           aria-label="Search by name"
           placeholder="Search by name"
@@ -41,10 +45,10 @@ export default function FamilyPicker({ title, candidates, onPick, onClose }: {
             >{label}</button>
           ))}
         </div>
-        <div style={{ overflowY: 'auto', marginTop: 8 }}>
+        <div style={{ overflowY: 'auto', overscrollBehavior: 'contain', marginTop: 8 }}>
           {shown.length === 0 && <div style={{ fontSize: 13, color: '#718096', padding: 8 }}>No one to choose.</div>}
           {shown.map(c => {
-            const second = c.fromHouseholdId && c.familyTitle ? `in the ${c.familyTitle}` : c.address;
+            const second = c.fromHouseholdId && c.familyTitle ? inFamilyText(c.familyTitle) : c.address;
             return (
               <button
                 key={c.id}

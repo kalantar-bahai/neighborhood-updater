@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Household, HouseholdMember, NucleusPerson } from './clusterNotebook';
-import { familyEntries, familyTitle, filterFamilies, hiddenText, householdMove, sizeText, sortFamilies, srpBadge, canRemoveMember, addCandidates, startCandidates, sortCandidates, type Candidate, type FamilyEntry } from './households';
+import { familyEntries, familyTitle, filterFamilies, hiddenText, householdMove, sizeText, sortFamilies, srpBadge, canRemoveMember, addCandidates, startCandidates, sortCandidates, moveConfirmText, inFamilyText, type Candidate, type FamilyEntry } from './households';
 
 const mem = (id: string, firstName: string, familyName: string): HouseholdMember => ({
   id, firstName, familyName, middleNames: '', nickname: '', inSrp: false,
@@ -165,5 +165,16 @@ describe('candidates', () => {
     const list = [c('1', 'Zed', 'A', '5 Oak St'), c('2', 'Abe', 'B', null), c('3', 'Mid', 'C', '12 Elm St'), c('4', 'Abe', 'A', '2 Oak St')];
     expect(sortCandidates(list, 'name').map((x) => x.id)).toEqual(['4', '2', '3', '1']);
     expect(sortCandidates(list, 'address').map((x) => x.id)).toEqual(['3', '4', '1', '2']);
+  });
+});
+
+describe('moveConfirmText and inFamilyText', () => {
+  it('names the family when it has a name', () => {
+    expect(moveConfirmText('Sam Test', 'Test household')).toBe('Move Sam Test from the Test household?');
+    expect(inFamilyText('Test household')).toBe('in the Test household');
+  });
+  it('avoids "the Household" for a family with no name', () => {
+    expect(moveConfirmText('Sam Test', 'Household')).toBe('Move Sam Test from their current family?');
+    expect(inFamilyText('Household')).toBe('in another family');
   });
 });

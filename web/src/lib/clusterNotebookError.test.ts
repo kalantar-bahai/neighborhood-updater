@@ -53,7 +53,7 @@ describe('clusterNotebookErrorResponse', () => {
     ['MEMBER_ON_NEIGHBORHOOD', 400, "A Neighborhood's people are its residents. Tick Resident instead."],
     ['PARENT_CYCLE', 400, "A nucleus can't be its own parent, or be placed under one of its own pockets."],
     ['PARENT_OTHER_CLUSTER', 400, 'A parent nucleus must be in the same cluster.'],
-    ['CONTACT_MUST_STAY', 409, 'Make someone else the contact first.'],
+    ['CONTACT_MUST_STAY', 409, "That person is their family's contact. Make someone else the contact first."],
     ['ALREADY_IN_HOUSEHOLD', 409, "That person's family changed. The list has been refreshed; try again."],
     ['NOT_IN_HOUSEHOLD', 409, "That person's family changed. The list has been refreshed; try again."],
     ['NOT_A_MEMBER', 409, "That person isn't in this family any more. The list has been refreshed."],

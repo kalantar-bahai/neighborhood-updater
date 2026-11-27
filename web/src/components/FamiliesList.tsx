@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PersonSrpDot } from './SrpBadge';
 import FamilyPicker from './FamilyPicker';
-import { addCandidates, canRemoveMember, filterFamilies, hiddenText, sizeText, sortFamilies, srpBadge, startCandidates, type Candidate, type FamilyEntry, type FamilySort } from '@/lib/households';
+import { addCandidates, moveConfirmText, canRemoveMember, filterFamilies, hiddenText, sizeText, sortFamilies, srpBadge, startCandidates, type Candidate, type FamilyEntry, type FamilySort } from '@/lib/households';
 
 // The Families card's list: households (and people with no household), searchable by anyone in them.
 type PickerState = { entry: FamilyEntry; mode: 'add' | 'start' };
@@ -40,9 +40,8 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
     } catch (e: unknown) {
       setErrors(prev => ({ ...prev, [key]: e instanceof Error ? e.message : String(e) }));
       onChanged();
-    } finally {
-      setSavingKey(null);
     }
+    // The busy key stays set until the list re-reads (see the fetch effect), so buttons never act on stale data.
   }
 
   function pick(c: Candidate) {
@@ -53,7 +52,7 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
       run(entry.key, { action: 'create', contactId: entry.members[0].id, memberIds: [c.id] });
       return;
     }
-    if (c.fromHouseholdId && c.familyTitle !== c.name && !window.confirm(`Move ${c.name} from the ${c.familyTitle}?`)) return;
+    if (c.fromHouseholdId && c.familyTitle !== c.name && !window.confirm(moveConfirmText(c.name, c.familyTitle))) return;
     run(entry.key, { action: 'add', householdId: entry.householdId!, individualId: c.id, ...(c.fromHouseholdId ? { fromHouseholdId: c.fromHouseholdId } : {}) });
   }
 
@@ -63,9 +62,9 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
       .then(async res => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to load families');
-        if (live) { setFamilies(data.families); setLoadError(''); }
+        if (live) { setFamilies(data.families); setLoadError(''); setSavingKey(null); }
       })
-      .catch((e: unknown) => { if (live) setLoadError(e instanceof Error ? e.message : String(e)); });
+      .catch((e: unknown) => { if (live) { setLoadError(e instanceof Error ? e.message : String(e)); setSavingKey(null); } });
     return () => { live = false; };
   }, [nucleus, refreshKey]);
 
@@ -158,6 +157,7 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
       </div>
       {picker && (
         <FamilyPicker
+          note={picker.mode === 'start' ? 'Only people not yet in a family are listed.' : undefined}
           title={picker.mode === 'add' ? 'Add someone' : `Start a family with ${picker.entry.title}`}
           candidates={picker.mode === 'add' ? addCandidates(families, picker.entry.key) : startCandidates(families, picker.entry.key)}
           onPick={pick}

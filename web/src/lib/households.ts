@@ -146,3 +146,12 @@ export function addCandidates(entries: FamilyEntry[], targetKey: string): Candid
 export function startCandidates(entries: FamilyEntry[], personKey: string): Candidate[] {
   return candidatesFrom(entries.filter((e) => e.householdId === null && e.key !== personKey));
 }
+
+// A family with no surname is titled just "Household"; "the Household" would read oddly, so word it without a name.
+export function moveConfirmText(name: string, title: string | null): string {
+  return title === 'Household' ? `Move ${name} from their current family?` : `Move ${name} from the ${title}?`;
+}
+
+export function inFamilyText(title: string): string {
+  return title === 'Household' ? 'in another family' : `in the ${title}`;
+}

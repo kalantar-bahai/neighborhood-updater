@@ -68,7 +68,7 @@ const CODED_ERRORS: Record<string, { status: number; message: string | null | ((
   PARENT_OTHER_CLUSTER: { status: 400, message: 'A parent nucleus must be in the same cluster.' },
   // Confirmed with cluster-notebook 2026-11-27: household edits. Refusals are 409s because the app's list was stale
   // (it re-reads after any of them); CONTACT_MUST_STAY and DIFFERENT_PLACE are rules the person can act on.
-  CONTACT_MUST_STAY: { status: 409, message: 'Make someone else the contact first.' },
+  CONTACT_MUST_STAY: { status: 409, message: "That person is their family's contact. Make someone else the contact first." },
   ALREADY_IN_HOUSEHOLD: { status: 409, message: "That person's family changed. The list has been refreshed; try again." },
   NOT_IN_HOUSEHOLD: { status: 409, message: "That person's family changed. The list has been refreshed; try again." },
   NOT_A_MEMBER: { status: 409, message: "That person isn't in this family any more. The list has been refreshed." },

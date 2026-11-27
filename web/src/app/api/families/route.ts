@@ -71,6 +71,8 @@ function parseAction(body: Record<string, unknown>): FamilyAction | string {
 }
 
 // Household edits from the Families card: create, add a member, remove a member, set the contact.
+const FORBIDDEN_TEXT = "You can't change this family.";
+
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) {
@@ -93,7 +95,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const permissions = await getNucleusPermissions(record.nucleus);
-    if (!permissions.canWrite) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    if (!permissions.canWrite) return NextResponse.json({ error: FORBIDDEN_TEXT }, { status: 403 });
 
     let household;
     switch (parsed.action) {
@@ -112,6 +114,6 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ household });
   } catch (e: unknown) {
-    return clusterNotebookErrorResponse(e);
+    return clusterNotebookErrorResponse(e, { forbidden: FORBIDDEN_TEXT });
   }
 }
