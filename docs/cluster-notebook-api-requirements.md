@@ -542,3 +542,26 @@ input NucleusPatch {
   map, and the app shows the id.
 - **Type null.** A null `nucleusType` means "not decided yet". It is allowed only away from a Setting, and counts as not
   a Neighborhood.
+- **Behaviour updates, confirmed with cluster-notebook later on 2026-11-26:**
+  - **`Location.homeNucleus`** is now set for unlinked Settings too, so having a `homeNucleus` no longer means "in SRP".
+    Use `srpLinked` or `Nucleus.inSrp` to tell. The app uses `homeNucleus` only to find a person's previous nucleus when
+    they move in.
+  - **A Neighborhood's location is always its own Setting**, including migrated ones that used to sit at a Locality.
+    Re-sending that Setting as `locationName` does nothing.
+  - **Any other Setting given as `locationName` is `BAD_INPUT`**, and so is moving a nucleus onto another nucleus's
+    linked Setting.
+  - **`moveIndividuals`** accepts a Locality, any linked Setting, or an unlinked Setting that has a home nucleus.
+  - **Pushing an untyped nucleus at a Locality** first makes it a Neighborhood with its own Setting. If it has members,
+    the push is refused with `HAS_MEMBERS`. The app doesn't offer Push for an untyped nucleus.
+    - **What the app does:** Push is offered for any `isHome && !inSrp` nucleus, as a create, whatever its Setting.
+  - **Pushing a Neighborhood** moves each resident's whole SRP household into the new FN (owner's decision).
+  - **A move that leaves SRP's placement unchanged** is not sent to SRP. `placeSync` shows it as synced, with code
+    `UNCHANGED_IN_SRP`.
+  - **`createNucleus` with `srpLocalityName`** returns the new nucleus's own Setting as `location` (type `SETTING`).
+  - **Creating a Neighborhood without SRP:** after `createNucleus(name, clusterName)`, one `updateNucleus` with
+    `{nucleusType: "Neighborhood", localityId}` leaves it a Neighborhood at its own unlinked Setting in that Locality,
+    as a single savepointed change. Send `localityId`, not `locationName`: `locationName` is looked up by name across
+    Clusters, Localities and Settings, and names aren't unique (cluster-notebook #41).
+  - **`getLocationOptions`** lists every Setting under a readable Locality, including an unpushed Neighborhood's own
+    Setting (`srpLinked: false`, `nuclei: [its name]`). Archived Settings are left out (cluster-notebook's members
+    branch, 2026-11-26).

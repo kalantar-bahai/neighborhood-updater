@@ -146,15 +146,17 @@ describe('effectivePermissions', () => {
 });
 
 describe('createPayload', () => {
-  const base = { name: ' Alpha ', cluster: 'C', locality: 'Elm Locality' };
+  const base = { name: ' Alpha ', cluster: 'C', locality: 'Elm Locality', localityId: 'loc-1' };
   it('uses srpLocality when creating in SRP', () => {
     expect(createPayload({ ...base, createInSrp: true })).toEqual({ identity: { nucleus: 'Alpha', cluster: 'C', srpLocality: 'Elm Locality' } });
   });
-  it('uses location otherwise', () => {
-    expect(createPayload({ ...base, createInSrp: false })).toEqual({ identity: { nucleus: 'Alpha', cluster: 'C', location: 'Elm Locality', nucleusType: 'Neighborhood' } });
+  it('sends the locality by id otherwise, never by name', () => {
+    const r = createPayload({ ...base, createInSrp: false });
+    expect(r).toEqual({ identity: { nucleus: 'Alpha', cluster: 'C', localityId: 'loc-1', nucleusType: 'Neighborhood' } });
+    expect('location' in r.identity).toBe(false);
   });
   it('omits locality when empty', () => {
-    const r = createPayload({ ...base, locality: '', createInSrp: true });
+    const r = createPayload({ ...base, locality: '', localityId: '', createInSrp: true });
     expect(r).toEqual({ identity: { nucleus: 'Alpha', cluster: 'C' } });
     expect('srpLocality' in r.identity).toBe(false);
     expect('nucleusType' in r.identity).toBe(false);
@@ -230,10 +232,13 @@ describe('srpOutOfStepMessage', () => {
 });
 
 describe('pushToSrpMode', () => {
-  const base = { state: 'LOCAL_ONLY' as const, name: 'N', srpName: null, locationType: 'LOCALITY', settingLinked: undefined, canCreateInCluster: true };
+  const base = { state: 'LOCAL_ONLY' as const, name: 'N', srpName: null, locationType: 'LOCALITY', settingLinked: undefined, isHome: false, canCreateInCluster: true };
   it('creates at a locality or an unlinked setting', () => {
     expect(pushToSrpMode(base)).toBe('create');
     expect(pushToSrpMode({ ...base, locationType: 'SETTING', settingLinked: false })).toBe('create');
+  });
+  it('creates for an unpushed Neighborhood at its own Setting, even when that Setting is not in the locality list', () => {
+    expect(pushToSrpMode({ ...base, isHome: true, locationType: 'SETTING', settingLinked: undefined })).toBe('create');
   });
   it('makes a new neighbourhood from a nucleus at a linked setting', () => {
     expect(pushToSrpMode({ ...base, locationType: 'SETTING', settingLinked: true })).toBe('newNeighbourhood');

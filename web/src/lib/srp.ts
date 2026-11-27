@@ -126,14 +126,17 @@ export function pendingIdentityLocks(
   return { location: true, type: action === 'create' };
 }
 
-type CreateIdentity = { nucleus: string; cluster: string; location?: string; srpLocality?: string; nucleusType?: string };
+type CreateIdentity = { nucleus: string; cluster: string; localityId?: string; srpLocality?: string; nucleusType?: string };
 
-// Without SRP the nucleus is created, then moved to its Locality and typed Neighborhood in one
-// updateNucleus (cluster-notebook allows both together). With SRP, cluster-notebook places it and sets the type.
+// Without SRP the nucleus is created, then given its Locality and typed Neighborhood in one updateNucleus, which
+// leaves it at its own unlinked Setting there. The Locality goes by id: confirmed with cluster-notebook 2026-11-26,
+// names aren't unique and locationName can pick the wrong place (their #41). With SRP, cluster-notebook places it
+// and sets the type (srpLocalityName is still a name).
 export function createPayload(input: {
   name: string;
   cluster: string;
   locality: string;
+  localityId: string;
   createInSrp: boolean;
 }): { identity: CreateIdentity } {
   const identity: CreateIdentity = {
@@ -143,7 +146,7 @@ export function createPayload(input: {
   if (input.locality) {
     if (input.createInSrp) identity.srpLocality = input.locality;
     else {
-      identity.location = input.locality;
+      identity.localityId = input.localityId;
       identity.nucleusType = 'Neighborhood';
     }
   }
@@ -184,6 +187,7 @@ export function pushToSrpMode(input: {
   srpName: string | null;
   locationType: string;
   settingLinked: boolean | undefined;
+  isHome: boolean;
   canCreateInCluster: boolean;
 }): 'create' | 'newNeighbourhood' | 'resendName' | null {
   if (!input.canCreateInCluster) return null;
@@ -191,6 +195,9 @@ export function pushToSrpMode(input: {
     return input.srpName && input.srpName !== input.name ? 'resendName' : null;
   }
   if (input.state !== 'LOCAL_ONLY') return null;
+  // Confirmed with cluster-notebook 2026-11-26: an unpushed Neighborhood is at its own unlinked Setting; pushing creates
+  // its FN. Decided from isHome, so Push doesn't depend on finding that Setting in the locality list.
+  if (input.isHome) return 'create';
   if (input.locationType === 'LOCALITY') return 'create';
   if (input.locationType === 'SETTING' && input.settingLinked === false) return 'create';
   if (input.locationType === 'SETTING' && input.settingLinked === true) return 'newNeighbourhood';
