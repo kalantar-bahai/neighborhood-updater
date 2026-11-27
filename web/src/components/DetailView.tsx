@@ -1242,7 +1242,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             <div className="card-header" onClick={() => setChildrenOpen(o => !o)} style={{ cursor: 'pointer', userSelect: 'none' }}>
               <span><span style={{ fontSize: 11, marginRight: 6 }}>{childrenOpen ? '▼' : '▶'}</span>Child nuclei</span>
             </div>
-            {childrenOpen && <div className="card-body"><NucleusGroupRows nodes={childNodes} onSelect={onOpenNucleus} /></div>}
+            {childrenOpen && <div className="card-body"><NucleusGroupRows nodes={childNodes} onSelect={onOpenNucleus} openState={{ open: cardOpen, onOpenChange: onCardOpenChange }} keyPrefix="children" /></div>}
           </div>
         )}
 

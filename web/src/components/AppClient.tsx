@@ -28,9 +28,25 @@ export default function AppClient() {
   const [reloadNotice, setReloadNotice] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [creatingNew, setCreatingNew] = useState(false);
-  // Card open/closed state for the open nucleus. Kept here, not in DetailView, so it survives
-  // the remount on an in-place reload; cleared when the user leaves the nucleus.
-  const [cardOpen, setCardOpen] = useState<Record<string, boolean>>({});
+  // What is open on each page (cards and bars on a nucleus, clusters/localities/bars on the list; key '' is the
+  // list) and where it was scrolled, so going to a child and coming back (in-app or browser Back) finds the page
+  // as it was (owner, 2026-11-27). Kept for this tab only; a refresh starts afresh. Also survives the remount on
+  // an in-place reload. viewRef is the page shown now; restoreRef the page whose scroll to put back once it shows.
+  const [openByView, setOpenByView] = useState<Record<string, Record<string, boolean>>>({});
+  const scrollByView = useRef<Record<string, number>>({});
+  const viewRef = useRef('');
+  const restoreRef = useRef<string | null>(null);
+
+  function setOpen(view: string, key: string, open: boolean) {
+    setOpenByView(v => ({ ...v, [view]: { ...v[view], [key]: open } }));
+  }
+
+  // Leaving the page shown now for `next`: remember its scroll, and put back `next`'s once it shows.
+  function goToView(next: string) {
+    scrollByView.current[viewRef.current] = window.scrollY;
+    viewRef.current = next;
+    restoreRef.current = next;
+  }
   // Shown above the list when the address named a nucleus this user can't open (removed, or no access).
   const [urlNote, setUrlNote] = useState('');
   // The open nucleus is in the address (/?nucleus=<id>, see lib/nucleusUrl.ts) so refresh and the phone's back
@@ -68,14 +84,28 @@ export default function AppClient() {
       .catch(() => setError('Failed to load. Please refresh.'));
   }
 
-  useEffect(() => { loadInitialData(); }, []);
+  useEffect(() => {
+    // We put the scroll back ourselves (below), after the page's data is in; the browser would do it too early.
+    window.history.scrollRestoration = 'manual';
+    loadInitialData();
+  }, []);
+
+  useEffect(() => {
+    const view = restoreRef.current;
+    if (view === null) return;
+    const shown = view === '' ? initialData !== null && selectedNucleus === null : detail !== null && !loadingDetail;
+    if (!shown) return;
+    restoreRef.current = null;
+    const y = scrollByView.current[view] ?? 0;
+    requestAnimationFrame(() => window.scrollTo(0, y));
+  }, [initialData, selectedNucleus, detail, loadingDetail]);
 
   // Browser back/forward: open whatever the address now names, or go to the list.
   useEffect(() => {
     const onPop = () => {
       pushedRef.current = false;
       const target = nucleusFromUrl(window.location.search, rowsRef.current);
-      if (target.kind === 'open') { setCardOpen({}); loadNucleus(target.name); }
+      if (target.kind === 'open') loadNucleus(target.name);
       else showList();
     };
     window.addEventListener('popstate', onPop);
@@ -83,6 +113,7 @@ export default function AppClient() {
   }, []);
 
   function loadNucleus(name: string) {
+    goToView(name);
     setUrlNote('');
     setLoadingDetail(true);
     setSelectedNucleus(name);
@@ -123,7 +154,7 @@ export default function AppClient() {
   }
 
   function showList() {
-    setCardOpen({});
+    goToView('');
     setDetail(null);
     setSelectedNucleus(null);
     loadInitialData();
@@ -162,14 +193,14 @@ export default function AppClient() {
         onReload={notice => reloadNucleus(selectedNucleus, notice)}
         initialNotice={reloadNotice}
         onRenamed={(newName) => { setDetail(null); setSelectedNucleus(newName); setLoadingDetail(true); loadInitialData(newName); }}
-        onOpenNucleus={(name) => { setCardOpen({}); setAddress(name, initialData.rows, 'push'); loadNucleus(name); }}
+        onOpenNucleus={(name) => { setAddress(name, initialData.rows, 'push'); loadNucleus(name); }}
         canCreateInCluster={initialData.clusterNames.includes(detail.row.cluster)}
         allNucleusNames={initialData.rows.map(r => r.nucleus)}
         parentChoices={parentOptions(initialData.rows, selectedNucleus, detail.row.cluster)}
         childCount={initialData.rows.filter(r => r.parentNucleus === selectedNucleus).length}
         rows={initialData.rows}
-        cardOpen={cardOpen}
-        onCardOpenChange={(key, open) => setCardOpen(c => ({ ...c, [key]: open }))}
+        cardOpen={openByView[selectedNucleus] ?? {}}
+        onCardOpenChange={(key, open) => setOpen(selectedNucleus, key, open)}
       />
     );
   }
@@ -197,7 +228,8 @@ export default function AppClient() {
       <Picker
         rows={initialData.rows}
         email={initialData.email}
-        onSelect={(name) => { setCardOpen({}); setAddress(name, initialData.rows, 'push'); loadNucleus(name); }}
+        onSelect={(name) => { setAddress(name, initialData.rows, 'push'); loadNucleus(name); }}
+        openState={{ open: openByView[''] ?? {}, onOpenChange: (key, open) => setOpen('', key, open) }}
         onAdd={canCreateNucleus ? () => setCreatingNew(true) : undefined}
         onAdmin={initialData.isAdmin ? () => window.location.href = '/admin' : undefined}
       />

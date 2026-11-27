@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { NucleusSummary } from '@/types';
 import ConcentricRainbow, { type AlignedLabel } from './ConcentricRainbow';
 import NucleusListRow from './NucleusListRow';
-import NucleusGroup from './NucleusGroup';
+import NucleusGroup, { type OpenState } from './NucleusGroup';
 import { childTree, rootOf, type ChildNode } from '@/lib/children';
 import PageHeader, { HeaderButton } from './PageHeader';
 
@@ -12,6 +12,9 @@ interface Props {
   rows: NucleusSummary[];
   email: string;
   onSelect: (name: string) => void;
+  // Which clusters, localities and parent bars are open; kept by AppClient so coming back to the list finds
+  // them as they were (owner, 2026-11-27).
+  openState: OpenState;
   onAdd?: () => void;
   onAdmin?: () => void;
 }
@@ -179,9 +182,7 @@ function RollupCards({ rows: rowsIn, groupLabel, onCardClick }: {
   );
 }
 
-export default function Picker({ rows, email, onSelect, onAdd, onAdmin }: Props) {
-  const [openClusters, setOpenClusters] = useState<Set<string>>(new Set());
-  const [openLocalities, setOpenLocalities] = useState<Set<string>>(new Set());
+export default function Picker({ rows, email, onSelect, openState, onAdd, onAdmin }: Props) {
   // Rollup-card popup (2026-10-08) -- null when closed. `rows` are the exact
   // nuclei the clicked card already summed, re-summed here into the nine-field
   // totals the rainbow diagram needs (the card itself only shows nuclei/act/
@@ -192,17 +193,11 @@ export default function Picker({ rows, email, onSelect, onAdd, onAdmin }: Props)
     setPopup({ title, rows: rowsIn });
   }
 
-  function toggleCluster(key: string) {
-    setOpenClusters(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
-  }
-
-  function toggleLocality(key: string) {
-    setOpenLocalities(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
-  }
+  function toggle(key: string) { openState.onOpenChange(key, !openState.open[key]); }
 
   // A nucleus with no parent is a row, or a bar over its children (any depth, see childTree). Children whose
   // parent isn't in this bucket keep a bar named after that parent, which can't be opened from here.
-  function renderClusterContent(clusterRows: NucleusSummary[]) {
+  function renderClusterContent(clusterRows: NucleusSummary[], keyPrefix: string) {
     const names = new Set(clusterRows.map(r => r.nucleus));
     const entries: Array<{ name: string; row?: NucleusSummary; nodes: ChildNode[] }> = [];
     clusterRows.forEach(r => {
@@ -213,7 +208,7 @@ export default function Picker({ rows, email, onSelect, onAdd, onAdmin }: Props)
     entries.sort((x, y) => x.name.localeCompare(y.name));
     return entries.map(e => e.row && e.nodes.length === 0
       ? <NucleusListRow key={e.name} r={e.row} isPocket={false} onSelect={onSelect} />
-      : <NucleusGroup key={e.name} label={e.name} row={e.row} nodes={e.nodes} onSelect={onSelect} />);
+      : <NucleusGroup key={e.name} label={e.name} row={e.row} nodes={e.nodes} onSelect={onSelect} openState={openState} keyPrefix={keyPrefix} />);
   }
 
   // New locality level, 2026-10-08, sitting between Cluster and the existing
@@ -250,12 +245,12 @@ export default function Picker({ rows, email, onSelect, onAdd, onAdmin }: Props)
     return localityOrder.map(loc => {
       const localityRows = localityMap[loc];
       const localityKey = `${keyPrefix}__loc_${loc || '(none)'}`;
-      const isOpen = isSingleLocality || openLocalities.has(localityKey);
+      const isOpen = isSingleLocality || !!openState.open[localityKey];
       return (
         <div key={localityKey}>
           <div
             className="cluster-header"
-            onClick={isSingleLocality ? undefined : () => toggleLocality(localityKey)}
+            onClick={isSingleLocality ? undefined : () => toggle(localityKey)}
             style={isSingleLocality ? { paddingLeft: 20, cursor: 'default' } : { paddingLeft: 20 }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -266,7 +261,7 @@ export default function Picker({ rows, email, onSelect, onAdd, onAdmin }: Props)
           </div>
           <div className={`cluster-rows${isOpen ? ' open' : ''}`}>
             {isOpen && <RollupCards rows={localityRows} groupLabel={loc || '(No Locality)'} onCardClick={openRollupPopup} />}
-            {renderClusterContent(localityRows)}
+            {renderClusterContent(localityRows, localityKey)}
           </div>
         </div>
       );
@@ -325,13 +320,13 @@ export default function Picker({ rows, email, onSelect, onAdd, onAdmin }: Props)
             {gEntry.clusterOrder.map(clusterName => {
               const clusterRows = gEntry.clusterMap[clusterName];
               const clusterKey = `${gName}__${clusterName}`;
-              const isClusterOpen = isSingleCluster || openClusters.has(clusterKey);
+              const isClusterOpen = isSingleCluster || !!openState.open[clusterKey];
 
               return (
                 <div key={clusterKey}>
                   <div
                     className="cluster-header"
-                    onClick={isSingleCluster ? undefined : () => toggleCluster(clusterKey)}
+                    onClick={isSingleCluster ? undefined : () => toggle(clusterKey)}
                     style={isSingleCluster ? { cursor: 'default' } : undefined}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
