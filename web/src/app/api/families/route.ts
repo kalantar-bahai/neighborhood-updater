@@ -1,7 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getNucleusPermissions } from '@/lib/access';
-import { getNucleusHouseholds, getNucleusPeople } from '@/lib/clusterNotebook';
+import {
+  addHouseholdMember,
+  createHousehold,
+  getNucleusHouseholds,
+  getNucleusPeople,
+  removeHouseholdMember,
+  setHouseholdContact,
+} from '@/lib/clusterNotebook';
 import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
 import { familyEntries } from '@/lib/households';
 
@@ -24,5 +31,89 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ families: familyEntries(households, people) });
   } catch (e: unknown) {
     return clusterNotebookErrorResponse(e);
+  }
+}
+
+type FamilyAction =
+  | { action: 'create'; contactId: string; memberIds: string[] }
+  | { action: 'add'; householdId: string; individualId: string; fromHouseholdId?: string }
+  | { action: 'remove'; householdId: string; individualId: string }
+  | { action: 'contact'; householdId: string; individualId: string };
+
+const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
+
+// Strict body validation: returns the typed action, or a message for a 400.
+function parseAction(body: Record<string, unknown>): FamilyAction | string {
+  switch (body.action) {
+    case 'create': {
+      const { contactId, memberIds } = body;
+      if (!isId(contactId)) return 'Missing contactId';
+      if (!Array.isArray(memberIds) || memberIds.length === 0 || !memberIds.every(isId)) {
+        return 'memberIds must be a non-empty list of ids';
+      }
+      return { action: 'create', contactId, memberIds };
+    }
+    case 'add': {
+      const { householdId, individualId, fromHouseholdId } = body;
+      if (!isId(householdId) || !isId(individualId)) return 'Missing householdId or individualId';
+      if (fromHouseholdId !== undefined && !isId(fromHouseholdId)) return 'Invalid fromHouseholdId';
+      return { action: 'add', householdId, individualId, fromHouseholdId };
+    }
+    case 'remove':
+    case 'contact': {
+      const { householdId, individualId } = body;
+      if (!isId(householdId) || !isId(individualId)) return 'Missing householdId or individualId';
+      return { action: body.action, householdId, individualId };
+    }
+    default:
+      return 'Unknown action';
+  }
+}
+
+// Household edits from the Families card: create, add a member, remove a member, set the contact.
+const FORBIDDEN_TEXT = "You can't change this family.";
+
+export async function POST(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+  }
+  const record = body as Record<string, unknown>;
+  if (!isId(record.nucleus)) return NextResponse.json({ error: 'Missing nucleus' }, { status: 400 });
+  const parsed = parseAction(record);
+  if (typeof parsed === 'string') return NextResponse.json({ error: parsed }, { status: 400 });
+
+  try {
+    const permissions = await getNucleusPermissions(record.nucleus);
+    if (!permissions.canWrite) return NextResponse.json({ error: FORBIDDEN_TEXT }, { status: 403 });
+
+    let household;
+    switch (parsed.action) {
+      case 'create':
+        household = await createHousehold(parsed.contactId, parsed.memberIds);
+        break;
+      case 'add':
+        household = await addHouseholdMember(parsed.householdId, parsed.individualId, parsed.fromHouseholdId);
+        break;
+      case 'remove':
+        household = await removeHouseholdMember(parsed.householdId, parsed.individualId);
+        break;
+      case 'contact':
+        household = await setHouseholdContact(parsed.householdId, parsed.individualId);
+        break;
+    }
+    return NextResponse.json({ household });
+  } catch (e: unknown) {
+    return clusterNotebookErrorResponse(e, { forbidden: FORBIDDEN_TEXT });
   }
 }

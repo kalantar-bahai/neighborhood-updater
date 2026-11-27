@@ -664,3 +664,33 @@ type Household {
 - **Read in:** `getNucleusHouseholds` (the nucleus query), and `household` on each person in `getNucleusPeople` and `getHiddenPeople`.
 - **NucleusPerson.address:** confirmed with cluster-notebook 2026-11-27 (PR #63). It is free text, as SRP holds it. It sits beside `individual` on a nucleus person, not inside it. It is null unless the caller may see person details at that nucleus, or when none is recorded. For a household member it equals the contact's address.
 - **Selection:** the app reads only `id firstName familyName middleNames nickname inSrp` for the contact and members. It does not read `place`.
+
+## Households, step 2 (editing), confirmed with cluster-notebook 2026-11-27
+
+```graphql
+createHousehold(contactId: String!, memberIds: [String!]): Household!
+addHouseholdMember(householdId: String!, individualId: String!, fromHouseholdId: String): Household!
+removeHouseholdMember(householdId: String!, individualId: String!): Household   # null when the household dissolved
+setHouseholdContact(householdId: String!, individualId: String!): Household!
+Household.srpState: HouseholdSrpState!   # IN_SRP | WAITING | LOCAL_ONLY
+```
+
+- **Rights:** the caller must be allowed to move each person a call touches.
+  - create: everyone named.
+  - add: the person and the contact.
+  - remove: the person.
+  - setContact: the new contact and the old one.
+- **Address:** the returned Household's address is null. The app re-reads `namedHouseholds` afterwards.
+- **Error codes (all 409; the app refreshes the list after each):**
+  - `CONTACT_MUST_STAY`: the contact can't be removed; make someone else the contact first.
+  - `ALREADY_IN_HOUSEHOLD`, `NOT_IN_HOUSEHOLD`: the person's family changed since the list was loaded.
+  - `NOT_A_MEMBER`: the person isn't in that household (any more).
+  - `DIFFERENT_PLACE`: the person lives at a different place than the household.
+  - `HOUSEHOLD_NOT_FOUND`, `INDIVIDUAL_NOT_FOUND`: the family or person no longer exists.
+  - `FORBIDDEN` is unchanged (403).
+- **srpState:** it is selected wherever `Household` is read (people, hidden people, search, `namedHouseholds`).
+- **Moving a person who is in a household:** confirmed with cluster-notebook 2026-11-27 (PR #65).
+  - `moveIndividuals` with `withHousehold` moves every member of one of their households, including members the caller can't read.
+  - Without `withHousehold` it returns `HOUSEHOLD_MOVES_TOGETHER`, and nobody moves.
+  - It is FORBIDDEN unless the caller may move every member.
+  - The app always sends `withHousehold: true`.

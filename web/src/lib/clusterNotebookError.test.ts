@@ -53,6 +53,13 @@ describe('clusterNotebookErrorResponse', () => {
     ['MEMBER_ON_NEIGHBORHOOD', 400, "A Neighborhood's people are its residents. Tick Resident instead."],
     ['PARENT_CYCLE', 400, "A nucleus can't be its own parent, or be placed under one of its own pockets."],
     ['PARENT_OTHER_CLUSTER', 400, 'A parent nucleus must be in the same cluster.'],
+    ['CONTACT_MUST_STAY', 409, "That person is their family's contact. Make someone else the contact first."],
+    ['ALREADY_IN_HOUSEHOLD', 409, "That person's family changed. The list has been refreshed; try again."],
+    ['NOT_IN_HOUSEHOLD', 409, "That person's family changed. The list has been refreshed; try again."],
+    ['NOT_A_MEMBER', 409, "That person isn't in this family any more. The list has been refreshed."],
+    ['DIFFERENT_PLACE', 409, 'That person lives somewhere else. Move them here first (People card).'],
+    ['HOUSEHOLD_NOT_FOUND', 409, 'That family or person no longer exists. The list has been refreshed.'],
+    ['INDIVIDUAL_NOT_FOUND', 409, 'That family or person no longer exists. The list has been refreshed.'],
     ['SOMETHING_NEW', 502, 'cluster-notebook GraphQL error: upstream: 3 groups in use'],
   ])('maps coded error %s to status %i with { error, code }', async (code, status, error) => {
     const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('cluster-notebook GraphQL error: upstream: 3 groups in use', code, 'upstream: 3 groups in use'));

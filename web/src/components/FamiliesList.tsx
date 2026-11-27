@@ -2,15 +2,59 @@
 
 import { useEffect, useState } from 'react';
 import { PersonSrpDot } from './SrpBadge';
-import { filterFamilies, hiddenText, sizeText, sortFamilies, type FamilyEntry, type FamilySort } from '@/lib/households';
+import FamilyPicker from './FamilyPicker';
+import { addCandidates, moveConfirmText, canRemoveMember, filterFamilies, hiddenText, sizeText, sortFamilies, srpBadge, startCandidates, type Candidate, type FamilyEntry, type FamilySort } from '@/lib/households';
 
 // The Families card's list: households (and people with no household), searchable by anyone in them.
-export default function FamiliesList({ nucleus, refreshKey }: { nucleus: string; refreshKey: number }) {
+type PickerState = { entry: FamilyEntry; mode: 'add' | 'start' };
+type FamilyAction =
+  | { action: 'create'; contactId: string; memberIds: string[] }
+  | { action: 'add'; householdId: string; individualId: string; fromHouseholdId?: string }
+  | { action: 'remove'; householdId: string; individualId: string }
+  | { action: 'contact'; householdId: string; individualId: string };
+
+const smallBtn = { minHeight: 44, padding: '4px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer', border: '1px solid #cbd5e0', background: 'white', color: '#2a4365' } as const;
+
+export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }: { nucleus: string; refreshKey: number; canEdit: boolean; onChanged: () => void }) {
   const [families, setFamilies] = useState<FamilyEntry[] | null>(null);
   const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState<FamilySort>('name');
   const [openKeys, setOpenKeys] = useState<ReadonlySet<string>>(new Set());
+  const [picker, setPicker] = useState<PickerState | null>(null);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
+
+  async function run(key: string, body: FamilyAction) {
+    setSavingKey(key);
+    setErrors(prev => ({ ...prev, [key]: '' }));
+    try {
+      const res = await fetch('/api/families', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nucleus, ...body }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setErrors(prev => ({ ...prev, [key]: data.error || 'Could not save that change.' }));
+      onChanged();
+    } catch (e: unknown) {
+      setErrors(prev => ({ ...prev, [key]: e instanceof Error ? e.message : String(e) }));
+      onChanged();
+    }
+    // The busy key stays set until the list re-reads (see the fetch effect), so buttons never act on stale data.
+  }
+
+  function pick(c: Candidate) {
+    if (!picker || !families) return;
+    const { entry, mode } = picker;
+    setPicker(null);
+    if (mode === 'start') {
+      run(entry.key, { action: 'create', contactId: entry.members[0].id, memberIds: [c.id] });
+      return;
+    }
+    if (c.fromHouseholdId && c.familyTitle !== c.name && !window.confirm(moveConfirmText(c.name, c.familyTitle))) return;
+    run(entry.key, { action: 'add', householdId: entry.householdId!, individualId: c.id, ...(c.fromHouseholdId ? { fromHouseholdId: c.fromHouseholdId } : {}) });
+  }
 
   useEffect(() => {
     let live = true;
@@ -18,9 +62,9 @@ export default function FamiliesList({ nucleus, refreshKey }: { nucleus: string;
       .then(async res => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to load families');
-        if (live) { setFamilies(data.families); setLoadError(''); }
+        if (live) { setFamilies(data.families); setLoadError(''); setSavingKey(null); }
       })
-      .catch((e: unknown) => { if (live) setLoadError(e instanceof Error ? e.message : String(e)); });
+      .catch((e: unknown) => { if (live) { setLoadError(e instanceof Error ? e.message : String(e)); setSavingKey(null); } });
     return () => { live = false; };
   }, [nucleus, refreshKey]);
 
@@ -58,6 +102,9 @@ export default function FamiliesList({ nucleus, refreshKey }: { nucleus: string;
         {shown.map(f => {
           const open = openKeys.has(f.key);
           const hidden = hiddenText(f.hidden);
+          const badge = srpBadge(f.srpState);
+          const busy = savingKey === f.key;
+          const isHousehold = f.householdId !== null;
           return (
             <div key={f.key} style={{ borderBottom: '1px solid #e2e8f0' }}>
               <button
@@ -71,6 +118,7 @@ export default function FamiliesList({ nucleus, refreshKey }: { nucleus: string;
                   <span style={{ display: 'block', fontSize: 14, color: '#2d3748' }}>{f.title}</span>
                   <span style={{ display: 'block', fontSize: 12, color: '#718096' }}>{f.address ?? 'No address in SRP'}</span>
                 </span>
+                {badge && <span style={{ fontSize: 11, color: '#744210', background: '#fefcbf', borderRadius: 8, padding: '1px 6px', whiteSpace: 'nowrap' }}>{badge}</span>}
                 <span style={{ fontSize: 11, color: '#4a5568', background: '#edf2f7', borderRadius: 8, padding: '1px 6px', whiteSpace: 'nowrap' }}>{sizeText(f.size)}</span>
               </button>
               {open && (
@@ -78,15 +126,44 @@ export default function FamiliesList({ nucleus, refreshKey }: { nucleus: string;
                   {f.members.map(m => (
                     <div key={m.id} style={{ padding: '2px 0' }}>
                       {m.isContact ? '★ ' : ''}{m.name}<PersonSrpDot inSrp={m.inSrp} />
+                      {canEdit && isHousehold && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+                          {!m.isContact && (
+                            <button type="button" disabled={busy} style={smallBtn}
+                              onClick={() => run(f.key, { action: 'contact', householdId: f.householdId!, individualId: m.id })}>Make contact</button>
+                          )}
+                          <button type="button" disabled={busy || !canRemoveMember(f, m.id)} style={smallBtn}
+                            onClick={() => run(f.key, { action: 'remove', householdId: f.householdId!, individualId: m.id })}>Remove</button>
+                          {!canRemoveMember(f, m.id) && (
+                            <span style={{ fontSize: 12, color: '#718096' }}>To remove {m.name}, make someone else the contact first.</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                   {hidden && <div style={{ color: '#718096', marginTop: 2 }}>{hidden}</div>}
+                  {canEdit && (
+                    <button type="button" disabled={busy} style={{ ...smallBtn, marginTop: 6 }}
+                      onClick={() => setPicker({ entry: f, mode: isHousehold ? 'add' : 'start' })}>
+                      {isHousehold ? 'Add someone…' : 'Start a family with…'}
+                    </button>
+                  )}
+                  {errors[f.key] && <div role="alert" style={{ color: '#c53030', marginTop: 6 }}>{errors[f.key]}</div>}
                 </div>
               )}
             </div>
           );
         })}
       </div>
+      {picker && (
+        <FamilyPicker
+          note={picker.mode === 'start' ? 'Only people not yet in a family are listed.' : undefined}
+          title={picker.mode === 'add' ? 'Add someone' : `Start a family with ${picker.entry.title}`}
+          candidates={picker.mode === 'add' ? addCandidates(families, picker.entry.key) : startCandidates(families, picker.entry.key)}
+          onPick={pick}
+          onClose={() => setPicker(null)}
+        />
+      )}
     </div>
   );
 }

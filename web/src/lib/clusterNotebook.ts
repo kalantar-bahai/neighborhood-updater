@@ -654,11 +654,14 @@ const PLACE_SELECTION = 'id name type locality cluster localityId homeNucleus';
 // caller. address is filled only on Nucleus.namedHouseholds and is always null on PersonSummary.household, where a
 // null household means the person is in none.
 export type HouseholdMember = PersonName & { inSrp: boolean };
+// Confirmed with cluster-notebook 2026-11-27: srpState is IN_SRP, WAITING (some member is waiting to reach SRP) or LOCAL_ONLY.
+export type HouseholdSrpState = 'IN_SRP' | 'WAITING' | 'LOCAL_ONLY';
 export interface Household {
   id: string; contact: HouseholdMember | null; members: HouseholdMember[]; size: number; address: string | null;
+  srpState: HouseholdSrpState;
 }
 const HOUSEHOLD_MEMBER_SELECTION = `${PERSON_NAME_SELECTION} inSrp`;
-const HOUSEHOLD_FIELDS = `id size address contact { ${HOUSEHOLD_MEMBER_SELECTION} } members { ${HOUSEHOLD_MEMBER_SELECTION} }`;
+const HOUSEHOLD_FIELDS = `id size address srpState contact { ${HOUSEHOLD_MEMBER_SELECTION} } members { ${HOUSEHOLD_MEMBER_SELECTION} }`;
 const PERSON_SUMMARY_SELECTION = `${PERSON_NAME_SELECTION} inSrp place { ${PLACE_SELECTION} } placeSync { status code }`;
 
 // individualDisplayName lives in personName.ts so browser code can use it without importing this
@@ -754,6 +757,46 @@ export async function getPersonDetails(individualId: string, nucleusName: string
 // NOT_FOUND, OTHER_CLUSTER and FORBIDDEN (privacy); `code` is null when moved. Whole-call refusals
 // (FORBIDDEN, LOCATION_NOT_FOUND, NOT_A_PLACE) come back as GraphQL errors.
 export interface MoveResult { individual: PersonSummary | null; moved: boolean; code: string | null }
+
+// Confirmed with cluster-notebook 2026-11-27: the Household these return has a null address (re-read namedHouseholds).
+export async function createHousehold(contactId: string, memberIds: string[]): Promise<Household> {
+  const mutation = `
+    mutation CreateHousehold($contactId: String!, $memberIds: [String!]) {
+      createHousehold(contactId: $contactId, memberIds: $memberIds) { ${HOUSEHOLD_FIELDS} }
+    }`;
+  const data = await request<{ createHousehold: Household }>(mutation, { contactId, memberIds });
+  return data.createHousehold;
+}
+
+export async function addHouseholdMember(householdId: string, individualId: string, fromHouseholdId?: string): Promise<Household> {
+  const mutation = `
+    mutation AddHouseholdMember($householdId: String!, $individualId: String!, $fromHouseholdId: String) {
+      addHouseholdMember(householdId: $householdId, individualId: $individualId, fromHouseholdId: $fromHouseholdId) { ${HOUSEHOLD_FIELDS} }
+    }`;
+  const variables: Record<string, string> = { householdId, individualId };
+  if (fromHouseholdId !== undefined) variables.fromHouseholdId = fromHouseholdId;
+  const data = await request<{ addHouseholdMember: Household }>(mutation, variables);
+  return data.addHouseholdMember;
+}
+
+// Null when the household dissolved (it was left with no one else).
+export async function removeHouseholdMember(householdId: string, individualId: string): Promise<Household | null> {
+  const mutation = `
+    mutation RemoveHouseholdMember($householdId: String!, $individualId: String!) {
+      removeHouseholdMember(householdId: $householdId, individualId: $individualId) { ${HOUSEHOLD_FIELDS} }
+    }`;
+  const data = await request<{ removeHouseholdMember: Household | null }>(mutation, { householdId, individualId });
+  return data.removeHouseholdMember;
+}
+
+export async function setHouseholdContact(householdId: string, individualId: string): Promise<Household> {
+  const mutation = `
+    mutation SetHouseholdContact($householdId: String!, $individualId: String!) {
+      setHouseholdContact(householdId: $householdId, individualId: $individualId) { ${HOUSEHOLD_FIELDS} }
+    }`;
+  const data = await request<{ setHouseholdContact: Household }>(mutation, { householdId, individualId });
+  return data.setHouseholdContact;
+}
 
 export async function moveIndividuals(individualIds: string[], locationId: string, withHousehold: boolean): Promise<MoveResult[]> {
   const mutation = `

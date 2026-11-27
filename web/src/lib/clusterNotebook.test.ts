@@ -8,7 +8,7 @@ import {
   getActivitySummaries, updateActivitySummary, getAllNuclei, getNucleusFields, updateNucleus,
   searchIndividuals, createIndividual, getNucleusWorkers, updateNucleusWorkers, individualDisplayName,
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
-  getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusCounts, getNucleusHouseholds, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext,
+  getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusCounts, getNucleusHouseholds, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext, createHousehold, addHouseholdMember, removeHouseholdMember, setHouseholdContact,
   getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople, getPeopleNotInSrp, getRoleHoldersWithoutAccess, getChangeLog,
   getMe, inviteIndividual, resendInvitation, revokeInvitation, removeAccess, restoreAccess, getInvitations, getAccounts,
 } from './clusterNotebook';
@@ -735,7 +735,7 @@ describe('searchIndividuals', () => {
     const selection = (body.query as string).match(/individuals\([^)]*\)\s*\{([\s\S]*)\}\s*\}/)![1]
       .replace(/household \{[^{}]*(\{[^{}]*\}[^{}]*)*\}/, '').replace(/\{[^}]*\}/g, '').trim().split(/\s+/).sort();
     expect(selection).toEqual(['familyName', 'firstName', 'id', 'inSrp', 'middleNames', 'nickname', 'place', 'placeSync']);
-    expect(body.query).toMatch(/household \{ id size address contact \{[^}]*\} members \{[^}]*\} \}/);
+    expect(body.query).toMatch(/household \{ id size address srpState contact \{[^}]*\} members \{[^}]*\} \}/);
     expect(body.query).toContain('place { id name type locality cluster localityId homeNucleus }');
     expect(body.query).toContain('placeSync { status code }');
   });
@@ -817,7 +817,7 @@ describe('getNucleusHouseholds', () => {
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables).toEqual({ name: 'Alpha' });
     const query = (body.query as string).replace(/\s+/g, ' ');
-    expect(query).toContain('nucleus(name: $name) { namedHouseholds { id size address contact {');
+    expect(query).toContain('nucleus(name: $name) { namedHouseholds { id size address srpState contact {');
     expect(query).toContain('members {');
   });
   test('null when the nucleus is not found', async () => {
@@ -841,7 +841,7 @@ describe('getNucleusPeople', () => {
     expect(result).toEqual([person]);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables).toEqual({ name: 'Alpha' });
-    expect((body.query as string).replace(/\s+/g, ' ')).toContain('people(includeHidden: true) { individual { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } household { id size address contact { id firstName familyName middleNames nickname inSrp } members { id firstName familyName middleNames nickname inSrp } } } address roles isResident ageCategory devotionalHost participates facilitates participation { activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current studyItemShortName personCompleted } hidden hide { hiddenAt reason hiddenBy { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } } }');
+    expect((body.query as string).replace(/\s+/g, ' ')).toContain('people(includeHidden: true) { individual { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } household { id size address srpState contact { id firstName familyName middleNames nickname inSrp } members { id firstName familyName middleNames nickname inSrp } } } address roles isResident ageCategory devotionalHost participates facilitates participation { activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current studyItemShortName personCompleted } hidden hide { hiddenAt reason hiddenBy { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } } }');
   });
 
   test('returns null when the nucleus is not found', async () => {
@@ -1347,7 +1347,7 @@ describe('admin client', () => {
     expect(vars).toEqual({ clusterName: 'Testville' });
     expect(q).toContain('hiddenPeople(clusterName: $clusterName)');
     expect(q).toContain('nucleusName roles isResident hide { hiddenAt reason hiddenBy {');
-    expect(q).toContain('household { id size address');
+    expect(q).toContain('household { id size address srpState');
   });
 
   test('getPersonDetails with null nucleus omits the variable and the argument', async () => {
@@ -1363,5 +1363,55 @@ describe('admin client', () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { personDetails: null } }));
     await getPersonDetails('I1', 'Northside');
     expect(norm(0).vars).toEqual({ individualId: 'I1', nucleusName: 'Northside' });
+  });
+});
+
+describe('household mutations', () => {
+  const hh = { id: 'h1', size: 2, address: null, srpState: 'LOCAL_ONLY', contact: null, members: [] };
+  const run = async (name: string, call: () => Promise<unknown>, result: unknown = hh) => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { [name]: result } }));
+    const out = await call();
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    return { out, vars: body.variables, q: (body.query as string).replace(/\s+/g, ' ') };
+  };
+
+  test('createHousehold', async () => {
+    const { out, vars, q } = await run('createHousehold', () => createHousehold('c1', ['m1', 'm2']));
+    expect(out).toEqual(hh);
+    expect(vars).toEqual({ contactId: 'c1', memberIds: ['m1', 'm2'] });
+    expect(q).toContain('createHousehold(contactId: $contactId, memberIds: $memberIds)');
+    expect(q).toContain('id size address srpState contact {');
+  });
+
+  test('addHouseholdMember sends fromHouseholdId when given', async () => {
+    const { vars, q } = await run('addHouseholdMember', () => addHouseholdMember('h1', 'p1', 'h0'));
+    expect(vars).toEqual({ householdId: 'h1', individualId: 'p1', fromHouseholdId: 'h0' });
+    expect(q).toContain('addHouseholdMember(householdId: $householdId, individualId: $individualId, fromHouseholdId: $fromHouseholdId)');
+    expect(q).toContain('srpState');
+  });
+
+  test('addHouseholdMember omits fromHouseholdId when undefined', async () => {
+    const { vars } = await run('addHouseholdMember', () => addHouseholdMember('h1', 'p1'));
+    expect(vars).toEqual({ householdId: 'h1', individualId: 'p1' });
+    expect('fromHouseholdId' in (vars as object)).toBe(false);
+  });
+
+  test('removeHouseholdMember returns the household, or null when it dissolved', async () => {
+    const first = await run('removeHouseholdMember', () => removeHouseholdMember('h1', 'p1'));
+    expect(first.out).toEqual(hh);
+    expect(first.vars).toEqual({ householdId: 'h1', individualId: 'p1' });
+    expect(first.q).toContain('removeHouseholdMember(householdId: $householdId, individualId: $individualId)');
+    expect(first.q).toContain('srpState');
+    mockFetch.mockClear();
+    const second = await run('removeHouseholdMember', () => removeHouseholdMember('h1', 'p1'), null);
+    expect(second.out).toBeNull();
+  });
+
+  test('setHouseholdContact', async () => {
+    const { out, vars, q } = await run('setHouseholdContact', () => setHouseholdContact('h1', 'p2'));
+    expect(out).toEqual(hh);
+    expect(vars).toEqual({ householdId: 'h1', individualId: 'p2' });
+    expect(q).toContain('setHouseholdContact(householdId: $householdId, individualId: $individualId)');
+    expect(q).toContain('srpState');
   });
 });
