@@ -1428,9 +1428,14 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
           </div>
           {activitiesOpen && <div className="card-body">
             {groupOption && (
-              <div className="toggle-row" role="group" aria-label="Which numbers to show">
-                <button className={`tb${showGroup ? '' : ' on'}`} aria-pressed={!showGroup} onClick={() => setActivitiesGroup(false)}>This nucleus</button>
-                <button className={`tb${showGroup ? ' on' : ''}`} aria-pressed={showGroup} onClick={() => setActivitiesGroup(true)}>{groupOption}</button>
+              // A sliding switch, not two buttons (owner, 2026-11-27): off is this nucleus, on is the group.
+              <div className="switch-row">
+                <span className={showGroup ? undefined : 'on'} onClick={() => setActivitiesGroup(false)}>This nucleus</span>
+                <button type="button" role="switch" aria-checked={showGroup} aria-label={groupOption}
+                  className={`switch${showGroup ? ' checked' : ''}`} onClick={() => setActivitiesGroup(g => !g)}>
+                  <span className="knob" />
+                </button>
+                <span className={showGroup ? 'on' : undefined} onClick={() => setActivitiesGroup(true)}>{groupOption}</span>
               </div>
             )}
             {showGroup && totals ? (
