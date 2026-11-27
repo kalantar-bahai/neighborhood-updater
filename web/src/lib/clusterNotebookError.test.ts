@@ -60,6 +60,7 @@ describe('clusterNotebookErrorResponse', () => {
     ['DIFFERENT_PLACE', 409, 'That person lives somewhere else. Move them here first (People card).'],
     ['HOUSEHOLD_NOT_FOUND', 409, 'That family or person no longer exists. The list has been refreshed.'],
     ['INDIVIDUAL_NOT_FOUND', 409, 'That family or person no longer exists. The list has been refreshed.'],
+    ['PARENT_FORBIDDEN', 403, "You can't put a nucleus under one you can't edit."],
     ['SOMETHING_NEW', 502, 'cluster-notebook GraphQL error: upstream: 3 groups in use'],
   ])('maps coded error %s to status %i with { error, code }', async (code, status, error) => {
     const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('cluster-notebook GraphQL error: upstream: 3 groups in use', code, 'upstream: 3 groups in use'));

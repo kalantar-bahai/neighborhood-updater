@@ -1144,7 +1144,7 @@ describe('createRowData', () => {
 
     await createRowData(baseCreateFormData);
 
-    expect(mockCreateNucleus).toHaveBeenCalledWith('Riverside', 'NC-215 Triangle', undefined);
+    expect(mockCreateNucleus).toHaveBeenCalledWith('Riverside', 'NC-215 Triangle', undefined, undefined);
   });
 
   test('with srpLocality passes it to createNucleus and sends no locationName', async () => {
@@ -1156,8 +1156,18 @@ describe('createRowData', () => {
       identity: { nucleus: 'Alpha', cluster: 'NC-1 Test', srpLocality: 'Elm Locality', location: 'Ignored' },
     });
 
-    expect(mockCreateNucleus).toHaveBeenCalledWith('Alpha', 'NC-1 Test', 'Elm Locality');
+    expect(mockCreateNucleus).toHaveBeenCalledWith('Alpha', 'NC-1 Test', 'Elm Locality', undefined);
     expect(mockUpdateNucleus).not.toHaveBeenCalled();
+  });
+
+  test('a child is created under its parent in the one call, with no parent patch after', async () => {
+    mockCreateNucleus.mockResolvedValue({ lastUpdated: null } as never);
+    mockUpdateNucleus.mockResolvedValue(null);
+
+    await createRowData({ identity: { nucleus: 'Alpha', cluster: 'NC-1 Test', parentNucleusId: 'p-1', localityId: 'loc-1', nucleusType: 'Neighborhood' } });
+
+    expect(mockCreateNucleus).toHaveBeenCalledWith('Alpha', 'NC-1 Test', undefined, 'p-1');
+    expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', { localityId: 'loc-1', nucleusType: 'Neighborhood' });
   });
 
   test('without SRP, sends location and nucleusType Neighborhood in the follow-up patch', async () => {
@@ -1168,7 +1178,7 @@ describe('createRowData', () => {
       identity: { nucleus: 'Alpha', cluster: 'NC-1 Test', location: 'Elm Locality', nucleusType: 'Neighborhood' },
     });
 
-    expect(mockCreateNucleus).toHaveBeenCalledWith('Alpha', 'NC-1 Test', undefined);
+    expect(mockCreateNucleus).toHaveBeenCalledWith('Alpha', 'NC-1 Test', undefined, undefined);
     expect(mockUpdateNucleus).toHaveBeenCalledWith('Alpha', expect.objectContaining({ nucleusType: 'Neighborhood' }));
     expect(mockUpdateNucleus.mock.calls[0][1]).toHaveProperty('locationName', 'Elm Locality');
   });

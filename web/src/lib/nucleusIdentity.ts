@@ -52,8 +52,9 @@ export function typeLabel(nucleusType: string): string {
 }
 
 // The Parent Nucleus picker's suggestions: nuclei in the same cluster, leaving out this nucleus and everything under it,
-// which cluster-notebook refuses (PARENT_CYCLE, PARENT_OTHER_CLUSTER; owner's rules, 2026-11-27). Sorted by name.
-export function parentOptions(rows: { nucleus: string; parentNucleus: string; cluster: string }[], nucleus: string, cluster: string): string[] {
+// which cluster-notebook refuses (PARENT_CYCLE, PARENT_OTHER_CLUSTER; owner's rules, 2026-11-27), and any the user
+// can't edit (PARENT_FORBIDDEN, cluster-notebook #60, 2026-11-27). Sorted by name.
+export function parentOptions(rows: { nucleus: string; parentNucleus: string; cluster: string }[], nucleus: string, cluster: string, canEdit: (name: string) => boolean): string[] {
   const excluded = new Set([nucleus]);
   // Walk down from this nucleus; the Set stops a loop already in the data.
   for (let grew = true; grew;) {
@@ -62,5 +63,5 @@ export function parentOptions(rows: { nucleus: string; parentNucleus: string; cl
       if (!excluded.has(r.nucleus) && excluded.has(r.parentNucleus)) { excluded.add(r.nucleus); grew = true; }
     }
   }
-  return rows.filter(r => r.cluster === cluster && !excluded.has(r.nucleus)).map(r => r.nucleus).sort((a, b) => a.localeCompare(b));
+  return rows.filter(r => r.cluster === cluster && !excluded.has(r.nucleus) && canEdit(r.nucleus)).map(r => r.nucleus).sort((a, b) => a.localeCompare(b));
 }

@@ -383,16 +383,21 @@ export async function getLocationOptions(clusterName: string): Promise<LocalityO
 // cluster-notebook to also create the nucleus in SRP under that locality; SRP
 // failures surface as coded errors (e.g. SRP_NAME_CLASH, see
 // ClusterNotebookCodedError). Sent only when given.
-export async function createNucleus(name: string, clusterName: string, srpLocalityName?: string): Promise<NucleusFields | null> {
+// Confirmed with cluster-notebook 2026-11-27 (their #60): parentNucleusId creates the nucleus under that parent in
+// the same all-or-nothing call. Without srpLocalityName it is placed at the parent's Locality (or the Cluster).
+// Refusals create nothing: PARENT_FORBIDDEN (no edit rights on the parent), PARENT_OTHER_CLUSTER, or an
+// uncoded error for an unknown parent id.
+export async function createNucleus(name: string, clusterName: string, srpLocalityName?: string, parentNucleusId?: string): Promise<NucleusFields | null> {
   const mutation = `
-    mutation CreateNucleus($name: String!, $clusterName: String!, $srpLocalityName: String) {
-      createNucleus(name: $name, clusterName: $clusterName, srpLocalityName: $srpLocalityName) {
+    mutation CreateNucleus($name: String!, $clusterName: String!, $srpLocalityName: String, $parentNucleusId: String) {
+      createNucleus(name: $name, clusterName: $clusterName, srpLocalityName: $srpLocalityName, parentNucleusId: $parentNucleusId) {
         ${NUCLEUS_FIELDS_SELECTION}
       }
     }
   `;
   const variables: Record<string, unknown> = { name, clusterName };
   if (srpLocalityName !== undefined) variables.srpLocalityName = srpLocalityName;
+  if (parentNucleusId !== undefined) variables.parentNucleusId = parentNucleusId;
   const data = await request<{ createNucleus: NucleusFields | null }>(mutation, variables);
   return data.createNucleus;
 }

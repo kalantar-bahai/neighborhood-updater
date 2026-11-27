@@ -3,17 +3,17 @@ import type { NucleusSummary } from '@/types';
 import type { LocalityOption } from './clusterNotebook';
 import { childPreset, presetLocalityId } from './createPreset';
 
-const row = (nucleus: string, cluster: string, locality: string): NucleusSummary =>
-  ({ nucleus, cluster, locality, parentNucleus: '' } as NucleusSummary);
+const row = (id: string, nucleus: string, cluster: string, locality: string): NucleusSummary =>
+  ({ id, nucleus, cluster, locality, parentNucleus: '' } as NucleusSummary);
 const loc = (id: string, name: string): LocalityOption => ({ id, name, settings: [] });
 
 describe('childPreset', () => {
-  const rows = [row('Elm Park', 'Orange', 'Carrboro'), row('Oak Net', 'Orange', '')];
-  test("cluster, the parent's locality, and the parent", () => {
-    expect(childPreset(rows, 'Elm Park')).toEqual({ cluster: 'Orange', locality: 'Carrboro', parent: 'Elm Park' });
+  const rows = [row('n-1', 'Elm Park', 'Orange', 'Carrboro'), row('n-2', 'Oak Net', 'Orange', '')];
+  test("cluster, the parent's locality, and the parent with its id", () => {
+    expect(childPreset(rows, 'Elm Park')).toEqual({ cluster: 'Orange', locality: 'Carrboro', parent: 'Elm Park', parentId: 'n-1' });
   });
   test('a parent with no locality leaves the locality to the user', () => {
-    expect(childPreset(rows, 'Oak Net')).toEqual({ cluster: 'Orange', parent: 'Oak Net' });
+    expect(childPreset(rows, 'Oak Net')).toEqual({ cluster: 'Orange', parent: 'Oak Net', parentId: 'n-2' });
   });
   test('an unknown parent', () => {
     expect(childPreset(rows, 'Nowhere')).toBeNull();

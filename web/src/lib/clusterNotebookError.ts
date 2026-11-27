@@ -75,6 +75,9 @@ const CODED_ERRORS: Record<string, { status: number; message: string | null | ((
   DIFFERENT_PLACE: { status: 409, message: 'That person lives somewhere else. Move them here first (People card).' },
   HOUSEHOLD_NOT_FOUND: { status: 409, message: 'That family or person no longer exists. The list has been refreshed.' },
   INDIVIDUAL_NOT_FOUND: { status: 409, message: 'That family or person no longer exists. The list has been refreshed.' },
+  // Confirmed with cluster-notebook 2026-11-27 (their #60): a new parent needs edit rights on it, since its contacts and
+  // accompaniers gain access to the child. Re-setting or clearing the parent needs none.
+  PARENT_FORBIDDEN: { status: 403, message: "You can't put a nucleus under one you can't edit." },
   BAD_INPUT: { status: 400, message: null },
   CLERK_ERROR: { status: 502, message: "The invitation email couldn't be sent. Try again." },
   CLERK_NOT_CONFIGURED: { status: 503, message: "Invitations aren't set up yet." },

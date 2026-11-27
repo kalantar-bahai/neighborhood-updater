@@ -102,10 +102,11 @@ describe('parentOptions', () => {
     { nucleus: 'Sibling', parentNucleus: '', cluster: 'C1' },
     { nucleus: 'Elsewhere', parentNucleus: '', cluster: 'C2' },
   ];
+  const all = () => true;
   it('leaves out the nucleus itself, its descendants, and other clusters', () => {
-    expect(parentOptions(rows, 'Top', 'C1')).toEqual(['Sibling']);
-    expect(parentOptions(rows, 'Child', 'C1')).toEqual(['Sibling', 'Top']);
-    expect(parentOptions(rows, 'Grandchild', 'C1')).toEqual(['Child', 'Sibling', 'Top']);
+    expect(parentOptions(rows, 'Top', 'C1', all)).toEqual(['Sibling']);
+    expect(parentOptions(rows, 'Child', 'C1', all)).toEqual(['Sibling', 'Top']);
+    expect(parentOptions(rows, 'Grandchild', 'C1', all)).toEqual(['Child', 'Sibling', 'Top']);
   });
   it('survives a cycle already in the data', () => {
     const loop = [
@@ -113,6 +114,9 @@ describe('parentOptions', () => {
       { nucleus: 'B', parentNucleus: 'A', cluster: 'C1' },
       { nucleus: 'D', parentNucleus: '', cluster: 'C1' },
     ];
-    expect(parentOptions(loop, 'A', 'C1')).toEqual(['D']);
+    expect(parentOptions(loop, 'A', 'C1', all)).toEqual(['D']);
+  });
+  it('leaves out nuclei the user can\'t edit', () => {
+    expect(parentOptions(rows, 'Grandchild', 'C1', n => n !== 'Top')).toEqual(['Child', 'Sibling']);
   });
 });
