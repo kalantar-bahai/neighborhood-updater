@@ -47,7 +47,17 @@ export default function ParticipationCard({ nucleus, canWrite, open, onOpenChang
         <span><span style={{ fontSize: 11, marginRight: 6 }}>{open ? '▼' : '▶'}</span>Participation</span>
       </div>
       {open && <div className="card-body">
-        {loadError && <div style={{ color: '#e53e3e', fontSize: 13, marginBottom: 8 }}>{loadError}</div>}
+        {loadError && (
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ color: '#e53e3e', fontSize: 13, marginBottom: 8 }}>{loadError}</div>
+            <button
+              onClick={() => { setLoadError(''); void load(); }}
+              style={{ minHeight: 44, padding: '4px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer', border: '1px solid #cbd5e0', background: 'white', color: '#2a4365' }}
+            >
+              Try again
+            </button>
+          </div>
+        )}
         {!loadError && spaces === null && <div style={{ fontSize: 13, color: '#718096' }}>Loading…</div>}
         {spaces?.length === 0 && <div style={{ fontSize: 13, color: '#718096' }}>No spaces yet.</div>}
         {spaces?.map(space => {
