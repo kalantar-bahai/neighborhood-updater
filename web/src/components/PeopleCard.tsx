@@ -25,6 +25,9 @@ interface Props {
   // Called with the roles that were written here (even after a partial failure), so the page can
   // re-read those name lists.
   onRolesChanged: (roles: string[]) => void;
+  // Called after anything here that may change who the nucleus's members (or residents) are: a save, a hide or an
+  // unhide, so the page can re-read its member count.
+  onPeopleChanged: () => void;
 }
 
 type Found = { id: string; name: string; place: string; homeNucleus: string | null };
@@ -119,7 +122,7 @@ async function rolesAt(nucleus: string, personId: string): Promise<string[]> {
   }
 }
 
-export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, onRolesChanged }: Props) {
+export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, onRolesChanged, onPeopleChanged }: Props) {
   const [rows, setRows] = useState<PersonRow[] | null>(null);
   const [moves, setMoves] = useState<Moves>({ here: null, out: null, srpAt: null });
   const [loadError, setLoadError] = useState('');
@@ -258,6 +261,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
       setRows(rs => rs && rs.map(r => r.id === target.id ? { ...r, hidden: false, hide: null } : r));
       setFilter(f => f === 'hidden' ? 'all' : f);
       setReloads(n => n + 1);
+      onPeopleChanged();
       if (target.roles.length > 0) onRolesChanged(target.roles);
       if (editingId.current !== target.id) return;
       target = { ...target, unhideFirst: false };
@@ -333,6 +337,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
       setSaving(false);
       // Re-read this card, and the page's name lists for whatever did save.
       setReloads(n => n + 1);
+      if (moved || written.length > 0) onPeopleChanged();
       if (written.length > 0) onRolesChanged(written);
     }
   }
@@ -353,6 +358,7 @@ export default function PeopleCard({ nucleus, isHome, permissions, refreshKey, o
     } finally {
       setSaving(false);
       setReloads(n => n + 1);
+      onPeopleChanged();
     }
   }
 

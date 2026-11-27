@@ -586,8 +586,19 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const [promoterNames, setPromoterNames] = useState<Worker[]>(() => detail.promoterNames);
   // People SRP shows hosting devotionals, taking part in and facilitating activities: the "(x)" on those estimates.
   const counts = detail.peopleCounts;
-  // Members of this nucleus (residents on a Neighborhood), shown on every nucleus.
-  const residentsNamed = detail.memberCount;
+  // Members of this nucleus (residents on a Neighborhood), shown on every nucleus. Kept in state so a change on the
+  // People card shows at once (owner 2026-11-26); refreshMemberCount re-reads it from cluster-notebook.
+  const [memberCount, setMemberCount] = useState(detail.memberCount);
+  const memberCountSeq = useRef(0);
+  async function refreshMemberCount() {
+    const seq = ++memberCountSeq.current;
+    try {
+      const res = await fetch(`/api/nucleus?name=${encodeURIComponent(row.nucleus)}`);
+      // Keep only the newest answer; on failure the old count stays until the next change or a reload.
+      if (res.ok && seq === memberCountSeq.current) setMemberCount((await res.json()).memberCount);
+    } catch { /* as above */ }
+  }
+  const residentsNamed = memberCount;
   const [showPromotersModal, setShowPromotersModal] = useState(false);
   // Which cards are open lives in AppClient, so an in-place reload (Refresh, Push, Location
   // save), which remounts this view, keeps the cards the user had open.
@@ -748,14 +759,14 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   }, [membersDialogOpen]);
   function changeType(to: string) {
     const from = form.nucleusType;
-    const prompt = typeChangePrompt({ from, to, isHome: detail.srp.isHome, memberCount: detail.memberCount });
+    const prompt = typeChangePrompt({ from, to, isHome: detail.srp.isHome, memberCount });
     if (prompt.kind === 'membersIn') { setMembersIn({ text: prompt.text }); return; }
     if (prompt.kind === 'residentsOut' && !window.confirm(prompt.text)) return;
     setAndSave('nucleusType', to, { identity: { nucleusType: to } }, 'Type', from === 'Neighborhood' || to === 'Neighborhood');
   }
   async function membersOnTypeChange(choice: 'MOVE_IN' | 'END') {
     setMembersIn(null);
-    const moved = detail.memberCount;
+    const moved = memberCount;
     setForm(f => ({ ...f, nucleusType: 'Neighborhood' }));
     const result = await saveField({ identity: { nucleusType: 'Neighborhood', membersOnTypeChange: choice } }, 'Type');
     if (!result.ok) {
@@ -940,6 +951,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
     srpName: detail.srp.srpName,
     locationType: row.locationType,
     settingLinked: locationSetting?.srpLinked,
+    isHome: detail.srp.isHome,
     canCreateInCluster,
   });
   // Bumped when a name list changes in a WorkerListModal, so the People card re-reads.
@@ -1275,7 +1287,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             <span><span style={{ fontSize: 11, marginRight: 6 }}>{peopleOpen ? '▼' : '▶'}</span>People</span>
           </div>
           {peopleOpen && <div className="card-body">
-            <PeopleCard nucleus={row.nucleus} isHome={detail.srp.isHome} permissions={permissions} refreshKey={peopleRefresh} onRolesChanged={refreshRoleLists} />
+            <PeopleCard nucleus={row.nucleus} isHome={detail.srp.isHome} permissions={permissions} refreshKey={peopleRefresh} onRolesChanged={refreshRoleLists} onPeopleChanged={refreshMemberCount} />
           </div>}
         </div>
 
