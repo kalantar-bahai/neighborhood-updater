@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import {
   SPACE_SUGGESTIONS, availableSuggestions, parseCount, countAfterNaming, namedLabel, lastTimeChoices,
-  isoDate, windowStart, shortDate, spaceRowSummary, canRecord, parseRecordBody, parseRecordPatch,
+  isoDate, windowStart, shortDate, spaceRowSummary, canRecord, parseRecordBody, parseRecordPatch, parseSpaceBody, parseSpacePatch,
 } from './participation';
 import type { ParticipationRecord, ParticipationSpace, PersonSummary } from './clusterNotebook';
 
@@ -111,5 +111,37 @@ describe('parseRecordPatch', () => {
     expect(parseRecordPatch({ count: 2 }).ok).toBe(false);
     expect(parseRecordPatch({ id: 'r1', date: 'x' }).ok).toBe(false);
     expect(parseRecordPatch({ id: 'r1', count: -2 }).ok).toBe(false);
+  });
+});
+
+describe('parseRecordPatch empty', () => {
+  test('rejects a patch with nothing to change', () => {
+    expect(parseRecordPatch({ id: 'r1' })).toEqual({ ok: false, error: 'Nothing to change' });
+  });
+});
+
+describe('parseSpaceBody', () => {
+  test('trims the name and accepts both modes', () => {
+    expect(parseSpaceBody({ name: '  Fun  ', kind: 'k', mode: 'RUNNING' })).toEqual({ ok: true, value: { name: 'Fun', kind: 'k', mode: 'RUNNING' } });
+    expect(parseSpaceBody({ name: 'A', kind: 'k', mode: 'EACH_TIME' }).ok).toBe(true);
+  });
+  test('rejects blank name, bad mode, missing kind', () => {
+    expect(parseSpaceBody({ name: '  ', kind: 'k', mode: 'RUNNING' })).toEqual({ ok: false, error: 'Name is required' });
+    expect(parseSpaceBody({ name: 'A', kind: 'k', mode: 'x' })).toEqual({ ok: false, error: 'Choose how it is recorded' });
+    expect(parseSpaceBody({ name: 'A', kind: '', mode: 'RUNNING' }).ok).toBe(false);
+    expect(parseSpaceBody(null).ok).toBe(false);
+  });
+});
+
+describe('parseSpacePatch', () => {
+  test('only present fields, trimmed name', () => {
+    expect(parseSpacePatch({ id: 's1', name: ' B ', archived: true })).toEqual({ ok: true, id: 's1', patch: { name: 'B', archived: true } });
+  });
+  test('rejects empty patch, blank name, bad types, missing id', () => {
+    expect(parseSpacePatch({ id: 's1' })).toEqual({ ok: false, error: 'Nothing to change' });
+    expect(parseSpacePatch({ id: 's1', name: ' ' })).toEqual({ ok: false, error: 'Name is required' });
+    expect(parseSpacePatch({ id: 's1', kind: '' }).ok).toBe(false);
+    expect(parseSpacePatch({ id: 's1', archived: 'yes' }).ok).toBe(false);
+    expect(parseSpacePatch({ name: 'x' }).ok).toBe(false);
   });
 });

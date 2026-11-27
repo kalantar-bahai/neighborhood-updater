@@ -110,5 +110,42 @@ export function parseRecordPatch(body: unknown): { ok: true; id: string; patch: 
     if (!isIds(b.personIds)) return { ok: false, error: 'Invalid list of people.' };
     patch.personIds = b.personIds;
   }
+  if (Object.keys(patch).length === 0) return { ok: false, error: 'Nothing to change' };
+  return { ok: true, id: b.id, patch };
+}
+
+export type SpaceBody = { name: string; kind: string; mode: SpaceMode };
+type SpacePatch = { name?: string; kind?: string; archived?: boolean };
+const isKind = (v: unknown): v is string => typeof v === 'string' && v !== '';
+
+export function parseSpaceBody(body: unknown): { ok: true; value: SpaceBody } | { ok: false; error: string } {
+  if (typeof body !== 'object' || body === null) return { ok: false, error: 'Invalid request.' };
+  const b = body as Record<string, unknown>;
+  const name = typeof b.name === 'string' ? b.name.trim() : '';
+  if (!name) return { ok: false, error: 'Name is required' };
+  if (!isKind(b.kind)) return { ok: false, error: 'Choose a kind' };
+  if (b.mode !== 'EACH_TIME' && b.mode !== 'RUNNING') return { ok: false, error: 'Choose how it is recorded' };
+  return { ok: true, value: { name, kind: b.kind, mode: b.mode } };
+}
+
+export function parseSpacePatch(body: unknown): { ok: true; id: string; patch: SpacePatch } | { ok: false; error: string } {
+  if (typeof body !== 'object' || body === null) return { ok: false, error: 'Invalid request.' };
+  const b = body as Record<string, unknown>;
+  if (typeof b.id !== 'string' || !b.id) return { ok: false, error: 'Missing space.' };
+  const patch: SpacePatch = {};
+  if ('name' in b) {
+    const name = typeof b.name === 'string' ? b.name.trim() : '';
+    if (!name) return { ok: false, error: 'Name is required' };
+    patch.name = name;
+  }
+  if ('kind' in b) {
+    if (!isKind(b.kind)) return { ok: false, error: 'Choose a kind' };
+    patch.kind = b.kind;
+  }
+  if ('archived' in b) {
+    if (typeof b.archived !== 'boolean') return { ok: false, error: 'Invalid request.' };
+    patch.archived = b.archived;
+  }
+  if (Object.keys(patch).length === 0) return { ok: false, error: 'Nothing to change' };
   return { ok: true, id: b.id, patch };
 }
