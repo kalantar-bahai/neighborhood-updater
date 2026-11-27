@@ -167,6 +167,7 @@ export default function AppClient() {
         allNucleusNames={initialData.rows.map(r => r.nucleus)}
         parentChoices={parentOptions(initialData.rows, selectedNucleus, detail.row.cluster)}
         childCount={initialData.rows.filter(r => r.parentNucleus === selectedNucleus).length}
+        rows={initialData.rows}
         cardOpen={cardOpen}
         onCardOpenChange={(key, open) => setCardOpen(c => ({ ...c, [key]: open }))}
       />
