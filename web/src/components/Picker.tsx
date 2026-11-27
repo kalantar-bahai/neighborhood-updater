@@ -124,6 +124,10 @@ function rollupByType(rowsIn: NucleusSummary[]) {
 // Neutral styling for the "All" card (2026-10-08) -- deliberately not one of
 // TYPE_META's type colors, since it spans every type rather than belonging to
 // one.
+// The All / Neighborhood / Population summary cards under each locality and cluster are hidden for now: too
+// crowded on a phone (owner, 2026-11-27). Kept, not deleted; set to true to bring them back.
+const SHOW_ROLLUP_CARDS = false;
+
 const ALL_TYPES_META = { label: 'All', bg: '#edf2f7', color: '#2d3748', border: '#cbd5e0' };
 
 // One small card per nucleus type actually present in this group (population
@@ -260,7 +264,7 @@ export default function Picker({ rows, email, onSelect, openState, onAdd, onAdmi
             <span className="cluster-count">{nucleusCountLabel(localityRows)}</span>
           </div>
           <div className={`cluster-rows${isOpen ? ' open' : ''}`}>
-            {isOpen && <RollupCards rows={localityRows} groupLabel={loc || '(No Locality)'} onCardClick={openRollupPopup} />}
+            {SHOW_ROLLUP_CARDS && isOpen && <RollupCards rows={localityRows} groupLabel={loc || '(No Locality)'} onCardClick={openRollupPopup} />}
             {renderClusterContent(localityRows, localityKey)}
           </div>
         </div>
@@ -337,7 +341,7 @@ export default function Picker({ rows, email, onSelect, openState, onAdd, onAdmi
                   </div>
 
                   <div className={`cluster-rows${isClusterOpen ? ' open' : ''}`}>
-                    {isClusterOpen && <RollupCards rows={clusterRows} groupLabel={clusterName} onCardClick={openRollupPopup} />}
+                    {SHOW_ROLLUP_CARDS && isClusterOpen && <RollupCards rows={clusterRows} groupLabel={clusterName} onCardClick={openRollupPopup} />}
                     {renderLocalityGroups(clusterRows, clusterKey)}
                   </div>
                 </div>
