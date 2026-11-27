@@ -10,6 +10,7 @@ import {
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
   getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusCounts, getNucleusHouseholds, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext, createHousehold, addHouseholdMember, removeHouseholdMember, setHouseholdContact, retryHouseholdSrp, takeSrpHousehold,
   getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople, getPeopleNotInSrp, getRoleHoldersWithoutAccess, getChangeLog,
+  getParticipationSpaces, getParticipationSpace, updateParticipationRecord,
   getMe, inviteIndividual, resendInvitation, revokeInvitation, removeAccess, restoreAccess, getInvitations, getAccounts,
 } from './clusterNotebook';
 import type { Individual, PersonSummary, NucleusPerson, MoveResult, MoveContext, PersonDetails } from './clusterNotebook';
@@ -1435,5 +1436,31 @@ describe('household mutations', () => {
     const { out, vars } = await run('takeSrpHousehold', () => takeSrpHousehold('h1'), null);
     expect(out).toBeNull();
     expect(vars).toEqual({ householdId: 'h1' });
+  });
+});
+
+describe('participation spaces', () => {
+  const space = (id: string) => ({ id, name: `Space ${id}`, kind: 'reflection', mode: 'EACH_TIME', createdAt: '2026-11-01T00:00:00Z', archivedAt: null, recordCount: 0, total: 0, latestRecord: null });
+
+  test('getParticipationSpaces returns nucleusId and spaces, null for an unknown nucleus', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ data: { nucleus: { id: 'n1', participationSpaces: [space('s1')] } } }));
+    expect(await getParticipationSpaces('Alpha')).toEqual({ nucleusId: 'n1', spaces: [space('s1')] });
+    mockFetch.mockResolvedValueOnce(jsonResponse({ data: { nucleus: null } }));
+    expect(await getParticipationSpaces('Nope')).toBeNull();
+  });
+
+  test('getParticipationSpace picks the space by id, null when absent', async () => {
+    const detail = { ...space('s2'), records: [], people: { recordCount: 0, people: [] } };
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { participationSpaces: [{ ...space('s1'), records: [], people: { recordCount: 0, people: [] } }, detail] } } }));
+    expect(await getParticipationSpace('Alpha', 's2', '2026-09-04')).toEqual(detail);
+    expect(await getParticipationSpace('Alpha', 'zzz', '2026-09-04')).toBeNull();
+  });
+
+  test('updateParticipationRecord sends only the given variables; note null clears', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { updateParticipationRecord: { id: 'r1' } } }));
+    await updateParticipationRecord('r1', { note: null });
+    const vars = JSON.parse(mockFetch.mock.calls[0][1].body).variables;
+    expect(vars).toEqual({ id: 'r1', note: null });
+    expect('count' in vars).toBe(false);
   });
 });

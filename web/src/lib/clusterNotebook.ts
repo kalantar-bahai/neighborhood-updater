@@ -1238,3 +1238,102 @@ export async function getAccounts(clusterName: string): Promise<AccountInfo[]> {
   const data = await request<{ accounts: AccountInfo[] }>(query, { clusterName });
   return data.accounts;
 }
+
+// ---- Participation spaces ----
+// Confirmed with cluster-notebook 2026-11-27 (#66). `Date` is ISO YYYY-MM-DD; SpaceMode is a GraphQL enum.
+
+export type SpaceMode = 'EACH_TIME' | 'RUNNING';
+export interface SpaceKind { key: string; label: string }
+export interface ParticipationRecord { id: string; date: string; count: number; note: string | null; people: PersonSummary[]; createdAt: string; updatedAt: string }
+export interface ParticipationSpace {
+  id: string; name: string; kind: string; mode: SpaceMode; createdAt: string; archivedAt: string | null;
+  recordCount: number; total: number; latestRecord: ParticipationRecord | null;
+}
+export interface SpacePeople { recordCount: number; people: { individual: PersonSummary; records: number }[] }
+export type SpaceDetail = ParticipationSpace & { records: ParticipationRecord[]; people: SpacePeople };
+
+const SPACE_RECORD_SELECTION = `id date count note people { ${PERSON_SUMMARY_SELECTION} } createdAt updatedAt`;
+const SPACE_SELECTION = `id name kind mode createdAt archivedAt recordCount total latestRecord { ${SPACE_RECORD_SELECTION} }`;
+
+export async function getSpaceKinds(): Promise<SpaceKind[]> {
+  const data = await request<{ spaceKinds: SpaceKind[] }>(`query GetSpaceKinds { spaceKinds { key label } }`, {});
+  return data.spaceKinds;
+}
+
+// null: unknown nucleus.
+export async function getParticipationSpaces(nucleusName: string, includeArchived = false): Promise<{ nucleusId: string; spaces: ParticipationSpace[] } | null> {
+  const query = `
+    query GetParticipationSpaces($name: String!, $includeArchived: Boolean) {
+      nucleus(name: $name) { id participationSpaces(includeArchived: $includeArchived) { ${SPACE_SELECTION} } }
+    }
+  `;
+  const data = await request<{ nucleus: { id: string; participationSpaces: ParticipationSpace[] } | null }>(query, { name: nucleusName, includeArchived });
+  return data.nucleus ? { nucleusId: data.nucleus.id, spaces: data.nucleus.participationSpaces } : null;
+}
+
+// There is no single-space query, so this asks for every space (archived too, so an archived one can still be
+// opened) with its records and people, then picks by id. Resolving records for every space is acceptable at
+// tens of spaces per nucleus. null when the id is absent.
+export async function getParticipationSpace(nucleusName: string, spaceId: string, since: string, limit = 20, offset = 0): Promise<SpaceDetail | null> {
+  const query = `
+    query GetParticipationSpace($name: String!, $since: Date!, $limit: Int, $offset: Int) {
+      nucleus(name: $name) {
+        participationSpaces(includeArchived: true) {
+          ${SPACE_SELECTION}
+          records(limit: $limit, offset: $offset) { ${SPACE_RECORD_SELECTION} }
+          people(since: $since) { recordCount people { individual { ${PERSON_SUMMARY_SELECTION} } records } }
+        }
+      }
+    }
+  `;
+  const data = await request<{ nucleus: { participationSpaces: SpaceDetail[] } | null }>(query, { name: nucleusName, since, limit, offset });
+  return data.nucleus?.participationSpaces.find(s => s.id === spaceId) ?? null;
+}
+
+export async function createParticipationSpace(nucleusId: string, name: string, kind: string, mode: SpaceMode): Promise<ParticipationSpace> {
+  const query = `
+    mutation CreateParticipationSpace($nucleusId: String!, $name: String!, $kind: String!, $mode: SpaceMode!) {
+      createParticipationSpace(nucleusId: $nucleusId, name: $name, kind: $kind, mode: $mode) { ${SPACE_SELECTION} }
+    }
+  `;
+  const data = await request<{ createParticipationSpace: ParticipationSpace }>(query, { nucleusId, name, kind, mode });
+  return data.createParticipationSpace;
+}
+
+export async function updateParticipationSpace(id: string, patch: { name?: string; kind?: string; archived?: boolean }): Promise<ParticipationSpace> {
+  const query = `
+    mutation UpdateParticipationSpace($id: String!, $name: String, $kind: String, $archived: Boolean) {
+      updateParticipationSpace(id: $id, name: $name, kind: $kind, archived: $archived) { ${SPACE_SELECTION} }
+    }
+  `;
+  // Only keys present in the patch are sent, so unspecified fields stay as they are.
+  const data = await request<{ updateParticipationSpace: ParticipationSpace }>(query, { id, ...patch });
+  return data.updateParticipationSpace;
+}
+
+export async function createParticipationRecord(spaceId: string, input: { date: string; count: number; note?: string | null; personIds?: string[] }): Promise<ParticipationRecord> {
+  const query = `
+    mutation CreateParticipationRecord($spaceId: String!, $date: Date!, $count: Int!, $note: String, $personIds: [String!]) {
+      createParticipationRecord(spaceId: $spaceId, date: $date, count: $count, note: $note, personIds: $personIds) { ${SPACE_RECORD_SELECTION} }
+    }
+  `;
+  const data = await request<{ createParticipationRecord: ParticipationRecord }>(query, { spaceId, ...input });
+  return data.createParticipationRecord;
+}
+
+export async function updateParticipationRecord(id: string, patch: { date?: string; count?: number; note?: string | null; personIds?: string[] }): Promise<ParticipationRecord> {
+  const query = `
+    mutation UpdateParticipationRecord($id: String!, $date: Date, $count: Int, $note: String, $personIds: [String!]) {
+      updateParticipationRecord(id: $id, date: $date, count: $count, note: $note, personIds: $personIds) { ${SPACE_RECORD_SELECTION} }
+    }
+  `;
+  // Only given fields change; `note: null` clears the note and `personIds` replaces the list.
+  const data = await request<{ updateParticipationRecord: ParticipationRecord }>(query, { id, ...patch });
+  return data.updateParticipationRecord;
+}
+
+export async function deleteParticipationRecord(id: string): Promise<boolean> {
+  const data = await request<{ deleteParticipationRecord: boolean }>(
+    `mutation DeleteParticipationRecord($id: String!) { deleteParticipationRecord(id: $id) }`, { id });
+  return data.deleteParticipationRecord;
+}
