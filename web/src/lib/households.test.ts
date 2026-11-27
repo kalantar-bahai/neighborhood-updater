@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Household, HouseholdMember, NucleusPerson } from './clusterNotebook';
-import { familyEntries, familyTitle, filterFamilies, hiddenText, householdMove, sizeText, sortFamilies, srpBadge, canRemoveMember, addCandidates, startCandidates, sortCandidates, moveConfirmText, inFamilyText, type Candidate, type FamilyEntry } from './households';
+import { familyEntries, familyTitle, filterFamilies, hiddenText, householdMove, sizeText, sortFamilies, srpBadge, canRemoveMember, addCandidates, startCandidates, sortCandidates, moveConfirmText, inFamilyText, matchesCandidate, type Candidate, type FamilyEntry } from './households';
 
 const mem = (id: string, firstName: string, familyName: string): HouseholdMember => ({
   id, firstName, familyName, middleNames: '', nickname: '', inSrp: false,
@@ -176,5 +176,52 @@ describe('moveConfirmText and inFamilyText', () => {
   it('avoids "the Household" for a family with no name', () => {
     expect(moveConfirmText('Sam Test', 'Household')).toBe('Move Sam Test from their current family?');
     expect(inFamilyText('Household')).toBe('in another family');
+  });
+});
+
+describe('edge cases', () => {
+  it('turns a whitespace address into null on both entry kinds', () => {
+    const h = { ...hh('hw', [mem('a', 'Ada', 'Okoro')]), address: '   ' };
+    const p = { ...person(mem('s', 'Sam', 'Test'), null), address: '  ' } as NucleusPerson;
+    const out = familyEntries([h], [p]);
+    expect(out.map((e) => e.address)).toEqual([null, null]);
+  });
+  it('orders letter-suffixed and ranged numbers by their first integer', () => {
+    const e = (key: string, address: string): FamilyEntry => ({
+      key, title: key, address, size: 1, members: [], hidden: 0, householdId: null, srpState: null, familyName: key, firstName: '',
+    });
+    const out = sortFamilies([e('d', '14 Oak St'), e('b', '12B Oak St'), e('c', '12-14 Oak St'), e('a', '10 Oak St')], 'address');
+    expect(out.map((x) => x.key)).toEqual(['a', 'b', 'c', 'd']);
+  });
+  it('lists a hidden person inside their household entry', () => {
+    const m = mem('a', 'Ada', 'Okoro');
+    const h = hh('hh', [m, mem('b', 'Bola', 'Okoro')]);
+    const out = familyEntries([h], [person(m, h, true)]);
+    expect(out).toHaveLength(1);
+    expect(out[0].members.map((x) => x.id)).toEqual(['a', 'b']);
+  });
+  it('does not match a search on names only among unreadable members', () => {
+    const entries = familyEntries([hh('hu', [mem('a', 'Ada', 'Okoro')], 3)], []);
+    expect(filterFamilies(entries, 'Hidden')).toEqual([]);
+  });
+  it('titles a size-1 household with an unreadable contact "Household"', () => {
+    expect(familyTitle(hh('hx', [], 1, null))).toBe('Household');
+  });
+  it('candidates handle a size-1 household and hidden members', () => {
+    const entries = familyEntries([lind, hh('hq', [mem('a', 'Ada', 'Okoro')], 4)], []);
+    expect(addCandidates(entries, 'none').map((c) => c.id)).toEqual(['c', 'a']);
+    expect(addCandidates(entries, 'h2').map((c) => c.id)).toEqual(['a']);
+    expect(startCandidates(entries, 'none')).toEqual([]);
+  });
+});
+
+describe('matchesCandidate', () => {
+  const c: Candidate = { id: '1', name: 'Sam Test', familyTitle: null, fromHouseholdId: null, familyName: 'Test', firstName: 'Sam', address: '9 Elm St' };
+  it('matches name, address, and blank', () => {
+    expect(matchesCandidate(c, ' SAM ')).toBe(true);
+    expect(matchesCandidate(c, 'elm')).toBe(true);
+    expect(matchesCandidate(c, '  ')).toBe(true);
+    expect(matchesCandidate(c, 'zzz')).toBe(false);
+    expect(matchesCandidate({ ...c, address: null }, 'elm')).toBe(false);
   });
 });

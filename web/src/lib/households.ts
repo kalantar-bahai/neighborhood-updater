@@ -32,7 +32,7 @@ export function familyEntries(households: Household[], people: NucleusPerson[]):
     householdId: h.id,
     srpState: h.srpState,
     title: familyTitle(h),
-    address: h.address,
+    address: h.address?.trim() || null,
     size: h.size,
     members: h.members.map((m) => toMember(m, m.id === h.contact?.id)),
     hidden: h.size - h.members.length,
@@ -42,7 +42,7 @@ export function familyEntries(households: Household[], people: NucleusPerson[]):
   for (const p of people) {
     if (p.hidden || p.individual.household) continue;
     const m = toMember(p.individual, false);
-    entries.push({ key: `person:${p.individual.id}`, title: m.name, address: p.address ?? null, size: 1, members: [m], hidden: 0, householdId: null, srpState: null,
+    entries.push({ key: `person:${p.individual.id}`, title: m.name, address: p.address?.trim() || null, size: 1, members: [m], hidden: 0, householdId: null, srpState: null,
       familyName: p.individual.familyName ?? '', firstName: p.individual.firstName ?? '',
     });
   }
@@ -57,20 +57,20 @@ const byName = (a: FamilyEntry, b: FamilyEntry) =>
 function addressKey(address: string | null): { street: string; num: number } | null {
   const text = address?.trim();
   if (!text) return null;
-  const m = /^\s*(\d+)\s+(.*)$/.exec(text);
+  const m = /^\s*(\d+)[A-Za-z]?(?:\s*-\s*\d+[A-Za-z]?)?\s+(.*)$/.exec(text);
   return m ? { street: m[2].toLowerCase(), num: Number(m[1]) } : { street: text.toLowerCase(), num: 0 };
 }
 
 type Sortable = { address: string | null; familyName: string; firstName: string };
 
-// Shared by entries and candidates; `byName` is the by-name comparator (with its own tiebreaks).
-function sortBy<T extends Sortable>(items: T[], by: FamilySort, byName: (a: T, b: T) => number): T[] {
-  if (by === 'name') return [...items].sort(byName);
+// Shared by entries and candidates; `compareByName` is the by-name comparator (with its own tiebreaks).
+function sortBy<T extends Sortable>(items: T[], by: FamilySort, compareByName: (a: T, b: T) => number): T[] {
+  if (by === 'name') return [...items].sort(compareByName);
   return [...items].sort((a, b) => {
     const ka = addressKey(a.address);
     const kb = addressKey(b.address);
-    if (!ka || !kb) return ka ? -1 : kb ? 1 : byName(a, b);
-    return ka.street.localeCompare(kb.street) || ka.num - kb.num || byName(a, b);
+    if (!ka || !kb) return ka ? -1 : kb ? 1 : compareByName(a, b);
+    return cmp(ka.street, kb.street) || ka.num - kb.num || compareByName(a, b);
   });
 }
 
@@ -123,6 +123,12 @@ export type Candidate = {
 
 const byCandidateName = (a: Candidate, b: Candidate) =>
   cmp(a.familyName, b.familyName) || cmp(a.firstName, b.firstName) || cmp(a.name, b.name);
+
+export function matchesCandidate(c: Candidate, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return c.name.toLowerCase().includes(q) || (c.address?.toLowerCase().includes(q) ?? false);
+}
 
 export function sortCandidates(candidates: Candidate[], by: FamilySort): Candidate[] {
   return sortBy(candidates, by, byCandidateName);
