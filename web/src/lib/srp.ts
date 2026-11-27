@@ -126,7 +126,7 @@ export function pendingIdentityLocks(
   return { location: true, type: action === 'create' };
 }
 
-type CreateIdentity = { nucleus: string; cluster: string; localityId?: string; srpLocality?: string; nucleusType?: string };
+type CreateIdentity = { nucleus: string; cluster: string; localityId?: string; srpLocality?: string; nucleusType?: string; parentNucleus?: string };
 
 // Without SRP the nucleus is created, then given its Locality and typed Neighborhood in one updateNucleus, which
 // leaves it at its own unlinked Setting there. The Locality goes by id: confirmed with cluster-notebook 2026-11-26,
@@ -138,6 +138,9 @@ export function createPayload(input: {
   locality: string;
   localityId: string;
   createInSrp: boolean;
+  // A child's parent, set in that same updateNucleus (owner, 2026-11-27). There is no create-with-parent yet, so if
+  // the update fails the nucleus exists without a parent.
+  parent?: string;
 }): { identity: CreateIdentity } {
   const identity: CreateIdentity = {
     nucleus: input.name.trim(),
@@ -150,6 +153,7 @@ export function createPayload(input: {
       identity.nucleusType = 'Neighborhood';
     }
   }
+  if (input.parent) identity.parentNucleus = input.parent;
   return { identity };
 }
 
