@@ -668,13 +668,14 @@ export { individualDisplayName } from './personName';
 // Everyone placed in the cluster containing nucleusName (needs WRITE on the nucleus; a reader
 // gets []), ordered by family then first name -- confirmed with cluster-notebook 2026-11-18. Never
 // notebook-wide. `search` is optional token matching across name fields; `limit` caps the result.
-export async function searchIndividuals(nucleusName: string, search?: string, limit?: number): Promise<PersonSummary[]> {
+// Each result carries their household (null when none) so a move in can warn who comes along.
+export async function searchIndividuals(nucleusName: string, search?: string, limit?: number): Promise<(PersonSummary & { household?: Household | null })[]> {
   const query = `
     query SearchIndividuals($nucleusName: String!, $search: String, $limit: Int) {
-      individuals(nucleusName: $nucleusName, search: $search, limit: $limit) { ${PERSON_SUMMARY_SELECTION} }
+      individuals(nucleusName: $nucleusName, search: $search, limit: $limit) { ${PERSON_SUMMARY_SELECTION} household { ${HOUSEHOLD_FIELDS} } }
     }
   `;
-  const data = await request<{ individuals: PersonSummary[] }>(query, { nucleusName, search: search ?? null, limit: limit ?? null });
+  const data = await request<{ individuals: (PersonSummary & { household?: Household | null })[] }>(query, { nucleusName, search: search ?? null, limit: limit ?? null });
   return data.individuals;
 }
 

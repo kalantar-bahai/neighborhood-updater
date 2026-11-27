@@ -731,8 +731,11 @@ describe('searchIndividuals', () => {
     await searchIndividuals('Alpha');
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
-    const selection = (body.query as string).match(/individuals\([^)]*\)\s*\{([\s\S]*)\}\s*\}/)![1].replace(/\{[^}]*\}/g, '').trim().split(/\s+/).sort();
+    // Drop the household sub-selection first (it nests), then the one-level place selections.
+    const selection = (body.query as string).match(/individuals\([^)]*\)\s*\{([\s\S]*)\}\s*\}/)![1]
+      .replace(/household \{[^{}]*(\{[^{}]*\}[^{}]*)*\}/, '').replace(/\{[^}]*\}/g, '').trim().split(/\s+/).sort();
     expect(selection).toEqual(['familyName', 'firstName', 'id', 'inSrp', 'middleNames', 'nickname', 'place', 'placeSync']);
+    expect(body.query).toMatch(/household \{ id size address contact \{[^}]*\} members \{[^}]*\} \}/);
     expect(body.query).toContain('place { id name type locality cluster localityId homeNucleus }');
     expect(body.query).toContain('placeSync { status code }');
   });

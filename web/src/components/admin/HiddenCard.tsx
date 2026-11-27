@@ -5,6 +5,8 @@ import type { AdminPlace, HiddenPerson } from '@/lib/clusterNotebook';
 import { moveTargets, placeTree } from '@/lib/admin';
 import { hideNote } from '@/lib/people';
 import { individualDisplayName } from '@/lib/personName';
+import { householdMove } from '@/lib/households';
+import { HouseholdMoveNote } from '../HouseholdMoveNote';
 
 // The inline "Move…" form for one row: pick a locality or setting, then Move.
 type MoveForm = { key: string; places: AdminPlace[] | null; filter: string; place: AdminPlace | null };
@@ -127,6 +129,11 @@ export default function HiddenCard({ cluster }: { cluster: string }) {
     setBusyFor(key, null);
   };
 
+  const moveLabel = (h: HiddenPerson) => {
+    const hm = householdMove(h.individual.household, h.individual.id);
+    return hm ? `Move all ${hm.total} people` : 'Move';
+  };
+
   const moveView = (h: HiddenPerson, m: MoveForm, saving: boolean) => (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: 8, marginTop: 6, display: 'flex', flexDirection: 'column', gap: 8 }}>
       {!m.place ? (
@@ -151,10 +158,14 @@ export default function HiddenCard({ cluster }: { cluster: string }) {
             style={{ ...BTN, padding: '1px 6px', fontSize: 12 }}>Change</button>
         </div>
       )}
+      {(() => {
+        const hm = householdMove(h.individual.household, h.individual.id);
+        return hm && <HouseholdMoveNote move={hm} name={individualDisplayName(h.individual)} />;
+      })()}
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="button" disabled={!m.place || saving} onClick={() => doMove(h)}
           style={{ ...BTN, background: '#3182ce', color: 'white', border: '1px solid #3182ce', opacity: !m.place || saving ? 0.5 : 1 }}>
-          {saving ? 'Moving…' : 'Move'}
+          {saving ? 'Moving…' : moveLabel(h)}
         </button>
         <button type="button" disabled={saving} onClick={closeMove} style={BTN}>Cancel</button>
       </div>

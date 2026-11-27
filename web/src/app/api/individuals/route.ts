@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
         id: ind.id, name: individualDisplayName(ind), place: placePath(ind.place),
         // For a move in: their current place's home nucleus, to ask about their roles there.
         homeNucleus: ind.place?.homeNucleus ?? null, placeId: ind.place?.id ?? null,
+        household: ind.household ?? null,
       })),
       more,
     });

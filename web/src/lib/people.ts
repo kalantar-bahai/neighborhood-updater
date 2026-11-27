@@ -1,7 +1,7 @@
 // People card (phase 1): pure decisions, tested in people.test.ts.
 // Spec: docs/superpowers/specs/2026-11-18-people-card-design.md
 // Age, devotional host, details (phase A) and activities (phase B): docs/superpowers/specs/2026-11-20-people-card-details-design.md.
-import type { AgeCategory, PersonHide, DevotionalHostRole, MoveContext, Participation, MoveResult, NucleusPerson, PermissionSet, PersonDetails, PlaceSummary, PlaceSync } from './clusterNotebook';
+import type { AgeCategory, PersonHide, DevotionalHostRole, MoveContext, Participation, MoveResult, NucleusPerson, Household, PermissionSet, PersonDetails, PlaceSummary, PlaceSync } from './clusterNotebook';
 import { individualDisplayName } from './personName';
 import { INFORMAL_WORKER_TYPES } from './config';
 
@@ -12,6 +12,8 @@ export type PersonRow = {
   ageCategory: AgeCategory | null; devotionalHost: DevotionalHostRole | null;
   participates: boolean; facilitates: boolean; participation: Participation[];
   hidden: boolean; hide: PersonHide | null;
+  // Who else moves with them (null: no household).
+  household?: Household | null;
 };
 export type PeopleSort = 'first' | 'family';
 
@@ -141,7 +143,7 @@ export function toPersonRow(p: NucleusPerson): PersonRow {
     place: ind.place, placeSync: ind.placeSync, inSrp: ind.inSrp,
     ageCategory: p.ageCategory, devotionalHost: p.devotionalHost,
     participates: p.participates, facilitates: p.facilitates, participation: p.participation,
-    hidden: p.hidden, hide: p.hide,
+    hidden: p.hidden, hide: p.hide, household: ind.household,
   };
 }
 
