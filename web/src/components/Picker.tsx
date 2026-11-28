@@ -9,6 +9,7 @@ import AddHere from './AddHere';
 import type { CreatePreset } from '@/lib/createPreset';
 import { childTree, rootOf, type ChildNode } from '@/lib/children';
 import PageHeader, { HeaderButton } from './PageHeader';
+import { searchNuclei } from '@/lib/nucleusSearch';
 
 interface Props {
   rows: NucleusSummary[];
@@ -198,6 +199,10 @@ export default function Picker({ rows, email, onSelect, openState, onAdd, canCre
   // totals the rainbow diagram needs (the card itself only shows nuclei/act/
   // part/FoF, not the nine fields, so this is computed on click, not upfront).
   const [popup, setPopup] = useState<{ title: string; rows: NucleusSummary[] } | null>(null);
+  // Search by part of a name (owner, 2026-11-28). While it has text, a flat list of matches replaces the groups.
+  const [query, setQuery] = useState('');
+  const searching = query.trim() !== '';
+  const matches = searchNuclei(rows, query);
 
   function openRollupPopup(title: string, rowsIn: NucleusSummary[]) {
     setPopup({ title, rows: rowsIn });
@@ -321,7 +326,21 @@ export default function Picker({ rows, email, onSelect, openState, onAdd, canCre
         {onAdmin && <HeaderButton onClick={onAdmin}>Admin</HeaderButton>}
       </PageHeader>
 
-      {groupingOrder.map(gName => {
+      <div style={{ padding: '8px 0' }}>
+        <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search nuclei…" aria-label="Search nuclei"
+          style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 16 }} />
+      </div>
+
+      {searching && (
+        <div>
+          {matches.map(r => <NucleusListRow key={r.nucleus} r={r} isPocket={false} onSelect={onSelect} />)}
+          <div style={{ fontSize: 12, color: '#718096', padding: '6px 4px' }}>
+            {matches.length === 0 ? 'No nucleus matches.' : matches.length === 1 ? '1 nucleus' : `${matches.length} nuclei`}
+          </div>
+        </div>
+      )}
+
+      {!searching && groupingOrder.map(gName => {
         const gEntry = groupingMap[gName];
         return (
           <div key={gName}>
