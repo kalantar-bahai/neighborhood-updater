@@ -7,7 +7,9 @@ import {
   getNucleusHouseholds,
   getNucleusPeople,
   removeHouseholdMember,
+  retryHouseholdSrp,
   setHouseholdContact,
+  takeSrpHousehold,
 } from '@/lib/clusterNotebook';
 import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
 import { familyEntries } from '@/lib/households';
@@ -35,7 +37,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// Household edits from the Families card: create, add a member, remove a member, set the contact.
+// Household edits from the Families card: create, add a member, remove a member, set the contact, send to SRP again, take SRP's version.
 const FORBIDDEN_TEXT = "You can't change this family.";
 
 export async function POST(req: NextRequest) {
@@ -75,6 +77,12 @@ export async function POST(req: NextRequest) {
         break;
       case 'contact':
         household = await setHouseholdContact(parsed.householdId, parsed.individualId);
+        break;
+      case 'retry':
+        household = await retryHouseholdSrp(parsed.householdId);
+        break;
+      case 'take':
+        household = await takeSrpHousehold(parsed.householdId);
         break;
     }
     return NextResponse.json({ household });

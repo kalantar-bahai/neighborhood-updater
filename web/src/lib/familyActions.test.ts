@@ -18,6 +18,12 @@ describe('parseAction', () => {
     expect(parseAction({ action: 'contact', householdId: 'h', individualId: 'i' }))
       .toEqual({ action: 'contact', householdId: 'h', individualId: 'i' });
   });
+  test('accepts retry and take, and rejects an empty householdId', () => {
+    expect(parseAction({ action: 'retry', householdId: 'h' })).toEqual({ action: 'retry', householdId: 'h' });
+    expect(parseAction({ action: 'take', householdId: 'h' })).toEqual({ action: 'take', householdId: 'h' });
+    expect(typeof parseAction({ action: 'retry', householdId: '' })).toBe('string');
+    expect(typeof parseAction({ action: 'take' })).toBe('string');
+  });
   test('rejects an unknown action', () => {
     expect(parseAction({ action: 'explode' })).toBe('Unknown action');
     expect(parseAction({})).toBe('Unknown action');

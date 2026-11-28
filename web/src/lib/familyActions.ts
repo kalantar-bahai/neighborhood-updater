@@ -3,7 +3,9 @@ export type FamilyAction =
   | { action: 'create'; contactId: string; memberIds: string[] }
   | { action: 'add'; householdId: string; individualId: string; fromHouseholdId?: string }
   | { action: 'remove'; householdId: string; individualId: string }
-  | { action: 'contact'; householdId: string; individualId: string };
+  | { action: 'contact'; householdId: string; individualId: string }
+  | { action: 'retry'; householdId: string }
+  | { action: 'take'; householdId: string };
 
 export const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
 
@@ -31,6 +33,12 @@ export function parseAction(input: unknown): FamilyAction | string {
       const { householdId, individualId } = body;
       if (!isId(householdId) || !isId(individualId)) return 'Missing householdId or individualId';
       return { action: body.action, householdId, individualId };
+    }
+    case 'retry':
+    case 'take': {
+      const { householdId } = body;
+      if (!isId(householdId)) return 'Missing householdId';
+      return { action: body.action, householdId };
     }
     default:
       return 'Unknown action';
