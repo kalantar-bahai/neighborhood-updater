@@ -2,6 +2,7 @@ import { describe, test, expect } from 'vitest';
 import {
   SPACE_SUGGESTIONS, availableSuggestions, parseCount, countAfterNaming, namedLabel, lastTimeChoices,
   isoDate, windowStart, shortDate, spaceRowSummary, canRecord, parseRecordBody, parseRecordPatch, parseSpaceBody, parseSpacePatch, recordPatch, countValid,
+  namedPeople, recordFormChanged,
 } from './participation';
 import type { ParticipationRecord, ParticipationSpace, PersonSummary } from './clusterNotebook';
 
@@ -174,5 +175,28 @@ describe('countValid', () => {
     expect(countValid(3, 3)).toBe(true);
     expect(countValid(0, 0)).toBe(true);
     expect(countValid(5, 3)).toBe(true);
+  });
+});
+
+describe('namedPeople', () => {
+  test('joins display names with commas; empty for nobody', () => {
+    const p = (firstName: string, familyName: string) => ({ id: firstName, firstName, familyName }) as unknown as PersonSummary;
+    expect(namedPeople([p('Ana', 'Example'), p('Ben', 'Sample')])).toBe('Ana Example, Ben Sample');
+    expect(namedPeople([])).toBe('');
+  });
+});
+
+describe('recordFormChanged', () => {
+  const initial = { date: '2026-11-20', countText: '', personIds: ['p1'], note: '' };
+  test('unchanged, including the same people in another order', () => {
+    expect(recordFormChanged(initial, { ...initial })).toBe(false);
+    expect(recordFormChanged({ ...initial, personIds: ['p1', 'p2'] }, { ...initial, personIds: ['p2', 'p1'] })).toBe(false);
+  });
+  test('any field typed or changed', () => {
+    expect(recordFormChanged(initial, { ...initial, countText: '5' })).toBe(true);
+    expect(recordFormChanged(initial, { ...initial, date: '2026-11-21' })).toBe(true);
+    expect(recordFormChanged(initial, { ...initial, note: 'x' })).toBe(true);
+    expect(recordFormChanged(initial, { ...initial, personIds: [] })).toBe(true);
+    expect(recordFormChanged(initial, { ...initial, personIds: ['p2'] })).toBe(true);
   });
 });

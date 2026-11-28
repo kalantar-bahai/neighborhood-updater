@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { ParticipationRecord, SpaceDetail, SpaceKind } from '@/lib/clusterNotebook';
 import { individualDisplayName } from '@/lib/personName';
-import { canRecord, namedLabel, shortDate } from '@/lib/participation';
+import { canRecord, namedLabel, namedPeople, shortDate } from '@/lib/participation';
 import RecordModal from './RecordModal';
 import SpaceFormModal from './SpaceFormModal';
 
@@ -30,6 +30,8 @@ export default function SpaceView({ nucleus, spaceId, canWrite, onBack }: Props)
   const [recording, setRecording] = useState(false);
   const [editing, setEditing] = useState<ParticipationRecord | null>(null);
   const [editingSpace, setEditingSpace] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreError, setRestoreError] = useState('');
 
   const url = `/api/participation/spaces?nucleus=${encodeURIComponent(nucleus)}&space=${encodeURIComponent(spaceId)}`;
 
@@ -74,6 +76,22 @@ export default function SpaceView({ nucleus, spaceId, canWrite, onBack }: Props)
       setMoreError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoadingMore(false);
+    }
+  }
+
+  // One tap: un-archive straight away (editing the space stays under "Edit space").
+  async function restore() {
+    setRestoring(true);
+    setRestoreError('');
+    try {
+      const res = await fetch('/api/participation/spaces', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nucleus, id: spaceId, archived: false }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not restore this space.');
+      await load();
+    } catch (e: unknown) {
+      setRestoreError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRestoring(false);
     }
   }
 
@@ -142,7 +160,8 @@ export default function SpaceView({ nucleus, spaceId, canWrite, onBack }: Props)
           {space.archivedAt && (
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 14, color: '#4a5568', marginBottom: 8 }}>This space is archived.</div>
-              {canWrite && <button onClick={() => setEditingSpace(true)} style={BTN}>Restore space</button>}
+              {canWrite && <button onClick={() => void restore()} disabled={restoring} style={BTN}>{restoring ? 'Restoring…' : 'Restore space'}</button>}
+              {restoreError && <div style={{ color: '#e53e3e', fontSize: 13, marginTop: 8 }}>{restoreError}</div>}
             </div>
           )}
           {running && (
@@ -187,6 +206,7 @@ export default function SpaceView({ nucleus, spaceId, canWrite, onBack }: Props)
                     <span style={{ fontSize: 14, fontWeight: 700, color: '#2d3748' }}>{r.count}</span>
                   </span>
                   {named && <span style={{ display: 'block', fontSize: 12, color: '#718096' }}>{named}</span>}
+                  {r.people.length > 0 && <span style={{ display: 'block', fontSize: 12, color: '#718096' }}>{namedPeople(r.people)}</span>}
                   {r.note && <span style={{ display: 'block', fontSize: 12, color: '#4a5568' }}>{r.note}</span>}
                 </>
               );

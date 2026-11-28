@@ -1,4 +1,5 @@
-import type { ParticipationRecord, ParticipationSpace, PersonSummary, SpaceKind, SpaceMode } from './clusterNotebook';
+import type { ParticipationRecord, ParticipationSpace, PersonName, PersonSummary, SpaceKind, SpaceMode } from './clusterNotebook';
+import { individualDisplayName } from './personName';
 
 // Pure helpers for the Participation card and its routes.
 
@@ -169,4 +170,19 @@ export function recordPatch(original: RecordFields, edited: RecordFields): Parti
 // A count can be saved only when it is a whole number >= 0 and covers everyone named.
 export function countValid(count: number | null, named: number): boolean {
   return count !== null && Number.isInteger(count) && count >= 0 && count >= named;
+}
+
+// Who came, for a record row: everyone can see the names, not only those who may open the editor.
+export function namedPeople(people: PersonName[]): string {
+  return people.map(individualDisplayName).join(', ');
+}
+
+// The record form as typed. A backdrop tap must not throw away anything typed, so it closes the form only while
+// this still equals what the form opened with (Cancel and × always close).
+export type RecordForm = { date: string; countText: string; personIds: string[]; note: string };
+
+export function recordFormChanged(initial: RecordForm, current: RecordForm): boolean {
+  if (initial.date !== current.date || initial.countText !== current.countText || initial.note !== current.note) return true;
+  const before = new Set(initial.personIds);
+  return before.size !== new Set(current.personIds).size || current.personIds.some(id => !before.has(id));
 }

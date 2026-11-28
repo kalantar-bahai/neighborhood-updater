@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ParticipationRecord, ParticipationSpace } from '@/lib/clusterNotebook';
 import { individualDisplayName } from '@/lib/personName';
-import { countAfterNaming, countValid, isoDate, lastTimeChoices, namedLabel, parseCount, recordPatch } from '@/lib/participation';
+import { countAfterNaming, countValid, isoDate, lastTimeChoices, namedLabel, parseCount, recordFormChanged, recordPatch, type RecordForm } from '@/lib/participation';
 import PersonSearch from './PersonSearch';
 
 interface Props {
@@ -22,10 +22,17 @@ const INPUT: React.CSSProperties = { width: '100%', minHeight: 44, padding: '6px
 const CHIP: React.CSSProperties = { minHeight: 44, padding: '4px 14px', borderRadius: 22, fontSize: 13, cursor: 'pointer', border: '1px solid #bee3f8', background: '#ebf8ff', color: '#2a4365' };
 
 export default function RecordModal({ nucleus, space, record, onClose, onSaved }: Props) {
-  const [date, setDate] = useState(record?.date ?? isoDate(new Date()));
-  const [countText, setCountText] = useState(record ? String(record.count) : '');
+  // What the form opened with, so a backdrop tap can tell whether anything has been typed.
+  const [initial] = useState<RecordForm>(() => ({
+    date: record?.date ?? isoDate(new Date()),
+    countText: record ? String(record.count) : '',
+    personIds: (record?.people ?? []).map(p => p.id),
+    note: record?.note ?? '',
+  }));
+  const [date, setDate] = useState(initial.date);
+  const [countText, setCountText] = useState(initial.countText);
   const [picked, setPicked] = useState<Picked[]>(() => (record?.people ?? []).map(p => ({ id: p.id, name: individualDisplayName(p) })));
-  const [note, setNote] = useState(record?.note ?? '');
+  const [note, setNote] = useState(initial.note);
   const [searching, setSearching] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -71,9 +78,14 @@ export default function RecordModal({ nucleus, space, record, onClose, onSaved }
     void send('PATCH', { id: record.id, ...patch });
   }
 
+  // A stray tap outside the form closes it only while nothing has been typed; Cancel and × always close.
+  function backdropClose() {
+    if (!recordFormChanged(initial, { date, countText, personIds: pickedIds, note })) onClose();
+  }
+
   const modal = (
     <div
-      onClick={onClose}
+      onClick={backdropClose}
       onKeyDown={e => { if (e.key === 'Escape') onClose(); }}
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
     >
