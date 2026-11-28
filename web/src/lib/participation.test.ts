@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import {
   SPACE_SUGGESTIONS, availableSuggestions, parseCount, countAfterNaming, namedLabel, lastTimeChoices,
-  isoDate, windowStart, shortDate, spaceRowSummary, canRecord, parseRecordBody, parseRecordPatch, parseSpaceBody, parseSpacePatch,
+  isoDate, windowStart, shortDate, spaceRowSummary, canRecord, parseRecordBody, parseRecordPatch, parseSpaceBody, parseSpacePatch, recordPatch,
 } from './participation';
 import type { ParticipationRecord, ParticipationSpace, PersonSummary } from './clusterNotebook';
 
@@ -143,5 +143,26 @@ describe('parseSpacePatch', () => {
     expect(parseSpacePatch({ id: 's1', kind: '' }).ok).toBe(false);
     expect(parseSpacePatch({ id: 's1', archived: 'yes' }).ok).toBe(false);
     expect(parseSpacePatch({ name: 'x' }).ok).toBe(false);
+  });
+});
+
+describe('recordPatch', () => {
+  const orig = { date: '2026-11-01', count: 5, note: 'Hi' as string | null, personIds: ['a', 'b'] };
+  test('nothing changed gives an empty patch', () => {
+    expect(recordPatch(orig, { ...orig })).toEqual({});
+  });
+  test('personIds compare as sets, ignoring order', () => {
+    expect(recordPatch(orig, { ...orig, personIds: ['b', 'a'] })).toEqual({});
+    expect(recordPatch(orig, { ...orig, personIds: ['a', 'c'] })).toEqual({ personIds: ['a', 'c'] });
+    expect(recordPatch(orig, { ...orig, personIds: [] })).toEqual({ personIds: [] });
+  });
+  test('only the changed fields', () => {
+    expect(recordPatch(orig, { ...orig, count: 6, date: '2026-11-02' })).toEqual({ count: 6, date: '2026-11-02' });
+  });
+  test('a blank note clears it; blank over no note is no change; trimmed text compares trimmed', () => {
+    expect(recordPatch(orig, { ...orig, note: '  ' })).toEqual({ note: null });
+    expect(recordPatch({ ...orig, note: null }, { ...orig, note: '' })).toEqual({});
+    expect(recordPatch(orig, { ...orig, note: ' Hi ' })).toEqual({});
+    expect(recordPatch(orig, { ...orig, note: 'Bye' })).toEqual({ note: 'Bye' });
   });
 });

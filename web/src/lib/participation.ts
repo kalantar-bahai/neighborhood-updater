@@ -149,3 +149,19 @@ export function parseSpacePatch(body: unknown): { ok: true; id: string; patch: S
   if (Object.keys(patch).length === 0) return { ok: false, error: 'Nothing to change' };
   return { ok: true, id: b.id, patch };
 }
+
+export type RecordFields = { date: string; count: number; note: string | null; personIds: string[] };
+
+// Only the fields that differ, so an edit never clobbers what it didn't touch. People compare as a set; a blank
+// note means "no note" (null).
+export function recordPatch(original: RecordFields, edited: RecordFields): Partial<RecordFields> {
+  const patch: Partial<RecordFields> = {};
+  if (edited.date !== original.date) patch.date = edited.date;
+  if (edited.count !== original.count) patch.count = edited.count;
+  const note = edited.note?.trim() || null;
+  if (note !== (original.note?.trim() || null)) patch.note = note;
+  const before = new Set(original.personIds);
+  const same = before.size === new Set(edited.personIds).size && edited.personIds.every(id => before.has(id));
+  if (!same) patch.personIds = edited.personIds;
+  return patch;
+}
