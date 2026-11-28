@@ -101,7 +101,7 @@ export default function RecordModal({ nucleus, space, record, onClose, onSaved }
         </div>
 
         <div className="field" style={{ marginBottom: 12 }}>
-          <label>{running ? 'How many to add' : 'Participants'}</label>
+          <label>{running ? 'How many to add' : '# participants'}</label>
           <input type="text" inputMode="numeric" value={countText} onChange={e => setCountText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') save(); }} style={INPUT} />
           {count !== null && count < picked.length && <div style={{ fontSize: 12, color: '#c53030', marginTop: 4 }}>{picked.length} named, so at least {picked.length}.</div>}
         </div>
