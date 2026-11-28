@@ -36,7 +36,10 @@ const GAP_AFTER = new Set([2, 5]); // ring indexes whose outer edge is a thicker
 // Each label curves along its own band (owner, 2026-11-25: a legend list below took more room than the
 // diagram). The open centre (HOLE) keeps even the innermost arc long enough for its text; the longest
 // label, ring 5's, fills about 80% of its arc.
-const HOLE = 40, STEP = 14, CX = 167, BASE = 167, W = 334, H = 170;
+// Drawn at twice the original scale (owner, 2026-11-27: on a phone the labels looked too big and off centre).
+// A ~10px font let a phone's minimum font size enlarge the labels; at 21 units they sit above any such
+// minimum, and the viewBox still scales the whole drawing to fit.
+const HOLE = 80, STEP = 28, CX = 334, BASE = 334, W = 668, H = 340, FONT = 21;
 
 // A half ring's outer edge, left foot -> over the top -> right foot.
 function arc(r: number): string {
@@ -67,12 +70,13 @@ export default function ConcentricRainbow({ labels, compact }: { labels: Aligned
               role: 'button', tabIndex: 0, 'aria-label': `${l.label}: ${ringValue(l.value, l.named)}. Change the estimate`,
               onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); click(); } },
             } : {})}>
-            <path d={arc(r)} fill={fill} stroke="white" strokeWidth={GAP_AFTER.has(i) ? 4 : 1.5} />
+            <path d={arc(r)} fill={fill} stroke="white" strokeWidth={GAP_AFTER.has(i) ? 8 : 3} />
             {!compact && (
-              <text fontSize={10.5} dominantBaseline="central" fill={i < DARK_TEXT ? '#ffffff' : '#172554'}
+              <text fontSize={FONT} fill={i < DARK_TEXT ? '#ffffff' : '#172554'}
                 aria-hidden={click ? 'true' : undefined}>
                 <textPath href={`#${id}-ring${i}`} startOffset="50%" textAnchor="middle">
-                  <tspan fontWeight={700}>{ringValue(l.value, l.named)}</tspan> {l.label}
+                  {/* dy centres the text on its band; Safari mishandles dominant-baseline on a textPath. */}
+                  <tspan dy="0.35em"><tspan fontWeight={700}>{ringValue(l.value, l.named)}</tspan> {l.label}</tspan>
                 </textPath>
               </text>
             )}
@@ -81,7 +85,7 @@ export default function ConcentricRainbow({ labels, compact }: { labels: Aligned
       })}
       {/* The open centre: white, so it reads as a hole rather than another ring. */}
       <path d={arc(HOLE)} fill="white" pointerEvents="none" />
-      <line x1={0} y1={BASE + 0.5} x2={W} y2={BASE + 0.5} stroke="#cbd5e0" strokeWidth={1} pointerEvents="none" />
+      <line x1={0} y1={BASE + 1} x2={W} y2={BASE + 1} stroke="#cbd5e0" strokeWidth={2} pointerEvents="none" />
     </svg>
   );
   if (compact || !editable) return svg;
