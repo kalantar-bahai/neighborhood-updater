@@ -10,13 +10,18 @@ const hh = (id: string, members: HouseholdMember[], size = members.length, conta
   id, contact: contactIdx === null ? null : members[contactIdx], members, size, address: null, srpState: 'LOCAL_ONLY', srpProblem: null,
 });
 
-const person = (m: HouseholdMember, household: Household | null | undefined, hidden = false): NucleusPerson =>
-  ({ hidden, individual: { ...m, household } }) as unknown as NucleusPerson;
+const person = (m: HouseholdMember, household: Household | null | undefined, hidden = false, isResident = true): NucleusPerson =>
+  ({ hidden, isResident, individual: { ...m, household } }) as unknown as NucleusPerson;
 
 const okoro = hh('h1', [mem('a', 'Ada', 'Okoro'), mem('b', 'Bola', 'Okoro')]);
 const lind = hh('h2', [mem('c', 'Cleo', 'Lind')]);
 
 describe('familyEntries', () => {
+  it('leaves out people who hold a role here but do not live here', () => {
+    const resident = person(mem('r', 'Rae', 'Test'), null);
+    const contactElsewhere = person(mem('c', 'Cy', 'Test'), null, false, false);
+    expect(familyEntries([], [resident, contactElsewhere]).map((f) => f.key)).toEqual(['person:r']);
+  });
   it('merges households and household-less people, sorted by family name', () => {
     const solo = person(mem('d', 'Dara', 'Zed'), null);
     const out = familyEntries([okoro, lind], [solo]);
