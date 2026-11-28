@@ -715,3 +715,33 @@ takeSrpHousehold(householdId: String!): Household   # null when the household di
   - Without `withHousehold` it returns `HOUSEHOLD_MOVES_TOGETHER`, and nobody moves.
   - It is FORBIDDEN unless the caller may move every member.
   - The app always sends `withHousehold: true`.
+
+## Participation spaces, confirmed with cluster-notebook 2026-11-27 (#66)
+
+- **Schema:** `spaceKinds: [SpaceKind!]! { key label }` is cluster-notebook's list and changes over time. The app reads
+  it and does not hard-code it. Current keys: `social_action`, `community_gathering`, `devotional`, `reflection`,
+  `expansion`, `visiting`, `other`.
+- **Reads:** `Nucleus.participationSpaces(includeArchived: Boolean = false)` is ordered by name. Each `ParticipationSpace`
+  has `recordCount`, `total`, `latestRecord`, `records(limit, offset)` and `people(since, until)`. `mode` is `EACH_TIME`
+  or `RUNNING`. `Date` is ISO `YYYY-MM-DD`.
+- **Writes:**
+  - `createParticipationSpace(nucleusId, name, kind, mode)`
+  - `updateParticipationSpace(id, name?, kind?, archived?)`
+  - `createParticipationRecord(spaceId, date, count, note?, personIds?)`
+  - `updateParticipationRecord(id, date?, count?, note?, personIds?)`: only the given fields change. `note: null`
+    clears the note, and `personIds` replaces the list.
+  - `deleteParticipationRecord(id): Boolean!` archives the record. It stops counting.
+- **Permissions:** reads need `canRead` on the nucleus. Every space and record mutation checks `canWrite` on the nucleus
+  that owns the space (for a record, its space's nucleus). Nothing the client sends is used for that check.
+  `createParticipationSpace` checks the `nucleusId` it is passed. The app's routes check the same permissions first, but
+  cluster-notebook enforces them too.
+- **Errors:** `FORBIDDEN`, `NUCLEUS_NOT_FOUND`, `SPACE_NOT_FOUND`, `RECORD_NOT_FOUND`, `UNKNOWN_KIND`, `NAME_TAKEN`,
+  `BAD_INPUT`, `BAD_COUNT`, `NAMED_EXCEED_COUNT`, `OTHER_CLUSTER`, `INDIVIDUAL_NOT_FOUND`, `SPACE_ARCHIVED`. Branch on
+  the code, as with the other routes.
+- **Counts:** a space with no records has a null count, which shows as "—", never 0.
+- **`inSpaces`:** `NucleusPerson.inSpaces: Boolean!` is true for anyone named on a live record of any of the nucleus's
+  spaces, archived spaces included, with or without a role. They can be hidden like anyone else. `namedCounts` is
+  unchanged: it still counts residents only.
+- **SRP:** nothing goes to SRP. Participation is local to cluster-notebook.
+- **App side:** the routes are `/api/participation/spaces` and `/api/participation/records`. The People card's
+  "Participating" filter uses `inSpaces`. The old roster filter is relabelled "In educational activities".
