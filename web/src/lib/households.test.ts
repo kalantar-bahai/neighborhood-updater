@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Household, HouseholdMember, NucleusPerson } from './clusterNotebook';
-import { familyEntries, familyTitle, filterFamilies, hiddenText, householdMove, sizeText, sortFamilies, srpBadge, srpProblemText, canRemoveMember, addCandidates, startCandidates, sortCandidates, moveConfirmText, inFamilyText, matchesCandidate, type Candidate, type FamilyEntry } from './households';
+import { familyEntries, familyTitle, filterFamilies, hiddenText, householdMove, sizeText, sortFamilies, srpBadge, srpProblemText, canRemoveMember, addCandidates, startCandidates, sortCandidates, moveConfirmText, inFamilyText, matchesCandidate, familiesCountLabel, FAMILY_SORTS, type Candidate, type FamilyEntry } from './households';
 
 const mem = (id: string, firstName: string, familyName: string): HouseholdMember => ({
   id, firstName, familyName, middleNames: '', nickname: '', inSrp: false,
@@ -264,5 +264,23 @@ describe('familyEntries srpProblem', () => {
     const out = familyEntries([h], [person(mem('s', 'Sol', 'Zed'), null)]);
     expect(out.find((e) => e.householdId === 'hp')?.srpProblem).toBe('SRP_CONFLICT');
     expect(out.find((e) => e.householdId === null)?.srpProblem).toBeNull();
+  });
+});
+
+describe('families list controls', () => {
+  it('labels the count like the People card', () => {
+    expect(familiesCountLabel(1, 1)).toBe('1 family');
+    expect(familiesCountLabel(4, 4)).toBe('4 families');
+    expect(familiesCountLabel(2, 9)).toBe('2 of 9 families');
+  });
+  it('offers family name then address as sorts', () => {
+    expect(FAMILY_SORTS.map((s) => s.key)).toEqual(['name', 'address']);
+  });
+  it('finds a family by its address as well as by a name', () => {
+    const h = { id: 'h1', size: 1, contact: mem('a', 'Ada', 'Test'), members: [mem('a', 'Ada', 'Test')], address: '3 Bldg O', srpState: 'IN_SRP', srpProblem: null } as unknown as Household;
+    const entries = familyEntries([h], []);
+    expect(filterFamilies(entries, 'bldg o').map((e) => e.key)).toEqual(['h1']);
+    expect(filterFamilies(entries, 'ada').map((e) => e.key)).toEqual(['h1']);
+    expect(filterFamilies(entries, 'zed')).toEqual([]);
   });
 });

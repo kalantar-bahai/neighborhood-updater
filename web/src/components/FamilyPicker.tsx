@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { inFamilyText, matchesCandidate, sortCandidates, type Candidate, type FamilySort } from '@/lib/households';
+import { FAMILY_SORTS, inFamilyText, matchesCandidate, sortCandidates, type Candidate, type FamilySort } from '@/lib/households';
 
 // A bottom sheet for choosing a person to add to, or start, a family. Portaled because cards clip overflow.
 export default function FamilyPicker({ title, note, candidates, onPick, onClose }: {
@@ -24,26 +24,19 @@ export default function FamilyPicker({ title, note, candidates, onPick, onClose 
           <button type="button" aria-label="Close" onClick={onClose} style={{ minWidth: 44, minHeight: 44, background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#4a5568' }}>×</button>
         </div>
         {note && <div style={{ fontSize: 12, color: '#718096', marginBottom: 6 }}>{note}</div>}
-        <input
-          ref={searchRef}
-          type="search"
-          aria-label="Search by name"
-          placeholder="Search by name"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 16 }}
-        />
-        <div role="group" aria-label="Sort by" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-          <span style={{ fontSize: 12, color: '#718096' }}>Sort by</span>
-          {([['name', 'Family name'], ['address', 'Address']] as const).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={sortBy === value}
-              onClick={() => setSortBy(value)}
-              style={{ minHeight: 44, padding: '4px 14px', borderRadius: 22, fontSize: 13, cursor: 'pointer', border: '1px solid #cbd5e0', background: sortBy === value ? '#bee3f8' : 'white', color: sortBy === value ? '#2a4365' : '#4a5568', fontWeight: sortBy === value ? 700 : 400 }}
-            >{label}</button>
-          ))}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <select value={sortBy} onChange={e => setSortBy(e.target.value as FamilySort)} aria-label="Sort people" style={{ width: 'auto', minHeight: 44, fontSize: 16 }}>
+            {FAMILY_SORTS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+          </select>
+          <input
+            ref={searchRef}
+            type="search"
+            aria-label="Search names or addresses"
+            placeholder="Search names or addresses…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            style={{ flex: 1, minWidth: 120, boxSizing: 'border-box', minHeight: 44, padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 16 }}
+          />
         </div>
         <div style={{ overflowY: 'auto', overscrollBehavior: 'contain', marginTop: 8 }}>
           {shown.length === 0 && <div style={{ fontSize: 13, color: '#718096', padding: 8 }}>No one to choose.</div>}
