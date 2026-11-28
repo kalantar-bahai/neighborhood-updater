@@ -574,13 +574,13 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 // The 9-figure diagram (ConcentricRainbow, formerly the staggered 9-ring one) lives in its own file,
 // 2026-10-08, so Picker.tsx can also render a rollup version of it from its own popup.
 
-// The Parent Nucleus options under its search box (owner, 2026-11-28). pointerdown is cancelled so the box
-// keeps focus until the tap lands.
+// The Parent Nucleus options under its search box (owner, 2026-11-28). pointerdown and mousedown are cancelled
+// so the box keeps focus until the tap lands where the browser allows it; the box's blur delay covers the rest.
 function ParentOptions({ choices, query, current, onPick }: { choices: string[]; query: string; current: string; onPick: (name: string) => void }) {
   const { shown, more } = matchParentChoices(choices, query);
   const option = (key: string, text: string, pick: string, muted = false) => (
     <button key={key} type="button" role="option" aria-selected={current === pick}
-      onPointerDown={e => e.preventDefault()} onClick={() => onPick(pick)}
+      onPointerDown={e => e.preventDefault()} onMouseDown={e => e.preventDefault()} onClick={() => onPick(pick)}
       style={{ textAlign: 'left', background: current === pick ? '#ebf8ff' : 'none', border: 'none', borderBottom: '1px solid #f7fafc', minHeight: 44, padding: '4px 8px', cursor: 'pointer', fontSize: 14, color: muted ? '#718096' : '#2d3748' }}>
       {text}
     </button>
@@ -898,13 +898,20 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const parentInputRef = useRef<HTMLInputElement>(null);
   // Set when an option is tapped, so the blur that follows doesn't commit again.
   const skipParentBlur = useRef(false);
+  // Leaving the box waits a moment before closing the list and saving what was typed. On iPhone Safari a tap
+  // on an option takes focus from the box before the tap registers; closing at once removed the option, the
+  // partial text reverted, and the pick was lost (owner, 2026-11-28). A pick in that moment cancels the wait.
+  const parentBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   function pickParent(name: string) {
+    if (parentBlurTimer.current) { clearTimeout(parentBlurTimer.current); parentBlurTimer.current = null; }
     setParentOpen(false);
     setParentQuery('');
     set('parentNucleus', name);
     commitParentNucleus('Parent Nucleus', name);
-    skipParentBlur.current = true;
-    parentInputRef.current?.blur();
+    if (document.activeElement === parentInputRef.current) {
+      skipParentBlur.current = true;
+      parentInputRef.current?.blur();
+    }
   }
 
   // Activities: blur/Enter-triggered, per sub-field (act/part/fof independently) --
@@ -1254,12 +1261,18 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                     aria-autocomplete="list"
                     placeholder="Search nuclei…"
                     value={form.parentNucleus}
-                    onFocus={() => { setParentQuery(''); setParentOpen(true); }}
+                    onFocus={() => {
+                      if (parentBlurTimer.current) { clearTimeout(parentBlurTimer.current); parentBlurTimer.current = null; }
+                      setParentQuery(''); setParentOpen(true);
+                    }}
                     onChange={e => { set('parentNucleus', e.target.value); setParentQuery(e.target.value); setParentOpen(true); }}
                     onBlur={() => {
-                      setParentOpen(false);
-                      if (skipParentBlur.current) { skipParentBlur.current = false; return; }
-                      commitParentNucleus('Parent Nucleus');
+                      if (skipParentBlur.current) { skipParentBlur.current = false; setParentOpen(false); return; }
+                      parentBlurTimer.current = setTimeout(() => {
+                        parentBlurTimer.current = null;
+                        setParentOpen(false);
+                        commitParentNucleus('Parent Nucleus');
+                      }, 300);
                     }}
                     onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur(); }}
                   />
