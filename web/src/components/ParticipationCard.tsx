@@ -11,9 +11,11 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOpenSpace: (spaceId: string) => void;
+  // Changes when something elsewhere (a space's page) may have changed the spaces; re-read if already loaded.
+  refreshKey: number;
 }
 
-export default function ParticipationCard({ nucleus, canWrite, open, onOpenChange, onOpenSpace }: Props) {
+export default function ParticipationCard({ nucleus, canWrite, open, onOpenChange, onOpenSpace, refreshKey }: Props) {
   const [spaces, setSpaces] = useState<ParticipationSpace[] | null>(null);
   const [kinds, setKinds] = useState<SpaceKind[]>([]);
   const [loadError, setLoadError] = useState('');
@@ -40,6 +42,15 @@ export default function ParticipationCard({ nucleus, canWrite, open, onOpenChang
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per mount, when first open
   }, [open]);
+
+  // Re-read on a new refreshKey, but only once loaded: a card never opened still fetches on first open.
+  const seenKey = useRef(refreshKey);
+  useEffect(() => {
+    if (seenKey.current === refreshKey) return;
+    seenKey.current = refreshKey;
+    if (started.current) void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the key changes
+  }, [refreshKey]);
 
   return (
     <div className="card">

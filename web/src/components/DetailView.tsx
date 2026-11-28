@@ -55,6 +55,8 @@ interface Props {
   onCardOpenChange: (key: string, open: boolean) => void;
   // Opens a participation space's page (Back returns here).
   onOpenSpace: (spaceId: string) => void;
+  // Changes on coming back from a space: the Participation and People cards re-read.
+  participationRefresh: number;
 }
 
 type FormState = NucleusRow;
@@ -602,7 +604,7 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 // The 9-figure diagram (ConcentricRainbow, formerly the staggered 9-ring one) lives in its own file,
 // 2026-10-08, so Picker.tsx can also render a rollup version of it from its own popup.
 
-export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, initialNotice, onRenamed, onOpenNucleus, canCreateInCluster, allNucleusNames, parentChoices, childCount, rows, addChild, cardOpen, onCardOpenChange, onOpenSpace }: Props) {
+export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, initialNotice, onRenamed, onOpenNucleus, canCreateInCluster, allNucleusNames, parentChoices, childCount, rows, addChild, cardOpen, onCardOpenChange, onOpenSpace, participationRefresh }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
   // Baseline to diff a blur-triggered field's current value against, so clicking into
@@ -1393,7 +1395,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             <span><span style={{ fontSize: 11, marginRight: 6 }}>{peopleOpen ? '▼' : '▶'}</span>People</span>
           </div>
           {peopleOpen && <div className="card-body">
-            <PeopleCard nucleus={row.nucleus} isHome={detail.srp.isHome} permissions={permissions} refreshKey={peopleRefresh} onRolesChanged={refreshRoleLists} onPeopleChanged={handlePeopleChanged} />
+            <PeopleCard nucleus={row.nucleus} isHome={detail.srp.isHome} permissions={permissions} refreshKey={peopleRefresh + participationRefresh} onRolesChanged={refreshRoleLists} onPeopleChanged={handlePeopleChanged} />
           </div>}
         </div>
 
@@ -1487,7 +1489,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
         </div>
 
         {/* Participation */}
-        <ParticipationCard nucleus={row.nucleus} canWrite={permissions.canWrite} open={participationOpen} onOpenChange={setParticipationOpen} onOpenSpace={onOpenSpace} />
+        <ParticipationCard nucleus={row.nucleus} canWrite={permissions.canWrite} open={participationOpen} onOpenChange={setParticipationOpen} onOpenSpace={onOpenSpace} refreshKey={participationRefresh} />
 
         {/* Additional Details */}
         <div className="card">

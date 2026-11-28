@@ -31,8 +31,12 @@ export default function AppClient() {
   const [detail, setDetail] = useState<NucleusDetail | null>(null);
   const [selectedNucleus, setSelectedNucleus] = useState<string | null>(null);
   // A participation space of the selected nucleus, shown in place of its page (/?nucleus=<id>&space=<id>). The
-  // nucleus detail stays loaded underneath, so coming back doesn't refetch it.
+  // nucleus page stays mounted underneath, hidden, so coming back finds it as it was: the edits autosaved since it
+  // loaded, its open cards and its scroll (final review 2026-11-27).
   const [selectedSpace, setSelectedSpace] = useState<string | null>(null);
+  // Bumped on leaving a space, so the nucleus page's Participation and People cards re-read what a record saved
+  // there changed (a space's last count, who is participating).
+  const [participationRefresh, setParticipationRefresh] = useState(0);
   // Bumped on every successful (re)load so DetailView remounts with fresh form state.
   const [detailVersion, setDetailVersion] = useState(0);
   // A one-shot status for the DetailView a reload mounts (e.g. "3 moved in; SRP is being updated").
@@ -195,6 +199,7 @@ export default function AppClient() {
 
   // The loaded nucleus's page (space null) or one of its spaces, without refetching the nucleus.
   function showLoaded(name: string, space: string | null) {
+    if (shownRef.current.space) setParticipationRefresh(n => n + 1);
     goToView(viewKey({ nucleus: name, space }));
     setReloadNotice(null);
     setSelectedSpace(space);
@@ -257,9 +262,10 @@ export default function AppClient() {
   if (detail && selectedNucleus) {
     const perms = initialData.access.permissions[norm(selectedNucleus)] ?? NO_ACCESS;
     const permissions = effectivePermissions(perms, detail.srp.state, detail.srp.action?.action);
-    if (selectedSpace) {
-      // Keyed by space: SpaceView keeps no guard against a previous space's late response.
-      return (
+    return (
+      <>
+      {/* Keyed by space: SpaceView keeps no guard against a previous space's late response. */}
+      {selectedSpace && (
         <SpaceView
           key={selectedSpace}
           nucleus={selectedNucleus}
@@ -267,10 +273,10 @@ export default function AppClient() {
           canWrite={permissions.canWrite}
           onBack={() => spaceBack(selectedNucleus)}
         />
-      );
-    }
-    return (
-      <>
+      )}
+      {/* Hidden, not unmounted, while a space shows: DetailView builds its form from `detail` only once, so a
+          remount would show the page as first loaded and hide the edits autosaved since. */}
+      <div style={selectedSpace ? { display: 'none' } : undefined}>
       <DetailView
         key={`${selectedNucleus}:${detailVersion}`}
         detail={detail}
@@ -290,9 +296,11 @@ export default function AppClient() {
         rows={initialData.rows}
         addChild={addChild}
         onOpenSpace={space => openSpace(selectedNucleus, space)}
+        participationRefresh={participationRefresh}
         cardOpen={openByView[selectedNucleus] ?? {}}
         onCardOpenChange={(key, open) => setOpen(selectedNucleus, key, open)}
       />
+      </div>
       {createModal}
       </>
     );
