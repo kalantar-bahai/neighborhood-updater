@@ -228,17 +228,28 @@ describe('matchesCandidate', () => {
 
 describe('srpProblemText', () => {
   it('words each known code', () => {
-    expect(srpProblemText('SRP_CONFLICT')).toBe('Changed in SRP since we last looked.');
-    expect(srpProblemText('OTHER_HOUSEHOLD_CONTACT')).toBe('SRP refused: someone here is the contact of another SRP household.');
-    expect(srpProblemText('PLACE_MISMATCH')).toBe("SRP refused: the members aren't all at the same place in SRP.");
-    expect(srpProblemText('OUTSIDE_WRITABLE_SCOPE')).toBe("SRP refused: we aren't allowed to change this family in SRP.");
-    expect(srpProblemText('MEMBER_NOT_IN_SRP')).toBe("SRP refused: someone here isn't in SRP yet.");
-    expect(srpProblemText('STATE_CHANGED')).toBe("Sending to SRP didn't finish. Try again.");
-    expect(srpProblemText('NOT_CONVERGED')).toBe("Sending to SRP didn't finish. Try again.");
+    expect(srpProblemText('SRP_CONFLICT', true)).toBe('Changed in SRP since we last looked.');
+    expect(srpProblemText('OTHER_HOUSEHOLD_CONTACT', true)).toBe('SRP refused: someone here is the contact of another SRP household.');
+    expect(srpProblemText('PLACE_MISMATCH', true)).toBe("SRP refused: the members aren't all at the same place in SRP.");
+    expect(srpProblemText('OUTSIDE_WRITABLE_SCOPE', true)).toBe("SRP refused: we aren't allowed to change this family in SRP.");
+    expect(srpProblemText('MEMBER_NOT_IN_SRP', true)).toBe("SRP refused: someone here isn't in SRP yet.");
+    expect(srpProblemText('STATE_CHANGED', true)).toBe("Sending to SRP didn't finish. Try again.");
+    expect(srpProblemText('NOT_CONVERGED', true)).toBe("Sending to SRP didn't finish. Try again.");
   });
   it('names an unknown code, and gives null for null', () => {
-    expect(srpProblemText('O026')).toBe("SRP couldn't save this family (code O026). Try again later.");
-    expect(srpProblemText(null)).toBeNull();
+    expect(srpProblemText('O026', true)).toBe("SRP couldn't save this family (code O026). Try again later.");
+    expect(srpProblemText(null, true)).toBeNull();
+    expect(srpProblemText(undefined, true)).toBeNull();
+  });
+  it('falls through to the generic line for inherited property names', () => {
+    expect(srpProblemText('constructor', true)).toBe("SRP couldn't save this family (code constructor). Try again later.");
+  });
+  it("doesn't tell readers to act", () => {
+    expect(srpProblemText('STATE_CHANGED', false)).toBe("Sending to SRP didn't finish.");
+    expect(srpProblemText('NOT_CONVERGED', false)).toBe("Sending to SRP didn't finish.");
+    expect(srpProblemText('O026', false)).toBe("SRP couldn't save this family (code O026).");
+    expect(srpProblemText('constructor', false)).toBe("SRP couldn't save this family (code constructor).");
+    expect(srpProblemText('SRP_CONFLICT', false)).toBe('Changed in SRP since we last looked.');
   });
 });
 

@@ -122,7 +122,7 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'block', fontSize: 14, color: '#2d3748' }}>{f.title}</span>
                   <span style={{ display: 'block', fontSize: 12, color: '#718096' }}>{f.address ?? 'No address in SRP'}</span>
-                  {f.srpProblem && <span style={{ display: 'block', fontSize: 12, color: '#c53030' }}>{srpProblemText(f.srpProblem)}</span>}
+                  {f.srpProblem && <span style={{ display: 'block', fontSize: 12, color: '#c53030' }}>{srpProblemText(f.srpProblem, canEdit)}{canEdit && !open ? ' Open the family to fix it.' : ''}</span>}
                 </span>
                 {badge && <span style={{ fontSize: 11, color: '#744210', background: '#fefcbf', borderRadius: 8, padding: '1px 6px', whiteSpace: 'nowrap' }}>{badge}</span>}
                 <span style={{ fontSize: 11, color: '#4a5568', background: '#edf2f7', borderRadius: 8, padding: '1px 6px', whiteSpace: 'nowrap' }}>{sizeText(f.size)}</span>
@@ -160,7 +160,7 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
                   {canEdit && isHousehold && f.srpProblem && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
                       <button type="button" disabled={busy} style={smallBtn(busy)}
-                        onClick={() => run(f.key, { action: 'retry', householdId: f.householdId! })}>
+                        onClick={() => { if (f.srpProblem === 'SRP_CONFLICT' && !window.confirm('Replace the changes made in SRP with this family?')) return; run(f.key, { action: 'retry', householdId: f.householdId! }); }}>
                         {f.srpProblem === 'SRP_CONFLICT' ? 'Keep ours' : 'Send again'}
                       </button>
                       <button type="button" disabled={busy} style={smallBtn(busy)}

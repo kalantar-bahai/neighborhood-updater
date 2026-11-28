@@ -122,9 +122,11 @@ const SRP_PROBLEM_TEXT: Record<string, string> = {
   NOT_CONVERGED: "Sending to SRP didn't finish. Try again.",
 };
 
-export function srpProblemText(problem: string | null): string | null {
-  if (problem === null) return null;
-  return SRP_PROBLEM_TEXT[problem] ?? `SRP couldn't save this family (code ${problem}). Try again later.`;
+export function srpProblemText(problem: string | null | undefined, canAct: boolean): string | null {
+  if (problem == null) return null;
+  if (!canAct && (problem === 'STATE_CHANGED' || problem === 'NOT_CONVERGED')) return "Sending to SRP didn't finish.";
+  if (Object.hasOwn(SRP_PROBLEM_TEXT, problem)) return SRP_PROBLEM_TEXT[problem];
+  return canAct ? `SRP couldn't save this family (code ${problem}). Try again later.` : `SRP couldn't save this family (code ${problem}).`;
 }
 
 // The contact of a multi-person household can't be removed; they must be replaced first.
