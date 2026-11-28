@@ -107,7 +107,7 @@ export default function SpaceView({ nucleus, spaceId, canWrite, onBack }: Props)
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0 }}>
         <button className="back-btn" onClick={onBack} style={{ minHeight: 44 }}>← Back</button>
         <div style={{ minWidth: 0 }}>
-          <h1>{space?.name ?? 'Participation'}</h1>
+          <h1>{space?.name ?? 'Gathering'}</h1>
           <div className="meta">{nucleus}</div>
         </div>
       </div>

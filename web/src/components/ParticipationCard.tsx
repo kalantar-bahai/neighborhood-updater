@@ -55,7 +55,7 @@ export default function ParticipationCard({ nucleus, canWrite, open, onOpenChang
   return (
     <div className="card">
       <div className="card-header" onClick={() => onOpenChange(!open)} style={{ cursor: 'pointer', userSelect: 'none' }}>
-        <span><span style={{ fontSize: 11, marginRight: 6 }}>{open ? '▼' : '▶'}</span>Participation</span>
+        <span><span style={{ fontSize: 11, marginRight: 6 }}>{open ? '▼' : '▶'}</span>Gatherings</span>
       </div>
       {open && <div className="card-body">
         {loadError && (
