@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { identityControls, parentOptions, typeChangePrompt, typeLabel } from './nucleusIdentity';
+import { identityControls, matchParentChoices, parentOptions, resolveParentInput, typeChangePrompt, typeLabel } from './nucleusIdentity';
 
 const base = { isHome: false, inSrp: false, pending: false, canChangeIdentity: true, locationType: 'LOCALITY' };
 
@@ -118,5 +118,31 @@ describe('parentOptions', () => {
   });
   it('leaves out nuclei the user can\'t edit', () => {
     expect(parentOptions(rows, 'Grandchild', 'C1', n => n !== 'Top')).toEqual(['Child', 'Sibling']);
+  });
+});
+
+describe('matchParentChoices', () => {
+  const choices = ['Alpha Park', 'Beta Hills', 'Gamma Court', 'Park View'];
+  it('lists everything for a blank query', () => {
+    expect(matchParentChoices(choices, '  ')).toEqual({ shown: choices, more: false });
+  });
+  it('matches anywhere in the name, ignoring case', () => {
+    expect(matchParentChoices(choices, 'park').shown).toEqual(['Alpha Park', 'Park View']);
+  });
+  it('caps the list and says there is more', () => {
+    expect(matchParentChoices(choices, '', 2)).toEqual({ shown: ['Alpha Park', 'Beta Hills'], more: true });
+  });
+});
+
+describe('resolveParentInput', () => {
+  const choices = ['Alpha Park', 'Beta Hills'];
+  it('clears for blank text', () => {
+    expect(resolveParentInput(choices, '   ')).toBe('');
+  });
+  it('takes the canonical name for an exact match in any case', () => {
+    expect(resolveParentInput(choices, ' alpha park ')).toBe('Alpha Park');
+  });
+  it('refuses text that names no choice', () => {
+    expect(resolveParentInput(choices, 'Alp')).toBeNull();
   });
 });

@@ -65,3 +65,19 @@ export function parentOptions(rows: { nucleus: string; parentNucleus: string; cl
   }
   return rows.filter(r => r.cluster === cluster && !excluded.has(r.nucleus) && canEdit(r.nucleus)).map(r => r.nucleus).sort((a, b) => a.localeCompare(b));
 }
+
+// The Parent Nucleus picker's list under the box (owner, 2026-11-28: show the options while searching, like
+// "+ Add" on the People card). A blank query lists everything; the list stops at `limit`.
+export function matchParentChoices(choices: string[], query: string, limit = 8): { shown: string[]; more: boolean } {
+  const q = query.trim().toLowerCase();
+  const hits = q ? choices.filter(n => n.toLowerCase().includes(q)) : choices;
+  return { shown: hits.slice(0, limit), more: hits.length > limit };
+}
+
+// What a typed Parent Nucleus commits as: '' to clear, the canonical name for an exact match in any case,
+// or null when the text names no choice (the box then goes back to the saved parent).
+export function resolveParentInput(choices: string[], text: string): string | null {
+  const t = text.trim();
+  if (!t) return '';
+  return choices.find(n => n.toLowerCase() === t.toLowerCase()) ?? null;
+}
