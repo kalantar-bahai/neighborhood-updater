@@ -18,7 +18,7 @@ import { canRenameNucleus, deleteNotice, pendingIdentityLocks, nextNameAfterRena
 import FamiliesList from './FamiliesList';
 import ConcentricRainbow, { formatValue, type AlignedLabel } from './ConcentricRainbow';
 import { groupCountsNote, namedToShow } from '@/lib/people';
-import { identityControls, typeChangePrompt, typeLabel } from '@/lib/nucleusIdentity';
+import { identityControls, matchParentChoices, resolveParentInput, typeChangePrompt, typeLabel } from '@/lib/nucleusIdentity';
 import ParticipationCard from './ParticipationCard';
 
 interface Props {
@@ -574,6 +574,28 @@ function AlignedConcentricDiagram({ rings, residing }: { rings: AlignedRingConte
 // The 9-figure diagram (ConcentricRainbow, formerly the staggered 9-ring one) lives in its own file,
 // 2026-10-08, so Picker.tsx can also render a rollup version of it from its own popup.
 
+// The Parent Nucleus options under its search box (owner, 2026-11-28). pointerdown is cancelled so the box
+// keeps focus until the tap lands.
+function ParentOptions({ choices, query, current, onPick }: { choices: string[]; query: string; current: string; onPick: (name: string) => void }) {
+  const { shown, more } = matchParentChoices(choices, query);
+  const option = (key: string, text: string, pick: string, muted = false) => (
+    <button key={key} type="button" role="option" aria-selected={current === pick}
+      onPointerDown={e => e.preventDefault()} onClick={() => onPick(pick)}
+      style={{ textAlign: 'left', background: current === pick ? '#ebf8ff' : 'none', border: 'none', borderBottom: '1px solid #f7fafc', minHeight: 44, padding: '4px 8px', cursor: 'pointer', fontSize: 14, color: muted ? '#718096' : '#2d3748' }}>
+      {text}
+    </button>
+  );
+  return (
+    <div id="parent-nucleus-options" role="listbox" aria-label="Parent nucleus options"
+      style={{ marginTop: 4, border: '1px solid #e2e8f0', borderRadius: 6, maxHeight: 264, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      {!query.trim() && current && option('none', 'No parent', '', true)}
+      {shown.map(n => option(n, n, n))}
+      {shown.length === 0 && <div style={{ fontSize: 13, color: '#718096', padding: 8 }}>No nucleus matches.</div>}
+      {more && <div style={{ fontSize: 12, color: '#718096', padding: '4px 8px' }}>Keep typing to narrow the list.</div>}
+    </div>
+  );
+}
+
 export default function DetailView({ detail, permissions, email, showBack, onBack, onSaved, onReload, initialNotice, onRenamed, onOpenNucleus, canCreateInCluster, allNucleusNames, parentChoices, childCount, rows, addChild, cardOpen, onCardOpenChange, onOpenSpace, participationRefresh }: Props) {
   const { row } = detail;
   const [form, setForm] = useState<FormState>(() => rowToForm(row));
@@ -852,8 +874,12 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // location) its patch fragment is nested under identity -- commitField only
   // builds flat top-level fragments, so this gets its own small commit function
   // rather than trying to make that one handle both shapes.
-  function commitParentNucleus(label: string) {
-    const value = form.parentNucleus;
+  // Typed text that names no choice goes back to the saved parent; a match in any case saves its real name.
+  function commitParentNucleus(label: string, typed: string = form.parentNucleus) {
+    if (typed === committedRef.current.parentNucleus) return;
+    const value = resolveParentInput(parentChoices, typed);
+    if (value === null) { set('parentNucleus', committedRef.current.parentNucleus); return; }
+    if (value !== typed) set('parentNucleus', value);
     if (value === committedRef.current.parentNucleus) return;
     const attempt = async () => {
       const result = await saveField({ identity: { parentNucleus: value } }, label);
@@ -864,6 +890,21 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
       }
     };
     void attempt();
+  }
+
+  // The Parent Nucleus options list (owner, 2026-11-28): open while the box has focus, filtered by what's typed.
+  const [parentOpen, setParentOpen] = useState(false);
+  const [parentQuery, setParentQuery] = useState('');
+  const parentInputRef = useRef<HTMLInputElement>(null);
+  // Set when an option is tapped, so the blur that follows doesn't commit again.
+  const skipParentBlur = useRef(false);
+  function pickParent(name: string) {
+    setParentOpen(false);
+    setParentQuery('');
+    set('parentNucleus', name);
+    commitParentNucleus('Parent Nucleus', name);
+    skipParentBlur.current = true;
+    parentInputRef.current?.blur();
   }
 
   // Activities: blur/Enter-triggered, per sub-field (act/part/fof independently) --
@@ -1198,25 +1239,31 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
             </div>
             {/* Parent Nucleus ("pocket grouping") -- data/save plumbing already
                 existed (the picker already reads it to group nuclei), but nothing
-                ever let a user SET it until now, 2026-10-08. A search-assisted text
-                input rather than a flat dropdown: nucleus counts can run larger than
-                clusters/localities. datalist gives free browser-native autocomplete
-                over allNucleusNames without a new search API -- the same list the
-                main picker already uses, just filtered to exclude this nucleus. */}
+                ever let a user SET it until now, 2026-10-08. A search box with its options
+                listed under it (owner, 2026-11-28; the native datalist barely shows on a
+                phone): focus lists every choice, typing filters, a tap saves. */}
             <div className="field-grid-2">
               {permissions.canChangeIdentity ? (
                 <div className="field">
                   <label style={{ display: 'inline-flex', alignItems: 'center' }}>Parent Nucleus{openParent}</label>
                   <input
-                    list="parent-nucleus-options"
+                    ref={parentInputRef}
+                    role="combobox"
+                    aria-expanded={parentOpen}
+                    aria-controls="parent-nucleus-options"
+                    aria-autocomplete="list"
+                    placeholder="Search nuclei…"
                     value={form.parentNucleus}
-                    onChange={e => set('parentNucleus', e.target.value)}
-                    onBlur={() => commitParentNucleus('Parent Nucleus')}
-                    onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                    onFocus={() => { setParentQuery(''); setParentOpen(true); }}
+                    onChange={e => { set('parentNucleus', e.target.value); setParentQuery(e.target.value); setParentOpen(true); }}
+                    onBlur={() => {
+                      setParentOpen(false);
+                      if (skipParentBlur.current) { skipParentBlur.current = false; return; }
+                      commitParentNucleus('Parent Nucleus');
+                    }}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur(); }}
                   />
-                  <datalist id="parent-nucleus-options">
-                    {parentChoices.map(n => <option key={n} value={n} />)}
-                  </datalist>
+                  {parentOpen && <ParentOptions choices={parentChoices} query={parentQuery} current={form.parentNucleus} onPick={pickParent} />}
                 </div>
               ) : (
                 <Field label="Parent Nucleus" labelExtra={openParent} value={form.parentNucleus} readonly />
