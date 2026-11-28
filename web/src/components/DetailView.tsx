@@ -656,7 +656,8 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   // no way to collapse them at all; now they're collapsible like every other card,
   // just starting open instead of closed.
   const [overviewOpen, setOverviewOpen] = card('overview', false);
-  const [peopleOpen, setPeopleOpen] = card('people', false);
+  // People opens by default; Additional Details starts closed (owner, 2026-11-27).
+  const [peopleOpen, setPeopleOpen] = card('people', true);
   const [familiesOpen, setFamiliesOpen] = card('families', true);
   // The Families list's entry count, shown as "(C)" after Households Connected; undefined until it loads.
   const [familyCount, setFamilyCount] = useState<number | undefined>(undefined);
@@ -666,7 +667,7 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const groupOption = groupLabel(totals?.nucleiCounted);
   const showGroup = groupOption !== null && activitiesGroup;
   const [participationOpen, setParticipationOpen] = card('participation', false);
-  const [detailsOpen, setDetailsOpen] = card('details', true);
+  const [detailsOpen, setDetailsOpen] = card('details', false);
   const [narrativeOpen, setNarrativeOpen] = card('narrative', true);
   const [deleteInput, setDeleteInput] = useState('');
   const [deleting, setDeleting] = useState(false);
