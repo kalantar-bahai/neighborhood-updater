@@ -82,10 +82,23 @@ export function sortFamilies(entries: FamilyEntry[], by: FamilySort): FamilyEntr
   return sortBy(entries, by, byName);
 }
 
+// Matches a visible member's name or the family's address (owner, 2026-11-27: same search as the picker).
 export function filterFamilies(entries: FamilyEntry[], query: string): FamilyEntry[] {
   const q = query.trim().toLowerCase();
   if (!q) return entries;
-  return entries.filter((e) => e.members.some((m) => m.name.toLowerCase().includes(q)));
+  return entries.filter((e) => e.members.some((m) => m.name.toLowerCase().includes(q)) || !!e.address?.toLowerCase().includes(q));
+}
+
+// The sort dropdown on the Families card and the picker (owner, 2026-11-27: a dropdown like the People card's, not buttons).
+export const FAMILY_SORTS: readonly { key: FamilySort; label: string }[] = [
+  { key: 'name', label: 'By family name' },
+  { key: 'address', label: 'By address' },
+];
+
+// The line under the Families list, worded like the People card's count.
+export function familiesCountLabel(shown: number, total: number): string {
+  const noun = total === 1 ? 'family' : 'families';
+  return shown === total ? `${total} ${noun}` : `${shown} of ${total} ${noun}`;
 }
 
 export function sizeText(n: number): string {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PersonSrpDot } from './SrpBadge';
 import FamilyPicker from './FamilyPicker';
-import { addCandidates, moveConfirmText, canRemoveMember, filterFamilies, hiddenText, sizeText, sortFamilies, srpBadge, srpProblemText, startCandidates, type Candidate, type FamilyEntry, type FamilySort } from '@/lib/households';
+import { addCandidates, familiesCountLabel, FAMILY_SORTS, moveConfirmText, canRemoveMember, filterFamilies, hiddenText, sizeText, sortFamilies, srpBadge, srpProblemText, startCandidates, type Candidate, type FamilyEntry, type FamilySort } from '@/lib/households';
 
 // The Families card's list: households (and people with no household), searchable by anyone in them.
 type PickerState = { entry: FamilyEntry; mode: 'add' | 'start' };
@@ -77,34 +77,21 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged, 
 
   return (
     <div style={{ marginTop: 16 }}>
-      <input
-        type="search"
-        aria-label="Find a family by anyone in it"
-        placeholder="Find a family by anyone in it"
-        value={query}
-        onChange={e => setQuery(e.target.value)}
-        style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 14 }}
-      />
-      <div role="group" aria-label="Sort by" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-        <span style={{ fontSize: 12, color: '#718096' }}>Sort by</span>
-        {([['name', 'Family name'], ['address', 'Address']] as const).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            aria-pressed={sortBy === value}
-            onClick={() => setSortBy(value)}
-            style={{ minHeight: 44, padding: '4px 14px', borderRadius: 22, fontSize: 13, cursor: 'pointer', border: '1px solid #cbd5e0', background: sortBy === value ? '#bee3f8' : 'white', color: sortBy === value ? '#2a4365' : '#4a5568', fontWeight: sortBy === value ? 700 : 400 }}
-          >{label}</button>
-        ))}
+      {/* Same control row as the People card: a compact dropdown, then search (owner, 2026-11-27). */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value as FamilySort)} aria-label="Sort families" style={{ width: 'auto' }}>
+          {FAMILY_SORTS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+        </select>
+        <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search names or addresses…" aria-label="Search names or addresses" style={{ flex: 1, minWidth: 120 }} />
       </div>
       {shown.length === 0 && query.trim() && (
-        <div style={{ fontSize: 13, color: '#718096', marginTop: 10 }}>No family has anyone by that name.</div>
+        <div style={{ fontSize: 13, color: '#718096' }}>No matches.</div>
       )}
       {families.length === 0 && !query.trim() && (
-        <div style={{ fontSize: 13, color: '#718096', marginTop: 10 }}>No people in this nucleus yet.</div>
+        <div style={{ fontSize: 13, color: '#718096' }}>No people in this nucleus yet.</div>
       )}
       {/* Same height as the People card's list: about 10 rows, then it scrolls (owner, 2026-11-27). */}
-      <div style={{ marginTop: 8, maxHeight: 360, overflowY: 'auto' }}>
+      <div style={{ maxHeight: 360, overflowY: 'auto' }}>
         {shown.map(f => {
           const open = openKeys.has(f.key);
           const hidden = hiddenText(f.hidden);
@@ -177,6 +164,12 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged, 
           );
         })}
       </div>
+      {/* Outside the scrolling list, like the People card's count. */}
+      {families.length > 0 && (
+        <div style={{ fontSize: 12, color: '#718096', borderTop: '1px solid #e2e8f0', paddingTop: 4, marginTop: 2 }}>
+          {familiesCountLabel(shown.length, families.length)}
+        </div>
+      )}
       {picker && (
         <FamilyPicker
           note={picker.mode === 'start' ? 'Only people not yet in a family are listed.' : undefined}
