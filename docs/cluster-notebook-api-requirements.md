@@ -669,6 +669,7 @@ type Household {
 ```
 
 - **Address:** it is filled only on `Nucleus.namedHouseholds`. It is always null on `PersonSummary.household`.
+- **Residents only:** confirmed with cluster-notebook 2026-11-27 (PR #70). `namedHouseholds` lists only households with at least one resident of the nucleus: someone placed at its own Setting, not counting anyone hidden there. A nucleus that isn't a Neighborhood lists none. The app applies the same rule to its one-person entries, using `isResident`.
 - **Person's household:** null means the person is in none.
 - **Contact:** null when the caller can't read the contact.
 - **Read in:** `getNucleusHouseholds` (the nucleus query), and `household` on each person in `getNucleusPeople` and `getHiddenPeople`.
