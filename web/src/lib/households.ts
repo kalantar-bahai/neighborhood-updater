@@ -11,6 +11,7 @@ export type FamilyEntry = {
   key: string; title: string; address: string | null; size: number; members: FamilyMember[]; hidden: number;
   familyName: string; firstName: string; // sort keys
   householdId: string | null; srpState: HouseholdSrpState | null; // null for a one-person entry
+  srpProblem: string | null; // why SRP didn't take the change; null for a one-person entry
 };
 export type FamilySort = 'name' | 'address';
 
@@ -31,6 +32,7 @@ export function familyEntries(households: Household[], people: NucleusPerson[]):
     key: h.id,
     householdId: h.id,
     srpState: h.srpState,
+    srpProblem: h.srpProblem,
     title: familyTitle(h),
     address: h.address?.trim() || null,
     size: h.size,
@@ -42,7 +44,7 @@ export function familyEntries(households: Household[], people: NucleusPerson[]):
   for (const p of people) {
     if (p.hidden || p.individual.household) continue;
     const m = toMember(p.individual, false);
-    entries.push({ key: `person:${p.individual.id}`, title: m.name, address: p.address?.trim() || null, size: 1, members: [m], hidden: 0, householdId: null, srpState: null,
+    entries.push({ key: `person:${p.individual.id}`, title: m.name, address: p.address?.trim() || null, size: 1, members: [m], hidden: 0, householdId: null, srpState: null, srpProblem: null,
       familyName: p.individual.familyName ?? '', firstName: p.individual.firstName ?? '',
     });
   }
@@ -108,6 +110,23 @@ export function srpBadge(state: HouseholdSrpState | null): string | null {
   if (state === 'WAITING') return 'Not in SRP yet';
   if (state === 'LOCAL_ONLY') return 'Only in Nucleus Assistant';
   return null;
+}
+
+const SRP_PROBLEM_TEXT: Record<string, string> = {
+  SRP_CONFLICT: 'Changed in SRP since we last looked.',
+  OTHER_HOUSEHOLD_CONTACT: 'SRP refused: someone here is the contact of another SRP household.',
+  PLACE_MISMATCH: "SRP refused: the members aren't all at the same place in SRP.",
+  OUTSIDE_WRITABLE_SCOPE: "SRP refused: we aren't allowed to change this family in SRP.",
+  MEMBER_NOT_IN_SRP: "SRP refused: someone here isn't in SRP yet.",
+  STATE_CHANGED: "Sending to SRP didn't finish. Try again.",
+  NOT_CONVERGED: "Sending to SRP didn't finish. Try again.",
+};
+
+export function srpProblemText(problem: string | null | undefined, canAct: boolean): string | null {
+  if (problem == null) return null;
+  if (!canAct && (problem === 'STATE_CHANGED' || problem === 'NOT_CONVERGED')) return "Sending to SRP didn't finish.";
+  if (Object.hasOwn(SRP_PROBLEM_TEXT, problem)) return SRP_PROBLEM_TEXT[problem];
+  return canAct ? `SRP couldn't save this family (code ${problem}). Try again later.` : `SRP couldn't save this family (code ${problem}).`;
 }
 
 // The contact of a multi-person household can't be removed; they must be replaced first.

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Household, HouseholdMember, NucleusPerson } from './clusterNotebook';
-import { familyEntries, familyTitle, filterFamilies, hiddenText, householdMove, sizeText, sortFamilies, srpBadge, canRemoveMember, addCandidates, startCandidates, sortCandidates, moveConfirmText, inFamilyText, matchesCandidate, type Candidate, type FamilyEntry } from './households';
+import { familyEntries, familyTitle, filterFamilies, hiddenText, householdMove, sizeText, sortFamilies, srpBadge, srpProblemText, canRemoveMember, addCandidates, startCandidates, sortCandidates, moveConfirmText, inFamilyText, matchesCandidate, type Candidate, type FamilyEntry } from './households';
 
 const mem = (id: string, firstName: string, familyName: string): HouseholdMember => ({
   id, firstName, familyName, middleNames: '', nickname: '', inSrp: false,
 } as HouseholdMember);
 
 const hh = (id: string, members: HouseholdMember[], size = members.length, contactIdx: number | null = 0): Household => ({
-  id, contact: contactIdx === null ? null : members[contactIdx], members, size, address: null, srpState: 'LOCAL_ONLY',
+  id, contact: contactIdx === null ? null : members[contactIdx], members, size, address: null, srpState: 'LOCAL_ONLY', srpProblem: null,
 });
 
 const person = (m: HouseholdMember, household: Household | null | undefined, hidden = false): NucleusPerson =>
@@ -23,7 +23,7 @@ describe('familyEntries', () => {
     expect(out.map((e) => e.key)).toEqual(['h2', 'h1', 'person:d']);
     expect(out[2]).toMatchObject({ title: 'Dara Zed', size: 1, address: null, hidden: 0 });
     expect(out[2].members).toEqual([{ id: 'd', name: 'Dara Zed', inSrp: false, isContact: false, familyName: 'Zed', firstName: 'Dara' }]);
-    expect(out[2]).toMatchObject({ householdId: null, srpState: null });
+    expect(out[2]).toMatchObject({ householdId: null, srpState: null, srpProblem: null });
     expect(out[0]).toMatchObject({ householdId: 'h2', srpState: 'LOCAL_ONLY' });
   });
   it('skips hidden household-less people and treats undefined household as none', () => {
@@ -101,7 +101,7 @@ describe('familyEntries addresses and sort keys', () => {
 
 describe('sortFamilies', () => {
   const entry = (key: string, address: string | null, familyName = key, firstName = ''): FamilyEntry => ({
-    key, title: key, address, size: 1, members: [], hidden: 0, householdId: null, srpState: null, familyName, firstName,
+    key, title: key, address, size: 1, members: [], hidden: 0, householdId: null, srpState: null, srpProblem: null, familyName, firstName,
   });
   const addrs = ['120 Oak Ridge Ct', '34 Birch Ln', '118 Oak Ridge Ct', null, 'Rural Route 5'];
   const list = addrs.map((a, i) => entry(`e${i}`, a));
@@ -188,7 +188,7 @@ describe('edge cases', () => {
   });
   it('orders letter-suffixed and ranged numbers by their first integer', () => {
     const e = (key: string, address: string): FamilyEntry => ({
-      key, title: key, address, size: 1, members: [], hidden: 0, householdId: null, srpState: null, familyName: key, firstName: '',
+      key, title: key, address, size: 1, members: [], hidden: 0, householdId: null, srpState: null, srpProblem: null, familyName: key, firstName: '',
     });
     const out = sortFamilies([e('d', '14 Oak St'), e('b', '12B Oak St'), e('c', '12-14 Oak St'), e('a', '10 Oak St')], 'address');
     expect(out.map((x) => x.key)).toEqual(['a', 'b', 'c', 'd']);
@@ -223,5 +223,41 @@ describe('matchesCandidate', () => {
     expect(matchesCandidate(c, '  ')).toBe(true);
     expect(matchesCandidate(c, 'zzz')).toBe(false);
     expect(matchesCandidate({ ...c, address: null }, 'elm')).toBe(false);
+  });
+});
+
+describe('srpProblemText', () => {
+  it('words each known code', () => {
+    expect(srpProblemText('SRP_CONFLICT', true)).toBe('Changed in SRP since we last looked.');
+    expect(srpProblemText('OTHER_HOUSEHOLD_CONTACT', true)).toBe('SRP refused: someone here is the contact of another SRP household.');
+    expect(srpProblemText('PLACE_MISMATCH', true)).toBe("SRP refused: the members aren't all at the same place in SRP.");
+    expect(srpProblemText('OUTSIDE_WRITABLE_SCOPE', true)).toBe("SRP refused: we aren't allowed to change this family in SRP.");
+    expect(srpProblemText('MEMBER_NOT_IN_SRP', true)).toBe("SRP refused: someone here isn't in SRP yet.");
+    expect(srpProblemText('STATE_CHANGED', true)).toBe("Sending to SRP didn't finish. Try again.");
+    expect(srpProblemText('NOT_CONVERGED', true)).toBe("Sending to SRP didn't finish. Try again.");
+  });
+  it('names an unknown code, and gives null for null', () => {
+    expect(srpProblemText('O026', true)).toBe("SRP couldn't save this family (code O026). Try again later.");
+    expect(srpProblemText(null, true)).toBeNull();
+    expect(srpProblemText(undefined, true)).toBeNull();
+  });
+  it('falls through to the generic line for inherited property names', () => {
+    expect(srpProblemText('constructor', true)).toBe("SRP couldn't save this family (code constructor). Try again later.");
+  });
+  it("doesn't tell readers to act", () => {
+    expect(srpProblemText('STATE_CHANGED', false)).toBe("Sending to SRP didn't finish.");
+    expect(srpProblemText('NOT_CONVERGED', false)).toBe("Sending to SRP didn't finish.");
+    expect(srpProblemText('O026', false)).toBe("SRP couldn't save this family (code O026).");
+    expect(srpProblemText('constructor', false)).toBe("SRP couldn't save this family (code constructor).");
+    expect(srpProblemText('SRP_CONFLICT', false)).toBe('Changed in SRP since we last looked.');
+  });
+});
+
+describe('familyEntries srpProblem', () => {
+  it('carries the household problem and is null for one-person entries', () => {
+    const h = { ...hh('hp', [mem('a', 'Ada', 'Okoro')], 1), srpProblem: 'SRP_CONFLICT' };
+    const out = familyEntries([h], [person(mem('s', 'Sol', 'Zed'), null)]);
+    expect(out.find((e) => e.householdId === 'hp')?.srpProblem).toBe('SRP_CONFLICT');
+    expect(out.find((e) => e.householdId === null)?.srpProblem).toBeNull();
   });
 });

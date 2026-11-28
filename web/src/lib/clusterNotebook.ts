@@ -664,9 +664,11 @@ export type HouseholdSrpState = 'IN_SRP' | 'WAITING' | 'LOCAL_ONLY';
 export interface Household {
   id: string; contact: HouseholdMember | null; members: HouseholdMember[]; size: number; address: string | null;
   srpState: HouseholdSrpState;
+  // Confirmed with cluster-notebook 2026-11-27 (PR #67): null unless SRP didn't take the change; srpState stays WAITING meanwhile.
+  srpProblem: string | null;
 }
 const HOUSEHOLD_MEMBER_SELECTION = `${PERSON_NAME_SELECTION} inSrp`;
-const HOUSEHOLD_FIELDS = `id size address srpState contact { ${HOUSEHOLD_MEMBER_SELECTION} } members { ${HOUSEHOLD_MEMBER_SELECTION} }`;
+const HOUSEHOLD_FIELDS = `id size address srpState srpProblem contact { ${HOUSEHOLD_MEMBER_SELECTION} } members { ${HOUSEHOLD_MEMBER_SELECTION} }`;
 const PERSON_SUMMARY_SELECTION = `${PERSON_NAME_SELECTION} inSrp place { ${PLACE_SELECTION} } placeSync { status code }`;
 
 // individualDisplayName lives in personName.ts so browser code can use it without importing this
@@ -801,6 +803,27 @@ export async function setHouseholdContact(householdId: string, individualId: str
     }`;
   const data = await request<{ setHouseholdContact: Household }>(mutation, { householdId, individualId });
   return data.setHouseholdContact;
+}
+
+// Send our version of the household to SRP again (ours wins over a conflict).
+export async function retryHouseholdSrp(householdId: string): Promise<Household> {
+  const mutation = `
+    mutation RetryHouseholdSrp($householdId: String!) {
+      retryHouseholdSrp(householdId: $householdId) { ${HOUSEHOLD_FIELDS} }
+    }`;
+  const data = await request<{ retryHouseholdSrp: Household }>(mutation, { householdId });
+  return data.retryHouseholdSrp;
+}
+
+// Drop the changes made here. People only in the app leave the family at once; the rest follow SRP on the next read.
+// Returns null when nobody is left and the family dissolved.
+export async function takeSrpHousehold(householdId: string): Promise<Household | null> {
+  const mutation = `
+    mutation TakeSrpHousehold($householdId: String!) {
+      takeSrpHousehold(householdId: $householdId) { ${HOUSEHOLD_FIELDS} }
+    }`;
+  const data = await request<{ takeSrpHousehold: Household | null }>(mutation, { householdId });
+  return data.takeSrpHousehold;
 }
 
 export async function moveIndividuals(individualIds: string[], locationId: string, withHousehold: boolean): Promise<MoveResult[]> {

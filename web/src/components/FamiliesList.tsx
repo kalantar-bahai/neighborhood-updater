@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PersonSrpDot } from './SrpBadge';
 import FamilyPicker from './FamilyPicker';
-import { addCandidates, moveConfirmText, canRemoveMember, filterFamilies, hiddenText, sizeText, sortFamilies, srpBadge, startCandidates, type Candidate, type FamilyEntry, type FamilySort } from '@/lib/households';
+import { addCandidates, moveConfirmText, canRemoveMember, filterFamilies, hiddenText, sizeText, sortFamilies, srpBadge, srpProblemText, startCandidates, type Candidate, type FamilyEntry, type FamilySort } from '@/lib/households';
 
 // The Families card's list: households (and people with no household), searchable by anyone in them.
 type PickerState = { entry: FamilyEntry; mode: 'add' | 'start' };
@@ -11,7 +11,9 @@ type FamilyAction =
   | { action: 'create'; contactId: string; memberIds: string[] }
   | { action: 'add'; householdId: string; individualId: string; fromHouseholdId?: string }
   | { action: 'remove'; householdId: string; individualId: string }
-  | { action: 'contact'; householdId: string; individualId: string };
+  | { action: 'contact'; householdId: string; individualId: string }
+  | { action: 'retry'; householdId: string }
+  | { action: 'take'; householdId: string };
 
 const smallBtn = (disabled: boolean) => ({ minHeight: 44, padding: '4px 12px', borderRadius: 6, fontSize: 13, cursor: disabled ? 'default' : 'pointer', border: '1px solid #cbd5e0', background: 'white', color: disabled ? '#a0aec0' : '#2a4365' }) as const;
 
@@ -120,6 +122,7 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'block', fontSize: 14, color: '#2d3748' }}>{f.title}</span>
                   <span style={{ display: 'block', fontSize: 12, color: '#718096' }}>{f.address ?? 'No address in SRP'}</span>
+                  {f.srpProblem && <span style={{ display: 'block', fontSize: 12, color: '#c53030' }}>{srpProblemText(f.srpProblem, canEdit)}{canEdit && !open ? ' Open the family to fix it.' : ''}</span>}
                 </span>
                 {badge && <span style={{ fontSize: 11, color: '#744210', background: '#fefcbf', borderRadius: 8, padding: '1px 6px', whiteSpace: 'nowrap' }}>{badge}</span>}
                 <span style={{ fontSize: 11, color: '#4a5568', background: '#edf2f7', borderRadius: 8, padding: '1px 6px', whiteSpace: 'nowrap' }}>{sizeText(f.size)}</span>
@@ -153,6 +156,18 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
                       onClick={() => setPicker({ entry: f, mode: isHousehold ? 'add' : 'start' })}>
                       {isHousehold ? 'Add someone…' : 'Start a family with…'}
                     </button>
+                  )}
+                  {canEdit && isHousehold && f.srpProblem && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+                      <button type="button" disabled={busy} style={smallBtn(busy)}
+                        onClick={() => { if (f.srpProblem === 'SRP_CONFLICT' && !window.confirm('Replace the changes made in SRP with this family?')) return; run(f.key, { action: 'retry', householdId: f.householdId! }); }}>
+                        {f.srpProblem === 'SRP_CONFLICT' ? 'Keep ours' : 'Send again'}
+                      </button>
+                      <button type="button" disabled={busy} style={smallBtn(busy)}
+                        onClick={() => { if (window.confirm("Use SRP's version? This family will be replaced by what SRP has on the next update. People only in Nucleus Assistant leave the family now.")) run(f.key, { action: 'take', householdId: f.householdId! }); }}>
+                        Use SRP&apos;s version
+                      </button>
+                    </div>
                   )}
                   {errors[f.key] && <div role="alert" style={{ color: '#c53030', marginTop: 6 }}>{errors[f.key]}</div>}
                 </div>
