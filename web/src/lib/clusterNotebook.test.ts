@@ -11,6 +11,7 @@ import {
   getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusCounts, getNucleusHouseholds, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext, createHousehold, addHouseholdMember, removeHouseholdMember, setHouseholdContact, retryHouseholdSrp, takeSrpHousehold,
   getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople, getPeopleNotInSrp, getRoleHoldersWithoutAccess, getChangeLog,
   getParticipationSpaces, getParticipationSpace, updateParticipationRecord,
+  createParticipationSpace, updateParticipationSpace, createParticipationRecord, deleteParticipationRecord, getSpaceKinds,
   getMe, inviteIndividual, resendInvitation, revokeInvitation, removeAccess, restoreAccess, getInvitations, getAccounts,
 } from './clusterNotebook';
 import type { Individual, PersonSummary, NucleusPerson, MoveResult, MoveContext, PersonDetails } from './clusterNotebook';
@@ -1454,6 +1455,49 @@ describe('participation spaces', () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { participationSpaces: [{ ...space('s1'), records: [], people: { recordCount: 0, people: [] } }, detail] } } }));
     expect(await getParticipationSpace('Alpha', 's2', '2026-09-04')).toEqual(detail);
     expect(await getParticipationSpace('Alpha', 'zzz', '2026-09-04')).toBeNull();
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('participationSpaces(includeArchived: true)');
+    expect(body.variables).toEqual({ name: 'Alpha', since: '2026-09-04', limit: 20, offset: 0 });
+  });
+
+  test('createParticipationSpace sends the mode as a SpaceMode', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { createParticipationSpace: space('s3') } }));
+    expect(await createParticipationSpace('n1', 'Space s3', 'reflection', 'EACH_TIME')).toEqual(space('s3'));
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('$mode: SpaceMode!');
+    expect(body.variables).toEqual({ nucleusId: 'n1', name: 'Space s3', kind: 'reflection', mode: 'EACH_TIME' });
+  });
+
+  test('updateParticipationSpace sends only the given fields', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { updateParticipationSpace: space('s1') } }));
+    await updateParticipationSpace('s1', { archived: false });
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('updateParticipationSpace(id: $id, name: $name, kind: $kind, archived: $archived)');
+    expect(body.variables).toEqual({ id: 's1', archived: false });
+  });
+
+  test('createParticipationRecord sends the date as a Date and the people as ids', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { createParticipationRecord: { id: 'r1' } } }));
+    await createParticipationRecord('s1', { date: '2026-11-20', count: 7, note: null, personIds: ['p1'] });
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('$date: Date!');
+    expect(body.query).toContain('$personIds: [String!]');
+    expect(body.variables).toEqual({ spaceId: 's1', date: '2026-11-20', count: 7, note: null, personIds: ['p1'] });
+  });
+
+  test('deleteParticipationRecord returns the result', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { deleteParticipationRecord: true } }));
+    expect(await deleteParticipationRecord('r1')).toBe(true);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('deleteParticipationRecord(id: $id)');
+    expect(body.variables).toEqual({ id: 'r1' });
+  });
+
+  test('getSpaceKinds returns the kinds', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { spaceKinds: [{ key: 'reflection', label: 'Reflection' }] } }));
+    expect(await getSpaceKinds()).toEqual([{ key: 'reflection', label: 'Reflection' }]);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('spaceKinds { key label }');
   });
 
   test('updateParticipationRecord sends only the given variables; note null clears', async () => {
