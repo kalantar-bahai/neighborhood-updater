@@ -15,7 +15,7 @@ import { clusterNotebookErrorResponse } from '@/lib/clusterNotebookError';
 import { familyEntries } from '@/lib/households';
 import { isId, parseAction, parsePersonName } from '@/lib/familyActions';
 
-// The Families card's list: one entry per household, plus one per visible person with no household.
+// The Families card's list: one entry per household, plus one per visible resident with no household.
 export async function GET(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) {

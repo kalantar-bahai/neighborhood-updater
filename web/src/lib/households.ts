@@ -41,8 +41,10 @@ export function familyEntries(households: Household[], people: NucleusPerson[]):
     familyName: (h.contact ?? h.members[0])?.familyName ?? '',
     firstName: (h.contact ?? h.members[0])?.firstName ?? '',
   }));
+  // Families are residents only (owner, 2026-11-27): a role holder who lives elsewhere, such as a contact, gets no entry.
+  // Confirmed with cluster-notebook 2026-11-27 (PR #70): namedHouseholds follows the same rule.
   for (const p of people) {
-    if (p.hidden || p.individual.household) continue;
+    if (p.hidden || !p.isResident || p.individual.household) continue;
     const m = toMember(p.individual, false);
     entries.push({ key: `person:${p.individual.id}`, title: m.name, address: p.address?.trim() || null, size: 1, members: [m], hidden: 0, householdId: null, srpState: null, srpProblem: null,
       familyName: p.individual.familyName ?? '', firstName: p.individual.firstName ?? '',

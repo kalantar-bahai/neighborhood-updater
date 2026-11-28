@@ -65,14 +65,6 @@ function rowToForm(row: NucleusRow): FormState {
   return { ...row };
 }
 
-function computedPct(connected: string, total: string): string {
-  const c = parseFloat(connected);
-  const t = parseFloat(total);
-  if (!c || !t || t === 0) return '';
-  const pct = (c / t) * 100;
-  return (pct <= 1.0 ? +pct.toFixed(2) : +pct.toFixed(1)) + '%';
-}
-
 function isValidInt(v: string) { return !v || /^\d+$/.test(v.trim()); }
 
 // The three actually-editable Activity fields -- excludes isOverridden, which is
@@ -271,28 +263,6 @@ function InfoTip({ text }: { text: string }) {
         document.body
       )}
     </>
-  );
-}
-
-function PairField({ label, numVal, pctVal, onNumChange, onNumBlur, readonly, pctReadonly, numInteger, fromSheet, info }: {
-  label: string; numVal: string; pctVal: string;
-  onNumChange: (v: string) => void; onNumBlur?: () => void; readonly?: boolean; pctReadonly?: boolean; numInteger?: boolean; fromSheet?: boolean; info?: string;
-}) {
-  const hasError = numInteger && !readonly && !isValidInt(numVal);
-  return (
-    <div className={`pair-field${fromSheet ? ' from-sheet' : ''}`}>
-      <label>{label}{info && <InfoTip text={info} />}</label>
-      <div className="pair-inputs">
-        <input
-          type="text" value={numVal || ''} placeholder="#" readOnly={readonly}
-          className={[readonly ? 'ro' : '', hasError ? 'error' : ''].filter(Boolean).join(' ') || undefined}
-          onChange={e => onNumChange(e.target.value)}
-          onBlur={onNumBlur}
-          onKeyDown={onNumBlur ? (e => { if (e.key === 'Enter') e.currentTarget.blur(); }) : undefined}
-        />
-        <input type="text" value={pctVal || ''} placeholder="%" className={`pct${pctReadonly ? ' ro' : ''}`} readOnly={pctReadonly} />
-      </div>
-    </div>
   );
 }
 
@@ -688,6 +658,8 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
   const [overviewOpen, setOverviewOpen] = card('overview', false);
   const [peopleOpen, setPeopleOpen] = card('people', false);
   const [familiesOpen, setFamiliesOpen] = card('families', true);
+  // The Families list's entry count, shown as "(C)" after Households Connected; undefined until it loads.
+  const [familyCount, setFamilyCount] = useState<number | undefined>(undefined);
   const [activitiesOpen, setActivitiesOpen] = card('activities', true);
   // "This nucleus" (editable, the default) or the group's totals; kept with the page state like the open cards.
   const [activitiesGroup, setActivitiesGroup] = card('activitiesGroup', false);
@@ -1418,14 +1390,14 @@ export default function DetailView({ detail, permissions, email, showBack, onBac
                   meaningless now that the Overview card's "In Conversation" field covers
                   the same idea with real SRP sync. The underlying cluster-notebook field
                   (connectedPopulation) is untouched -- just no longer shown/edited here. */}
-              <PairField
+              {/* Owner, 2026-11-27: the "%" box is gone; "(C)" is the Families list's count, one-person entries included. */}
+              <Field
                 label="Households Connected"
                 info="Number of households where at least one person is engaged in a conversation about the Faith, participating, serving, and/or accompanying others."
-                numVal={form.hhNum} pctVal={computedPct(form.hhNum, form.totalHH)}
-                onNumChange={v => set('hhNum', v)} onNumBlur={() => commitField('hhNum', 'Households Connected', true)} readonly={!canWrite} pctReadonly numInteger
+                value={form.hhNum} onChange={v => set('hhNum', v)} onBlur={() => commitField('hhNum', 'Households Connected', true)} readonly={!canWrite} integer named={familyCount}
               />
             </div>
-            <FamiliesList nucleus={row.nucleus} refreshKey={peopleRefresh + peopleChanged} canEdit={permissions.canWrite} onChanged={() => setPeopleRefresh(n => n + 1)} />
+            <FamiliesList nucleus={row.nucleus} refreshKey={peopleRefresh + peopleChanged} canEdit={permissions.canWrite} onChanged={() => setPeopleRefresh(n => n + 1)} onCount={setFamilyCount} />
           </div>}
         </div>
 

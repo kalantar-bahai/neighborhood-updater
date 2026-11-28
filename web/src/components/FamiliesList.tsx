@@ -17,7 +17,7 @@ type FamilyAction =
 
 const smallBtn = (disabled: boolean) => ({ minHeight: 44, padding: '4px 12px', borderRadius: 6, fontSize: 13, cursor: disabled ? 'default' : 'pointer', border: '1px solid #cbd5e0', background: 'white', color: disabled ? '#a0aec0' : '#2a4365' }) as const;
 
-export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }: { nucleus: string; refreshKey: number; canEdit: boolean; onChanged: () => void }) {
+export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged, onCount }: { nucleus: string; refreshKey: number; canEdit: boolean; onChanged: () => void; onCount?: (n: number) => void }) {
   const [families, setFamilies] = useState<FamilyEntry[] | null>(null);
   const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState('');
@@ -64,11 +64,11 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
       .then(async res => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to load families');
-        if (live) { setFamilies(data.families); setLoadError(''); setSavingKey(null); }
+        if (live) { setFamilies(data.families); setLoadError(''); setSavingKey(null); onCount?.(data.families.length); }
       })
       .catch((e: unknown) => { if (live) { setLoadError(e instanceof Error ? e.message : String(e)); setSavingKey(null); } });
     return () => { live = false; };
-  }, [nucleus, refreshKey]);
+  }, [nucleus, refreshKey, onCount]);
 
   if (loadError) return <div style={{ fontSize: 13, color: '#c53030', marginTop: 12 }}>{loadError}</div>;
   if (!families) return <div style={{ fontSize: 13, color: '#718096', marginTop: 12 }}>Loading families…</div>;
@@ -103,7 +103,8 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
       {families.length === 0 && !query.trim() && (
         <div style={{ fontSize: 13, color: '#718096', marginTop: 10 }}>No people in this nucleus yet.</div>
       )}
-      <div style={{ marginTop: 8 }}>
+      {/* Same height as the People card's list: about 10 rows, then it scrolls (owner, 2026-11-27). */}
+      <div style={{ marginTop: 8, maxHeight: 360, overflowY: 'auto' }}>
         {shown.map(f => {
           const open = openKeys.has(f.key);
           const hidden = hiddenText(f.hidden);
