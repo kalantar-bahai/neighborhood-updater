@@ -1430,4 +1430,10 @@ describe('household mutations', () => {
     expect(q).toContain('takeSrpHousehold(householdId: $householdId)');
     expect(q).toContain('srpProblem');
   });
+
+  test('takeSrpHousehold passes null through when the family dissolved', async () => {
+    const { out, vars } = await run('takeSrpHousehold', () => takeSrpHousehold('h1'), null);
+    expect(out).toBeNull();
+    expect(vars).toEqual({ householdId: 'h1' });
+  });
 });

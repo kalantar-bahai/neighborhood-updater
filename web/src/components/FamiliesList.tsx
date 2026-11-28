@@ -164,7 +164,7 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged }
                         {f.srpProblem === 'SRP_CONFLICT' ? 'Keep ours' : 'Send again'}
                       </button>
                       <button type="button" disabled={busy} style={smallBtn(busy)}
-                        onClick={() => { if (window.confirm('Drop the changes made here? The family will match SRP after the next read.')) run(f.key, { action: 'take', householdId: f.householdId! }); }}>
+                        onClick={() => { if (window.confirm("Use SRP's version? This family will be replaced by what SRP has on the next update. People only in Nucleus Assistant leave the family now.")) run(f.key, { action: 'take', householdId: f.householdId! }); }}>
                         Use SRP&apos;s version
                       </button>
                     </div>

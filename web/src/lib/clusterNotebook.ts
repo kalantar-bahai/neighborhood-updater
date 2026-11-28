@@ -815,13 +815,14 @@ export async function retryHouseholdSrp(householdId: string): Promise<Household>
   return data.retryHouseholdSrp;
 }
 
-// Drop the changes made here; the next read makes the household match SRP.
-export async function takeSrpHousehold(householdId: string): Promise<Household> {
+// Drop the changes made here. People only in the app leave the family at once; the rest follow SRP on the next read.
+// Returns null when nobody is left and the family dissolved.
+export async function takeSrpHousehold(householdId: string): Promise<Household | null> {
   const mutation = `
     mutation TakeSrpHousehold($householdId: String!) {
       takeSrpHousehold(householdId: $householdId) { ${HOUSEHOLD_FIELDS} }
     }`;
-  const data = await request<{ takeSrpHousehold: Household }>(mutation, { householdId });
+  const data = await request<{ takeSrpHousehold: Household | null }>(mutation, { householdId });
   return data.takeSrpHousehold;
 }
 

@@ -685,7 +685,7 @@ setHouseholdContact(householdId: String!, individualId: String!): Household!
 Household.srpState: HouseholdSrpState!   # IN_SRP | WAITING | LOCAL_ONLY
 Household.srpProblem: String             # null unless SRP didn't take the change
 retryHouseholdSrp(householdId: String!): Household!
-takeSrpHousehold(householdId: String!): Household!
+takeSrpHousehold(householdId: String!): Household   # null when the household dissolved
 ```
 
 - **Rights:** the caller must be allowed to move each person a call touches.
@@ -707,6 +707,7 @@ takeSrpHousehold(householdId: String!): Household!
   - Codes we word: `SRP_CONFLICT`, `OTHER_HOUSEHOLD_CONTACT`, `PLACE_MISMATCH`, `OUTSIDE_WRITABLE_SCOPE`, `MEMBER_NOT_IN_SRP`, `STATE_CHANGED`, `NOT_CONVERGED`. Any other code gets a generic line with the code.
   - `retryHouseholdSrp` sends ours again; over a conflict, ours wins.
   - `takeSrpHousehold` drops the changes made here; the next read makes it match SRP.
+  - `takeSrpHousehold` returns a nullable `Household`: null when nobody is left and the family dissolved. People only in the app leave the family at once; the rest follow SRP on the next read. Confirmed with cluster-notebook 2026-11-27.
   - Both are FORBIDDEN unless the caller may move the household's contact, and `HOUSEHOLD_NOT_FOUND` otherwise.
   - Any edit clears the problem and resends.
 - **Moving a person who is in a household:** confirmed with cluster-notebook 2026-11-27 (PR #65).
