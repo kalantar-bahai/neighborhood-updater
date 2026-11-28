@@ -78,6 +78,16 @@ const CODED_ERRORS: Record<string, { status: number; message: string | null | ((
   // Confirmed with cluster-notebook 2026-11-27 (their #60): a new parent needs edit rights on it, since its contacts and
   // accompaniers gain access to the child. Re-setting or clearing the parent needs none.
   PARENT_FORBIDDEN: { status: 403, message: "You can't put a nucleus under one you can't edit." },
+  // Confirmed with cluster-notebook 2026-11-27 (#66): participation spaces and records. NAME_TAKEN and
+  // INDIVIDUAL_NOT_FOUND also apply here; the participation routes reword them with `messages`.
+  NUCLEUS_NOT_FOUND: { status: 404, message: 'Nucleus not found.' },
+  SPACE_NOT_FOUND: { status: 404, message: "That space wasn't found. It may have been removed." },
+  RECORD_NOT_FOUND: { status: 404, message: "That record wasn't found. It may have been removed." },
+  UNKNOWN_KIND: { status: 400, message: 'Choose a kind from the list.' },
+  BAD_COUNT: { status: 400, message: 'The number of participants must be 0 or more.' },
+  NAMED_EXCEED_COUNT: { status: 400, message: 'More people are named than took part. Raise the number or remove a name.' },
+  OTHER_CLUSTER: { status: 400, message: 'Only people in this cluster can be named.' },
+  SPACE_ARCHIVED: { status: 409, message: 'This space is archived. Restore it to record again.' },
   BAD_INPUT: { status: 400, message: null },
   CLERK_ERROR: { status: 502, message: "The invitation email couldn't be sent. Try again." },
   CLERK_NOT_CONFIGURED: { status: 503, message: "Invitations aren't set up yet." },

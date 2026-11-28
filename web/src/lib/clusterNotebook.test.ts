@@ -10,6 +10,8 @@ import {
   getClusters, createNucleus, deleteNucleus, ClusterNotebookForbiddenError, ClusterNotebookCodedError, pushNucleusToSrp,
   getMyPermissions, getAssignableRoleDetails, getIsAdministrator, getLocationOptions, getNucleusPeople, getNucleusCounts, getNucleusHouseholds, hideIndividual, unhideIndividual, getPersonDetails, moveIndividuals, getMoveContext, createHousehold, addHouseholdMember, removeHouseholdMember, setHouseholdContact, retryHouseholdSrp, takeSrpHousehold,
   getAdminClusters, searchPeople, getIndividualRoles, getAdminPlaces, getAssignableRolesAt, grantRole, endRole, getHiddenPeople, getPeopleNotInSrp, getRoleHoldersWithoutAccess, getChangeLog,
+  getParticipationSpaces, getParticipationSpace, updateParticipationRecord,
+  createParticipationSpace, updateParticipationSpace, createParticipationRecord, deleteParticipationRecord, getSpaceKinds,
   getMe, inviteIndividual, resendInvitation, revokeInvitation, removeAccess, restoreAccess, getInvitations, getAccounts,
 } from './clusterNotebook';
 import type { Individual, PersonSummary, NucleusPerson, MoveResult, MoveContext, PersonDetails } from './clusterNotebook';
@@ -831,7 +833,7 @@ describe('getNucleusPeople', () => {
     const person: NucleusPerson = {
       individual: { id: '7', firstName: 'Ana', familyName: 'Lopez', middleNames: null, nickname: null, place: { id: 'S1', name: 'Parkside', type: 'SETTING', locality: 'Chapelboro', cluster: 'Chapel Hill', localityId: 'L1', homeNucleus: 'Alpha' }, placeSync: { status: 'pending', code: null }, inSrp: false },
       address: null, roles: ['promoter'], isResident: true, ageCategory: null, devotionalHost: null,
-      participates: true, facilitates: false, hidden: false, hide: null,
+      participates: true, inSpaces: false, facilitates: false, hidden: false, hide: null,
       participation: [{ activityId: 'A1', activityType: 'sc', heldAt: 'Parkside', role: 'PARTICIPANT', studyItem: 'Book 1', studyItemTitle: 'Reflections on the Life of the Spirit', startDate: '2026-01-05', endDate: null, completed: false, current: true, studyItemShortName: 'B1', personCompleted: null }],
     };
     mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { people: [person] } } }));
@@ -841,7 +843,7 @@ describe('getNucleusPeople', () => {
     expect(result).toEqual([person]);
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body.variables).toEqual({ name: 'Alpha' });
-    expect((body.query as string).replace(/\s+/g, ' ')).toContain('people(includeHidden: true) { individual { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } household { id size address srpState srpProblem contact { id firstName familyName middleNames nickname inSrp } members { id firstName familyName middleNames nickname inSrp } } } address roles isResident ageCategory devotionalHost participates facilitates participation { activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current studyItemShortName personCompleted } hidden hide { hiddenAt reason hiddenBy { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } } }');
+    expect((body.query as string).replace(/\s+/g, ' ')).toContain('people(includeHidden: true) { individual { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } household { id size address srpState srpProblem contact { id firstName familyName middleNames nickname inSrp } members { id firstName familyName middleNames nickname inSrp } } } address roles isResident ageCategory devotionalHost participates inSpaces facilitates participation { activityId activityType heldAt role studyItem studyItemTitle startDate endDate completed current studyItemShortName personCompleted } hidden hide { hiddenAt reason hiddenBy { id firstName familyName middleNames nickname inSrp place { id name type locality cluster localityId homeNucleus } placeSync { status code } } } }');
   });
 
   test('returns null when the nucleus is not found', async () => {
@@ -985,7 +987,7 @@ describe('hideIndividual / unhideIndividual', () => {
   const person = {
     individual: { id: '7', firstName: 'Ana', familyName: 'Lopez', middleNames: null, nickname: null, place: null, placeSync: null, inSrp: false },
     address: null,
-    roles: [], isResident: true, ageCategory: null, devotionalHost: null, participates: false, facilitates: false,
+    roles: [], isResident: true, ageCategory: null, devotionalHost: null, participates: false, inSpaces: false, facilitates: false,
     participation: [], hidden: true, hide: { hiddenAt: '2026-11-23T10:00:00Z', reason: 'Moved away', hiddenBy: null },
   } as NucleusPerson;
 
@@ -1435,5 +1437,74 @@ describe('household mutations', () => {
     const { out, vars } = await run('takeSrpHousehold', () => takeSrpHousehold('h1'), null);
     expect(out).toBeNull();
     expect(vars).toEqual({ householdId: 'h1' });
+  });
+});
+
+describe('participation spaces', () => {
+  const space = (id: string) => ({ id, name: `Space ${id}`, kind: 'reflection', mode: 'EACH_TIME', createdAt: '2026-11-01T00:00:00Z', archivedAt: null, recordCount: 0, total: 0, latestRecord: null });
+
+  test('getParticipationSpaces returns nucleusId and spaces, null for an unknown nucleus', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ data: { nucleus: { id: 'n1', participationSpaces: [space('s1')] } } }));
+    expect(await getParticipationSpaces('Alpha')).toEqual({ nucleusId: 'n1', spaces: [space('s1')] });
+    mockFetch.mockResolvedValueOnce(jsonResponse({ data: { nucleus: null } }));
+    expect(await getParticipationSpaces('Nope')).toBeNull();
+  });
+
+  test('getParticipationSpace picks the space by id, null when absent', async () => {
+    const detail = { ...space('s2'), records: [], people: { recordCount: 0, people: [] } };
+    mockFetch.mockResolvedValue(jsonResponse({ data: { nucleus: { participationSpaces: [{ ...space('s1'), records: [], people: { recordCount: 0, people: [] } }, detail] } } }));
+    expect(await getParticipationSpace('Alpha', 's2', '2026-09-04')).toEqual(detail);
+    expect(await getParticipationSpace('Alpha', 'zzz', '2026-09-04')).toBeNull();
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('participationSpaces(includeArchived: true)');
+    expect(body.variables).toEqual({ name: 'Alpha', since: '2026-09-04', limit: 20, offset: 0 });
+  });
+
+  test('createParticipationSpace sends the mode as a SpaceMode', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { createParticipationSpace: space('s3') } }));
+    expect(await createParticipationSpace('n1', 'Space s3', 'reflection', 'EACH_TIME')).toEqual(space('s3'));
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('$mode: SpaceMode!');
+    expect(body.variables).toEqual({ nucleusId: 'n1', name: 'Space s3', kind: 'reflection', mode: 'EACH_TIME' });
+  });
+
+  test('updateParticipationSpace sends only the given fields', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { updateParticipationSpace: space('s1') } }));
+    await updateParticipationSpace('s1', { archived: false });
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('updateParticipationSpace(id: $id, name: $name, kind: $kind, archived: $archived)');
+    expect(body.variables).toEqual({ id: 's1', archived: false });
+  });
+
+  test('createParticipationRecord sends the date as a Date and the people as ids', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { createParticipationRecord: { id: 'r1' } } }));
+    await createParticipationRecord('s1', { date: '2026-11-20', count: 7, note: null, personIds: ['p1'] });
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('$date: Date!');
+    expect(body.query).toContain('$personIds: [String!]');
+    expect(body.variables).toEqual({ spaceId: 's1', date: '2026-11-20', count: 7, note: null, personIds: ['p1'] });
+  });
+
+  test('deleteParticipationRecord returns the result', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { deleteParticipationRecord: true } }));
+    expect(await deleteParticipationRecord('r1')).toBe(true);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('deleteParticipationRecord(id: $id)');
+    expect(body.variables).toEqual({ id: 'r1' });
+  });
+
+  test('getSpaceKinds returns the kinds', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { spaceKinds: [{ key: 'reflection', label: 'Reflection' }] } }));
+    expect(await getSpaceKinds()).toEqual([{ key: 'reflection', label: 'Reflection' }]);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.query).toContain('spaceKinds { key label }');
+  });
+
+  test('updateParticipationRecord sends only the given variables; note null clears', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { updateParticipationRecord: { id: 'r1' } } }));
+    await updateParticipationRecord('r1', { note: null });
+    const vars = JSON.parse(mockFetch.mock.calls[0][1].body).variables;
+    expect(vars).toEqual({ id: 'r1', note: null });
+    expect('count' in vars).toBe(false);
   });
 });

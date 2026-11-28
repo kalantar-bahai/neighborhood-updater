@@ -7,7 +7,7 @@ const perms = (over: Partial<PermissionSet> = {}): PermissionSet => ({
   assignableRoles: [], createableEntityTypes: [], ...over,
 });
 
-const row = (name: string, roles: string[], isResident = false): PersonRow => ({ id: name, name, familyFirst: name, roles, isResident, place: null, placeSync: null, inSrp: true, ageCategory: null, devotionalHost: null, participates: false, facilitates: false, participation: [], hidden: false, hide: null });
+const row = (name: string, roles: string[], isResident = false): PersonRow => ({ id: name, name, familyFirst: name, roles, isResident, place: null, placeSync: null, inSrp: true, ageCategory: null, devotionalHost: null, participates: false, inSpaces: false, facilitates: false, participation: [], hidden: false, hide: null });
 
 describe('placePath', () => {
   test('a Setting shows cluster, locality and setting', () => {
@@ -55,10 +55,10 @@ describe('canEditRole', () => {
 describe('peopleFilters', () => {
   const rows = [row('Ana', ['contact']), row('Ben', ['promoter', 'cso']), row('Cy', [], true)];
   test('home nucleus: the Overview card\'s order, then contact, unknown roles last', () => {
-    expect(peopleFilters(rows, true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'cso', 'hidden']);
+    expect(peopleFilters(rows, true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'devotional-host', 'educational', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'cso', 'hidden']);
   });
   test('non-home nucleus has no resident filter', () => {
-    expect(peopleFilters(rows, false).map(f => f.key)).toEqual(['all', 'member', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'cso', 'hidden']);
+    expect(peopleFilters(rows, false).map(f => f.key)).toEqual(['all', 'member', 'promoter', 'devotional-host', 'educational', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'cso', 'hidden']);
   });
   test('member filter only off a home nucleus', () => {
     expect(peopleFilters(rows, false)[1]).toEqual({ key: 'member', label: 'Member' });
@@ -66,7 +66,7 @@ describe('peopleFilters', () => {
     expect(peopleFilters(rows, true).some(f => f.key === 'member')).toBe(false);
   });
   test('every known role shows even when nobody holds it', () => {
-    expect(peopleFilters([], true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'devotional-host', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'hidden']);
+    expect(peopleFilters([], true).map(f => f.key)).toEqual(['all', 'resident', 'promoter', 'devotional-host', 'educational', 'participating', 'facilitating', 'protagonist', 'accompanier', 'contact', 'hidden']);
   });
   test('labels', () => {
     expect(peopleFilters(rows, true).slice(0, 3).map(f => f.label)).toEqual(['All', 'Resident', 'Promoting']);
@@ -196,14 +196,14 @@ describe('nextRoleIds', () => {
 });
 
 describe('toPersonRow', () => {
-  const noActivity = { participates: false, facilitates: false, participation: [] };
+  const noActivity = { participates: false, inSpaces: false, facilitates: false, participation: [] };
   const noHide = { hidden: false, hide: null };
   const noAddr = { address: null };
   test('activity fields pass through', () => {
     const ind = { id: '4', firstName: 'Di', middleNames: null, familyName: null, nickname: null, place: null, placeSync: null, inSrp: true };
     const participation = [act({})];
-    const r = toPersonRow({ individual: ind, roles: [], isResident: false, ageCategory: null, devotionalHost: null, participates: true, facilitates: true, participation, hidden: false, hide: null, address: null });
-    expect([r.participates, r.facilitates, r.participation]).toEqual([true, true, participation]);
+    const r = toPersonRow({ individual: ind, roles: [], isResident: false, ageCategory: null, devotionalHost: null, participates: true, inSpaces: true, facilitates: true, participation, hidden: false, hide: null, address: null });
+    expect([r.participates, r.inSpaces, r.facilitates, r.participation]).toEqual([true, true, true, participation]);
   });
   test('uses the display name and keeps roles and residency', () => {
     const r = toPersonRow({
@@ -417,12 +417,22 @@ describe('activity filters', () => {
   const r = (name: string, participates: boolean, facilitates: boolean): PersonRow => ({ ...row(name, []), participates, facilitates });
   const rows = [r('A', true, false), r('B', false, true), r('C', true, true), r('D', false, false)];
   test('follow devotional host, always listed', () => {
-    expect(peopleFilters([], false).map(f => f.key).slice(3, 6)).toEqual(['devotional-host', 'participating', 'facilitating']);
+    expect(peopleFilters([], false).map(f => f.key).slice(3, 7)).toEqual(['devotional-host', 'educational', 'participating', 'facilitating']);
     expect(peopleFilters([], false).find(f => f.key === 'facilitating')?.label).toBe('Facilitating');
+    expect(peopleFilters([], false).find(f => f.key === 'educational')?.label).toBe('In educational activities');
+    expect(peopleFilters([], false).find(f => f.key === 'participating')?.label).toBe('Participating');
   });
   test('keep those taking part or facilitating', () => {
-    expect(filterPeople(rows, 'participating', '').map(x => x.name)).toEqual(['A', 'C']);
+    expect(filterPeople(rows, 'educational', '').map(x => x.name)).toEqual(['A', 'C']);
     expect(filterPeople(rows, 'facilitating', '').map(x => x.name)).toEqual(['B', 'C']);
+  });
+});
+
+describe('participating filter', () => {
+  const r = (name: string, inSpaces: boolean, roles: string[] = []): PersonRow => ({ ...row(name, roles), inSpaces });
+  test('keeps people named in a space, with or without roles', () => {
+    const rows = [r('A', true), r('B', false), r('C', true, ['promoter'])];
+    expect(filterPeople(rows, 'participating', '').map(x => x.name)).toEqual(['A', 'C']);
   });
 });
 

@@ -10,7 +10,7 @@ export type PersonRow = {
   id: string; name: string; familyFirst: string; roles: string[]; isResident: boolean;
   place: PlaceSummary | null; placeSync: PlaceSync | null; inSrp: boolean;
   ageCategory: AgeCategory | null; devotionalHost: DevotionalHostRole | null;
-  participates: boolean; facilitates: boolean; participation: Participation[];
+  participates: boolean; inSpaces: boolean; facilitates: boolean; participation: Participation[];
   hidden: boolean; hide: PersonHide | null;
   // Who else moves with them (null: no household).
   household?: Household | null;
@@ -31,7 +31,7 @@ export const KNOWN_ROLES = ROLES.map(r => r.role);
 export const RESIDENT = { label: 'Resident', icon: '🏠' };
 export const DEVOTIONAL_HOST = { label: 'Devotional host', icon: '🕯' };
 export const FACILITATES = { label: 'Facilitating', icon: '🎓' };
-export const PARTICIPATES = { label: 'Participating', icon: '📖' };
+export const PARTICIPATES = { label: 'In educational activities', icon: '📖' };
 const ACTIVITY_TYPES: Record<string, string> = { cc: "Children's class", jyg: 'Junior youth group', sc: 'Study circle' };
 export const AGE_LABELS: Record<AgeCategory, string> = {
   CHILD: 'Child', JUNIOR_YOUTH: 'Junior Youth', YOUTH: 'Youth', ADULT: 'Adult',
@@ -80,12 +80,13 @@ export function editorRoleList(isHome: boolean, held: string[]): string[] {
 }
 
 // The main filter follows the Overview card's order (owner, 2026-11-21): Promoting, Devotional host,
-// Participating, Facilitating, Helping Others, Accompanying; then Contact and any other role someone holds.
+// In educational activities, Participating (named in a space), Facilitating, Helping Others, Accompanying; then Contact and any other role someone holds.
 // Every one of these always shows, so the list doesn't change from nucleus to nucleus.
 const PRIMARY_FILTERS: { key: string; label: string }[] = [
   { key: 'promoter', label: roleLabel('promoter').label },
   { key: 'devotional-host', label: DEVOTIONAL_HOST.label },
-  { key: 'participating', label: PARTICIPATES.label },
+  { key: 'educational', label: PARTICIPATES.label },
+  { key: 'participating', label: 'Participating' },
   { key: 'facilitating', label: FACILITATES.label },
   { key: 'protagonist', label: roleLabel('protagonist').label },
   { key: 'accompanier', label: roleLabel('accompanier').label },
@@ -113,7 +114,8 @@ function matchesFilter(r: PersonRow, filter: string): boolean {
   if (r.hidden) return false;
   if (filter === 'all') return true;
   if (filter === 'resident') return r.isResident;
-  if (filter === 'participating') return r.participates;
+  if (filter === 'educational') return r.participates;
+  if (filter === 'participating') return r.inSpaces;
   if (filter === 'facilitating') return r.facilitates;
   if (filter === 'devotional-host') return r.devotionalHost !== null;
   return r.roles.includes(filter);
@@ -152,7 +154,7 @@ export function toPersonRow(p: NucleusPerson): PersonRow {
     id: ind.id, name: individualDisplayName(ind), familyFirst, roles: p.roles, isResident: p.isResident,
     place: ind.place, placeSync: ind.placeSync, inSrp: ind.inSrp,
     ageCategory: p.ageCategory, devotionalHost: p.devotionalHost,
-    participates: p.participates, facilitates: p.facilitates, participation: p.participation,
+    participates: p.participates, inSpaces: p.inSpaces, facilitates: p.facilitates, participation: p.participation,
     hidden: p.hidden, hide: p.hide, household: ind.household,
   };
 }

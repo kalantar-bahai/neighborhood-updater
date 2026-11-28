@@ -4,14 +4,25 @@
 // point at the wrong nucleus.
 
 const PARAM = 'nucleus';
+const SPACE_PARAM = 'space';
 
 export function nucleusIdFromSearch(search: string): string | null {
   const id = new URLSearchParams(search).get(PARAM)?.trim();
   return id ? id : null;
 }
 
-export function nucleusHref(id: string | null): string {
-  return id ? `/?${new URLSearchParams({ [PARAM]: id })}` : '/';
+// A space's page is the nucleus page with the space in the address too. Without a nucleus there is nothing to
+// put the space under, so the space is dropped.
+export function spaceIdFromSearch(search: string): string | null {
+  const id = new URLSearchParams(search).get(SPACE_PARAM)?.trim();
+  return id ? id : null;
+}
+
+export function nucleusHref(id: string | null, spaceId?: string | null): string {
+  if (!id) return '/';
+  const params = new URLSearchParams({ [PARAM]: id });
+  if (spaceId) params.set(SPACE_PARAM, spaceId);
+  return `/?${params}`;
 }
 
 export type UrlNucleus = { kind: 'none' } | { kind: 'open'; name: string } | { kind: 'missing' };
@@ -23,4 +34,25 @@ export function nucleusFromUrl(search: string, rows: { id: string; nucleus: stri
   if (!id) return { kind: 'none' };
   const row = rows.find(r => r.id === id);
   return row ? { kind: 'open', name: row.nucleus } : { kind: 'missing' };
+}
+
+// What is shown: the list (no nucleus), a nucleus page, or one of its spaces.
+export type Shown = { nucleus: string | null; space: string | null };
+
+// The key a page's open cards and scroll are saved under: '' for the list, the name for a nucleus page.
+export function viewKey(shown: Shown): string {
+  if (!shown.nucleus) return '';
+  return shown.space ? `${shown.nucleus}#space:${shown.space}` : shown.nucleus;
+}
+
+export type AddressTarget = { kind: 'list' } | { kind: 'nucleus'; name: string; space: string | null; refetch: boolean };
+
+// What the address (after browser Back or Forward) asks to show, given what is shown now. Moving between a nucleus
+// page and its spaces keeps the nucleus already loaded; anything else loads it. The same page again also reloads,
+// so the page is put back exactly as a fresh visit would.
+export function addressTarget(search: string, rows: { id: string; nucleus: string }[], shown: Shown): AddressTarget {
+  const n = nucleusFromUrl(search, rows);
+  if (n.kind !== 'open') return { kind: 'list' };
+  const space = spaceIdFromSearch(search);
+  return { kind: 'nucleus', name: n.name, space, refetch: !(shown.nucleus === n.name && shown.space !== space) };
 }

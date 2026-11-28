@@ -61,6 +61,14 @@ describe('clusterNotebookErrorResponse', () => {
     ['HOUSEHOLD_NOT_FOUND', 409, 'That family or person no longer exists. The list has been refreshed.'],
     ['INDIVIDUAL_NOT_FOUND', 409, 'That family or person no longer exists. The list has been refreshed.'],
     ['PARENT_FORBIDDEN', 403, "You can't put a nucleus under one you can't edit."],
+    ['NUCLEUS_NOT_FOUND', 404, 'Nucleus not found.'],
+    ['SPACE_NOT_FOUND', 404, "That space wasn't found. It may have been removed."],
+    ['RECORD_NOT_FOUND', 404, "That record wasn't found. It may have been removed."],
+    ['UNKNOWN_KIND', 400, 'Choose a kind from the list.'],
+    ['BAD_COUNT', 400, 'The number of participants must be 0 or more.'],
+    ['NAMED_EXCEED_COUNT', 400, 'More people are named than took part. Raise the number or remove a name.'],
+    ['OTHER_CLUSTER', 400, 'Only people in this cluster can be named.'],
+    ['SPACE_ARCHIVED', 409, 'This space is archived. Restore it to record again.'],
     ['SOMETHING_NEW', 502, 'cluster-notebook GraphQL error: upstream: 3 groups in use'],
   ])('maps coded error %s to status %i with { error, code }', async (code, status, error) => {
     const res = clusterNotebookErrorResponse(new ClusterNotebookCodedError('cluster-notebook GraphQL error: upstream: 3 groups in use', code, 'upstream: 3 groups in use'));
