@@ -103,7 +103,8 @@ export default function FamiliesList({ nucleus, refreshKey, canEdit, onChanged, 
       {families.length === 0 && !query.trim() && (
         <div style={{ fontSize: 13, color: '#718096', marginTop: 10 }}>No people in this nucleus yet.</div>
       )}
-      <div style={{ marginTop: 8 }}>
+      {/* Same height as the People card's list: about 10 rows, then it scrolls (owner, 2026-11-27). */}
+      <div style={{ marginTop: 8, maxHeight: 360, overflowY: 'auto' }}>
         {shown.map(f => {
           const open = openKeys.has(f.key);
           const hidden = hiddenText(f.hidden);
