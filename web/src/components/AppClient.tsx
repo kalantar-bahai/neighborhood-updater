@@ -3,17 +3,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { InitialData, NucleusDetail, NucleusSummary } from '@/types';
 import { parentOptions } from '@/lib/nucleusIdentity';
-import { nucleusFromUrl, nucleusHref } from '@/lib/nucleusUrl';
+import { addressTarget, nucleusFromUrl, nucleusHref, spaceIdFromSearch, viewKey, type Shown } from '@/lib/nucleusUrl';
 import type { PermissionSet } from '@/lib/access';
 import { effectivePermissions, reloadOutcome } from '@/lib/srp';
 import { readViewState, writeViewState } from '@/lib/viewState';
 import Picker from './Picker';
 import DetailView from './DetailView';
+import SpaceView from './SpaceView';
 import CreateNucleusModal from './CreateNucleusModal';
 import type { AddChild } from './NucleusGroup';
 import { childPreset, type CreatePreset } from '@/lib/createPreset';
 
 function norm(s: string) { return (s || '').toLowerCase().trim(); }
+
+// Marks a history entry we pushed (kept in history.state, which Next merges its own keys into), so returning to it
+// by browser Back or Forward still knows the in-app Back can step back rather than replace.
+const PUSHED = 'nucleusAssistantPushed';
 
 const NO_ACCESS: PermissionSet = {
   canRead: false, canWrite: false, canChangeIdentity: false, canDelete: false,
@@ -25,6 +30,9 @@ export default function AppClient() {
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<NucleusDetail | null>(null);
   const [selectedNucleus, setSelectedNucleus] = useState<string | null>(null);
+  // A participation space of the selected nucleus, shown in place of its page (/?nucleus=<id>&space=<id>). The
+  // nucleus detail stays loaded underneath, so coming back doesn't refetch it.
+  const [selectedSpace, setSelectedSpace] = useState<string | null>(null);
   // Bumped on every successful (re)load so DetailView remounts with fresh form state.
   const [detailVersion, setDetailVersion] = useState(0);
   // A one-shot status for the DetailView a reload mounts (e.g. "3 moved in; SRP is being updated").
@@ -71,13 +79,16 @@ export default function AppClient() {
   // The open nucleus is in the address (/?nucleus=<id>, see lib/nucleusUrl.ts) so refresh and the phone's back
   // button keep you on it. rowsRef is the latest list, for the popstate handler; pushedRef says the current
   // history entry is one we pushed, so the in-app Back can step back to the list instead of stacking a new entry.
+  // shownRef is what is shown now, for the popstate handler.
   const rowsRef = useRef<NucleusSummary[]>([]);
   const pushedRef = useRef(false);
+  const shownRef = useRef<Shown>({ nucleus: null, space: null });
+  shownRef.current = { nucleus: selectedNucleus, space: selectedSpace };
 
-  function setAddress(name: string | null, rows: NucleusSummary[], mode: 'push' | 'replace') {
-    const href = nucleusHref(name ? rows.find(r => r.nucleus === name)?.id ?? null : null);
+  function setAddress(name: string | null, rows: NucleusSummary[], mode: 'push' | 'replace', space?: string | null) {
+    const href = nucleusHref(name ? rows.find(r => r.nucleus === name)?.id ?? null : null, space);
     if (href === window.location.pathname + window.location.search) return;
-    if (mode === 'push') { window.history.pushState(null, '', href); pushedRef.current = true; }
+    if (mode === 'push') { window.history.pushState({ [PUSHED]: true }, '', href); pushedRef.current = true; }
     else window.history.replaceState(null, '', href);
   }
 
@@ -93,7 +104,7 @@ export default function AppClient() {
         rowsRef.current = data.rows;
         if (openAfter) { setAddress(openAfter, data.rows, mode); loadNucleus(openAfter); return; }
         const fromUrl = nucleusFromUrl(window.location.search, data.rows);
-        if (fromUrl.kind === 'open') { loadNucleus(fromUrl.name); return; }
+        if (fromUrl.kind === 'open') { loadNucleus(fromUrl.name, spaceIdFromSearch(window.location.search)); return; }
         if (fromUrl.kind === 'missing') {
           setUrlNote("That nucleus wasn't found. It may have been removed, or you may not have access to it.");
           window.history.replaceState(null, '', nucleusHref(null));
@@ -116,32 +127,36 @@ export default function AppClient() {
 
   useEffect(() => {
     const view = restoreRef.current;
-    if (view === null) return;
-    const shown = view === '' ? initialData !== null && selectedNucleus === null : detail !== null && !loadingDetail;
+    if (view === null || view !== viewKey({ nucleus: selectedNucleus, space: selectedSpace })) return;
+    // A space page shows as soon as SpaceView mounts; it loads its own records after, so its scroll may land short.
+    const shown = view === '' ? initialData !== null : detail !== null && !loadingDetail;
     if (!shown) return;
     restoreRef.current = null;
     viewRef.current = view;
     const y = scrolls()[view] ?? 0;
     requestAnimationFrame(() => window.scrollTo(0, y));
-  }, [initialData, selectedNucleus, detail, loadingDetail]);
+  }, [initialData, selectedNucleus, selectedSpace, detail, loadingDetail]);
 
-  // Browser back/forward: open whatever the address now names, or go to the list.
+  // Browser back/forward: open whatever the address now names, or go to the list. Between a nucleus page and its
+  // spaces the loaded nucleus is kept.
   useEffect(() => {
     const onPop = () => {
-      pushedRef.current = false;
-      const target = nucleusFromUrl(window.location.search, rowsRef.current);
-      if (target.kind === 'open') loadNucleus(target.name);
-      else showList();
+      pushedRef.current = window.history.state?.[PUSHED] === true;
+      const target = addressTarget(window.location.search, rowsRef.current, shownRef.current);
+      if (target.kind === 'list') showList();
+      else if (target.refetch) loadNucleus(target.name, target.space);
+      else showLoaded(target.name, target.space);
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  function loadNucleus(name: string) {
-    goToView(name);
+  function loadNucleus(name: string, space: string | null = null) {
+    goToView(viewKey({ nucleus: name, space }));
     setUrlNote('');
     setLoadingDetail(true);
     setSelectedNucleus(name);
+    setSelectedSpace(space);
     setDetail(null);
     setReloadNotice(null);
     fetch(`/api/nucleus?name=${encodeURIComponent(name)}`)
@@ -178,10 +193,30 @@ export default function AppClient() {
     showList();
   }
 
+  // The loaded nucleus's page (space null) or one of its spaces, without refetching the nucleus.
+  function showLoaded(name: string, space: string | null) {
+    goToView(viewKey({ nucleus: name, space }));
+    setReloadNotice(null);
+    setSelectedSpace(space);
+  }
+
+  function openSpace(name: string, space: string) {
+    setAddress(name, rowsRef.current, 'push', space);
+    showLoaded(name, space);
+  }
+
+  // SpaceView's Back: like handleBack, one level up to the nucleus page.
+  function spaceBack(name: string) {
+    if (pushedRef.current) { window.history.back(); return; }
+    setAddress(name, rowsRef.current, 'replace');
+    showLoaded(name, null);
+  }
+
   function showList() {
     goToView('');
     setDetail(null);
     setSelectedNucleus(null);
+    setSelectedSpace(null);
     loadInitialData();
   }
 
@@ -222,6 +257,18 @@ export default function AppClient() {
   if (detail && selectedNucleus) {
     const perms = initialData.access.permissions[norm(selectedNucleus)] ?? NO_ACCESS;
     const permissions = effectivePermissions(perms, detail.srp.state, detail.srp.action?.action);
+    if (selectedSpace) {
+      // Keyed by space: SpaceView keeps no guard against a previous space's late response.
+      return (
+        <SpaceView
+          key={selectedSpace}
+          nucleus={selectedNucleus}
+          spaceId={selectedSpace}
+          canWrite={permissions.canWrite}
+          onBack={() => spaceBack(selectedNucleus)}
+        />
+      );
+    }
     return (
       <>
       <DetailView
@@ -242,7 +289,7 @@ export default function AppClient() {
         childCount={initialData.rows.filter(r => r.parentNucleus === selectedNucleus).length}
         rows={initialData.rows}
         addChild={addChild}
-        onOpenSpace={() => {}} // Task 7
+        onOpenSpace={space => openSpace(selectedNucleus, space)}
         cardOpen={openByView[selectedNucleus] ?? {}}
         onCardOpenChange={(key, open) => setOpen(selectedNucleus, key, open)}
       />

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nucleusIdFromSearch, spaceIdFromSearch, nucleusHref, nucleusFromUrl } from './nucleusUrl';
+import { nucleusIdFromSearch, spaceIdFromSearch, nucleusHref, nucleusFromUrl, viewKey, addressTarget } from './nucleusUrl';
 
 const rows = [
   { id: 'id-a', nucleus: 'Riverside' },
@@ -54,5 +54,39 @@ describe('nucleusFromUrl', () => {
   // Removed, or not readable by this user: the list shows, with a note.
   it('is missing when the id is not among the rows', () => {
     expect(nucleusFromUrl('?nucleus=gone', rows)).toEqual({ kind: 'missing' });
+  });
+});
+
+describe('viewKey', () => {
+  it('is empty for the list, the name for a nucleus, and name plus space for a space', () => {
+    expect(viewKey({ nucleus: null, space: null })).toBe('');
+    expect(viewKey({ nucleus: 'Riverside', space: null })).toBe('Riverside');
+    expect(viewKey({ nucleus: 'Riverside', space: 's1' })).toBe('Riverside#space:s1');
+  });
+});
+
+describe('addressTarget', () => {
+  const none = { nucleus: null, space: null };
+  it('is the list when the address names no readable nucleus', () => {
+    expect(addressTarget('', rows, none)).toEqual({ kind: 'list' });
+    expect(addressTarget('?nucleus=gone&space=s1', rows, { nucleus: 'Riverside', space: 's1' })).toEqual({ kind: 'list' });
+  });
+  it('loads a nucleus that is not the one shown, with its space if any', () => {
+    expect(addressTarget('?nucleus=id-a', rows, none)).toEqual({ kind: 'nucleus', name: 'Riverside', space: null, refetch: true });
+    expect(addressTarget('?nucleus=id-a&space=s1', rows, { nucleus: 'Elm Park', space: null }))
+      .toEqual({ kind: 'nucleus', name: 'Riverside', space: 's1', refetch: true });
+  });
+  // Back from a space to its nucleus, Forward into it again, or between two of its spaces: the nucleus is loaded.
+  it('keeps the loaded nucleus when only the space changes', () => {
+    expect(addressTarget('?nucleus=id-a', rows, { nucleus: 'Riverside', space: 's1' }))
+      .toEqual({ kind: 'nucleus', name: 'Riverside', space: null, refetch: false });
+    expect(addressTarget('?nucleus=id-a&space=s1', rows, { nucleus: 'Riverside', space: null }))
+      .toEqual({ kind: 'nucleus', name: 'Riverside', space: 's1', refetch: false });
+    expect(addressTarget('?nucleus=id-a&space=s2', rows, { nucleus: 'Riverside', space: 's1' }))
+      .toEqual({ kind: 'nucleus', name: 'Riverside', space: 's2', refetch: false });
+  });
+  it('reloads when the address names exactly what is shown', () => {
+    expect(addressTarget('?nucleus=id-a', rows, { nucleus: 'Riverside', space: null }))
+      .toEqual({ kind: 'nucleus', name: 'Riverside', space: null, refetch: true });
   });
 });
