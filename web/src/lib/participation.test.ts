@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import {
   SPACE_SUGGESTIONS, availableSuggestions, parseCount, countAfterNaming, namedLabel, lastTimeChoices,
-  isoDate, windowStart, shortDate, spaceRowSummary, canRecord, parseRecordBody, parseRecordPatch, parseSpaceBody, parseSpacePatch, recordPatch,
+  isoDate, windowStart, shortDate, spaceRowSummary, canRecord, parseRecordBody, parseRecordPatch, parseSpaceBody, parseSpacePatch, recordPatch, countValid,
 } from './participation';
 import type { ParticipationRecord, ParticipationSpace, PersonSummary } from './clusterNotebook';
 
@@ -164,5 +164,15 @@ describe('recordPatch', () => {
     expect(recordPatch({ ...orig, note: null }, { ...orig, note: '' })).toEqual({});
     expect(recordPatch(orig, { ...orig, note: ' Hi ' })).toEqual({});
     expect(recordPatch(orig, { ...orig, note: 'Bye' })).toEqual({ note: 'Bye' });
+  });
+});
+
+describe('countValid', () => {
+  test('whole number that is at least the number named', () => {
+    expect(countValid(null, 0)).toBe(false);
+    expect(countValid(2, 3)).toBe(false);
+    expect(countValid(3, 3)).toBe(true);
+    expect(countValid(0, 0)).toBe(true);
+    expect(countValid(5, 3)).toBe(true);
   });
 });

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ParticipationRecord, ParticipationSpace } from '@/lib/clusterNotebook';
 import { individualDisplayName } from '@/lib/personName';
-import { countAfterNaming, isoDate, lastTimeChoices, namedLabel, parseCount, recordPatch } from '@/lib/participation';
+import { countAfterNaming, countValid, isoDate, lastTimeChoices, namedLabel, parseCount, recordPatch } from '@/lib/participation';
 import PersonSearch from './PersonSearch';
 
 interface Props {
@@ -32,7 +32,7 @@ export default function RecordModal({ nucleus, space, record, onClose, onSaved }
   const [error, setError] = useState('');
 
   const count = parseCount(countText);
-  const canSave = count !== null && date !== '' && !busy;
+  const canSave = countValid(count, picked.length) && date !== '' && !busy;
   const pickedIds = picked.map(p => p.id);
   const running = space.mode === 'RUNNING';
   const sameAsLatest = !!record && record.id === space.latestRecord?.id;
@@ -91,6 +91,7 @@ export default function RecordModal({ nucleus, space, record, onClose, onSaved }
         <div className="field" style={{ marginBottom: 12 }}>
           <label>{running ? 'How many to add' : 'Participants'}</label>
           <input type="text" inputMode="numeric" value={countText} onChange={e => setCountText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') save(); }} style={INPUT} />
+          {count !== null && count < picked.length && <div style={{ fontSize: 12, color: '#c53030', marginTop: 4 }}>{picked.length} named, so at least {picked.length}.</div>}
         </div>
 
         <div className="field" style={{ marginBottom: 12 }}>

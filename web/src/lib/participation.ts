@@ -165,3 +165,8 @@ export function recordPatch(original: RecordFields, edited: RecordFields): Parti
   if (!same) patch.personIds = edited.personIds;
   return patch;
 }
+
+// A count can be saved only when it is a whole number >= 0 and covers everyone named.
+export function countValid(count: number | null, named: number): boolean {
+  return count !== null && Number.isInteger(count) && count >= 0 && count >= named;
+}
